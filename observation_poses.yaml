@@ -15,7 +15,7 @@ poses:
     - 1.221196174621582
     - -1.2280004660235804
     captured_at: 1777314776.5233626
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   home:
     positions:
     - 2.268556594848633
@@ -25,7 +25,7 @@ poses:
     - 1.5419175624847412
     - 0.09074017405509949
     captured_at: 1777314776.5233626
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   detect_right:
     positions:
     - 1.7956414222717285
@@ -35,7 +35,7 @@ poses:
     - 1.728851079940796
     - 0.7280051708221436
     captured_at: 1777314776.5233626
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   detect_higher:
     positions:
     - 0.19939443469047546
@@ -45,7 +45,7 @@ poses:
     - 2.284529447555542
     - 2.3079347610473633
     captured_at: 1777314776.5233626
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   sleep_home:
     positions:
     - 2.214561939239502
@@ -55,7 +55,7 @@ poses:
     - 1.4114429950714111
     - -0.11266929308046514
     captured_at: 1777548000.0
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   drop:
     # SRDF values had shoulder_lift=6.178 and wrist_1=-3.815 wrapped past
     # one revolution; normalised to the equivalent position in [-pi, pi]
@@ -68,7 +68,7 @@ poses:
     - -1.3287490049945276
     - 1.826249361038208
     captured_at: 1777548000.0
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   drop_right_side:
     positions:
     - 0.9405646324157715
@@ -78,7 +78,7 @@ poses:
     - 1.5615633726119995
     - 1.5674934387207031
     captured_at: 1777548000.0
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   drop_left_side:
     positions:
     - 0.9394397735595703
@@ -88,4 +88,4 @@ poses:
     - 1.561439871788025
     - 1.5674901008605957
     captured_at: 1777548000.0
-    source: srdf:/home/deep/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+    source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf

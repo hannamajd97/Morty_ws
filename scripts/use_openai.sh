@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # Source this file to point Morty at OpenAI directly. Requires OPENAI_API_KEY_DIRECT
-# in ~/new_ur_gripper_ws/.morty_env (a real sk-... key from platform.openai.com).
-#   source ~/new_ur_gripper_ws/use_openai.sh
+# in ~/morty_ws/.morty_env (a real sk-... key from platform.openai.com).
+#   source ~/morty_ws/use_openai.sh
 #   ros2 launch communication_llm voice_robot.launch.py
 
 # Resolve the workspace from this script's own location (…/<ws>/scripts/), so it
-# works whatever the folder is called. On the Alienware the name
-# ~/new_ur_gripper_ws was already taken by a pre-existing workspace that must not
-# be touched, so this copy lives in ~/morty_ws. (Edited 2026-08-06.)
+# works whatever the folder is called (normally ~/morty_ws).
 WS_DIR="${WS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 source "$WS_DIR/.morty_env"
 

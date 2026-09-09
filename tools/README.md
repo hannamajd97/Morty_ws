@@ -4,7 +4,7 @@ Experiment, debug, and dataset utilities for the grasping pipeline. None of
 these are required to *run* the system — they automate experiments, parse logs,
 generate plots/reports, and help capture training data.
 
-Most scripts honor `WS_DIR` (default `$HOME/new_ur_gripper_ws`). All hardcoded
+Most scripts honor `WS_DIR` (default `$HOME/morty_ws`). All hardcoded
 old-machine paths have been replaced with `$HOME`-relative ones.
 
 ## Multi-view grasping experiments
@@ -15,13 +15,13 @@ data for the thesis.
 
 ```bash
 # default: new 9-class YOLO model, multi-view + dynamic NBV + TSDF
-bash ~/new_ur_gripper_ws/tools/run_grasp_experiment.sh --tag vitamin_tube_run1
+bash ~/morty_ws/tools/run_grasp_experiment.sh --tag vitamin_tube_run1
 
 # use the older 3-class model
-bash ~/new_ur_gripper_ws/tools/run_grasp_experiment.sh --tag retail_box_old1 --model-preset old
+bash ~/morty_ws/tools/run_grasp_experiment.sh --tag retail_box_old1 --model-preset old
 
 # pass extra ros2 launch overrides
-bash ~/new_ur_gripper_ws/tools/run_grasp_experiment.sh --tag run42 registration_motion_timeout_s:=150
+bash ~/morty_ws/tools/run_grasp_experiment.sh --tag run42 registration_motion_timeout_s:=150
 ```
 
 What it writes under `$WS_DIR/src/experiment_logs/`:
@@ -41,20 +41,20 @@ A `trap` makes sure the summary + CSV/JSON are written **even if you Ctrl-C** th
 
 ```bash
 # 1. Parse a single run's raw log (run_grasp_experiment.sh already does this on exit):
-python3 ~/new_ur_gripper_ws/tools/parse_grasp_experiment.py \
+python3 ~/morty_ws/tools/parse_grasp_experiment.py \
     --raw-log <ts>_<tag>.log \
     --json-out <ts>_<tag>_structured.json \
     --run-csv-out <ts>_<tag>_run.csv \
     --views-csv-out <ts>_<tag>_views.csv
 
 # 2. Aggregate every run in the experiment_logs/ directory into one CSV:
-python3 ~/new_ur_gripper_ws/tools/aggregate_grasp_experiments.py
+python3 ~/morty_ws/tools/aggregate_grasp_experiments.py
 
 # 3. Generate plots from the aggregate CSV:
-python3 ~/new_ur_gripper_ws/tools/generate_experiment_plots.py
+python3 ~/morty_ws/tools/generate_experiment_plots.py
 
 # 4. Build an HTML report from the aggregate CSV:
-python3 ~/new_ur_gripper_ws/tools/build_experiment_report.py
+python3 ~/morty_ws/tools/build_experiment_report.py
 ```
 
 All four python scripts use `argparse` and accept `--help` to show their full
@@ -68,10 +68,10 @@ window — works on WSL). Reads either a sample-data JSON or a precomputed
 
 ```bash
 # render the newest GraspGen sample object + its grasps:
-python3 ~/new_ur_gripper_ws/tools/grasp_debug_viewer.py --topk 20 --save /tmp/grasps.png
+python3 ~/morty_ws/tools/grasp_debug_viewer.py --topk 20 --save /tmp/grasps.png
 
 # from a JSON the pipeline produced (used by GRASPGEN_SAVE_VIZ):
-python3 ~/new_ur_gripper_ws/tools/grasp_debug_viewer.py --from-json input.json --save out.png
+python3 ~/morty_ws/tools/grasp_debug_viewer.py --from-json input.json --save out.png
 ```
 
 The live pipeline can call this automatically every grasp request — set
@@ -84,7 +84,7 @@ Capture ROS2 camera frames to JPG/PNG + a manifest CSV, so you can later label
 them (CVAT / Roboflow / Label Studio) and fine-tune the YOLO segmentation model.
 
 ```bash
-python3 ~/new_ur_gripper_ws/tools/capture_yolo_dataset.py --help
+python3 ~/morty_ws/tools/capture_yolo_dataset.py --help
 ```
 
 ## ROS graph export
@@ -94,5 +94,5 @@ figures or sanity-checking what's actually running).
 
 ```bash
 # run while the system is live (morty.sh / launch is up in another terminal):
-python3 ~/new_ur_gripper_ws/tools/export_ros_graph.py --output-prefix ~/ros_graph
+python3 ~/morty_ws/tools/export_ros_graph.py --output-prefix ~/ros_graph
 ```

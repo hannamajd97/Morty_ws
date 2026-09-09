@@ -33,9 +33,8 @@ os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
 # pyqtgraph's GL widget needs a GLX context — run through XWayland, never
 # the native wayland QPA (same family of lesson as the Open3D viewers).
 os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
-# Everything the GUI spawns (pipeline!) resolves models/caches via $WS_DIR;
-# without it the pipeline launch used to fall back to the OLD workspace
-# (2026-08-11: GraspGen failed on new_ur_gripper_ws paths).
+# Everything the GUI spawns (pipeline!) resolves models/caches via $WS_DIR,
+# so they always point inside this workspace.
 os.environ.setdefault("WS_DIR", os.path.expanduser("~/morty_ws"))
 
 import numpy as np

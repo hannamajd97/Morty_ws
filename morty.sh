@@ -150,9 +150,7 @@ sleep 1
 
 # ── Source ROS + workspace ───────────────────────────────────────────────
 # WS_DIR resolves to the directory this script lives in, so the launcher
-# works whatever the workspace folder is called. On the Alienware the name
-# ~/new_ur_gripper_ws was already taken by a pre-existing workspace that must
-# not be touched, so this copy lives in ~/morty_ws. (Edited 2026-08-06.)
+# works whatever the workspace folder is called (normally ~/morty_ws).
 # Exported, not just set: ROS nodes are child processes and read WS_DIR from the
 # environment to locate workspace-root assets (observation_poses.yaml, models/,
 # the Vosk model). Without the export they silently fall back to the old

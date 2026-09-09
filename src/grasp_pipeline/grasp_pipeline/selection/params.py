@@ -31,8 +31,7 @@ def declare_all_parameters(node: "Node") -> None:
     # Resolve the workspace dir from $HOME (fall back to the user's expanded
     # home, never a hardcoded machine path). Override with WS_DIR if needed.
     home = os.environ.get("HOME", os.path.expanduser("~"))
-    # Fallback changed new_ur_gripper_ws -> morty_ws (2026-08-11), see the
-    # matching note in run_grasp_pipeline.launch.py.
+    # Same fallback as run_grasp_pipeline.launch.py.
     ws_dir = os.environ.get("WS_DIR", os.path.join(home, "morty_ws"))
     node.declare_parameter("classes", "")
     node.declare_parameter(

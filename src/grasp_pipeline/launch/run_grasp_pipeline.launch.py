@@ -27,13 +27,9 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description():
     home = EnvironmentVariable("HOME")
 
-    # Workspace root: honour $WS_DIR (same convention as selection/params.py) and
-    # fall back to the historical ~/new_ur_gripper_ws. On the Alienware that name
-    # was already taken by a pre-existing workspace, so this copy lives in
-    # ~/morty_ws. (Edited 2026-08-06.)
-    # Fallback changed new_ur_gripper_ws -> morty_ws (2026-08-11): launching
-    # without $WS_DIR (e.g. from the GUI) silently read models/cache from the
-    # OLD workspace — GraspGen then failed on a missing config there.
+    # Workspace root: honour $WS_DIR (same convention as selection/params.py),
+    # fall back to ~/morty_ws. The GUI exports WS_DIR for everything it
+    # spawns, so models/ and caches always resolve inside this workspace.
     ws_dir = os.environ.get(
         "WS_DIR", os.path.join(os.path.expanduser("~"), "morty_ws")
     )

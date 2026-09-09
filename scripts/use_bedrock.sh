@@ -3,12 +3,10 @@
 # Automatically picks the right backend based on the model ID:
 #   anthropic.* / meta.* / mistral.* / ...  -> native Bedrock Converse (via boto3)
 #   openai.* (e.g. openai.gpt-oss-20b-1:0)  -> Bedrock's OpenAI-compatible /openai/v1 endpoint
-# Switch models by editing BEDROCK_MODEL in ~/new_ur_gripper_ws/.morty_env.
+# Switch models by editing BEDROCK_MODEL in ~/morty_ws/.morty_env.
 
 # Resolve the workspace from this script's own location (…/<ws>/scripts/), so it
-# works whatever the folder is called. On the Alienware the name
-# ~/new_ur_gripper_ws was already taken by a pre-existing workspace that must not
-# be touched, so this copy lives in ~/morty_ws. (Edited 2026-08-06.)
+# works whatever the folder is called (normally ~/morty_ws).
 WS_DIR="${WS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 source "$WS_DIR/.morty_env"
 

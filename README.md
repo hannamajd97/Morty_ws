@@ -76,9 +76,10 @@ Full details: `docs/1_Installation.docx` (Ubuntu 22.04, ROS 2 Humble, NVIDIA GPU
 ≥ 12 GB, CUDA 12.8, PyTorch cu128, pip deps, GraspGen extras).
 
 ```bash
-# place this folder at ~/new_ur_gripper_ws (paths/scripts expect this name)
-mv voice_guided_grasping_code ~/new_ur_gripper_ws
-cd ~/new_ur_gripper_ws
+# place the workspace at ~/morty_ws (the default the scripts fall back to;
+# any other location works when WS_DIR points at it)
+git clone git@github.com:hannamajd97/Morty_ws.git ~/morty_ws
+cd ~/morty_ws
 
 # python deps
 pip install --user -r requirements.txt
@@ -96,12 +97,12 @@ Full details in `docs/2_Launches_and_First_Run.docx` and `docs/3_Fast_Run.docx`.
 ### 1. Create the `.morty_env` secrets file
 
 This file is intentionally **not shipped** so no live API key leaks into the
-submission. Create it yourself at `~/new_ur_gripper_ws/.morty_env`, paste in
+submission. Create it yourself at `~/morty_ws/.morty_env`, paste in
 your own keys, and lock the permissions so it is readable by you only:
 
 ```bash
-nano ~/new_ur_gripper_ws/.morty_env     # create the file with the template below
-chmod 600 ~/new_ur_gripper_ws/.morty_env
+nano ~/morty_ws/.morty_env     # create the file with the template below
+chmod 600 ~/morty_ws/.morty_env
 ```
 
 You only need credentials for the provider(s) you actually plan to use.
@@ -170,7 +171,7 @@ See Scenario A / B above for the matching command, or:
 ## Run experiments
 
 ```bash
-bash ~/new_ur_gripper_ws/tools/run_grasp_experiment.sh --tag run1
+bash ~/morty_ws/tools/run_grasp_experiment.sh --tag run1
 # logs + structured CSV/JSON appear under src/experiment_logs/
 # then:  python3 tools/aggregate_grasp_experiments.py  /  generate_experiment_plots.py  /  build_experiment_report.py
 ```
@@ -179,8 +180,8 @@ See `tools/README.md` for the full tool reference.
 
 ## Notes
 
-- The workspace folder name `new_ur_gripper_ws` is referenced by several
-  defaults and helper scripts. Keep that name (or override with `WS_DIR`).
+- The scripts resolve the workspace from their own location and fall back
+  to `~/morty_ws`; set `WS_DIR` to use another location.
 - GraspGen runs **in-process** by default (no separate service). To use the
   standalone ZMQ service instead, run `./scripts/start_graspgen.sh` and
   `export GRASPGEN_MODE=zmq`.

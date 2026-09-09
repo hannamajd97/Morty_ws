@@ -141,19 +141,13 @@ treated as compromised.
 
 ---
 
-## 4. The `~/new_ur_gripper_ws` symlink
+## 4. Workspace location
 
-A few launch files in `grasp_pipeline/launch/` still have baked-in paths
-under `/home/<user>/new_ur_gripper_ws/...` (the previous developer's
-workspace name). The most reliable fix is a symlink so those paths
-resolve back to the real workspace:
-
-```bash
-ln -s ~/ur_ros2_ws ~/new_ur_gripper_ws
-```
-
-The YOLO model file `yolo26s-seg_24_04.pt` (in
-`src/grasp_pipeline/`) is loaded through this symlink at launch time.
+All launch files and scripts resolve the workspace from `$WS_DIR`, falling
+back to `~/morty_ws`. If the workspace lives elsewhere, export `WS_DIR`
+before launching (the GUI does this for everything it spawns). The YOLO
+model file `yolo26s-seg_24_04.pt` (in `src/grasp_pipeline/`) is found
+through that path at launch time.
 
 ---
 
@@ -361,7 +355,7 @@ TTS output.
 | `ModuleNotFoundError: openai` (and friends) | Python deps installed to a venv that ROS isn't using | Reinstall to `--user` (§2) |
 | `cannot import name 'Inf' from 'numpy'` | NumPy 2.x got pulled in | `pip install --user --force-reinstall "numpy==1.26.4"` |
 | `cannot import name 'AlbertModel' from 'transformers'` | Transformers 4.46+ | `pip install --user --force-reinstall "transformers==4.45.0" "tokenizers<0.21"` |
-| `No such file or directory: '/home/.../new_ur_gripper_ws/...'` | Missing symlink | `ln -s ~/ur_ros2_ws ~/new_ur_gripper_ws` (§4) |
+| `No such file or directory: '/home/.../morty_ws/...'` | Workspace not at `~/morty_ws` | `export WS_DIR=/path/to/workspace` (§4) |
 | `Bedrock 'on-demand throughput isn't supported'` for Claude | Wrong model ID — direct Claude IDs need cross-region inference | Prefix the model ID with `us.` (e.g. `us.anthropic.claude-haiku-4-5-...`) |
 | Morty hears himself / says "I didn't catch that" loop | PulseAudio echo-cancel not the default sink/source | Set defaults in `pavucontrol` (§8) — or use headphones |
 | `[morty.sh] ERROR: no OpenAI API key found` | `OPENAI_API_KEY_DIRECT` empty | Paste a fresh key in `.morty_env`, or use `--debug` |

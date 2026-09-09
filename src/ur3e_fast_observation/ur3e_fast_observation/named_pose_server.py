@@ -300,8 +300,7 @@ class MoveToNamedPoseServer(Node):
         # Path to the same YAML the replay node uses (so we know target joints).
         # $HOME-relative so it is not tied to a specific machine/username.
         # Honour $WS_DIR (same convention as grasp_pipeline/selection/params.py)
-        # and fall back to the historical name. On the Alienware the workspace is
-        # ~/morty_ws, because ~/new_ur_gripper_ws was already taken. (2026-08-06)
+        # and fall back to ~/morty_ws.
         self.declare_parameter(
             "poses_file",
             os.path.join(

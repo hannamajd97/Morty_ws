@@ -7,8 +7,7 @@ set -e
 set -o pipefail
 
 # Resolve the workspace from this script's own location instead of a hardcoded
-# name. Without this the wrapper silently fell back to ~/new_ur_gripper_ws and
-# ran the OLD workspace's code even when launched from ~/morty_ws.
+# name, so the wrapper always runs the code of the workspace it lives in.
 #
 # NOTE: do NOT use `readlink -f` here. With `colcon build --symlink-install`
 # this file is a symlink back into src/, so resolving the link lands in
@@ -25,7 +24,7 @@ if [ -z "${WS_DIR:-}" ]; then
         fi
         _dir="$(dirname "${_dir}")"
     done
-    WS_DIR="${WS_DIR:-${HOME}/new_ur_gripper_ws}"
+    WS_DIR="${WS_DIR:-${HOME}/morty_ws}"
 fi
 
 export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"

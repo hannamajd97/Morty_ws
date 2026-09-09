@@ -30,7 +30,7 @@ directly drops the move time well below one second.
 ### 1. Build
 
 ```bash
-cd ~/new_ur_gripper_ws
+cd ~/morty_ws
 colcon build --packages-select ur3e_fast_observation --symlink-install
 source install/setup.bash
 ```
@@ -41,9 +41,9 @@ source install/setup.bash
 
 ```bash
 ros2 run ur3e_fast_observation import_srdf \
-  --srdf $HOME/new_ur_gripper_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf \
+  --srdf $HOME/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf \
   --group ur3e_manipulator \
-  --output $HOME/new_ur_gripper_ws/observation_poses.yaml \
+  --output $HOME/morty_ws/observation_poses.yaml \
   --names initgrasp detect_left detect_right detect_higher
 ```
 
@@ -54,7 +54,7 @@ schema consumed by `replay_node`. Re-run after editing the SRDF.
 
 ```bash
 ros2 launch ur3e_fast_observation teach.launch.py \
-  output_file:=$HOME/new_ur_gripper_ws/observation_poses.yaml
+  output_file:=$HOME/morty_ws/observation_poses.yaml
 ```
 
 | Command | Effect |
@@ -71,7 +71,7 @@ The YAML file is rewritten atomically after every capture.
 
 ```bash
 ros2 launch ur3e_fast_observation replay.launch.py \
-  poses_file:=$HOME/new_ur_gripper_ws/observation_poses.yaml \
+  poses_file:=$HOME/morty_ws/observation_poses.yaml \
   default_pose_name:=seed_view
 ```
 
