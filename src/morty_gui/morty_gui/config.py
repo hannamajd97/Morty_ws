@@ -462,3 +462,34 @@ GREEN = "#2ecc40"
 RED = "#d33a3a"
 ORANGE = "#f39c12"
 GREY = "#666"
+
+
+# ── ROS bag per trial (Hamid 2026-09-09) ────────────────────────────────────
+# Recorded by bag_link.BagLink for the span of every MMHRI trial / VLA
+# episode. Compressed colour only (depth is not used by the VLA models and
+# would be 18 MB/s raw); everything else is small. ~2.5 MB/s in total.
+BAG_TOPICS = [
+    "/camera/camera/color/image_raw/compressed",          # wrist RealSense
+    "/camera/camera/color/camera_info",
+    "/astra/color/compressed_slow",                       # fixed Astra (shuttle PC relay, 10 Hz)
+    "/astra/color/camera_info",
+    "/joint_states",
+    "/tcp_pose_broadcaster/pose",                         # end-effector pose
+    "/scaled_joint_trajectory_controller/controller_state",  # commanded vs actual joints
+    "/io_and_status_controller/io_states",                # gripper: TI0 holding, TI1 slip, tool outputs
+    "/gripper_controller/joint_states",                   # finger joint mirror
+    "/speed_scaling_state_broadcaster/speed_scaling",
+    "/io_and_status_controller/robot_program_running",
+    "/speech/accepted_transcript",                        # what the human said
+    "/robot/intent",                                      # what the LLM decided
+    "/yolo/all_detections",
+    "/graspgen/selection_cycle_id",
+    "/grasp_executor_lin_llm/selected_pose",
+    "/grasp_executor_lin_llm/interactive_status",
+    "/grasp_executor_lin_llm/cycle_done",
+    "/tf",
+    "/tf_static",
+]
+# Trials with MMHRI evidence keep their bag inside the trial folder; a
+# VLA-only trial (no trial folder) puts it here, one folder per trial.
+BAG_DIR_VLA_ONLY = os.path.expanduser("~/morty_ws/vla_experiments/bags")

@@ -28,7 +28,10 @@ ros2 run morty_gui morty_gui
 - **Experiments** (`experiments_window.py`, `mmhri_window.py`,
   `scenario_experiments.py`): MMHRI trial recorder — trial folders
   `trial_NNN_LX_SN` with logs, CSV summary, 3D view, modifiers M1–M3;
-  starts and stops a VLA episode with each trial (`vla_link.py`).
+  starts and stops a VLA episode with each trial (`vla_link.py`) and a
+  ROS bag for the span of the trial (`bag_link.py`, topic list in
+  `config.BAG_TOPICS`). The Record row chooses MMHRI evidence, VLA
+  episode, ROS bag; all three on by default.
 - **Motion window** (`motion_window.py`): jog and named poses.
 - **Advanced**: settings profiles (`profiles.py`), executor variant, view
   options.

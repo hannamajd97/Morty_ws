@@ -44,6 +44,8 @@ from PyQt5 import QtCore, QtWidgets
 
 from .html_viewer import write_view3d_html
 from .vla_link import VlaLink
+from .bag_link import BagLink
+from .config import BAG_DIR_VLA_ONLY
 
 MMHRI_DIR = os.path.expanduser("~/morty_ws/experiments/mmhri")
 
@@ -188,6 +190,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._cloud_saved = False
         self._conv_entries: List[tuple] = []
         self._vla = VlaLink(bridge, self)
+        self._bag = BagLink(self)          # one ROS bag per trial (Hamid 2026-09-09)
         self._vla_ended = False
 
         central = QtWidgets.QWidget()
@@ -272,8 +275,17 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "Kept ONLY if the arm moves; a 'what do you see' trial is\n"
             "dropped by itself. The recorder starts with this window.")
         self.rec_vla.toggled.connect(self._vla.set_enabled)
+        self.rec_bag = QtWidgets.QCheckBox("ROS bag")
+        self.rec_bag.setChecked(True)
+        self.rec_bag.setToolTip(
+            "ros2 bag record for the span of the trial: both cameras\n"
+            "(compressed), joints, TCP pose, gripper I/O, controller state,\n"
+            "transcript, intents, detections, executor status, /tf.\n"
+            "In the trial folder (bag/), or vla_experiments/bags/ for a\n"
+            "VLA-only trial. ~2.5 MB/s.")
         rec_lay.addWidget(self.rec_mmhri)
         rec_lay.addWidget(self.rec_vla)
+        rec_lay.addWidget(self.rec_bag)
         rec_lay.addStretch(1)
         rec_box.setToolTip("What ⏺ Start records. Both on by default.")
         # Target/destination only make sense for some scenarios:
@@ -472,6 +484,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
 
     def vla_shutdown(self) -> None:
         self._vla.shutdown()
+        self._bag.shutdown()
 
     def _fallback_task(self) -> str:
         """The episode's instruction if nothing was said (clicked trials)."""
@@ -498,8 +511,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # have only the trial number in the folder"), e.g. trial_008_LA_S1.
         # _next_trial_id() still parses the number from split("_")[1].
         want_mmhri, want_vla = self.rec_mmhri.isChecked(), self.rec_vla.isChecked()
-        if not (want_mmhri or want_vla):
-            self.status.setText("nothing to record — tick MMHRI and/or VLA first")
+        want_bag = self.rec_bag.isChecked()
+        if not (want_mmhri or want_vla or want_bag):
+            self.status.setText("nothing to record — tick MMHRI, VLA and/or ROS bag first")
             return
         la = self.layout_edit.currentText().strip()[-1:]
         sid = self.scenario.currentText().split(":")[0]
@@ -569,9 +583,19 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         if want_vla:
             vla_note = (" + VLA episode" if self._vla.begin(self._fallback_task())
                         else " — VLA recorder NOT up, MMHRI only")
+        # One ROS bag per trial, inside the trial folder when there is one.
+        self._bag_ended = True
+        bag_note = ""
+        if want_bag:
+            parent = self._trial_dir or os.path.join(
+                BAG_DIR_VLA_ONLY, f"trial_{tid}_L{la}_{sid}_{datetime.datetime.now():%Y%m%d_%H%M%S}")
+            bag_dir = self._bag.begin(parent)
+            if bag_dir:
+                self._bag_ended = False
+                bag_note = " + bag"
         self.status.setText(
             f"⏺ RECORDING trial {tid}{'' if want_mmhri else ' (VLA only)'}"
-            f"{vla_note} — speak/click your command now.")
+            f"{vla_note}{bag_note} — speak/click your command now.")
 
     def _finish_recorders(self) -> None:
         self._active = False
@@ -608,6 +632,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
 
     def _on_discard(self) -> None:
         self._vla.abort()
+        self._bag.abort()
+        self._bag_ended = True
         self._finish_recorders()
         if self._bridge is not None:
             try:
@@ -819,6 +845,10 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         if not self._vla_ended:
             self._vla_ended = True
             self._vla.end(self._vla_success())
+        # The bag also ends at the PRESS: after it only Morty talks.
+        if not getattr(self, "_bag_ended", True):
+            self._bag_ended = True
+            self._bag.end()
         # Wait for Morty to FINISH TALKING before ending the recording
         # (Majd 2026-08-25: trial.mp4 cut the speech mid-sentence). Poll
         # the TTS busy flag; cap the wait at 20 s; add a short tail so
@@ -887,7 +917,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self._reset_buttons()
             return
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as f:
-            json.dump({**meta, **row}, f, indent=2)
+            json.dump({**meta, **row, "bag": self._bag.last_dir}, f, indent=2)
         self._append_csv(os.path.join(MMHRI_DIR, "mmhri_experiments.csv"),
                          CSV_COLUMNS, [row.get(c, "") for c in CSV_COLUMNS])
         # Stage times as CSV columns too (Majd 2026-08-25: "I need

@@ -114,7 +114,9 @@ knows the robot's state.
 
 GUI: subscribes to the debug image, candidates, executor status, driver and
 dashboard state; publishes selections, abort, E-Stop (dashboard stop),
-experiment markers; records MMHRI trials and drives the VLA recorder.
+experiment markers; records MMHRI trials, drives the VLA recorder and
+records one ROS bag per trial (`bag_link.py`; topics in `config.BAG_TOPICS`,
+about 2.5 MB/s with both cameras compressed).
 
 ## 8. Executor behaviour worth knowing
 

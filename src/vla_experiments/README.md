@@ -92,6 +92,27 @@ Ticks are dropped (not written) when any required source is older than
 `max_image_age_s` / `max_joint_age_s`; `meta.json` records how many and why, so a
 stale camera is visible immediately.
 
+## ROS bags (one per trial, since 2026-09-09)
+
+Next to the recorder's own files, the GUI records a standard ROS 2 bag for
+the span of every trial (`Record: ROS bag`, on by default): inside the
+trial folder as `bag/`, or under `~/morty_ws/vla_experiments/bags/` for a
+VLA-only trial. Topics (`morty_gui/config.py`, `BAG_TOPICS`):
+
+| group | topics |
+| --- | --- |
+| cameras | `/camera/camera/color/image_raw/compressed` (wrist, 30 Hz), `/astra/color/compressed_slow` (fixed, 10 Hz), both `camera_info` |
+| robot state | `/joint_states` (500 Hz), `/tcp_pose_broadcaster/pose`, `/scaled_joint_trajectory_controller/controller_state` (commanded vs actual), `/speed_scaling_state_broadcaster/speed_scaling`, `/io_and_status_controller/robot_program_running` |
+| gripper | `/io_and_status_controller/io_states` (TI0 holding, TI1 slip, tool outputs), `/gripper_controller/joint_states` |
+| commands / language | `/speech/accepted_transcript`, `/robot/intent`, `/yolo/all_detections`, `/graspgen/selection_cycle_id`, `/grasp_executor_lin_llm/selected_pose`, `/grasp_executor_lin_llm/interactive_status`, `/grasp_executor_lin_llm/cycle_done` |
+| frames | `/tf`, `/tf_static` |
+
+Every message keeps the ROS time it was published, so the streams align by
+timestamp. About 2.5 MB/s; a 30 s demonstration is under 100 MB. Depth is
+not recorded (18 MB/s raw, unused by the models). Read with `ros2 bag info`,
+`ros2 bag play`, or `rosbag2_py` / the `rosbags` Python package on a
+machine without ROS.
+
 ## Export
 
 openpi:
