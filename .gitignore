@@ -63,3 +63,8 @@ SYSTEM_STATE_LOG.md
 # --- planning notes and handover documents kept locally only ---
 MORTY_GUI_PLAN.md
 VLA_ASTRA.md
+
+# --- kept locally, not published (Majd 2026-09-09) ---
+/docs/
+/tools/
+src/rosgraph2.png

@@ -12,7 +12,7 @@ only at ~0.68 m. The table below is the 99.5th percentile TCP distance per
 10-degree band over 800k random joint configurations, restricted to the
 grasp family the filter chain keeps: tool within 25 degrees of horizontal,
 approaching from the base side (yaw within 60 degrees). Regenerate with
-tools/reach_table.py if the tool offset or the arm changes.
+src/grasp_pipeline/scripts/reach_table.py if the tool offset or the arm changes.
 
 Percent = distance / limit(angle). Under 85 % the planner still has a free
 choice of orientation (both of yesterday's edge cases sat at 90-93 %):

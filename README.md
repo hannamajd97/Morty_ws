@@ -9,7 +9,7 @@ against the scene, and picks it.
 ## Hardware
 
 | part | role |
-|---|---|
+| --- | --- |
 | UR3e (e-Series, driver over Ethernet) | arm; pendant program with the External Control node |
 | gripper_3d | 3D-printed two-finger gripper, driven through the UR tool I/O |
 | Intel RealSense (eye-in-hand) | colour + aligned depth for detection, pointing and grasp clouds |
@@ -19,7 +19,7 @@ against the scene, and picks it.
 ## Packages (`src/`)
 
 | package | what it does |
-|---|---|
+| --- | --- |
 | `grasp_pipeline` | YOLO detection, MediaPipe finger-pointing selection, object segmentation, GraspGen candidate generation, the geometric filter chain, neighbour obstacles, reach warning overlay |
 | `ur3e_gripper_3d_moveit_commander` | the grasp executor: probes candidates with straight-line (Pilz LIN) plans, executes pick → lift → home → drop, reports why candidates were rejected |
 | `ur3e_gripper_3d_moveit_config` | MoveIt configuration for the arm + gripper, driver launch, RealSense launch |
@@ -30,8 +30,9 @@ against the scene, and picks it.
 | `vla_experiments` | synchronised demonstration recorder (both cameras, joints, TCP pose, gripper, commands) |
 | `Universal_Robots_ROS2_Driver`, `Universal_Robots_ROS2_Description` | vendor driver and robot description, built from source |
 
-Other folders: `scripts/` (provider switches, helpers), `tools/` (offline
-utilities), `config/` (Fast DDS profiles), `docs/`.
+Other folders: `scripts/` (provider switches, helpers) and `config/` (Fast
+DDS profiles). How the parts are wired, what a fresh machine needs and a
+troubleshooting table are in [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md).
 
 ## What is not in the repository
 
