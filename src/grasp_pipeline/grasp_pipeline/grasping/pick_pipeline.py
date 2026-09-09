@@ -506,9 +506,12 @@ class PickPipeline:
                         transformed_centroid.header.stamp = self._node.get_clock().now().to_msg()
                         transformed_centroid.pose = ps.pose
                     else:
-                        ps.header.stamp = (self._node.get_clock().now() - rclpy.duration.Duration(seconds=0.05)).to_msg()
+                        # Latest transform (stamp 0): the arm stands still while
+                        # a pick is prepared, and a stamped lookup waited its
+                        # full 0.5 s timeout on every pick (2026-09-09).
+                        ps.header.stamp = rclpy.time.Time().to_msg()
                         transformed_centroid = self._node.tf_buffer.transform(
-                            ps, target_frame, timeout=rclpy.duration.Duration(seconds=0.5)
+                            ps, target_frame, timeout=rclpy.duration.Duration(seconds=0.2)
                         )
                         transformed_centroid.header.frame_id = target_frame
                     try:

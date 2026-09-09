@@ -453,7 +453,8 @@ class PointOrVoiceSelector:
                names: List[str],
                frame_provider: Optional[Callable[[], Any]] = None,
                listen_seconds: float = 8.0,
-               overall_timeout_s: float = 10.0) -> Optional[int]:
+               overall_timeout_s: float = 10.0,
+               cancel: Optional[Callable[[], bool]] = None) -> Optional[int]:
         # Pointing-only selection. Voice arrives via ROS (communication_llm).
         # listen_seconds / names are kept in the signature for compatibility.
         del listen_seconds, names
@@ -470,6 +471,11 @@ class PointOrVoiceSelector:
         self._ema = None
 
         while time.time() - start < float(overall_timeout_s):
+            # A click or voice choice arrived while we were watching the
+            # hand: hand over at once (2026-09-09: a click used to wait for
+            # this loop's 10 s timeout, 1.5-4 s felt by the operator).
+            if cancel is not None and cancel():
+                return None
             cur_frame = frame_provider() if callable(frame_provider) else bgr_frame
             idx, px, mode = (None, None, "none")
             if self.use_mediapipe:

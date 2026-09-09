@@ -106,15 +106,22 @@ class CloudExtractor:
                         last_stamp = stamp
             if len(frames) < 2:
                 return node.fb.depth_frame
-            stack = np.stack([f.astype(np.float32) for f in frames])
-            stack[stack <= 0] = np.nan
-            # Pixels with zero depth in ALL frames are all-NaN slices; the
-            # median is legitimately NaN there (mapped to 0 below), so numpy's
-            # RuntimeWarning about it is expected noise.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                med = np.nanmedian(stack, axis=0)
-            med = np.nan_to_num(med, nan=0.0)
+            # Per-pixel median over VALID samples, sort-based (2026-09-09):
+            # np.nanmedian on the float stack cost 0.22 s per capture; a
+            # sort of the raw frames with invalid samples pushed to the top
+            # gives the same numbers in 0.05 s (even counts average the two
+            # middle values, as nanmedian does).
+            stack = np.stack(frames)
+            valid = (stack > 0) & np.isfinite(stack) if np.issubdtype(stack.dtype, np.floating) else (stack > 0)
+            cnt = valid.sum(axis=0)
+            top = np.inf if np.issubdtype(stack.dtype, np.floating) else np.iinfo(stack.dtype).max
+            s = np.where(valid, stack, top)
+            s.sort(axis=0)
+            lo = np.clip((cnt - 1) // 2, 0, len(frames) - 1)[None]
+            hi = np.clip(cnt // 2, 0, len(frames) - 1)[None]
+            med = (np.take_along_axis(s, lo, axis=0)[0].astype(np.float64)
+                   + np.take_along_axis(s, hi, axis=0)[0].astype(np.float64)) * 0.5
+            med[cnt == 0] = 0.0
             out = med.astype(frames[0].dtype)
             node.get_logger().info(
                 f"[multiframe] fused {len(frames)} {source} depth frames (median) in "

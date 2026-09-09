@@ -2244,6 +2244,7 @@ class YoloLiveSelectGrasp(Node):
                             frame_provider=lambda: self.fb.rgb_frame,
                             listen_seconds=float(self.get_parameter("listen_seconds").value),
                             overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
+                            cancel=lambda: self._pending_manual_choice is not None or self._pick_abort,
                         )
                     if choice is None:
                         if not bool(self.get_parameter("selection_prompt_once").value):
@@ -2294,6 +2295,7 @@ class YoloLiveSelectGrasp(Node):
                                     frame_provider=lambda: self.fb.rgb_frame,
                                     listen_seconds=float(self.get_parameter("listen_seconds").value),
                                     overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
+                                    cancel=lambda: self._pending_manual_choice is not None or self._pick_abort,
                                 )
                             self._selection_nap(0.1)
                     if choice is None:

@@ -478,7 +478,11 @@ class OperatorWindow(QtWidgets.QMainWindow):
         exec_col = QtWidgets.QVBoxLayout()
         exec_col.setSpacing(2)
         self.manual_auto_execute = QtWidgets.QCheckBox("auto-execute")
-        self.manual_auto_execute.setChecked(False)
+        # Remembered across GUI restarts (2026-09-09, Majd: "auto-execute
+        # doesn't work" — the box came back unticked after every restart).
+        self._qsettings = QtCore.QSettings("morty", "morty_gui")
+        self.manual_auto_execute.setChecked(
+            self._qsettings.value("manual_auto_execute", False, type=bool))
         self.manual_auto_execute.setToolTip(
             "Unchecked: clicking an object prepares its grasp and waits for "
             "EXECUTE. Checked: GUI clicks execute immediately. Voice picks "
@@ -642,6 +646,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
         )
 
     def _on_manual_auto_execute_toggled(self, enabled: bool) -> None:
+        try:
+            self._qsettings.setValue("manual_auto_execute", bool(enabled))
+        except Exception:
+            pass
         if enabled and self._manual_execution_pending:
             self._manual_execution_pending = False
             self._manual_execution_released = True
