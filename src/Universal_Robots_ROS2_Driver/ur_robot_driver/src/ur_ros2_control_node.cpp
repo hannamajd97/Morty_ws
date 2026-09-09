@@ -35,6 +35,7 @@
  */
 //----------------------------------------------------------------------
 
+#include <csignal>
 #include <thread>
 #include <memory>
 
@@ -48,6 +49,13 @@
 
 int main(int argc, char** argv)
 {
+  // Morty 2026-09-09: the robot closes the reverse-interface socket whenever
+  // its program restarts (pendant Play, or a reconnect while the old
+  // connection is still held). The next write raised SIGPIPE and killed the
+  // whole driver (exit -13, seen 16:26 today) instead of the client library
+  // reporting the drop and reconnecting. Ignore the signal; writes then fail
+  // with EPIPE, which the library handles.
+  signal(SIGPIPE, SIG_IGN);
   rclcpp::init(argc, argv);
 
   // create executor
