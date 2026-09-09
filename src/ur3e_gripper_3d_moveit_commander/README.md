@@ -30,6 +30,8 @@ Cycle:
    when `wait_for_destination` / `wait_for_release` are set.
 5. Publishes `/grasp_executor_lin_llm/cycle_done` so the pipeline re-arms.
 
+The gripper open is sent as soon as candidates arrive and collected right
+before the approach, so it overlaps the probing instead of adding 0.5 s.
 Every trajectory goes through the `/execute_trajectory` action with a
 deadline; a controller that never completes cannot wedge the node. The abort
 topic `/grasp_executor_lin_llm/abort` stops the current motion and the cycle.
@@ -40,6 +42,7 @@ TI1 (it re-squeezes on its own); the executor drops the UR speed slider to
 on `/executor/slip_event`. `slip_watchdog_enabled:=false` turns it off.
 
 Key parameters: `pregrasp_approach_distance`, `approach_autopsy_samples`,
+`prefilter_ik_timeout_s` (20 ms quick-IK ordering pass), `clear_stray_scene_objects` (off),
 `candidate_wait_timeout_s`, `execute`, `use_candidate_pose_array`,
 `wait_for_destination`, `wait_for_release`, `drop_target_name`,
 `skip_reset_before_drop` (keep it: the canonical flow goes through home),

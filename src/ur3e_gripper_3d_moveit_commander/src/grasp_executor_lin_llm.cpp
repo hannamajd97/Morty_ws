@@ -20,6 +20,7 @@
 #include <rcl_interfaces/msg/log.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <future>
 #include <moveit_msgs/action/execute_trajectory.hpp>
 #include <rclcpp/parameter_client.hpp>
 #include <control_msgs/control_msgs/action/gripper_command.hpp>
@@ -480,6 +481,19 @@ public:
     // clear (0 = off). All are queried in parallel: one round trip.
     approach_autopsy_samples_ = std::max(
       0, get_or_declare_param<int>(node_, "approach_autopsy_samples", 4));
+    // Selection-to-motion budget (2026-09-09, measured 2.8 s):
+    //  - the quick-IK pre-filter only ORDERS candidates, so a false negative
+    //    costs nothing but position; a failing candidate burns the whole
+    //    timeout, and 12 failures x 50 ms was 0.7 s per pick. 20 ms is enough
+    //    to find the ones that solve instantly.
+    //  - the "clear stray perception objects" step before the approach has
+    //    never found anything since the pipeline stopped publishing the
+    //    target box (0 hits in every log), yet it is a blocking planning-scene
+    //    service call that cost 0.05-0.9 s. Off by default.
+    prefilter_ik_timeout_s_ = std::max(
+      0.005, get_or_declare_param<double>(node_, "prefilter_ik_timeout_s", 0.02));
+    clear_stray_scene_objects_ =
+      get_or_declare_param<bool>(node_, "clear_stray_scene_objects", false);
     // Created ONCE: a client per candidate would be slow and would
     // leak service endpoints for the life of the node.
     state_validity_client_ =
@@ -731,9 +745,10 @@ public:
       }
     }
 
-    // Clear perception collision objects before approaching — the target object
-    // itself is published as a collision obstacle and would block the grasp LIN.
-    {
+    // Clear stray perception collision objects before approaching. The
+    // pipeline no longer publishes the target's own box, so this has never
+    // fired since; it is a blocking service call, hence gated (see ctor).
+    if (clear_stray_scene_objects_) {
       moveit::planning_interface::PlanningSceneInterface psi;
       auto obj_ids = psi.getKnownObjectNames();
       // NEVER wipe the static environment (table/wall/mount/...): the
@@ -853,8 +868,8 @@ public:
       }
     }
 
-    // 1) Open gripper
-    if (!execute_gripper_named_target(gripper_open_name_, "Step 1 - Open gripper")) {
+    // 1) Open gripper (usually already opened during the probing)
+    if (!finish_gripper_open("Step 1 - Open gripper")) {
       recover_to_reset_target("Step 1 (open gripper) failed");
       return false;
     }
@@ -2525,7 +2540,7 @@ private:
     }
     geometry_msgs::msg::Pose pose = target_pose.pose;
     moveit::core::RobotState probe(*ik_seed_state_);
-    return probe.setFromIK(jmg, pose, arm_group_.getEndEffectorLink(), 0.05);
+    return probe.setFromIK(jmg, pose, arm_group_.getEndEffectorLink(), prefilter_ik_timeout_s_);
   }
 
   void reset_ik_seed_state()
@@ -3542,6 +3557,7 @@ private:
     // negatives (today: 0/15 then 15/22 on the same object), and every
     // false negative used to cost a grasp. Candidates that fail the quick
     // probe go to the END of the probe order; the LIN probe stays the judge.
+    begin_gripper_open_async();   // overlaps the 0.5 s open with the probing below
     size_t ik_demoted = 0;
     std::vector<std::pair<double, size_t>> demoted;
     for (size_t i = 0; i < total_in; ++i) {
@@ -4511,6 +4527,51 @@ private:
     return true;
   }
 
+  void begin_gripper_open_async()
+  {
+    open_pending_ = false;
+    if (!execute_ || !gripper_action_client_) { return; }
+    if (!gripper_action_client_->action_server_is_ready()) { return; }   // finish() falls back
+    slip_monitor_armed_.store(false);
+    control_msgs::action::GripperCommand::Goal goal;
+    goal.command.position = gripper_open_position_;
+    goal.command.max_effort = 0.0;
+    open_goal_future_ = gripper_action_client_->async_send_goal(goal);
+    open_pending_ = true;
+    RCLCPP_INFO(node_->get_logger(),
+      "Gripper open sent early (target=%.3f) — overlapping with the candidate probing.",
+      gripper_open_position_);
+  }
+
+  bool finish_gripper_open(const std::string & step_name)
+  {
+    if (!open_pending_) {
+      return execute_gripper_named_target(gripper_open_name_, step_name);
+    }
+    open_pending_ = false;
+    const auto wait_timeout = std::chrono::duration<double>(gripper_action_timeout_s_);
+    if (rclcpp::spin_until_future_complete(node_, open_goal_future_, wait_timeout) !=
+      rclcpp::FutureReturnCode::SUCCESS || !open_goal_future_.get())
+    {
+      RCLCPP_WARN(node_->get_logger(), "%s: early open goal not accepted — sending it again.", step_name.c_str());
+      return execute_gripper_named_target(gripper_open_name_, step_name);
+    }
+    auto result_future = gripper_action_client_->async_get_result(open_goal_future_.get());
+    if (rclcpp::spin_until_future_complete(node_, result_future, wait_timeout) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "%s: timed out waiting for the early open result.", step_name.c_str());
+      return false;
+    }
+    const auto wrapped = result_future.get();
+    if (wrapped.code != rclcpp_action::ResultCode::SUCCEEDED) {
+      RCLCPP_WARN(node_->get_logger(), "%s: early open failed (code %d) — sending it again.", step_name.c_str(), static_cast<int>(wrapped.code));
+      return execute_gripper_named_target(gripper_open_name_, step_name);
+    }
+    RCLCPP_INFO(node_->get_logger(), "%s: already open (reached=%.3f, opened during the probing).", step_name.c_str(), wrapped.result->position);
+    return true;
+  }
+
   bool execute_gripper_named_target(const std::string & target_name, const std::string & step_name)
   {
     double target_pos = 0.0;
@@ -4964,6 +5025,15 @@ private:
   rclcpp::Client<moveit_msgs::srv::GetStateValidity>::SharedPtr
     state_validity_client_;
   int approach_autopsy_samples_ = 4;
+  double prefilter_ik_timeout_s_ = 0.02;
+  bool clear_stray_scene_objects_ = false;
+  // Gripper open started while the candidates are still being probed
+  // (2026-09-09): the 0.56 s open used to sit on the critical path after
+  // the feasible grasp was found. begin_gripper_open_async() at the start
+  // of the search, finish_gripper_open() where Step 1 used to block.
+  using GripperGoalHandle = rclcpp_action::ClientGoalHandle<control_msgs::action::GripperCommand>;
+  bool open_pending_ = false;
+  std::shared_future<GripperGoalHandle::SharedPtr> open_goal_future_;
   rclcpp_action::Client<moveit_msgs::action::ExecuteTrajectory>::SharedPtr exec_traj_client_;
   int collision_detail_max_reports_{5};
   int collision_detail_reports_ = 0;
