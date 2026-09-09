@@ -43,6 +43,7 @@ __all__ = [
     "PARAM_SECTIONS",
     "PERCEPTION_PARAMS",
     "PIPELINE_CMD",
+    "GRASPGEN_SERVICE_CMD", "GRASPGEN_LOG", "GRASPGEN_PGREP", "PIPELINE_ENV_EXTRA",
     "PLANNER_LIBS",
     "PROFILE_HELP",
     "RED",
@@ -229,6 +230,20 @@ OFFLINE_LAUNCH = [
 # needs the trajectory controller, not the pipeline; historically it was
 # bundled in the pipeline launch). with_replay:=false stops the pipeline
 # from starting a duplicate instance.
+# GraspGen as its own process (2026-09-09, stage one of the speed work):
+# inside the pipeline node one inference cost 0.3-0.9 s because YOLO, the
+# hand tracker and the camera callbacks share that process's interpreter
+# lock; in a clean process it is 0.10 s. The pipeline talks to it over ZMQ
+# (GRASPGEN_MODE=zmq, grasp_client.py); the GUI starts it with the pipeline.
+GRASPGEN_SERVICE_CMD = [
+    "/usr/bin/python3", "-u", os.path.expanduser("~/morty_ws/GraspGen/scripts/graspgen_service.py"),
+    "--config", os.path.expanduser("~/morty_ws/models/graspgen/graspgen_robotiq_2f_140.yml"),
+    "--bind", "tcp://127.0.0.1:5555",
+]
+GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
+GRASPGEN_PGREP = r"graspgen_service\.p[y]"
+PIPELINE_ENV_EXTRA = {"GRASPGEN_MODE": "zmq"}
+
 PIPELINE_CMD = ["ros2", "launch", "grasp_pipeline", "run_grasp_pipeline.launch.py",
                 "with_replay:=false",
                 # Voice-pick plumbing (mirrors morty_full.launch.py): the GUI

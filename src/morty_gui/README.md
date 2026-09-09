@@ -10,9 +10,9 @@ ros2 run morty_gui morty_gui
 
 ## What it does
 
-- **Starts and stops the stack**: driver + MoveIt + RealSense, grasp
-  pipeline, executor, voice stack (`managed_launch.py`, commands in
-  `config.py`). Adopts processes left over from a previous GUI session and
+- **Starts and stops the stack**: driver + MoveIt + RealSense, the
+  GraspGen service, grasp pipeline, executor, voice stack
+  (`managed_launch.py`, commands in `config.py`). Adopts processes left over from a previous GUI session and
   retires duplicate executors.
 - **Status lights**: driver, RealSense, Astra, shuttle PC, RViz, robot link,
   pendant program (Play), voice. Pendant state and Remote mode are read

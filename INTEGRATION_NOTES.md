@@ -76,13 +76,14 @@ After renaming or removing packages wipe `build/ install/ log/` first.
 
 ## 6. What runs, and who starts it
 
-The GUI (`ros2 run morty_gui morty_gui`) owns every process. Its four
+The GUI (`ros2 run morty_gui morty_gui`) owns every process. Its
 launches, in the order `Start ALL` uses:
 
 | launch | contents |
 | --- | --- |
 | `ur3e_gripper_3d_moveit_config/ur3e_gripper_3d_moveit_real_camera.launch.py` | UR driver, controllers, robot_state_publisher, MoveIt `move_group` (Pilz + OMPL), RealSense, gripper command adapter, point-cloud downsampler, planning-scene environment (table, mount, wall) |
-| `grasp_pipeline/run_grasp_pipeline.launch.py` | the `yolo_live_select_grasp` node (detection, pointing, segmentation, GraspGen in-process, filter chain, neighbour obstacles, debug image) |
+| `GraspGen/scripts/graspgen_service.py` (plain process, ZMQ :5555) | GraspGen inference, started with the pipeline; log `logs/graspgen_gui.log` |
+| `grasp_pipeline/run_grasp_pipeline.launch.py` | the `yolo_live_select_grasp` node (detection, pointing, segmentation, GraspGen client, filter chain, neighbour obstacles, debug image) |
 | `ur3e_gripper_3d_moveit_commander/grasp_executor_lin_llm.launch.py` | the grasp executor (persistent; one cycle per selection) |
 | `communication_llm/voice_robot.launch.py` via `morty.sh --voice-only` | speech input, chat/LLM node, intent router, speech output |
 

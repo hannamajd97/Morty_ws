@@ -344,6 +344,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # ── System bar ────────────────────────────────────────────────
         self._driver = ManagedLaunch(self)
         self._pipeline = ManagedLaunch(self)
+        self._graspgen = ManagedLaunch(self)   # GraspGen service, lives with the pipeline (2026-09-09)
         self._rviz_extra = ManagedLaunch(self)
         self._camera_extra = ManagedLaunch(self)
         self._replay_extra = ManagedLaunch(self)
@@ -1655,6 +1656,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self._manual_execution_released = False
             self.bridge.set_grasp_execution_enabled(True)
             self._pipeline.stop()
+            if self._graspgen.running():
+                self._graspgen.stop()
             if self._executor.running():
                 self._executor.stop()
             self.pipeline_btn.setText("stopping…")
@@ -1664,10 +1667,21 @@ class OperatorWindow(QtWidgets.QMainWindow):
         cmd = list(PIPELINE_CMD)
         if self.cb_multiview.isChecked():
             cmd.append("registration_enabled:=true")
+        # GraspGen service first (it preloads the model in ~6 s; ZMQ queues
+        # the pipeline's first request until the service is bound).
+        if not self._graspgen.running():
+            pid = self._pgrep_oldest(GRASPGEN_PGREP)
+            if pid is not None:
+                self._graspgen.adopt(pid)
+            else:
+                self._graspgen.start(list(GRASPGEN_SERVICE_CMD), env=os.environ.copy(),
+                                     log_path=GRASPGEN_LOG)
+        pipeline_env = os.environ.copy()
+        pipeline_env.update(PIPELINE_ENV_EXTRA)
         # Timestamped log for post-trial timing analysis (Majd, 2026-08-12:
         # "save the logs so we can understand timing for everything").
         self._pipeline.start(
-            cmd, log_path=os.path.expanduser("~/morty_ws/logs/pipeline_gui.log")
+            cmd, env=pipeline_env, log_path=os.path.expanduser("~/morty_ws/logs/pipeline_gui.log")
         )
         if not self._executor.running():
             exec_cmd = list(EXECUTOR_CMD)
@@ -2719,6 +2733,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self._voice.adopt(pid)
                 self.voice_btn.setText("Stop voice")
                 self.voice_combo.setEnabled(False)
+        if not self._graspgen.running():
+            pid = self._pgrep_oldest(GRASPGEN_PGREP)
+            if pid is not None:
+                self._graspgen.adopt(pid)
         if not self._pipeline.running():
             pid = self._pgrep_oldest(r"ros2 launch grasp_pipeline run_grasp_pipelin[e]")
             if pid is not None:
@@ -2826,6 +2844,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             if box.clickedButton() is not keep:
                 self.mmhri_win.vla_shutdown()   # the recorder we launched, if any
                 self._pipeline.stop()
+                self._graspgen.stop()
                 self._driver.stop()
                 self._rviz_extra.stop()
                 self._camera_extra.stop()

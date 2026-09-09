@@ -15,13 +15,17 @@ selected object into ranked grasp candidates for the executor.
    a click in the debug window, or a voice/LLM choice on `/yolo/select_index`
    and `/yolo/select_detection`.
 3. **Capture** — segmentation of the selected object (`segmentation.py`),
-   median fusion of several depth frames, object cloud extraction and
+   median fusion of the last five depth frames kept in `frame_buffer.py`'s
+   ring (no waiting at selection), object cloud extraction and
    table-plane estimate (`perception/cloud_extraction.py`), one padded
    collision box per neighbouring object for the planner
    (`perception/neighbour_obstacles.py`).
-4. **GraspGen** — NVIDIA GraspGen run in-process on the object cloud
-   (`grasp_client.py`, `grasping/graspgen_client.py`); the model is
-   preloaded at start so the first pick does not pay the load.
+4. **GraspGen** — NVIDIA GraspGen on the object cloud, in its own
+   process since 2026-09-09 (`GraspGen/scripts/graspgen_service.py`, ZMQ on
+   port 5555, started by the GUI with the pipeline; `GRASPGEN_MODE=zmq` in
+   `grasp_client.py`). One inference is 0.10 s there against 0.3–0.9 s
+   inside this node, whose YOLO, hand tracker and camera callbacks compete
+   for the interpreter lock. `GRASPGEN_MODE=inprocess` restores the old path.
 5. **Filter chain** — `grasping/filter_pipeline.py`: upright/level band,
    from-behind rejection, height window, roll canonicalisation, front
    preference, centroid and end-effector orientation re-weighting,

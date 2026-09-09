@@ -82,15 +82,28 @@ class CloudExtractor:
             return node.fb.depth_frame
         try:
             t_start = time.monotonic()
-            frames = [node.fb.depth_frame.copy()]
-            last_stamp = getattr(node.fb.depth_header, "stamp", None)
-            deadline = time.monotonic() + 1.0
-            while len(frames) < n and time.monotonic() < deadline:
-                time.sleep(0.01)
-                stamp = getattr(node.fb.depth_header, "stamp", None)
-                if stamp is not None and stamp != last_stamp:
-                    frames.append(node.fb.depth_frame.copy())
-                    last_stamp = stamp
+            # Frames already buffered before the selection (2026-09-09) —
+            # zero wait. Falls back to collecting fresh ones when the ring
+            # is stale (camera just started, or frames stopped).
+            buffered = None
+            try:
+                buffered = node.fb.recent_depths(n, max_age_s=0.6)
+            except AttributeError:
+                buffered = None
+            if buffered is not None:
+                frames = [f.copy() for f in buffered]
+                source = "buffered"
+            else:
+                source = "fresh"
+                frames = [node.fb.depth_frame.copy()]
+                last_stamp = getattr(node.fb.depth_header, "stamp", None)
+                deadline = time.monotonic() + 1.0
+                while len(frames) < n and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                    stamp = getattr(node.fb.depth_header, "stamp", None)
+                    if stamp is not None and stamp != last_stamp:
+                        frames.append(node.fb.depth_frame.copy())
+                        last_stamp = stamp
             if len(frames) < 2:
                 return node.fb.depth_frame
             stack = np.stack([f.astype(np.float32) for f in frames])
@@ -104,7 +117,7 @@ class CloudExtractor:
             med = np.nan_to_num(med, nan=0.0)
             out = med.astype(frames[0].dtype)
             node.get_logger().info(
-                f"[multiframe] fused {len(frames)} depth frames (median) in "
+                f"[multiframe] fused {len(frames)} {source} depth frames (median) in "
                 f"{time.monotonic() - t_start:.2f}s for single-view capture."
             )
             return out

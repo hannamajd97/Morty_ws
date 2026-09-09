@@ -29,6 +29,9 @@ Example::
 
 from __future__ import annotations
 
+import collections
+import time
+
 import numpy as np
 from sensor_msgs.msg import Image, CameraInfo
 from rclpy.node import Node
@@ -69,6 +72,11 @@ class FrameBuffer:
         self.depth_frame: np.ndarray | None = None  # HxW depth
         self.rgb_header = None
         self.depth_header = None
+        # Ring of the most recent depth frames (2026-09-09): the capture used
+        # to WAIT for 5 fresh frames after the selection (0.45 s at the
+        # ~10 Hz they reach this node); with the arm still they are as good
+        # taken before the selection as after it, so keep them ready.
+        self.depth_ring: collections.deque = collections.deque(maxlen=8)   # (monotonic_s, frame)
 
         # Intrinsics defaults
         self.fx: float = 615.0
@@ -134,6 +142,7 @@ class FrameBuffer:
         arr = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
         self.depth_frame = arr
         self.depth_header = msg.header
+        self.depth_ring.append((time.monotonic(), arr))   # a new array per message: no copy needed
         # infer scale (uint16 mm → m or float32 m)
         if arr.dtype == np.uint16:
             self.depth_scale = 1000.0
@@ -151,6 +160,18 @@ class FrameBuffer:
         self.have_depth_K = True
 
     # --- API ---
+    def recent_depths(self, n: int, max_age_s: float = 0.6):
+        """The last ``n`` depth frames if the newest is younger than
+        ``max_age_s`` and the whole set spans less than ``max_age_s``; else
+        None (caller then waits for fresh frames the old way)."""
+        frames = list(self.depth_ring)[-n:]
+        if len(frames) < n:
+            return None
+        now = time.monotonic()
+        if now - frames[-1][0] > max_age_s or frames[-1][0] - frames[0][0] > max_age_s:
+            return None
+        return [f for _, f in frames]
+
     def latest(self):
         """Return the latest RGB/depth frames and intrinsics.
 
