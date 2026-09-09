@@ -1,0 +1,13 @@
+# Convenience: move to the named "home" pose.
+# Served by: grasp_pipeline (delegates to MoveToNamedPose).
+
+# Goal
+float32 velocity_scaling
+---
+# Result
+bool success
+string error
+---
+# Feedback
+string phase
+float32 progress

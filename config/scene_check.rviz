@@ -1,0 +1,53 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Enabled: true
+      Name: Grid
+    - Class: rviz_default_plugins/RobotModel
+      Description Topic:
+        Value: /robot_description
+      Enabled: true
+      Name: RobotModel
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: EnvironmentMarkers
+      Topic:
+        Value: /environment_markers
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: CameraCloud
+      Size (m): 0.003
+      Style: Points
+      Topic:
+        Value: /camera/camera/depth/color/points
+    - Class: moveit_rviz_plugin/PlanningScene
+      Enabled: true
+      Move Group Namespace: ""
+      Name: PlanningScene
+      Planning Scene Topic: /monitored_planning_scene
+      Scene Geometry:
+        Scene Alpha: 0.7
+        Show Scene Geometry: true
+      Scene Robot:
+        Show Robot Collision: false
+        Show Robot Visual: true
+  Global Options:
+    Fixed Frame: world
+    Frame Rate: 15
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 2.0
+      Name: Current View
+      Pitch: 0.5
+      Yaw: 0.8
+Window Geometry:
+  Height: 800
+  Width: 1100

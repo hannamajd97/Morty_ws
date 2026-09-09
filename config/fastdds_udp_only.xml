@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Fast-DDS profile: UDPv4 transport ONLY, shared-memory transport OFF.
+  2026-09-02: three native segfaults in libfastrtps.so.2.6.10 on this
+  machine in one day (a python3 node, grasp_executor_lin_llm, and a
+  move_group core dump), all at the same code offset. Fast-DDS 2.6's
+  shared-memory transport is the usual culprit when participants vanish
+  abruptly (node crashes/restarts) — the surviving peers fault on the
+  dead segment. Disabling SHM trades a little intra-host latency for
+  stability. NOT enabled by default: export
+    FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/morty_ws/config/fastdds_udp_only.xml
+  in the environment of EVERY launch (driver, pipeline, voice, GUI),
+  then restart the whole stack. Mixed configurations still talk to
+  each other over UDP, so a partial rollout cannot break discovery.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udp_only</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="udp_only_participant" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>udp_only</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

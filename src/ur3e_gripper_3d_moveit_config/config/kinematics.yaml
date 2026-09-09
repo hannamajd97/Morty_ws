@@ -1,0 +1,24 @@
+ur3e_manipulator:
+  # KDL RESTORED (2026-08-27 evening) — this is the configuration that
+  # grasped reliably for weeks.
+  #
+  # The pick_ik experiment (2026-08-26/27) is REVERTED. Measured with
+  # /compute_ik on the live rig, sweeping one direction at 7 distances:
+  #   pick_ik mode=local  -> 1/7 solved (failed even at 0.40 m, which is
+  #                          deep inside the workspace)
+  #   pick_ik mode=global -> 4/7 solved, ~1.0 s burned per failure
+  # Whole cycles rejected ALL candidates ("no IK along straight
+  # approach" x19) while freedrive proved the same poses trivially
+  # reachable. pick_ik is a numerical optimiser: local mode only
+  # refines a NEARBY seed, and our goal IK is seeded at the CURRENT arm
+  # pose, which is far from the target.
+  #
+  # The speed that motivated the swap came from elsewhere anyway: the
+  # ~7 s planning round trips were CPU starvation (five nodes busy-
+  # looping, load 26 on 12 cores — fixed 2026-08-27, load now ~9), not
+  # the solver.
+  #
+  # Deliberately NO timeout/attempts overrides: the bare defaults are
+  # what the working weeks ran on. Do not re-tune these blind — measure
+  # with /compute_ik first (see the sweep above for the method).
+  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin

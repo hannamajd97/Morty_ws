@@ -1,0 +1,68 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Enabled: true
+      Name: Grid
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+      Show Names: true
+      Marker Scale: 0.3
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Astra cloud (xyzrgb from slow streams)
+      Topic:
+        Value: /astra/depth/points_local
+        Reliability Policy: Best Effort
+      Color Transformer: RGB8
+      Color: 255; 120; 0
+      Position Transformer: XYZ
+      Style: Points
+      Size (Pixels): 2
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Astra cloud (colored)
+      Topic:
+        Value: /astra/depth/color/points_slow
+        Reliability Policy: Best Effort
+      Color Transformer: RGB8
+      Position Transformer: XYZ
+      Style: Points
+      Size (Pixels): 2
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: RealSense cloud
+      Topic:
+        Value: /camera/camera/depth/color/points
+        Reliability Policy: Best Effort
+      Color Transformer: RGB8
+      Position Transformer: XYZ
+      Style: Points
+      Size (Pixels): 2
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Astra color
+      Topic:
+        Value: /astra/color/image_slow
+        Reliability Policy: Best Effort
+  Global Options:
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 2.5
+      Focal Point: {X: 0.2, Y: 0.3, Z: 0.3}
+      Pitch: 0.4
+      Yaw: 2.4
+      Name: Current View
+Window Geometry:
+  Height: 900
+  Width: 1400

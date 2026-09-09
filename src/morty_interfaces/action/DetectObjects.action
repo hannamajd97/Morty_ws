@@ -1,0 +1,16 @@
+# Run object detection once and return the current scene snapshot.
+# Served by: grasp_pipeline.
+
+# Goal
+string[] classes              # filter by YOLO class names; empty = all
+float32 confidence_threshold  # 0.0 = use server default
+bool include_segmentation     # if true, also compute and publish masks
+---
+# Result
+morty_interfaces/Detection[] detections
+sensor_msgs/Image debug_image
+bool success
+string error
+---
+# Feedback
+string phase                  # "capturing" | "running_yolo" | "post_processing"

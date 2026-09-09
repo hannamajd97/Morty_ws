@@ -1,0 +1,31 @@
+# Scan the workspace either single-view or multi-view, returning a fused cloud.
+# Served by: grasp_pipeline.
+
+uint8 SINGLEVIEW=0
+uint8 MULTIVIEW=1
+uint8 CONTINUOUS_SWEEP=2
+
+# Goal
+uint8 mode
+string[] view_poses           # named poses, e.g. ["detect_left","detect_right","detect_higher"]
+                              # ignored for SINGLEVIEW; defaults if empty
+string seed_pose              # where to start before scanning; empty = "initgrasp"
+uint32 num_observations       # MULTIVIEW: how many captures to fuse; 0 = use server default
+float32 observation_interval_s
+bool refresh_detection_each_view
+float32 voxel_size_m          # 0.0 = use server default
+bool use_icp
+---
+# Result
+sensor_msgs/PointCloud2 fused_cloud
+morty_interfaces/Detection[] final_detections
+uint32 views_used
+bool success
+string error
+---
+# Feedback
+string phase                  # "moving_to_seed" | "moving_to_view" | "capturing" | "fusing"
+uint32 current_view_index
+uint32 total_views
+string current_view_name
+sensor_msgs/PointCloud2 partial_cloud   # optional, may be empty

@@ -1,0 +1,24 @@
+# Open, close, or set the gripper to a target width.
+# Served by: ur3e_gripper_3d_moveit_commander (new shim — currently the
+# executor only drives the gripper inside the pick sequence).
+
+uint8 OPEN=0
+uint8 CLOSE=1
+uint8 SET_WIDTH=2
+
+# Goal
+uint8 command
+float32 width_m               # used when command = SET_WIDTH
+float32 force_n               # 0.0 = use server default
+float32 speed_m_s             # 0.0 = use server default
+---
+# Result
+bool success
+float32 final_width_m
+bool object_detected          # true if the gripper closed on something solid
+float32 contact_force_n
+string error
+---
+# Feedback
+string phase                  # "moving" | "contact_detected" | "settled"
+float32 current_width_m

@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+
+import time
+from dataclasses import dataclass
+from typing import Dict
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger
+from ur_msgs.msg import IOStates
+from ur_msgs.srv import SetIO
+
+
+@dataclass(frozen=True)
+class _Params:
+    open_pin: int
+    close_pin: int
+    di_slip_pin: int
+    di_no_grasp_pin: int
+    pulse_hold_s: float
+    left_joint: str
+    right_joint: str
+    open_pos: float
+    closed_pos: float
+    joint_states_topic: str
+
+
+class GripperIOBridge(Node):
+    def __init__(self) -> None:
+        super().__init__("gripper_io_bridge")
+        self.declare_parameter("open_pin", 16)
+        self.declare_parameter("close_pin", 17)
+        self.declare_parameter("di_slip_pin", 18)
+        self.declare_parameter("di_no_grasp_pin", 19)
+        self.declare_parameter("pulse_hold_s", 0.4)
+        self.declare_parameter("left_joint", "gripper_close_open_joint")
+        self.declare_parameter("right_joint", "gripper_finger_right_joint")
+        self.declare_parameter("open_pos", 0.5)
+        self.declare_parameter("closed_pos", 0.0)
+        self.declare_parameter("joint_states_topic", "/joint_states")
+        self._params = self._read_params()
+
+        self._di: Dict[int, int] = {}
+        self._open = False
+        self._pos = self._params.closed_pos
+
+        self._set_io = self.create_client(SetIO, "/io_and_status_controller/set_io")
+        self._io_states_sub = self.create_subscription(
+            IOStates, "/io_and_status_controller/io_states", 10, self._on_io_states
+        )
+
+        self._open_srv = self.create_service(Trigger, "~/open", self._handle_open)
+        self._close_srv = self.create_service(Trigger, "~/close", self._handle_close)
+        self._idle_srv = self.create_service(Trigger, "~/idle", self._handle_idle)
+
+        self._js_pub = self.create_publisher(JointState, self._params.joint_states_topic, 10)
+        self._js_timer = self.create_timer(0.1, self._publish_joint_state)
+
+    def _read_params(self) -> _Params:
+        return _Params(
+            open_pin=int(self.get_parameter("open_pin").value),
+            close_pin=int(self.get_parameter("close_pin").value),
+            di_slip_pin=int(self.get_parameter("di_slip_pin").value),
+            di_no_grasp_pin=int(self.get_parameter("di_no_grasp_pin").value),
+            pulse_hold_s=float(self.get_parameter("pulse_hold_s").value),
+            left_joint=self.get_parameter("left_joint").get_parameter_value().string_value,
+            right_joint=self.get_parameter("right_joint").get_parameter_value().string_value,
+            open_pos=float(self.get_parameter("open_pos").value),
+            closed_pos=float(self.get_parameter("closed_pos").value),
+            joint_states_topic=self.get_parameter("joint_states_topic").get_parameter_value().string_value,
+        )
+
+    def _on_io_states(self, msg: IOStates) -> None:
+        for state in msg.digital_in_states:
+            self._di[state.pin] = 1 if state.state else 0
+
+    def _publish_joint_state(self) -> None:
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = [self._params.left_joint, self._params.right_joint]
+        msg.position = [self._pos, -self._pos]
+        self._js_pub.publish(msg)
+
+    def _wait_for_set_io(self) -> bool:
+        if self._set_io.wait_for_service(timeout_sec=0.25):
+            return True
+        self.get_logger().warn("UR SetIO service unavailable: /io_and_status_controller/set_io")
+        return False
+
+    def _set_do(self, pin: int, high: bool) -> bool:
+        if not self._wait_for_set_io():
+            return False
+        req = SetIO.Request()
+        req.fun = 1  # set DO
+        req.pin = pin
+        req.state = 1.0 if high else 0.0
+        fut = self._set_io.call_async(req)
+        rclpy.spin_until_future_complete(self, fut, timeout_sec=0.25)
+        return True
+
+    def _pulse(self, pin: int, hold_s: float, stop_on_slip: bool) -> str:
+        self._set_do(pin, True)
+        t0 = time.monotonic()
+        outcome = "ok"
+        while rclpy.ok() and (time.monotonic() - t0) < hold_s:
+            time.sleep(0.01)
+            if stop_on_slip and self._di.get(self._params.di_slip_pin, 0) == 1:
+                outcome = "slip"
+                break
+        self._set_do(pin, False)
+        return outcome
+
+    def _handle_idle(self, _req: Trigger.Request, resp: Trigger.Response) -> Trigger.Response:
+        self._set_do(self._params.open_pin, False)
+        self._set_do(self._params.close_pin, False)
+        resp.success = True
+        resp.message = "idle"
+        return resp
+
+    def _handle_open(self, _req: Trigger.Request, resp: Trigger.Response) -> Trigger.Response:
+        self.get_logger().info("GRIPPER: OPEN (T0)")
+        self._pulse(self._params.open_pin, self._params.pulse_hold_s, stop_on_slip=False)
+        self._open = True
+        self._pos = self._params.open_pos
+        resp.success = True
+        resp.message = "ok"
+        return resp
+
+    def _handle_close(self, _req: Trigger.Request, resp: Trigger.Response) -> Trigger.Response:
+        self.get_logger().info("GRIPPER: CLOSE (T1)")
+        outcome = self._pulse(self._params.close_pin, self._params.pulse_hold_s, stop_on_slip=False)
+
+        if self._di.get(self._params.di_no_grasp_pin, 0) == 1:
+            outcome = "no_grasp"
+
+        self._open = False
+        self._pos = self._params.closed_pos
+
+        resp.success = outcome == "ok"
+        resp.message = outcome
+        return resp
+
+
+def main() -> None:
+    rclpy.init()
+    node = GripperIOBridge()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

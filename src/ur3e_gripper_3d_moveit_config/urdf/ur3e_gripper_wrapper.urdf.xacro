@@ -1,0 +1,125 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="ur3e_with_gripper_3d">
+  <!-- Keep robot name stable for MoveIt SRDF matching. -->
+
+  <!-- Args aligned with `ur_robot_driver/launch/ur_control.launch.py` -->
+  <xacro:arg name="name" default="ur3e_with_gripper_3d"/>
+  <xacro:arg name="ur_type" default="ur3e"/>
+  <xacro:arg name="tf_prefix" default=""/>
+
+  <!-- Override UR3e joint limits locally so MoveIt/RViz can treat wrist_3_joint as bounded (editable). -->
+  <!-- Kept under config/ur3e/joint_limits.yaml so `ur_robot_driver` can find it via `description_package`. -->
+  <xacro:arg name="joint_limit_params" default="$(find ur3e_gripper_3d_moveit_config)/config/ur3e/joint_limits.yaml"/>
+  <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
+  <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
+  <xacro:arg name="visual_params" default="$(find ur_description)/config/$(arg ur_type)/visual_parameters.yaml"/>
+  <!--
+    Startup pose for simulation only:
+    - Used by ur_description's ros2_control mock when `use_fake_hardware:=true`.
+    - Ignored when running real hardware via `ur_robot_driver` (joint states come from the robot).
+  -->
+  <xacro:arg name="home_positions_file" default="$(find ur3e_gripper_3d_moveit_config)/config/home_positions.yaml"/>
+  <xacro:property name="home_positions_file" value="$(arg home_positions_file)"/>
+
+  <xacro:arg name="safety_limits" default="false"/>
+  <xacro:arg name="safety_pos_margin" default="0.15"/>
+  <xacro:arg name="safety_k_position" default="20"/>
+
+  <!-- ros2_control / driver args -->
+  <xacro:arg name="use_fake_hardware" default="false"/>
+  <!-- When using mock hardware, mirror commands into state so /joint_states moves in RViz. -->
+  <xacro:arg name="fake_sensor_commands" default="true"/>
+  <xacro:arg name="headless_mode" default="false"/>
+  <xacro:arg name="robot_ip" default="0.0.0.0"/>
+  <xacro:arg name="script_filename" default=""/>
+  <xacro:arg name="output_recipe_filename" default=""/>
+  <xacro:arg name="input_recipe_filename" default=""/>
+  <xacro:arg name="reverse_ip" default="0.0.0.0"/>
+  <xacro:arg name="script_command_port" default="50004"/>
+  <xacro:arg name="reverse_port" default="50001"/>
+  <xacro:arg name="script_sender_port" default="50002"/>
+  <xacro:arg name="trajectory_port" default="50003"/>
+  <xacro:arg name="non_blocking_read" default="true"/>
+  <xacro:arg name="keep_alive_count" default="2"/>
+
+  <!-- tool communication -->
+  <xacro:arg name="use_tool_communication" default="false"/>
+  <xacro:arg name="tool_voltage" default="0"/>
+  <xacro:arg name="tool_parity" default="0"/>
+  <xacro:arg name="tool_baud_rate" default="115200"/>
+  <xacro:arg name="tool_stop_bits" default="1"/>
+  <xacro:arg name="tool_rx_idle_chars" default="1.5"/>
+  <xacro:arg name="tool_tx_idle_chars" default="3.5"/>
+  <xacro:arg name="tool_device_name" default="/tmp/ttyUR"/>
+  <xacro:arg name="tool_tcp_port" default="54321"/>
+
+  <!-- Gripper options -->
+  <xacro:arg name="camera_enabled" default="false"/>
+
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+  <xacro:include filename="$(find gripper_3d)/urdf/gripper_3d.xacro"/>
+
+  <link name="world"/>
+
+  <xacro:ur_robot
+      name="$(arg ur_type)"
+      tf_prefix="$(arg tf_prefix)"
+      parent="world"
+      joint_limits_parameters_file="$(arg joint_limit_params)"
+      kinematics_parameters_file="$(arg kinematics_params)"
+      physical_parameters_file="$(arg physical_params)"
+      visual_parameters_file="$(arg visual_params)"
+      initial_positions="${xacro.load_yaml(home_positions_file)}"
+      safety_limits="$(arg safety_limits)"
+      safety_pos_margin="$(arg safety_pos_margin)"
+      safety_k_position="$(arg safety_k_position)"
+      use_fake_hardware="$(arg use_fake_hardware)"
+      fake_sensor_commands="$(arg fake_sensor_commands)"
+      headless_mode="$(arg headless_mode)"
+      use_tool_communication="$(arg use_tool_communication)"
+      tool_voltage="$(arg tool_voltage)"
+      tool_parity="$(arg tool_parity)"
+      tool_baud_rate="$(arg tool_baud_rate)"
+      tool_stop_bits="$(arg tool_stop_bits)"
+      tool_rx_idle_chars="$(arg tool_rx_idle_chars)"
+      tool_tx_idle_chars="$(arg tool_tx_idle_chars)"
+      tool_device_name="$(arg tool_device_name)"
+      tool_tcp_port="$(arg tool_tcp_port)"
+      robot_ip="$(arg robot_ip)"
+      script_filename="$(arg script_filename)"
+      output_recipe_filename="$(arg output_recipe_filename)"
+      input_recipe_filename="$(arg input_recipe_filename)"
+      reverse_ip="$(arg reverse_ip)"
+      script_command_port="$(arg script_command_port)"
+      reverse_port="$(arg reverse_port)"
+      script_sender_port="$(arg script_sender_port)"
+      trajectory_port="$(arg trajectory_port)"
+      non_blocking_read="$(arg non_blocking_read)"
+      keep_alive_count="$(arg keep_alive_count)">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:ur_robot>
+
+  <xacro:attach_gripper_3d
+      parent="$(arg tf_prefix)tool0"
+      name="gripper"
+      camera_enabled="$(arg camera_enabled)"/>
+
+  <!-- Simple ros2_control component for the gripper when running fake hardware. -->
+  <xacro:if value="$(arg use_fake_hardware)">
+    <ros2_control name="gripper" type="system">
+      <hardware>
+        <plugin>mock_components/GenericSystem</plugin>
+        <param name="state_following_offset">0.0</param>
+      </hardware>
+      <joint name="gripper_close_open_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">0.0</param>
+        </state_interface>
+        <state_interface name="velocity">
+          <param name="initial_value">0.0</param>
+        </state_interface>
+      </joint>
+    </ros2_control>
+  </xacro:if>
+</robot>

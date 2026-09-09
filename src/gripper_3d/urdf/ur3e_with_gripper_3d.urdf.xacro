@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="ur3e_with_gripper_3d">
+
+  <xacro:arg name="name" default="ur3e"/>
+  <xacro:arg name="ur_type" default="ur3e"/>
+  <xacro:arg name="tf_prefix" default=""/>
+
+  <xacro:arg name="parent" default="world"/>
+  <xacro:arg name="xyz" default="0 0 0"/>
+  <xacro:arg name="rpy" default="0 0 0"/>
+
+  <xacro:arg name="joint_limits_parameters_file"
+             default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
+  <xacro:arg name="kinematics_parameters_file"
+             default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
+  <xacro:arg name="physical_parameters_file"
+             default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
+  <xacro:arg name="visual_parameters_file"
+             default="$(find ur_description)/config/$(arg ur_type)/visual_parameters.yaml"/>
+
+  <xacro:arg name="safety_limits" default="false"/>
+  <xacro:arg name="safety_pos_margin" default="0.15"/>
+  <xacro:arg name="safety_k_position" default="20"/>
+
+  <!-- Only keep args you actually override from launch/scripts -->
+  <xacro:arg name="camera_enabled" default="false"/>
+
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+  <xacro:include filename="$(find gripper_3d)/urdf/gripper_3d.xacro"/>
+
+  <link name="world"/>
+
+  <xacro:ur_robot
+      name="$(arg name)"
+      tf_prefix="$(arg tf_prefix)"
+      parent="$(arg parent)"
+      joint_limits_parameters_file="$(arg joint_limits_parameters_file)"
+      kinematics_parameters_file="$(arg kinematics_parameters_file)"
+      physical_parameters_file="$(arg physical_parameters_file)"
+      visual_parameters_file="$(arg visual_parameters_file)"
+      safety_limits="$(arg safety_limits)"
+      safety_pos_margin="$(arg safety_pos_margin)"
+      safety_k_position="$(arg safety_k_position)"
+      generate_ros2_control_tag="false">
+    <origin xyz="$(arg xyz)" rpy="$(arg rpy)"/>
+  </xacro:ur_robot>
+
+  <xacro:attach_gripper_3d
+      parent="$(arg tf_prefix)tool0"
+      name="gripper"
+      camera_enabled="$(arg camera_enabled)"/>
+
+  <!-- ros2_control hardware interface for fake/mock hardware -->
+  <ros2_control name="FakeSystem" type="system">
+    <hardware>
+      <plugin>mock_components/GenericSystem</plugin>
+      <param name="fake_sensor_commands">false</param>
+      <param name="state_following_offset">0.0</param>
+    </hardware>
+
+    <!-- UR3e arm joints -->
+    <joint name="shoulder_pan_joint">
+      <command_interface name="position">
+        <param name="min">-6.2832</param>
+        <param name="max">6.2832</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="shoulder_lift_joint">
+      <command_interface name="position">
+        <param name="min">-6.2832</param>
+        <param name="max">6.2832</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="elbow_joint">
+      <command_interface name="position">
+        <param name="min">-3.1416</param>
+        <param name="max">3.1416</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="wrist_1_joint">
+      <command_interface name="position">
+        <param name="min">-6.2832</param>
+        <param name="max">6.2832</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="wrist_2_joint">
+      <command_interface name="position">
+        <param name="min">-6.2832</param>
+        <param name="max">6.2832</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="wrist_3_joint">
+      <command_interface name="position">
+        <param name="min">-6.2832</param>
+        <param name="max">6.2832</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Gripper joint -->
+    <joint name="gripper_close_open_joint">
+      <command_interface name="position">
+        <param name="min">0.0</param>
+        <param name="max">0.5</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+</robot>

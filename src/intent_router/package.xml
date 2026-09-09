@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>intent_router</name>
+  <version>0.1.0</version>
+  <description>
+    Routes structured robot intents from communication_llm to grasp_pipeline.
+    Listens on /robot/intent, matches the LLM's target object to a label, and
+    sets the auto_select_label parameter on yolo_live_select_grasp so the
+    grasp pipeline picks that object on its next selection cycle without
+    triggering its built-in voice menu.
+  </description>
+
+  <maintainer email="Majd.Hanna@student.reutlingen-university.de">Majd Hanna</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>morty_interfaces</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

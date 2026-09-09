@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="ur3e_with_gripper_3d">
+  <group name="ur3e_manipulator">
+    <chain base_link="base_link" tip_link="gripper_tcp"/>
+  </group>
+
+  <group_state name="sleep_home" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="2.214561939239502"/>
+    <joint name="shoulder_lift_joint" value="-0.20886166513476567"/>
+    <joint name="elbow_joint" value="0.09883243242372686"/>
+    <joint name="wrist_1_joint" value="0.022836251849792433"/>
+    <joint name="wrist_2_joint" value="1.4114429950714111"/>
+    <joint name="wrist_3_joint" value="-0.11266929308046514"/>
+  </group_state>
+
+  <group_state name="init" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="0.0"/>
+    <joint name="shoulder_lift_joint" value="-1.57"/>
+    <joint name="elbow_joint" value="0.0"/>
+    <joint name="wrist_1_joint" value="-1.57"/>
+    <joint name="wrist_2_joint" value="0.0"/>
+    <joint name="wrist_3_joint" value="0.0"/>
+  </group_state>
+
+  <group_state name="home" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="2.268556594848633"/>
+    <joint name="shoulder_lift_joint" value="-3.5804025135436"/>
+    <joint name="elbow_joint" value="1.265893284474508"/>
+    <joint name="wrist_1_joint" value="0.7617410856434326"/>
+    <joint name="wrist_2_joint" value="1.5419175624847412"/>
+    <joint name="wrist_3_joint" value="0.09074017405509949"/>
+  </group_state>
+
+  <!-- Legacy taught observation poses (kept for backward compat).
+       These are intentionally close to home so the camera keeps overlap high
+       while looking at the same work area. Tune on-robot if your fixture/table changes. -->
+  <group_state name="detect_left" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="3.502199172973633"/>
+    <joint name="shoulder_lift_joint" value="-2.8761807880797328"/>
+    <joint name="elbow_joint" value="0.7025445143329065"/>
+    <joint name="wrist_1_joint" value="1.3926855760761718"/>
+    <joint name="wrist_2_joint" value="1.221196174621582"/>
+    <joint name="wrist_3_joint" value="-1.2280004660235804"/>
+  </group_state>
+
+  <group_state name="detect_right" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="1.7956414222717285"/>
+    <joint name="shoulder_lift_joint" value="-2.995260854760641"/>
+    <joint name="elbow_joint" value="-0.052436552941799164"/>
+    <joint name="wrist_1_joint" value="1.6793996530720214"/>
+    <joint name="wrist_2_joint" value="1.728851079940796"/>
+    <joint name="wrist_3_joint" value="0.7280051708221436"/>
+  </group_state>
+
+  <group_state name="detect_higher" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="0.19939443469047546"/>
+    <joint name="shoulder_lift_joint" value="-2.963076253930563"/>
+    <joint name="elbow_joint" value="0.8762853781329554"/>
+    <joint name="wrist_1_joint" value="1.152787132854126"/>
+    <joint name="wrist_2_joint" value="2.284529447555542"/>
+    <joint name="wrist_3_joint" value="2.3079347610473633"/>
+  </group_state>
+
+  <group_state name="old_initgrasp" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="2.2835402488708496"/>
+    <joint name="shoulder_lift_joint" value="-3.333818574944967"/>
+    <joint name="elbow_joint" value="0.7961128393756312"/>
+    <joint name="wrist_1_joint" value="1.0117356020161132"/>
+    <joint name="wrist_2_joint" value="1.5364316701889038"/>
+    <joint name="wrist_3_joint" value="0.09069927036762238"/>
+  </group_state>
+
+  <group_state name="drop" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="3.4572880268096924"/>
+    <joint name="shoulder_lift_joint" value="6.178505050926962"/>
+    <joint name="elbow_joint" value="0.11321670213808233"/>
+    <joint name="wrist_1_joint" value="-3.815062185327047"/>
+    <joint name="wrist_2_joint" value="-1.3287490049945276"/>
+    <joint name="wrist_3_joint" value="1.826249361038208"/>
+  </group_state>
+
+  <group_state name="drop_right_side" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="0.9405646324157715"/>
+    <joint name="shoulder_lift_joint" value="-1.6647268734373988"/>
+    <joint name="elbow_joint" value="-2.4495115280151367"/>
+    <joint name="wrist_1_joint" value="0.36912624418225093"/>
+    <joint name="wrist_2_joint" value="1.5615633726119995"/>
+    <joint name="wrist_3_joint" value="1.5674934387207031"/>
+  </group_state>
+
+  <group_state name="drop_left_side" group="ur3e_manipulator">
+    <joint name="shoulder_pan_joint" value="0.9394397735595703"/>
+    <joint name="shoulder_lift_joint" value="-1.6493994198241175"/>
+    <joint name="elbow_joint" value="1.82631761232485"/>
+    <joint name="wrist_1_joint" value="0.3638381200977783"/>
+    <joint name="wrist_2_joint" value="1.561439871788025"/>
+    <joint name="wrist_3_joint" value="1.5674901008605957"/>
+  </group_state>
+
+  <group name="gripper">
+    <link name="gripper_base"/>
+    <link name="gripper_finger_left"/>
+    <link name="gripper_finger_right"/>
+    <link name="gripper_tcp"/>
+    <joint name="gripper_close_open_joint"/>
+  </group>
+
+  <group_state name="open" group="gripper">
+    <joint name="gripper_close_open_joint" value="0.5"/>
+  </group_state>
+  <group_state name="close" group="gripper">
+    <joint name="gripper_close_open_joint" value="0.0"/>
+  </group_state>
+
+  <end_effector name="gripper" parent_link="tool0" parent_group="ur3e_manipulator" group="gripper"/>
+
+  <virtual_joint name="world_joint" type="fixed" parent_frame="world" child_link="base_link"/>
+
+  <!-- Disable self-collisions for adjacent links (otherwise the default pose is often "in collision") -->
+  <disable_collisions link1="base" link2="base_link" reason="Adjacent"/>
+  <disable_collisions link1="base_link" link2="base_link_inertia" reason="Adjacent"/>
+  <disable_collisions link1="base_link_inertia" link2="shoulder_link" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_link" link2="upper_arm_link" reason="Adjacent"/>
+  <disable_collisions link1="upper_arm_link" link2="forearm_link" reason="Adjacent"/>
+  <disable_collisions link1="forearm_link" link2="wrist_1_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_1_link" link2="wrist_2_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_2_link" link2="wrist_3_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_3_link" link2="flange" reason="Adjacent"/>
+  <disable_collisions link1="flange" link2="tool0" reason="Adjacent"/>
+
+  <!-- Camera is rigidly mounted on/near the gripper; allow close proximity without blocking planning. -->
+  <disable_collisions link1="camera_mount" link2="tool0" reason="Adjacent"/>
+  <disable_collisions link1="camera_mount" link2="gripper_base" reason="Mounted"/>
+  <disable_collisions link1="camera_mount" link2="gripper_finger_left" reason="Mounted"/>
+  <disable_collisions link1="camera_mount" link2="gripper_finger_right" reason="Mounted"/>
+  <disable_collisions link1="camera_mount" link2="gripper_tcp" reason="Mounted"/>
+  <disable_collisions link1="camera_camera_link" link2="gripper_base" reason="Mounted"/>
+  <disable_collisions link1="ft_frame" link2="flange" reason="Adjacent"/>
+  <disable_collisions link1="tool0" link2="wrist_1_link" reason="Never"/>
+  <disable_collisions link1="tool0" link2="wrist_2_link" reason="Never"/>
+  <disable_collisions link1="tool0" link2="wrist_3_link" reason="Adjacent"/>
+
+  <disable_collisions link1="tool0" link2="gripper_base" reason="Adjacent"/>
+  <!-- CAD meshes overlap here; treat as non-colliding for planning -->
+  <disable_collisions link1="wrist_3_link" link2="gripper_base" reason="Never"/>
+  <disable_collisions link1="gripper_base" link2="wrist_3_link" reason="Never"/>
+  <disable_collisions link1="flange" link2="gripper_base" reason="Never"/>
+  <disable_collisions link1="gripper_base" link2="flange" reason="Never"/>
+  <disable_collisions link1="gripper_base" link2="gripper_tcp" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_finger_left" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="gripper_finger_right" reason="Adjacent"/>
+  <disable_collisions link1="gripper_finger_left" link2="gripper_finger_right" reason="Default"/>
+</robot>

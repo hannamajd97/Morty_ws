@@ -1,0 +1,41 @@
+vla_episode_recorder:
+  ros__parameters:
+    dataset_root: "~/morty_ws/vla_experiments/datasets"
+    dataset_name: "morty_ur3e"
+    fps: 10.0
+    # fixed exterior camera (Orbbec Astra, run with camera_name:=astra)
+    exterior_image_topic: "/astra/color/image_raw"          # used only if exterior_compressed_topic is empty
+    exterior_compressed_topic: "/astra/color/compressed_slow"  # JPEG relayed from the shuttle at 10 Hz
+    exterior_info_topic: "/astra/color/camera_info"
+    # wrist camera (RealSense D435 on the gripper)
+    wrist_image_topic: "/camera/camera/color/image_raw"
+    wrist_compressed_topic: "/camera/camera/color/image_raw/compressed"  # avoids 900 KB raw frames over local UDP
+    wrist_info_topic: "/camera/camera/color/camera_info"
+    require_exterior: true
+    require_wrist: true
+    joint_states_topic: "/joint_states"
+    controller_state_topic: "/scaled_joint_trajectory_controller/controller_state"
+    tcp_pose_topic: "/tcp_pose_broadcaster/pose"
+    io_states_topic: "/io_and_status_controller/io_states"
+    transcript_topic: "/speech/accepted_transcript"
+    task_from_transcript: false
+    # auto mode: one episode per Morty trial (accepted transcript -> motion intent -> cycle_done)
+    auto_mode: false
+    intent_topic: "/robot/intent"
+    motion_intents: ["pick_and_place", "place", "drop_held", "drop_left", "drop_right", "go_home", "carry_release", "release_home", "release", "open_gripper", "close_gripper"]
+    cycle_done_topic: "/grasp_executor_lin_llm/cycle_done"
+    intent_wait_s: 25.0
+    max_episode_s: 240.0
+    mmhri_dir: "~/morty_ws/experiments/mmhri"
+    base_frame: "base_link"
+    ee_frame: "gripper_tcp"
+    tool_frame: "tool0"
+    gripper_joint: "gripper_close_open_joint"
+    gripper_open_pos: 0.23
+    grasp_pin: 16
+    max_image_age_s: 0.5
+    max_joint_age_s: 0.2
+    jpeg_quality: 95
+    # copied into every episode's meta.json so the dataset documents the camera pose it was recorded with
+    astra_tf_xyz: [-0.51, 0.51, 0.065]
+    astra_tf_rpy: [0.0, -0.576, -0.77]

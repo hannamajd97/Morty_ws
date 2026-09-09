@@ -1,0 +1,24 @@
+# Race a hand-pointing detector against ListenForChoice; first one wins.
+# Wraps the existing PointOrVoiceSelector logic.
+# Served by: communication_llm.
+
+uint8 OUTCOME_OK=0
+uint8 OUTCOME_TIMEOUT=1
+uint8 OUTCOME_CANCELLED=2
+
+# Goal
+string[] options
+float32 timeout_s
+bool enable_voice
+bool enable_pointing
+---
+# Result
+string choice
+string modality               # "voice" | "pointing" | "none"
+float32 confidence
+uint8 outcome
+---
+# Feedback
+string partial_voice
+string pointing_target        # which option the hand is currently aimed at
+float32 pointing_hold_ms

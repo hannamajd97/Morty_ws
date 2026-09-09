@@ -1,0 +1,61 @@
+# --- secrets: never commit ---
+.morty_env
+.morty_env.*
+*.env
+*.pem
+*.key
+
+# --- colcon / ROS 2 build products ---
+build/
+install/
+log/
+logs/
+*.egg-info/
+
+# --- third-party checkouts and model weights (multi-GB, downloaded separately) ---
+GraspGen/
+models/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.task
+src/communication_llm/models/
+
+# --- experiment recordings and data ---
+experiments/
+experiments_*/
+*.bag
+*.db3
+*.mcap
+*.npz
+*.mp4
+*.avi
+
+# --- local editor / OS / python caches ---
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+Thumbs.db
+
+# --- local backups made during debugging ---
+backups/
+
+# --- private conversation notes ---
+Hamid_Conv/
+
+# --- top-level VLA datasets/logs (the package lives in src/vla_experiments) ---
+/vla_experiments/
+
+# --- AI-assistant material: agent instructions, session logs, chats (never published) ---
+.claude/
+CLAUDE.md
+Instructions5
+INSTRUCTIONS_V6.md
+SYSTEM_STATE_LOG.md
+*.jsonl

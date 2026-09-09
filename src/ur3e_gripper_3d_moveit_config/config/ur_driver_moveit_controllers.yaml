@@ -1,0 +1,42 @@
+# MoveIt controller mapping for UR driver (real robot / URSim).
+trajectory_execution:
+  # Observation NBV moves on real hardware often run slower than the nominal
+  # planned trajectory timing, so keep execution monitoring permissive enough
+  # to avoid false timeouts during otherwise valid motion.
+  allowed_execution_duration_scaling: 3.0
+  allowed_goal_duration_margin: 2.0
+  allowed_start_tolerance: 0.01
+  # OFF (was true): with the UR scaled controller, slow-but-correct
+  # execution is legitimate (pendant slider, protective slow-down, slip
+  # crawl) — the monitor cancelled a healthy grasp approach at 3× budget
+  # and wasted the whole pick (TIMED_OUT, 2026-08-12). The robot's own
+  # safety stack owns overspeed/stuck protection; our stop paths handle
+  # aborts.
+  trajectory_duration_monitoring: false
+  execution_duration_monitoring: false
+
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names:
+    - scaled_joint_trajectory_controller
+    - gripper_controller
+
+  scaled_joint_trajectory_controller:
+    action_ns: follow_joint_trajectory
+    type: FollowJointTrajectory
+    default: true
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+
+  gripper_controller:
+    action_ns: gripper_cmd
+    type: GripperCommand
+    default: true
+    joints:
+      - gripper_close_open_joint

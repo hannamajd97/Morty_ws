@@ -1,0 +1,7 @@
+# Emergency stop: cancel all in-flight actions on every node.
+# Synchronous on purpose — this must be instant, not a long-running action.
+
+bool include_speech           # if true, also cancel any in-flight Speak
+---
+bool success
+string error

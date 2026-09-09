@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+import rclpy
+from control_msgs.action import GripperCommand
+from rclpy.action import ActionClient, ActionServer, CancelResponse, GoalResponse
+from rcl_interfaces.msg import SetParametersResult
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from ur_msgs.srv import SetIO
+
+
+@dataclass(frozen=True)
+class _Params:
+    backend: str
+    threshold: float
+    open_pos: float
+    closed_pos: float
+    pulse_hold_s_open: float
+    pulse_hold_s_close: float
+    open_pin: int
+    close_pin: int
+    joint_states_topic: str
+    joint_states_topic_alt: str
+    fake_action_name: str
+
+
+class GripperCommandAdapter(Node):
+    """
+    Expose a GripperCommand action for MoveIt/RViz and adapt it to either:
+      - a ros2_control GripperActionController (fake mode), or
+      - UR tool I/O pulses (real mode), or
+      - a pure simulation fallback (no hardware available).
+    """
+
+    def __init__(self) -> None:
+        super().__init__("gripper_command_adapter")
+
+        self._cbg = ReentrantCallbackGroup()
+
+        self.declare_parameter("backend", "auto")  # auto|fake|io|sim
+        self.declare_parameter("threshold", 0.25)
+        self.declare_parameter("open_pos", 0.23)  # ~13 deg, tracks the 0.20 s pulse (2026-08-31)
+        self.declare_parameter("closed_pos", 0.0)
+        self.declare_parameter("pulse_hold_s", 0.7)  # backward-compatible fallback
+        # Defaults (Majd 2026-08-28): open=0.20s / 1.0s max,
+        # close=1.00s / 1.5s max. Closing needs longer to fully grasp.
+        # 0.20 s open keeps the fingers narrow so the gripper does not
+        # swing into the neighbouring objects on the way in. Kept in
+        # lock-step with gripper_3d/config/gripper_control.yaml and the
+        # GUI spinboxes - all three must agree or the operator is shown
+        # a number the robot is not using.
+        self.declare_parameter("pulse_hold_s_open", 0.20)
+        self.declare_parameter("pulse_hold_s_close", 1.00)
+        self.declare_parameter("pulse_hold_s_open_max", 1.0)
+        self.declare_parameter("pulse_hold_s_close_max", 1.5)
+        self.declare_parameter("open_pin", 16)
+        self.declare_parameter("close_pin", 17)
+        self.declare_parameter("joint_states_topic", "/joint_state_broadcaster/joint_states")
+        # Was "/joint_states" — but publishing the gripper state there
+        # collides with the UR driver's joint_state_broadcaster on the
+        # same topic, which uses TRANSIENT_LOCAL durability while this
+        # publisher uses VOLATILE. The QoS mismatch confused DDS into
+        # dropping samples, which starved MoveIt's current_state_monitor
+        # and caused MoveIt to plan trajectories from stale joint
+        # positions — and the controller aborted with PATH_TOLERANCE_
+        # VIOLATED (0.5 rad off) the moment execution started.
+        # Publish ONLY to /joint_state_broadcaster/joint_states; the
+        # joint_state_publisher (or similar merger) feeds /joint_states.
+        # Set to a non-empty string to re-enable the alt publish.
+        self.declare_parameter("joint_states_topic_alt", "")
+        self.declare_parameter("joint_state_publish_rate_hz", 10.0)
+        self.declare_parameter("fake_action_name", "/gripper_hw_controller/gripper_cmd")
+
+        self._params = self._read_params()
+        self._publish_rate_hz = float(self.get_parameter("joint_state_publish_rate_hz").value)
+
+        self.add_on_set_parameters_callback(self._on_param_change)
+
+        self._js_pub = self.create_publisher(JointState, self._params.joint_states_topic, 10)
+        self._js_pub_alt = self.create_publisher(JointState, self._params.joint_states_topic_alt, 10)
+
+        self._set_io = self.create_client(SetIO, "/io_and_status_controller/set_io", callback_group=self._cbg)
+        self._fake_client = ActionClient(
+            self, GripperCommand, self._params.fake_action_name, callback_group=self._cbg
+        )
+
+        self._pos = self._params.closed_pos
+
+        self._server = ActionServer(
+            self,
+            GripperCommand,
+            "gripper_cmd",
+            goal_callback=self._goal_cb,
+            cancel_callback=self._cancel_cb,
+            execute_callback=self._execute_cb,
+            callback_group=self._cbg,
+        )
+
+        # Publish an initial JointState (and keep publishing periodically) so MoveIt can track
+        # the added gripper joint even when no gripper command has been sent yet.
+        self._publish_gripper_joint_state(self._pos)
+        rate = max(0.1, self._publish_rate_hz)
+        self.create_timer(1.0 / rate, lambda: self._publish_gripper_joint_state(self._pos), callback_group=self._cbg)
+
+        self.get_logger().info(
+            "GripperCommandAdapter ready (backend=%s, fake_action=%s)."
+            % (self._params.backend, self._params.fake_action_name)
+        )
+
+    def _on_param_change(self, params) -> SetParametersResult:
+        names = [p.name for p in params]
+        self.get_logger().info("Parameter change request: %s" % names)
+        # Accept all changes; _read_params() picks them up on next execute.
+        return SetParametersResult(successful=True)
+
+    def _read_params(self) -> _Params:
+        backend = self.get_parameter("backend").get_parameter_value().string_value
+        threshold = float(self.get_parameter("threshold").value)
+        open_pos = float(self.get_parameter("open_pos").value)
+        closed_pos = float(self.get_parameter("closed_pos").value)
+        pulse_hold_s = float(self.get_parameter("pulse_hold_s").value)
+        pulse_hold_s_open = float(self.get_parameter("pulse_hold_s_open").value)
+        pulse_hold_s_close = float(self.get_parameter("pulse_hold_s_close").value)
+        # Apply caps so any future override / parameter set still respects
+        # the hardware-safe maxima (open<=1.0s, close<=1.5s).
+        try:
+            open_max = float(self.get_parameter("pulse_hold_s_open_max").value)
+        except Exception:
+            open_max = 1.0
+        try:
+            close_max = float(self.get_parameter("pulse_hold_s_close_max").value)
+        except Exception:
+            close_max = 1.5
+        if pulse_hold_s_open > open_max:
+            self.get_logger().warn(
+                f"pulse_hold_s_open={pulse_hold_s_open:.2f}s exceeds max={open_max:.2f}s; clamping."
+            )
+            pulse_hold_s_open = open_max
+        if pulse_hold_s_close > close_max:
+            self.get_logger().warn(
+                f"pulse_hold_s_close={pulse_hold_s_close:.2f}s exceeds max={close_max:.2f}s; clamping."
+            )
+            pulse_hold_s_close = close_max
+        open_pin = int(self.get_parameter("open_pin").value)
+        close_pin = int(self.get_parameter("close_pin").value)
+        joint_states_topic = self.get_parameter("joint_states_topic").get_parameter_value().string_value
+        joint_states_topic_alt = self.get_parameter("joint_states_topic_alt").get_parameter_value().string_value
+        fake_action_name = self.get_parameter("fake_action_name").get_parameter_value().string_value
+        return _Params(
+            backend=backend,
+            threshold=threshold,
+            open_pos=open_pos,
+            closed_pos=closed_pos,
+            pulse_hold_s_open=(pulse_hold_s_open if pulse_hold_s_open > 0.0 else pulse_hold_s),
+            pulse_hold_s_close=(pulse_hold_s_close if pulse_hold_s_close > 0.0 else pulse_hold_s),
+            open_pin=open_pin,
+            close_pin=close_pin,
+            joint_states_topic=joint_states_topic,
+            joint_states_topic_alt=joint_states_topic_alt,
+            fake_action_name=fake_action_name,
+        )
+
+    def _goal_cb(self, _goal_request: GripperCommand.Goal) -> GoalResponse:
+        return GoalResponse.ACCEPT
+
+    def _cancel_cb(self, _goal_handle) -> CancelResponse:
+        return CancelResponse.ACCEPT
+
+    def _publish_gripper_joint_state(self, pos: float) -> None:
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = ["gripper_close_open_joint", "gripper_finger_right_joint"]
+        msg.position = [float(pos), -float(pos)]
+        self._js_pub.publish(msg)
+        self._js_pub_alt.publish(msg)
+
+    def _wait_for_set_io(self, timeout_s: float = 0.25) -> bool:
+        if self._set_io.wait_for_service(timeout_sec=timeout_s):
+            return True
+        return False
+
+    def _set_do(self, pin: int, high: bool) -> bool:
+        req = SetIO.Request()
+        req.fun = 1  # set DO
+        req.pin = int(pin)
+        req.state = 1.0 if high else 0.0
+        fut = self._set_io.call_async(req)
+        rclpy.spin_until_future_complete(self, fut, timeout_sec=0.5)
+        return fut.done()
+
+    def _pulse(self, pin: int, hold_s: float) -> None:
+        _ = self._set_do(pin, True)
+        t0 = time.monotonic()
+        while rclpy.ok() and (time.monotonic() - t0) < hold_s:
+            time.sleep(0.01)
+        _ = self._set_do(pin, False)
+
+    def _auto_backend(self) -> str:
+        forced = self._params.backend.lower().strip()
+        if forced in {"fake", "io", "sim"}:
+            return forced
+
+        # auto: prefer fake controller when available, else IO, else simulation.
+        if self._fake_client.wait_for_server(timeout_sec=0.05):
+            return "fake"
+        if self._wait_for_set_io(timeout_s=0.05):
+            return "io"
+        return "sim"
+
+    def _forward_to_fake(self, goal_handle) -> Optional[GripperCommand.Result]:
+        if not self._fake_client.wait_for_server(timeout_sec=0.5):
+            self.get_logger().warn("Fake gripper action server not available: %s" % self._params.fake_action_name)
+            return None
+
+        target = float(goal_handle.request.command.position)
+        want_open = target > self._params.threshold
+        quantized_pos = self._params.open_pos if want_open else self._params.closed_pos
+
+        goal_msg = GripperCommand.Goal()
+        # Even in fake mode, behave like the real gripper: only OPEN/CLOSE.
+        goal_msg.command.position = float(quantized_pos)
+        goal_msg.command.max_effort = float(goal_handle.request.command.max_effort)
+
+        send_future = self._fake_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(self, send_future, timeout_sec=2.0)
+        fake_goal_handle = send_future.result()
+        if fake_goal_handle is None or not fake_goal_handle.accepted:
+            self.get_logger().warn("Fake gripper goal was rejected.")
+            return None
+
+        result_future = fake_goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=10.0)
+        res = result_future.result()
+        if res is None:
+            return None
+        return res.result
+
+    def _execute_cb(self, goal_handle) -> GripperCommand.Result:
+        # Refresh runtime params so external ros2 param overrides take effect immediately.
+        self._params = self._read_params()
+        backend = self._auto_backend()
+        target = float(goal_handle.request.command.position)
+        self.get_logger().info(
+            "execute_cb: backend=%s, target=%.2f, pulse_open=%.3fs, pulse_close=%.3fs"
+            % (backend, target, self._params.pulse_hold_s_open, self._params.pulse_hold_s_close)
+        )
+
+        if backend == "fake":
+            res = self._forward_to_fake(goal_handle)
+            if res is not None:
+                goal_handle.succeed()
+                return res
+
+            # If forwarding failed, fall through to sim so MoveIt doesn't deadlock.
+            backend = "sim"
+
+        want_open = target > self._params.threshold
+        pos = self._params.open_pos if want_open else self._params.closed_pos
+
+        if backend == "io":
+            if not self._wait_for_set_io(timeout_s=0.5):
+                self.get_logger().warn("UR SetIO service unavailable, falling back to simulation.")
+            else:
+                hold_s = self._params.pulse_hold_s_open if want_open else self._params.pulse_hold_s_close
+                self.get_logger().info(
+                    "GRIPPER: %s (pulse %ds for %.2fs)"
+                    % (
+                        "OPEN" if want_open else "CLOSE",
+                        self._params.open_pin if want_open else self._params.close_pin,
+                        hold_s,
+                    )
+                )
+                self._pulse(self._params.open_pin if want_open else self._params.close_pin, hold_s)
+
+        # io or sim: update joint state for RViz/MoveIt monitoring.
+        self._pos = pos
+        self._publish_gripper_joint_state(self._pos)
+
+        result = GripperCommand.Result()
+        result.position = float(self._pos)
+        result.effort = 0.0
+        result.stalled = False
+        result.reached_goal = True
+
+        goal_handle.succeed()
+        return result
+
+
+def main() -> None:
+    rclpy.init()
+    node = GripperCommandAdapter()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    main()

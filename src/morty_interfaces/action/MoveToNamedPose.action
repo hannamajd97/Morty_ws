@@ -1,0 +1,23 @@
+# Move the arm to a named pose loaded from observation_poses.yaml.
+# Served by: ur3e_gripper_3d_moveit_commander.
+
+# Goal
+string pose_name              # "home" | "initgrasp" | "detect_left" | "detect_right" | "detect_higher"
+float32 velocity_scaling      # 0.0 = use server default
+float32 settle_time_s         # seconds to dwell after motion completes; 0.0 = use server default
+# Optional intermediate poses to flow THROUGH on the way to pose_name.
+# Empty (the default) == the historical single-pose behaviour, byte for
+# byte. When non-empty the server builds ONE dense, S-curve-timed
+# trajectory covering current -> via_poses[0] -> ... -> pose_name, so the
+# arm never decelerates to zero at the via points (2026-08-28, blended
+# lift->home->drop: two moves + two fixed overheads -> one of each).
+string[] via_poses
+---
+# Result
+bool success
+string error
+int32 waypoints               # trajectory points actually sent (0 for the single-pose path)
+---
+# Feedback
+string phase                  # "planning" | "moving" | "settling"
+float32 progress

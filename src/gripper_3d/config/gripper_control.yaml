@@ -1,0 +1,67 @@
+/gripper_controller/gripper_command_adapter:
+  ros__parameters:
+    backend: "auto"
+    threshold: 0.25
+    # open_pos is the JOINT STATE published while "open" — it poses the
+    # finger COLLISION MODEL in MoveIt (Majd 2026-08-31: planning was
+    # rejecting paths with the fingers modeled at the URDF max 0.5 rad
+    # = ~29 deg while the real 0.20 s pulse opens ~13 deg). 0.23 rad =
+    # ~13 deg. NOTE: if you raise pulse_hold_s_open past ~0.3 s, raise
+    # this too or the collision model will be NARROWER than reality.
+    # Incoming GripperCommand targets (0.5/0.0 vs threshold 0.25) are
+    # unaffected — they are a binary flag, not this value.
+    open_pos: 0.23
+    closed_pos: 0.0
+    # Hold times for the open/close pulses (seconds).
+    # Defaults: open=0.5s, close=1.2s. Closing needs longer to fully grasp.
+    # Allowed maxima: open <= 1.0s, close <= 1.5s. The C++ executor and any
+    # other override path should respect these caps.
+    pulse_hold_s: 0.7
+    # Majd 2026-08-28: "make it 0.20s ... so the gripper dont open very
+    # wide crashing with other objects". 0.20 s open / 1.00 s close are
+    # now the LAUNCH defaults, not just what the GUI shows. They used to
+    # be 0.5 / 1.2 here while the GUI displayed 0.30 / 1.00, so any
+    # session without the GUI (or before its startup push landed) opened
+    # the gripper on a 0.5 s pulse - nearly DOUBLE what he had asked for.
+    pulse_hold_s_open: 0.20
+    pulse_hold_s_close: 1.00
+    pulse_hold_s_open_max: 1.0
+    pulse_hold_s_close_max: 1.5
+    open_pin: 16
+    close_pin: 17
+    fake_action_name: "/gripper_hw_controller/gripper_cmd"
+    joint_state_publish_rate_hz: 10.0
+    joint_states_topic: "/gripper_controller/joint_states"
+    joint_states_topic_alt: "/gripper_controller/joint_states_alt"
+
+/gripper_io_bridge:
+  ros__parameters:
+    open_pin: 16
+    close_pin: 17
+    # Tool Digital Inputs TI0 / TI1 from the UR e-series tool flange.
+    # The UR ros2_control driver exposes them on /io_and_status_controller/io_states
+    # at digital_in_states indices 16 (TI0) and 17 (TI1) — NOT at pins 18/19
+    # (those don't exist in the IOStates layout, which only goes 0..17).
+    # The old 18/19 config silently read 0 forever because
+    # IOStates never publishes those keys.
+    # TI0 (pin 16): GRASP-DETECTED — HIGH = holding, LOW = empty.
+    #   The bridge's _handle_close reads this as "no_grasp" when LOW —
+    #   set di_no_grasp_pin to 16 and interpret state==0 as the no-grasp
+    #   trigger (di_no_grasp_active_low documents that intent here; the
+    #   bridge code itself currently checks state==1 which is wrong for
+    #   this hardware but the live path goes through gripper_command_
+    #   adapter, not this bridge).
+    # TI1 (pin 17): SLIP-DETECTION OUTPUT — HIGH = the slip model
+    #   detected slip. The gripper hardware self-compensates by closing
+    #   harder when TI1 is HIGH — NO software action is needed. Software
+    #   only logs this for visibility.
+    di_no_grasp_pin: 16
+    di_no_grasp_active_low: true
+    di_slip_pin: 17
+    di_slip_software_action: "none"
+    pulse_hold_s: 0.7
+    left_joint: "gripper_close_open_joint"
+    right_joint: "gripper_finger_right_joint"
+    open_pos: 0.5
+    closed_pos: 0.0
+    joint_states_topic: "/joint_states"

@@ -1,0 +1,23 @@
+# Constrained STT: listen for one of a fixed list of options (Vosk grammar).
+# Served by: communication_llm.
+
+uint8 OUTCOME_MATCHED=0
+uint8 OUTCOME_NO_MATCH=1
+uint8 OUTCOME_TIMEOUT=2
+uint8 OUTCOME_CANCELLED=3
+
+# Goal
+string[] options              # e.g. ["red cube","blue mug","green bottle"]
+string prompt                 # optional TTS prompt to play first; empty = silent
+float32 timeout_s             # 0.0 = no timeout
+float32 silence_timeout_s     # seconds of silence to finalize an utterance
+---
+# Result
+string choice                 # one of options, or "" if no match
+float32 confidence            # 0.0..1.0
+string raw_transcript
+uint8 outcome
+---
+# Feedback
+string partial                # streaming partial transcript
+float32 audio_level           # RMS, 0.0..1.0

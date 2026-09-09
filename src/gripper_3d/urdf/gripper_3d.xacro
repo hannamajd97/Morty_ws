@@ -1,0 +1,243 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="gripper_3d">
+
+  <!--
+    Mesh-based gripper with two revolute fingers.
+    Provide 3 STL files:
+      - gripper_base.stl
+      - finger_left.stl
+      - finger_right.stl
+  -->
+  <!-- Collision geometry (2026-09-08, Majd: "we only need the outside look"):
+       the print STLs are 6k-157k triangles; every planning-scene collision
+       query paid for them (measured: 7 s Pilz LIN plans = ~21 samples at
+       hundreds of ms each). Collision now uses CONVEX HULLS of the same
+       parts (500-2086 triangles, verified to contain every original vertex),
+       visuals keep the full meshes. Regenerate with open3d compute_convex_hull. -->
+  <xacro:macro name="attach_gripper_3d" params="
+    parent:=tool0
+    name:=gripper
+    joint_xyz:='0 0 0.01'
+    joint_rpy:='0 0 0'
+    camera_enabled:=false
+    camera_link:='camera_camera_link'
+    camera_mount_link:='camera_mount'
+      camera_joint_xyz:='0.0001 -0.09405 -0.01335'
+      camera_joint_rpy:='1.5708 -1.5708 0'
+      camera_mount_to_camera_xyz:='0.0042 0.0175 0.0125'
+      camera_mount_to_camera_rpy:='0 0 0'
+      camera_mesh:='package://gripper_3d/meshes/realsense_d345.stl'
+      camera_mesh_scale:='0.001 0.001 0.001'
+      camera_mass:='0.08'
+      mesh_scale:='0.001 0.001 0.001'
+      base_mesh:='package://gripper_3d/meshes/zusammen_greifer_3_c8.stl'
+      left_finger_mesh:='package://gripper_3d/meshes/finger_left_co9.stl'
+      right_finger_mesh:='package://gripper_3d/meshes/finger_right_co9.stl'
+      base_collision_mesh:='package://gripper_3d/meshes/collision/gripper_base_hull.stl'
+      camera_collision_mesh:='package://gripper_3d/meshes/collision/camera_mount_hull.stl'
+      left_finger_collision_mesh:='package://gripper_3d/meshes/collision/finger_left_hull.stl'
+      right_finger_collision_mesh:='package://gripper_3d/meshes/collision/finger_right_hull.stl'
+    show_finger_meshes:=true
+    base_mesh_xyz:='0 0 0'
+    base_mesh_rpy:='0 0 0'
+    left_mesh_xyz:='0 0 0'
+    left_mesh_rpy:='0 0 0'
+    right_mesh_xyz:='0 0 0'
+    right_mesh_rpy:='0 0.08726 0'
+    left_hinge_xyz:='-0.018 0.0035 0.056'
+    right_hinge_xyz:='0.018 0.0035 0.056'
+    hinge_rpy:='0 0 0'
+    hinge_axis_xyz:='0 -1 0'
+    lower:=0.0
+    upper:=0.5
+    effort:=5.0
+    velocity:=5.0
+    mimic_multiplier:='-1'
+    mimic_offset:='0'
+    base_mass:=0.5
+    finger_mass:=0.05
+    tcp_xyz:='0 0 0.12'
+    tcp_rpy:='0 0 0'">
+
+    <!-- If the right finger mimics with a negative multiplier, it will have negative joint values.
+         Allow that by flipping the right joint limits accordingly. -->
+    <xacro:property name="right_lower" value="${lower}"/>
+    <xacro:property name="right_upper" value="${upper}"/>
+    <xacro:if value="${mimic_multiplier == '-1' or mimic_multiplier == -1}">
+      <xacro:property name="right_lower" value="${-upper}"/>
+      <xacro:property name="right_upper" value="${-lower}"/>
+    </xacro:if>
+
+    <!--
+      Finger joint parameters used by these joints:
+      - Left joint:  ${name}_close_open_joint
+      - Right joint: ${name}_finger_right_joint
+
+      Parameters:
+      - hinge_rpy: joint frame rotation at the hinge (radians) for BOTH finger joints.
+      - hinge_axis_xyz: revolute joint axis (flip sign to flip open/close direction) for BOTH finger joints.
+      - lower/upper: joint limits in radians for BOTH finger joints.
+      - effort: max joint torque (controllers/simulation) for BOTH finger joints.
+      - velocity: max joint speed in rad/s (controllers/simulation) for BOTH finger joints.
+      - mimic_multiplier/mimic_offset: ONLY used by ${name}_finger_right_joint to follow ${name}_close_open_joint.
+      - base_mass/finger_mass: inertial masses (mainly for physics/simulation).
+    -->
+
+    <link name="${name}_base">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${base_mass}"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+      <visual>
+        <origin xyz="${base_mesh_xyz}" rpy="${base_mesh_rpy}"/>
+        <geometry>
+          <mesh filename="${base_mesh}" scale="${mesh_scale}"/>
+        </geometry>
+        <material name="light_blue">
+          <color rgba="0.4 0.7 1.0 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="${base_mesh_xyz}" rpy="${base_mesh_rpy}"/>
+        <geometry>
+          <mesh filename="${base_collision_mesh}" scale="${mesh_scale}"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${parent}_${name}_fixed" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}_base"/>
+      <origin xyz="${joint_xyz}" rpy="${joint_rpy}"/>
+    </joint>
+
+    <xacro:if value="${camera_enabled}">
+      <!--
+        Camera frames:
+          - ${camera_mount_link}: mount/visual frame placed on the gripper (CAD-aligned)
+          - ${camera_link}: RealSense base frame (prefixed by driver to e.g. `camera_camera_link`)
+
+        Keep ${camera_link} as `camera_camera_link` so it matches the RealSense-published TF tree.
+        Add the fixed offset ${camera_mount_link} -> ${camera_link} here (camera_mount_to_camera_*).
+      -->
+      <link name="${camera_mount_link}">
+        <inertial>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <mass value="${camera_mass}"/>
+          <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+        </inertial>
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+              <mesh filename="${camera_mesh}" scale="${camera_mesh_scale}"/>
+            </geometry>
+          <material name="white">
+            <color rgba="1 1 1 1"/>
+          </material>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <mesh filename="${camera_collision_mesh}" scale="${camera_mesh_scale}"/>
+          </geometry>
+        </collision>
+      </link>
+
+      <joint name="${parent}_${camera_mount_link}_fixed" type="fixed">
+        <parent link="${parent}"/>
+        <child link="${camera_mount_link}"/>
+        <origin xyz="${camera_joint_xyz}" rpy="${camera_joint_rpy}"/>
+      </joint>
+
+      <link name="${camera_link}"/>
+      <joint name="${camera_mount_link}_to_${camera_link}_fixed" type="fixed">
+        <parent link="${camera_mount_link}"/>
+        <child link="${camera_link}"/>
+        <origin xyz="${camera_mount_to_camera_xyz}" rpy="${camera_mount_to_camera_rpy}"/>
+      </joint>
+    </xacro:if>
+
+    <link name="${name}_finger_left">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${finger_mass}"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+      <xacro:if value="${show_finger_meshes}">
+        <visual>
+          <origin xyz="${left_mesh_xyz}" rpy="${left_mesh_rpy}"/>
+          <geometry>
+            <mesh filename="${left_finger_mesh}" scale="${mesh_scale}"/>
+          </geometry>
+          <material name="white">
+            <color rgba="1 1 1 1"/>
+          </material>
+        </visual>
+        <collision>
+          <origin xyz="${left_mesh_xyz}" rpy="${left_mesh_rpy}"/>
+          <geometry>
+            <mesh filename="${left_finger_collision_mesh}" scale="${mesh_scale}"/>
+          </geometry>
+        </collision>
+      </xacro:if>
+    </link>
+
+    <joint name="${name}_close_open_joint" type="revolute">
+      <parent link="${name}_base"/>
+      <child link="${name}_finger_left"/>
+      <!-- ${name}_close_open_joint: hinge_rpy + hinge_axis_xyz define the joint frame and rotation axis -->
+      <origin xyz="${left_hinge_xyz}" rpy="${hinge_rpy}"/>
+      <axis xyz="${hinge_axis_xyz}"/>
+      <!-- ${name}_close_open_joint limits: lower/upper (rad), effort (Nm), velocity (rad/s) -->
+      <limit lower="${lower}" upper="${upper}" effort="${effort}" velocity="${velocity}"/>
+    </joint>
+
+    <link name="${name}_finger_right">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${finger_mass}"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+      <xacro:if value="${show_finger_meshes}">
+        <visual>
+          <origin xyz="${right_mesh_xyz}" rpy="${right_mesh_rpy}"/>
+          <geometry>
+            <mesh filename="${right_finger_mesh}" scale="${mesh_scale}"/>
+          </geometry>
+          <material name="white">
+            <color rgba="1 1 1 1"/>
+          </material>
+        </visual>
+        <collision>
+          <origin xyz="${right_mesh_xyz}" rpy="${right_mesh_rpy}"/>
+          <geometry>
+            <mesh filename="${right_finger_collision_mesh}" scale="${mesh_scale}"/>
+          </geometry>
+        </collision>
+      </xacro:if>
+    </link>
+
+    <joint name="${name}_finger_right_joint" type="revolute">
+      <parent link="${name}_base"/>
+      <child link="${name}_finger_right"/>
+      <!-- ${name}_finger_right_joint: hinge_rpy + hinge_axis_xyz define the joint frame and rotation axis -->
+      <origin xyz="${right_hinge_xyz}" rpy="${hinge_rpy}"/>
+      <axis xyz="${hinge_axis_xyz}"/>
+      <!-- ${name}_finger_right_joint limits: lower/upper (rad), effort (Nm), velocity (rad/s) -->
+      <limit lower="${right_lower}" upper="${right_upper}" effort="${effort}" velocity="${velocity}"/>
+      <!-- ${name}_finger_right_joint mimic: follows ${name}_close_open_joint -->
+      <mimic joint="${name}_close_open_joint" multiplier="${mimic_multiplier}" offset="${mimic_offset}"/>
+    </joint>
+
+    <!-- Optional TCP frame on the gripper base -->
+    <link name="${name}_tcp"/>
+    <joint name="${name}_base_to_tcp" type="fixed">
+      <parent link="${name}_base"/>
+      <child link="${name}_tcp"/>
+      <origin xyz="${tcp_xyz}" rpy="${tcp_rpy}"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

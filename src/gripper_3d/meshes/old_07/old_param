@@ -1,0 +1,36 @@
+  <xacro:macro name="attach_gripper_3d" params="
+    parent:=tool0
+    name:=gripper
+    joint_xyz:='0 0 0'
+    joint_rpy:='0 0 0'
+    mesh_scale:='0.001 0.001 0.001'
+    base_mesh:='package://gripper_3d/meshes/zusammen_greifer_3_c1.stl'
+    left_finger_mesh:='package://gripper_3d/meshes/finger_left.stl'
+    right_finger_mesh:='package://gripper_3d/meshes/finger_right.stl'
+    base_mesh_xyz:='0 0 0'
+    base_mesh_rpy:='0 0 0'
+    left_mesh_xyz:='0.0015 0.0037 0.0955'
+    left_mesh_rpy:='3.14159265359 0 0'
+    right_mesh_xyz:='-0.002 0.0037 0.0955'
+    right_mesh_rpy:='0 0 0'
+    left_hinge_xyz:='0.01 0 0'
+    right_hinge_xyz:='-0.01 0 0'
+    hinge_rpy:='0 0 0'
+    hinge_axis_xyz:='0 1 0'
+    lower:=0.0
+    upper:=0.8
+    effort:=5.0
+    velocity:=2.0
+    mimic_multiplier:='-1'
+    mimic_offset:='0'
+    base_mass:=0.5
+    finger_mass:=0.05">
+
+
+
+    left_mesh_xyz:='-0.0015 0.0115 0'
+    left_mesh_rpy:='0 -0.02530  0' 
+    right_mesh_xyz:='0.0015 -0.0035 0'
+    right_mesh_rpy:='0 -0.02530 0'
+    left_hinge_xyz:='0.02 0 0.056'
+    right_hinge_xyz:='-0.02 0 0.056'

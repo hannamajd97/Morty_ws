@@ -1,0 +1,22 @@
+# Execute a known grasp pose using the existing grasp_executor_lin C++ node.
+# This is the LOW-LEVEL action: no scanning, no detection — caller must already
+# know which grasp to perform. The high-level Pick action calls this at the end.
+#
+# Served by: grasp_executor_action_server (a Python shim around the topic-based
+# C++ executor). Publishes the goal to /grasp_pose, optional candidates to
+# /graspgen/candidate_poses_base_link, and a fresh cycle id to
+# /graspgen/selection_cycle_id, then waits for /grasp_executor_lin/cycle_done.
+
+# Goal
+geometry_msgs/PoseStamped grasp_pose
+geometry_msgs/PoseArray candidate_poses   # optional fallback candidates; leave empty to skip
+float32 timeout_s                         # 0.0 = use server default (e.g. 60s)
+---
+# Result
+bool success
+string error
+int64 cycle_id                            # the cycle id the executor reported on
+---
+# Feedback
+string phase                              # "publishing" | "waiting_for_executor" | "done"
+int64 cycle_id

@@ -1,0 +1,24 @@
+# These limits are used by MoveIt and augment/override the definitions in ur_description / gripper_3d.
+joint_limits:
+  shoulder_pan_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  shoulder_lift_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  elbow_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  wrist_1_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  wrist_2_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  wrist_3_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+  gripper_close_open_joint:
+    has_acceleration_limits: true
+    max_acceleration: 5.0
+

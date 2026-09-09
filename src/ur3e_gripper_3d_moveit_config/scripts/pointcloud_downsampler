@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""
+Point Cloud Downsampler Node - Optimized for High-Resolution Cameras
+
+This node subscribes to a dense point cloud topic, applies voxel grid downsampling,
+and publishes the downsampled result. Heavily optimized for 1280x720 cameras.
+
+Author: Claude
+"""
+
+import time
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import PointCloud2, PointField
+import numpy as np
+from sensor_msgs_py import point_cloud2 as pc2
+import struct
+import open3d as o3d
+
+
+class PointCloudDownsampler(Node):
+    """
+    ROS2 node that downsamples point clouds using voxel grid filtering.
+    Optimized for high-resolution cameras (1280x720+).
+    """
+
+    def __init__(self):
+        super().__init__('pointcloud_downsampler')
+
+        # Declare parameters
+        # 2026-09-02 (Majd: "run rviz with the camera at 30 FPS without
+        # drops"): the RViz-facing cloud. 5 mm voxels keep it dense enough
+        # to look like the raw stream; 15 Hz is fluid to the eye at a
+        # fraction of the raw 28.6 Hz x 111 k-point cost that locked RViz
+        # up (SYSTEM_STATE_LOG #298). Read once at start -> driver restart.
+        self.declare_parameter('voxel_size', 0.005)
+        self.declare_parameter('input_topic', '/camera/camera/depth/color/points')
+        self.declare_parameter('output_topic', '/camera/camera/depth/color/points_downsampled')
+        self.declare_parameter('stride', 1)  # Skip every N points for faster processing
+        self.declare_parameter('max_publish_hz', 15.0)  # Rate-limit output for RViz (was 5)
+
+        # Get parameters
+        self.voxel_size = self.get_parameter('voxel_size').value
+        input_topic = self.get_parameter('input_topic').value
+        output_topic = self.get_parameter('output_topic').value
+        self.stride = self.get_parameter('stride').value
+        max_hz = self.get_parameter('max_publish_hz').value
+        self._min_publish_interval = 1.0 / max(max_hz, 0.1)
+        self._last_publish_time = 0.0
+
+        # Create subscriber and publisher
+        self.sub = self.create_subscription(
+            PointCloud2,
+            input_topic,
+            self.pointcloud_callback,
+            10
+        )
+        self.pub = self.create_publisher(PointCloud2, output_topic, 10)
+
+        # Statistics
+        self.msg_count = 0
+        self.last_log_time = self.get_clock().now()
+
+        self.get_logger().info(
+            f'PointCloud downsampler started:\n'
+            f'  Input topic: {input_topic}\n'
+            f'  Output topic: {output_topic}\n'
+            f'  Voxel size: {self.voxel_size}m\n'
+            f'  Stride: {self.stride}'
+        )
+
+    @staticmethod
+    def _extract_float32_field(points_flat, offset):
+        field_bytes = points_flat[:, offset:offset + 4].copy()
+        return np.frombuffer(field_bytes.tobytes(), dtype=np.float32)
+
+    @staticmethod
+    def _rgb_uint32_to_colors(rgb_uint32):
+        r = ((rgb_uint32 >> 16) & 0xFF).astype(np.float32) / 255.0
+        g = ((rgb_uint32 >> 8) & 0xFF).astype(np.float32) / 255.0
+        b = (rgb_uint32 & 0xFF).astype(np.float32) / 255.0
+        return np.stack((r, g, b), axis=1)
+
+    @staticmethod
+    def _colors_to_rgb_float(colors):
+        rgb_uint32 = (
+            (np.clip(colors[:, 0], 0.0, 1.0) * 255.0).astype(np.uint32) << 16
+        ) | (
+            (np.clip(colors[:, 1], 0.0, 1.0) * 255.0).astype(np.uint32) << 8
+        ) | (
+            (np.clip(colors[:, 2], 0.0, 1.0) * 255.0).astype(np.uint32)
+        )
+        return rgb_uint32.view(np.float32)
+
+    def pointcloud_callback(self, msg):
+        """
+        Callback for incoming point cloud messages.
+        Uses optimized binary parsing for speed.
+
+        Args:
+            msg (PointCloud2): Input point cloud message
+        """
+        try:
+            # Rate-limit: skip frames to avoid flooding RViz
+            now = time.monotonic()
+            if (now - self._last_publish_time) < self._min_publish_interval:
+                return
+            self._last_publish_time = now
+
+            # Fast method: Parse binary data directly to numpy array
+            # This bypasses the slow Python generator approach
+
+            # Get point cloud dimensions
+            num_points = msg.width * msg.height
+
+            if num_points == 0:
+                return
+
+            # Parse XYZ coordinates directly from binary data
+            # Assume PointXYZRGB format (x, y, z, rgb as float32)
+            point_step = msg.point_step
+
+            # Extract all points as structured array
+            cloud_array = np.frombuffer(msg.data, dtype=np.uint8)
+
+            # Reshape to (N, point_step) where N is number of points
+            points_flat = cloud_array.reshape(-1, point_step)
+
+            # Apply stride (skip points) - much faster than islice
+            if self.stride > 1:
+                points_flat = points_flat[::self.stride]
+
+            field_offsets = {field.name: field.offset for field in msg.fields}
+
+            if not {"x", "y", "z"}.issubset(field_offsets):
+                self.get_logger().warn(
+                    'Point cloud is missing XYZ fields',
+                    throttle_duration_sec=5.0,
+                )
+                return
+
+            points = np.column_stack([
+                self._extract_float32_field(points_flat, field_offsets["x"]),
+                self._extract_float32_field(points_flat, field_offsets["y"]),
+                self._extract_float32_field(points_flat, field_offsets["z"]),
+            ])
+
+            color_field = None
+            if "rgb" in field_offsets:
+                color_field = "rgb"
+            elif "rgba" in field_offsets:
+                color_field = "rgba"
+
+            colors = None
+            if color_field is not None:
+                rgb_float = self._extract_float32_field(points_flat, field_offsets[color_field])
+                colors = self._rgb_uint32_to_colors(rgb_float.view(np.uint32))
+
+            # Remove NaN and Inf
+            mask = np.isfinite(points).all(axis=1)
+            points = points[mask]
+            if colors is not None:
+                colors = colors[mask]
+
+            if len(points) == 0:
+                self.get_logger().warn('No valid points after filtering', throttle_duration_sec=5.0)
+                return
+
+            original_count = len(points)
+
+            # Convert to Open3D point cloud
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points.astype(np.float64))
+            if colors is not None:
+                pcd.colors = o3d.utility.Vector3dVector(colors.astype(np.float64))
+
+            # Apply voxel grid downsampling
+            pcd_down = pcd.voxel_down_sample(voxel_size=self.voxel_size)
+
+            # Convert back to numpy
+            points_down = np.asarray(pcd_down.points, dtype=np.float32)
+            downsampled_count = len(points_down)
+
+            if colors is not None and pcd_down.has_colors():
+                colors_down = np.asarray(pcd_down.colors, dtype=np.float32)
+                rgb_down = self._colors_to_rgb_float(colors_down)
+                fields = [
+                    PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
+                    PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
+                    PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
+                    PointField(name='rgb', offset=12, datatype=PointField.FLOAT32, count=1),
+                ]
+                points_with_rgb = np.column_stack([points_down, rgb_down])
+                msg_down = pc2.create_cloud(msg.header, fields, points_with_rgb.tolist())
+            else:
+                # Fall back to XYZ-only output when the input cloud has no color field.
+                msg_down = pc2.create_cloud_xyz32(msg.header, points_down)
+
+            # Publish downsampled cloud
+            self.pub.publish(msg_down)
+
+            # Log statistics periodically (debug only)
+            self.msg_count += 1
+            current_time = self.get_clock().now()
+            if (current_time - self.last_log_time).nanoseconds > 5e9:  # Every 5 seconds
+                reduction_ratio = (1 - downsampled_count / original_count) * 100
+                self.get_logger().debug(
+                    f'Downsampling: {original_count} → {downsampled_count} points '
+                    f'({reduction_ratio:.1f}% reduction, {self.msg_count} msgs processed)'
+                )
+                self.last_log_time = current_time
+
+        except Exception as e:
+            self.get_logger().error(f'Error processing point cloud: {str(e)}', throttle_duration_sec=5.0)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = PointCloudDownsampler()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

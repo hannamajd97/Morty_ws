@@ -1,0 +1,25 @@
+# Call GraspGen on a point cloud and return ranked grasp candidates.
+# Served by: grasp_pipeline.
+
+# Goal
+sensor_msgs/PointCloud2 cloud      # if empty, server uses the most recent fused cloud
+geometry_msgs/Point object_centroid  # optional hint
+float32 grasp_threshold            # 0.0 = use server default
+uint32 max_candidates_returned     # 0 = no limit
+
+# Filter toggles (correspond to existing grasp_filters.py)
+bool filter_no_under_grasp
+bool filter_finger_penetration
+bool filter_view_consistent
+bool filter_roll_upright_by_plane
+bool filter_top_only_plane
+---
+# Result
+morty_interfaces/Grasp[] candidates  # ranked, best first
+morty_interfaces/Grasp best
+bool success
+string error
+---
+# Feedback
+string phase                       # "calling_graspgen" | "filtering" | "ranking"
+uint32 candidates_remaining

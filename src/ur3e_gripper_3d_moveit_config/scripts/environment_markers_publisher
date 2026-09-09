@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+
+import math
+
+import rclpy
+from rclpy.node import Node
+from rclpy.parameter import Parameter
+from visualization_msgs.msg import Marker, MarkerArray
+
+
+def _quat_from_rpy(roll: float, pitch: float, yaw: float) -> tuple[float, float, float, float]:
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+    return (qx, qy, qz, qw)
+
+
+def _rotate_vector_by_rpy(vx: float, vy: float, vz: float, roll: float, pitch: float, yaw: float) -> tuple[float, float, float]:
+    # R = Rz(yaw) * Ry(pitch) * Rx(roll)
+    cr = math.cos(roll)
+    sr = math.sin(roll)
+    cp = math.cos(pitch)
+    sp = math.sin(pitch)
+    cy = math.cos(yaw)
+    sy = math.sin(yaw)
+
+    r00 = cy * cp
+    r01 = cy * sp * sr - sy * cr
+    r02 = cy * sp * cr + sy * sr
+
+    r10 = sy * cp
+    r11 = sy * sp * sr + cy * cr
+    r12 = sy * sp * cr - cy * sr
+
+    r20 = -sp
+    r21 = cp * sr
+    r22 = cp * cr
+
+    x = r00 * vx + r01 * vy + r02 * vz
+    y = r10 * vx + r11 * vy + r12 * vz
+    z = r20 * vx + r21 * vy + r22 * vz
+    return (x, y, z)
+
+
+class EnvironmentMarkersPublisher(Node):
+    def __init__(self):
+        # Parameters are expected to come from a shared YAML (see `gripper_3d/config/environment.yaml`).
+        # Allow the node to run without explicit `declare_parameter` boilerplate.
+        super().__init__(
+            "environment_markers_publisher",
+            allow_undeclared_parameters=True,
+            automatically_declare_parameters_from_overrides=True,
+        )
+
+        self._require_parameters(
+            [
+                "frame_id",
+                "publish_wall",
+                "wall_size",
+                "wall_xyz",
+                "wall_rpy",
+                "wall_rgba",
+                "publish_table",
+                "table_size",
+                "table_xyz",
+                "table_rpy",
+                "table_rgba",
+                "publish_flower",
+                "flower_size",
+                "flower_xyz",
+                "flower_rpy",
+                "flower_rgba",
+                "flower_pose_is_center",
+            ]
+        )
+
+        self.publisher = self.create_publisher(MarkerArray, "environment_markers", 1)
+        self.timer = self.create_timer(0.2, self._publish)
+
+    def _require_parameters(self, names: list[str]) -> None:
+        missing = []
+        for name in names:
+            p = self.get_parameter(name)
+            if p.type_ == Parameter.Type.NOT_SET:
+                missing.append(name)
+        if missing:
+            raise RuntimeError(
+                "Missing required ROS parameters for environment_markers_publisher: "
+                + ", ".join(missing)
+                + " (load gripper_3d/config/environment.yaml)"
+            )
+
+    def _publish(self):
+        frame_id = self.get_parameter("frame_id").get_parameter_value().string_value
+
+        publish_wall = self.get_parameter("publish_wall").get_parameter_value().bool_value
+        publish_table = self.get_parameter("publish_table").get_parameter_value().bool_value
+        publish_flower = self.get_parameter("publish_flower").get_parameter_value().bool_value
+
+        wall_size = self.get_parameter("wall_size").get_parameter_value().double_array_value
+        wall_xyz = self.get_parameter("wall_xyz").get_parameter_value().double_array_value
+        wall_rpy = self.get_parameter("wall_rpy").get_parameter_value().double_array_value
+        wall_rgba = self.get_parameter("wall_rgba").get_parameter_value().double_array_value
+
+        table_size = self.get_parameter("table_size").get_parameter_value().double_array_value
+        table_xyz = self.get_parameter("table_xyz").get_parameter_value().double_array_value
+        table_rpy = self.get_parameter("table_rpy").get_parameter_value().double_array_value
+        table_rgba = self.get_parameter("table_rgba").get_parameter_value().double_array_value
+
+        flower_size = self.get_parameter("flower_size").get_parameter_value().double_array_value
+        flower_xyz = self.get_parameter("flower_xyz").get_parameter_value().double_array_value
+        flower_rpy = self.get_parameter("flower_rpy").get_parameter_value().double_array_value
+        flower_rgba = self.get_parameter("flower_rgba").get_parameter_value().double_array_value
+        flower_pose_is_center = self.get_parameter("flower_pose_is_center").get_parameter_value().bool_value
+
+        now = self.get_clock().now().to_msg()
+        markers = MarkerArray()
+
+        if publish_wall:
+            wall = Marker()
+            wall.header.frame_id = frame_id
+            wall.header.stamp = now
+            wall.ns = "environment"
+            wall.id = 1
+            wall.type = Marker.CUBE
+            wall.action = Marker.ADD
+            wall.pose.position.x = float(wall_xyz[0])
+            wall.pose.position.y = float(wall_xyz[1])
+            wall.pose.position.z = float(wall_xyz[2])
+            qx, qy, qz, qw = _quat_from_rpy(float(wall_rpy[0]), float(wall_rpy[1]), float(wall_rpy[2]))
+            wall.pose.orientation.x = qx
+            wall.pose.orientation.y = qy
+            wall.pose.orientation.z = qz
+            wall.pose.orientation.w = qw
+            wall.scale.x = float(wall_size[0])
+            wall.scale.y = float(wall_size[1])
+            wall.scale.z = float(wall_size[2])
+            wall.color.r = float(wall_rgba[0])
+            wall.color.g = float(wall_rgba[1])
+            wall.color.b = float(wall_rgba[2])
+            wall.color.a = float(wall_rgba[3])
+            markers.markers.append(wall)
+
+        if publish_table:
+            table = Marker()
+            table.header.frame_id = frame_id
+            table.header.stamp = now
+            table.ns = "environment"
+            table.id = 2
+            table.type = Marker.CUBE
+            table.action = Marker.ADD
+            table.pose.position.x = float(table_xyz[0])
+            table.pose.position.y = float(table_xyz[1])
+            table.pose.position.z = float(table_xyz[2])
+            qx, qy, qz, qw = _quat_from_rpy(float(table_rpy[0]), float(table_rpy[1]), float(table_rpy[2]))
+            table.pose.orientation.x = qx
+            table.pose.orientation.y = qy
+            table.pose.orientation.z = qz
+            table.pose.orientation.w = qw
+            table.scale.x = float(table_size[0])
+            table.scale.y = float(table_size[1])
+            table.scale.z = float(table_size[2])
+            table.color.r = float(table_rgba[0])
+            table.color.g = float(table_rgba[1])
+            table.color.b = float(table_rgba[2])
+            table.color.a = float(table_rgba[3])
+            markers.markers.append(table)
+
+        # In the URDF the flower box is centered at (0, FLOWER_Y/2, 0) in the flower link frame.
+        # For environment usage it's often easier to specify the box center directly.
+        if publish_flower:
+            if flower_pose_is_center:
+                flower_center_offset = (0.0, 0.0, 0.0)
+            else:
+                flower_center_offset = (0.0, float(flower_size[1]) / 2.0, 0.0)
+            roll, pitch, yaw = (float(flower_rpy[0]), float(flower_rpy[1]), float(flower_rpy[2]))
+            dx, dy, dz = _rotate_vector_by_rpy(*flower_center_offset, roll, pitch, yaw)
+
+            flower = Marker()
+            flower.header.frame_id = frame_id
+            flower.header.stamp = now
+            flower.ns = "environment"
+            flower.id = 3
+            flower.type = Marker.CUBE
+            flower.action = Marker.ADD
+            flower.pose.position.x = float(flower_xyz[0]) + dx
+            flower.pose.position.y = float(flower_xyz[1]) + dy
+            flower.pose.position.z = float(flower_xyz[2]) + dz
+            qx, qy, qz, qw = _quat_from_rpy(roll, pitch, yaw)
+            flower.pose.orientation.x = qx
+            flower.pose.orientation.y = qy
+            flower.pose.orientation.z = qz
+            flower.pose.orientation.w = qw
+            flower.scale.x = float(flower_size[0])
+            flower.scale.y = float(flower_size[1])
+            flower.scale.z = float(flower_size[2])
+            flower.color.r = float(flower_rgba[0])
+            flower.color.g = float(flower_rgba[1])
+            flower.color.b = float(flower_rgba[2])
+            flower.color.a = float(flower_rgba[3])
+            markers.markers.append(flower)
+
+        self.publisher.publish(markers)
+
+
+def main():
+    rclpy.init()
+    node = EnvironmentMarkersPublisher()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    main()

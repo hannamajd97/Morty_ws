@@ -1,0 +1,59 @@
+# ===========================================================================
+# Python dependencies for ur_ros2_ws on ROS 2 Humble / Ubuntu 22.04
+# ---------------------------------------------------------------------------
+# Install with:
+#     pip install --user --upgrade pip
+#     pip install --user -r requirements.txt
+#
+# DO NOT use a venv with ROS 2 Humble - the rclpy / message Python paths
+# from /opt/ros/humble do not cooperate cleanly with venv isolation.
+# Use --user instead so packages land in ~/.local/lib/python3.10/site-packages
+# alongside ROS's own packages.
+#
+# Some packages need apt prerequisites first; see APT_PREREQS.md or the
+# accompanying setup notes for the system-side installs (portaudio19-dev,
+# espeak-ng, pulseaudio, etc.).
+# ===========================================================================
+
+# --- Core scientific stack (PIN these - they survive the NumPy 2.x break) ---
+numpy==1.26.4
+opencv-python<5
+
+# --- Transforms helper (apt version uses np.float which NumPy 1.20+ removed) -
+transforms3d>=0.4
+
+# --- Transformers stack pinned for Kokoro TTS compatibility ----------------
+transformers==4.45.0
+tokenizers<0.21
+
+# --- Speech-to-text ---------------------------------------------------------
+faster-whisper            # primary STT engine (faster-whisper / CTranslate2)
+vosk                      # backup STT engine, fully offline
+
+# --- Voice activity detection -----------------------------------------------
+webrtcvad                 # WebRTC VAD used for utterance segmentation
+
+# --- Text-to-speech ---------------------------------------------------------
+kokoro                    # neural TTS, primary engine for English
+pyttsx3                   # offline TTS fallback (uses espeak-ng on Linux)
+
+# --- Audio I/O --------------------------------------------------------------
+pyaudio                   # microphone capture (needs portaudio19-dev apt pkg)
+
+# --- Perception -------------------------------------------------------------
+open3d                    # point cloud processing in grasp_pipeline
+ultralytics               # YOLO model inference for object detection
+
+# --- LLM backends -----------------------------------------------------------
+openai                    # OpenAI Responses API (gpt-5.4-mini etc.)
+boto3                     # AWS Bedrock Converse (Claude Haiku etc.)
+pydantic                  # structured output validation for llm_service
+
+# --- ZeroMQ (used by grasp pipeline for GraspGen client) --------------------
+pyzmq                     # python binding for ZeroMQ
+
+# --- Plotting / experiment analysis ----------------------------------------
+matplotlib                # plot generation for experiment_runs aggregates
+
+# --- Documentation generation ----------------------------------------------
+python-docx               # used by tools/build_experiment_report.py

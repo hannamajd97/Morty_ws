@@ -1,0 +1,7 @@
+# Return the latest cached perception snapshot without re-running detection.
+# Use DetectObjects.action for a fresh capture instead.
+
+---
+morty_interfaces/Detection[] detections
+builtin_interfaces/Time stamp
+bool is_stale                 # true if the snapshot is older than the server's freshness threshold

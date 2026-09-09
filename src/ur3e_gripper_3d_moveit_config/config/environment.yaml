@@ -1,0 +1,64 @@
+/**:
+  ros__parameters:
+    # Shared environment parameters for:
+    # - ur3e_gripper_3d_moveit_config/environment_markers_publisher (RViz markers)
+    # - ur3e_gripper_3d_moveit_config/planning_scene_environment_publisher (MoveIt collision objects)
+    publish_wall: true
+    wall_size: [2.0, 2.0, 0.10]
+    wall_xyz: [0.0, 0.0, -0.08]
+    wall_rpy: [0.0, 0.0, 0.0]
+
+    # Separate table collision object
+    publish_table: true
+    # 2026-08-21: 55 cm CUBE -> thin TABLETOP SLAB. Majd's RViz picture
+    # proved the cube cannot sit anywhere safely: at z-center 0.875 it
+    # walled off the grasp space ABOVE the tabletop (finger contacts in
+    # mid-air, 29 s planner grinds); at 0.32 it filled the arm's own
+    # travel space BELOW table level (robot at home shown in collision).
+    # The base is mounted LOW: tabletop measured at z=0.622 above base,
+    # arm works under/beside that plane. Only the tabletop slab itself
+    # needs collision protection.
+    # 2026-08-25 (FINAL, Majd): thesis cube 0.55^3 at the OLD
+    # WORKSPACE'S placement — z-center 0.875, body spanning z 0.60-1.15,
+    # i.e. UPWARD from the tabletop (+z of the home TCP, away from the
+    # robot). My earlier z-center 0.325 (body downward into the arm's
+    # workspace) was the wrong reading of the thesis and killed picks.
+    # y kept at Majd's tuned -0.615 (old ws had -0.595).
+    # NOTE: the executor wipes ALL collision objects before each real
+    # approach and they only return on driver restart — so this cube
+    # mostly guards transit moves; the FIRST pick after a driver restart
+    # still probes candidates against it (candidate z ~0.58-0.75 may
+    # intersect its 0.60 bottom edge).
+    table_size: [0.55, 0.55, 0.55]
+    # Center pose in world (z-center = 0.30 => spans z=[0.0..0.60])
+    # 2026-08-20 Majd: y -0.595 -> -0.695 -> -0.605 -> -0.615 (2 cm net
+    # shift away from the robot).
+    # 2026-08-21 z 0.875 -> 0.32 (TRIAL, Majd: "we can try and I will
+    # show you a picture — deal"): the box now spans z 0.045..0.595 =
+    # the real table BODY, top 5 mm under the camera-measured tabletop
+    # (0.62). Was 0.60..1.15 = a phantom wall in the object zone that
+    # cost 30-50 s of planner collision-retries per pick. REVERT = put
+    # 0.875 back and restart the driver.
+    # Slab spans z 0.55..0.60 — top 2 cm under the camera-measured
+    # surface (0.622), grasps at 0.61+ stay clear above, arm stays
+    # clear below.
+    table_xyz: [0.275, -0.615, 0.875]
+    table_rpy: [0.0, 0.0, 0.7853981633974483]
+
+    publish_mount_surface: true
+    mount_surface_size: [0.55, 0.55, 0.25]
+    mount_surface_xyz: [0.275, -0.595, 0.0]
+    mount_surface_rpy: [0.0, 0.0, 0.7853981633974483]
+
+    publish_flower: true
+    flower_size: [2.0, 2.0, 2.0]
+    flower_xyz: [1.30, -1.0, 0.0]
+    # Flower orientation (45deg yaw about Z)
+    flower_rpy: [0.0, 0.0, 0.7853981633974483]
+    flower_pose_is_center: true
+
+    # Highly visible colors for RViz + MoveIt scene
+    wall_rgba: [1.0, 1.0, 0.0, 0.45]     # yellow
+    table_rgba: [1.0, 1.0, 1.0, 0.70]    # white
+    mount_surface_rgba: [0.0, 1.0, 0.5, 0.60]  # green
+    flower_rgba: [0.75, 0.20, 0.85, 0.50]

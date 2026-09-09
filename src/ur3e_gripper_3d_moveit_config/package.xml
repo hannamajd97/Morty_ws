@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ur3e_gripper_3d_moveit_config</name>
+  <version>0.1.0</version>
+  <description>MoveIt2 configuration for UR3e with the gripper_3d end-effector.</description>
+
+  <maintainer email="Majd.Hanna@student.reutlingen-university.de">Majd Hanna</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>moveit_ros_move_group</exec_depend>
+  <exec_depend>moveit_ros_visualization</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>position_controllers</exec_depend>
+  <exec_depend>mock_components</exec_depend>
+  <exec_depend>ur_robot_driver</exec_depend>
+
+  <exec_depend>gripper_3d</exec_depend>
+  <exec_depend>ur_description</exec_depend>
+
+  <!-- Environment publishers (PlanningScene + RViz markers) -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>shape_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

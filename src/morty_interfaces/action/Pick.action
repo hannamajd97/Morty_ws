@@ -1,0 +1,30 @@
+# High-level pick: scan -> detect -> match description -> grasp -> lift.
+# Served by: grasp_pipeline. Calls MoveToPose / OperateGripper on the executor,
+# and ScanScene / DetectObjects / GenerateGrasps on its own siblings.
+
+uint8 SCAN_SKIP=0
+uint8 SCAN_SINGLEVIEW=1
+uint8 SCAN_MULTIVIEW=2
+
+# Goal
+string object_description     # natural-language target, e.g. "blue mug"
+string object_id              # if known from a prior DetectObjects, takes precedence
+uint8 scan_mode
+string[] scan_views           # optional override; empty = server default
+bool ask_on_ambiguity         # if true and >1 match, trigger SelectObject
+float32 grasp_force_n         # 0.0 = use server default
+float32 lift_height_m         # 0.0 = use server default
+---
+# Result
+bool success
+string grasped_object_id
+geometry_msgs/Pose grasp_pose
+geometry_msgs/Pose final_pose
+string error
+---
+# Feedback
+string phase                  # "scanning" | "detecting" | "disambiguating" |
+                              # "planning_grasp" | "approaching" | "closing" |
+                              # "lifting" | "done"
+float32 progress
+string narration              # human-readable, chat_node speaks this

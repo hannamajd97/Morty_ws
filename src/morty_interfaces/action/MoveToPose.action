@@ -1,0 +1,23 @@
+# Move the arm to a Cartesian pose.
+# Served by: ur3e_gripper_3d_moveit_commander (executor package).
+
+# Goal
+geometry_msgs/PoseStamped target_pose
+float32 velocity_scaling      # 0.0 = use server default, otherwise 0.0..1.0
+float32 acceleration_scaling  # 0.0 = use server default, otherwise 0.0..1.0
+bool cartesian_path           # true = LIN, false = MoveIt joint plan
+float32 cartesian_eef_step    # metres, used when cartesian_path = true
+string planner_id             # empty = use server default
+float32 planning_time_s       # 0.0 = use server default
+---
+# Result
+bool success
+string error                  # empty on success
+geometry_msgs/Pose final_pose
+float64 planning_time_s
+float64 execution_time_s
+---
+# Feedback
+string phase                  # "planning" | "executing" | "settling"
+float32 progress              # 0.0..1.0
+float64 distance_remaining_m

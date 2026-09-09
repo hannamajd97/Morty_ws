@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>grasp_pipeline</name>
+  <version>0.1.0</version>
+  <description>YOLO + speech + point cloud filtering + GraspGen client</description>
+
+  <maintainer email="Majd.Hanna@student.reutlingen-university.de">Majd Hanna</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>shape_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>ur3e_fast_observation</exec_depend>
+  <!-- optional (documenting pip deps) -->
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

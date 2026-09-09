@@ -1,0 +1,18 @@
+# High-level place: move above target -> lower -> open gripper -> retract.
+# Served by: grasp_pipeline.
+
+# Goal
+geometry_msgs/PoseStamped target_pose   # explicit target; takes precedence
+string target_description               # natural-language fallback, e.g. "to the left"
+float32 release_height_m                # height above target_pose.z to release
+float32 retract_height_m                # how far to lift after release
+---
+# Result
+bool success
+geometry_msgs/Pose final_pose
+string error
+---
+# Feedback
+string phase                  # "approaching" | "lowering" | "releasing" | "retracting" | "done"
+float32 progress
+string narration

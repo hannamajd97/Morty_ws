@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ur3e_fast_observation</name>
+  <version>0.1.0</version>
+  <description>
+    Fast observation-pose motion for the UR3e arm. Provides a teach tool to
+    record observation joint poses via /joint_states and a replay tool that
+    sends them straight to the FollowJointTrajectory action of the
+    scaled_joint_trajectory_controller, bypassing MoveIt for taught,
+    collision-free observation viewpoints.
+  </description>
+
+  <maintainer email="Majd.Hanna@student.reutlingen-university.de">Majd Hanna</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+  <exec_depend>action_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <!-- For move_to_named_pose_server: MoveIt collision pre-check + action def -->
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>morty_interfaces</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

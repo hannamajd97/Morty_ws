@@ -1,0 +1,16 @@
+# TTS playback via Kokoro (with pyttsx3 fallback).
+# Served by: communication_llm.
+
+# Goal
+string text
+string voice                  # empty = server default (e.g. "af_bella")
+float32 volume_gain           # dB; 0.0 = server default
+bool interrupt_current        # if true, cancel any in-flight Speak before starting
+---
+# Result
+bool success
+string error
+---
+# Feedback
+string phase                  # "synthesizing" | "playing" | "finished"
+float32 progress              # 0.0..1.0

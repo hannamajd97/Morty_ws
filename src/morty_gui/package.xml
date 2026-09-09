@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>morty_gui</name>
+  <version>0.1.0</version>
+  <description>
+    Unified operator + advanced-debug GUI for the Morty grasping pipeline.
+    Talks to grasp_pipeline exclusively via ROS topics — no code imports —
+    so the pipeline stays headless and the GUI can crash/restart freely.
+  </description>
+  <maintainer email="Majd.Hanna@student.reutlingen-university.de">Majd Hanna</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>action_msgs</depend>
+  <depend>control_msgs</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>cv_bridge</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
