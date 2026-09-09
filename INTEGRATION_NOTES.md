@@ -146,8 +146,8 @@ the Output and Input tabs; otherwise the microphone hears the speakers.
 `us.anthropic.`, `eu.anthropic.`, `meta.`, `mistral.`, `cohere.`, `ai21.`,
 `amazon.` go to AWS Bedrock Converse through boto3; `gpt-` with
 `OPENAI_BASE_URL` set goes to Bedrock's OpenAI-compatible endpoint; `gpt-`
-without it goes to OpenAI directly. `scripts/use_openai.sh` and
-`scripts/use_bedrock.sh` export the matching variables from `.morty_env`.
+without it goes to OpenAI directly. `llm_provider/use_openai.sh` and
+`llm_provider/use_bedrock.sh` export the matching variables from `.morty_env`.
 
 ## 11. Troubleshooting
 

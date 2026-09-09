@@ -4,7 +4,7 @@
 #   source ~/morty_ws/use_openai.sh
 #   ros2 launch communication_llm voice_robot.launch.py
 
-# Resolve the workspace from this script's own location (…/<ws>/scripts/), so it
+# Resolve the workspace from this script's own location (…/<ws>/llm_provider/), so it
 # works whatever the folder is called (normally ~/morty_ws).
 WS_DIR="${WS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 source "$WS_DIR/.morty_env"

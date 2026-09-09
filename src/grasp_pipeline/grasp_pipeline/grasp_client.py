@@ -10,7 +10,7 @@ supported, chosen by the ``GRASPGEN_MODE`` environment variable:
     inference directly. No separate service / ZMQ port needed. The model loads
     once (lazily) and is cached for the life of the process.
   * ``zmq`` — talk to a standalone GraspGen service over a ZMQ REQ/REP socket
-    (the original design; start it with ``start_graspgen.sh``). Kept as a
+    (the original design: GraspGen's own ZMQ service, ``GraspGen/scripts``). Kept as a
     fallback so the service-based setup still works unchanged.
 
 Both backends return the SAME dict shape, so every caller

@@ -167,7 +167,7 @@ export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$WS_DIR
 # ── Source the right provider based on --debug flag ─────────────────────
 if $USE_DEBUG; then
     # Bedrock + Claude (cheap dev path).
-    source "$WS_DIR/scripts/use_bedrock.sh"
+    source "$WS_DIR/llm_provider/use_bedrock.sh"
 else
     # OpenAI direct + gpt-5.4-mini (production default).
     # First load .morty_env directly so we can sanity-check the key
@@ -190,7 +190,7 @@ Options:
 EOF
         exit 1
     fi
-    source "$WS_DIR/scripts/use_openai.sh"
+    source "$WS_DIR/llm_provider/use_openai.sh"
 fi
 
 # ── Decide launch file + args based on hardware flags ────────────────────

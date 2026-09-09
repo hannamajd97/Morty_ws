@@ -30,8 +30,8 @@ against the scene, and picks it.
 | `vla_experiments` | synchronised demonstration recorder (both cameras, joints, TCP pose, gripper, commands) |
 | `Universal_Robots_ROS2_Driver`, `Universal_Robots_ROS2_Description` | vendor driver and robot description, built from source |
 
-Other folders: `scripts/` (provider switches, helpers) and `config/` (Fast
-DDS profiles). How the parts are wired, what a fresh machine needs and a
+Other folders: `llm_provider/` (API-key and provider selection sourced by
+`morty.sh`) and `config/` (Fast DDS profiles). How the parts are wired, what a fresh machine needs and a
 troubleshooting table are in [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md).
 
 ## What is not in the repository
