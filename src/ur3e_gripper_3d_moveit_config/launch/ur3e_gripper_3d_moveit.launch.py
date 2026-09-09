@@ -45,6 +45,12 @@ def generate_launch_description():
     use_ur_driver = LaunchConfiguration("use_ur_driver")
     camera_enabled = LaunchConfiguration("camera_enabled")
     use_real_camera = LaunchConfiguration("use_real_camera")
+    # RealSense point cloud + downsampler (2026-09-09): the driver's own
+    # point cloud cost a full core (99 % CPU) and its only consumer, the
+    # downsampler, had no subscribers — the pipeline builds its clouds
+    # from the depth image and the GUI shows those. Off by default; pass
+    # camera_pointcloud:=true for an RViz camera cloud.
+    camera_pointcloud = LaunchConfiguration("camera_pointcloud")
     use_joint_state_publisher_gui = LaunchConfiguration("use_joint_state_publisher_gui")
     use_standalone_ros2_control = LaunchConfiguration("use_standalone_ros2_control")
     robot_ip = LaunchConfiguration("robot_ip")
@@ -302,7 +308,7 @@ def generate_launch_description():
                 "output_topic": "/camera/camera/depth/color/points_downsampled",
             }
         ],
-        condition=IfCondition(use_real_camera),
+        condition=IfCondition(AndSubstitution(use_real_camera, camera_pointcloud)),
     )
 
     ur_driver_launch = IncludeLaunchDescription(
@@ -337,6 +343,7 @@ def generate_launch_description():
         # Only start the camera driver when explicitly requested.
         # (camera_enabled only affects the robot model / TF, not the hardware driver.)
         condition=IfCondition(use_real_camera),
+        launch_arguments={"pointcloud_enable": camera_pointcloud}.items(),
     )
 
     move_group_launch = IncludeLaunchDescription(
@@ -385,6 +392,12 @@ def generate_launch_description():
                 "use_real_camera",
                 default_value="false",
                 description="Start the RealSense driver (gripper_3d realsense_d345_hardware.launch.py).",
+            ),
+            DeclareLaunchArgument(
+                "camera_pointcloud",
+                default_value="false",
+                description="Let the RealSense driver compute its point cloud (+ downsampler) for RViz. "
+                            "Costs a full core; the pipeline and GUI do not use it.",
             ),
             DeclareLaunchArgument(
                 "use_ur_driver",

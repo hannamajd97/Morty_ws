@@ -36,6 +36,14 @@ from rclpy.qos import QoSProfile, QoSDurabilityPolicy, QoSReliabilityPolicy, qos
 from rclpy.time import Time
 from std_msgs.msg import String
 from sensor_msgs.msg import Image, CameraInfo, CompressedImage, JointState
+
+
+class _Jpeg:
+    """A camera frame kept as its compressed bytes (see _on_cimg)."""
+    __slots__ = ("data",)
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
 from geometry_msgs.msg import PoseStamped
 from control_msgs.msg import JointTrajectoryControllerState
 from tf2_ros import Buffer, TransformListener, TransformException
@@ -171,11 +179,12 @@ class EpisodeRecorder(Node):
             self.img[cam] = (time.time(), bgr)
 
     def _on_cimg(self, cam, msg):
-        bgr = cv2.imdecode(np.frombuffer(bytes(msg.data), np.uint8), cv2.IMREAD_COLOR)
-        if bgr is None:
-            return
+        # Keep the JPEG bytes as they are (2026-09-09): decoding every frame
+        # of both cameras cost this node 52 % of a core while idle, and the
+        # episode re-encoded them anyway. The tick writes the bytes straight
+        # to disk; freshness only needs the timestamp.
         with self.lock:
-            self.img[cam] = (time.time(), bgr)
+            self.img[cam] = (time.time(), _Jpeg(bytes(msg.data)))
 
     def _on_info(self, cam, msg):
         if self.info[cam] is None:
@@ -445,7 +454,11 @@ class EpisodeRecorder(Node):
         i = len(self.rows["t"])
         for cam, sample in (("exterior", ext), ("wrist", wri)):
             if sample is not None:
-                cv2.imwrite(str(self.ep_dir / "images" / cam / f"{i:06d}.jpg"), sample[1], [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_q])
+                path = self.ep_dir / "images" / cam / f"{i:06d}.jpg"
+                if isinstance(sample[1], _Jpeg):
+                    path.write_bytes(sample[1].data)        # original JPEG, no decode/re-encode
+                else:
+                    cv2.imwrite(str(path), sample[1], [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_q])
         r = self.rows
         r["t"].append(now - self.t0); r["stamp_ros"].append(self.get_clock().now().nanoseconds * 1e-9)
         r["joint_pos"].append(joints[1]); r["joint_vel"].append(joints[2])
