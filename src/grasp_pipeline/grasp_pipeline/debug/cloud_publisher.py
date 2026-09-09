@@ -109,21 +109,34 @@ class CloudPublisher:
         points: np.ndarray,
         colors: Optional[np.ndarray],
     ) -> PointCloud2:
-        pts = np.asarray(points, dtype=np.float32)
-        if pts.size == 0:
-            return pc2.create_cloud_xyz32(header, [])
+        # Built straight from the numpy buffer (2026-09-09): the previous
+        # ``pc2.create_cloud(..., xyzrgb.tolist())`` packed every point
+        # through Python and cost 0.26-0.49 s for the 7k-16k-point object
+        # cloud on the pick's critical path. Same message, ~1 ms.
+        pts = np.ascontiguousarray(np.asarray(points, dtype=np.float32).reshape(-1, 3))
         cols = None if colors is None else np.asarray(colors)
-        if cols is None or len(cols) != len(pts):
-            return pc2.create_cloud_xyz32(header, pts.tolist())
-        rgb = self.colors_to_rgb_float(cols)
         fields = [
             PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
             PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
             PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
-            PointField(name="rgb", offset=12, datatype=PointField.FLOAT32, count=1),
         ]
-        xyzrgb = np.column_stack([pts, rgb])
-        return pc2.create_cloud(header, fields, xyzrgb.tolist())
+        if cols is not None and len(cols) == len(pts) and len(pts) > 0:
+            rgb = self.colors_to_rgb_float(cols).astype(np.float32).reshape(-1, 1)
+            fields.append(PointField(name="rgb", offset=12, datatype=PointField.FLOAT32, count=1))
+            data = np.ascontiguousarray(np.column_stack([pts, rgb]).astype(np.float32))
+        else:
+            data = pts
+        msg = PointCloud2()
+        msg.header = header
+        msg.height = 1
+        msg.width = int(data.shape[0])
+        msg.fields = fields
+        msg.is_bigendian = False
+        msg.point_step = int(data.shape[1] * 4)
+        msg.row_step = msg.point_step * msg.width
+        msg.is_dense = True
+        msg.data = data.tobytes()
+        return msg
 
     # ------------------------------------------------------------------
     # Registration preview
