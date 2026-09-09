@@ -255,6 +255,13 @@ class MortyGuiBridge(Node):
         self._pub_llm_abort = self.create_publisher(
             String, "/grasp_executor_lin_llm/abort", 10
         )
+        # The pipeline's own abort (2026-09-09): Reset/E-Stop used to reach
+        # the pipeline only through the voice stack's intent router; with
+        # voice off, a pipeline stuck "waiting for executor completion"
+        # ignored every Reset press.
+        self._pub_pipeline_abort = self.create_publisher(
+            String, "/grasp_pipeline/abort", 10
+        )
         self.create_subscription(
             String, "/yolo/all_detections",
             lambda m: self.trial_mark("detections", str(m.data)[:400]), 5,
@@ -756,8 +763,11 @@ class MortyGuiBridge(Node):
             self._executor_done_pending = str(msg.data)
 
     def publish_llm_abort(self) -> None:
-        """Ask the voice/LLM executor to freeze in place, instantly."""
+        """Abort the pick everywhere: the executor freezes in place, the
+        pipeline ends its cycle at the next phase boundary (or leaves its
+        wait for the executor)."""
         self._pub_llm_abort.publish(String(data="abort"))
+        self._pub_pipeline_abort.publish(String(data="abort"))
         self.llm_cycle_active = False
 
     def _on_cand_status(self, msg: String) -> None:

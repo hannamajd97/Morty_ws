@@ -83,6 +83,25 @@ class PickPipeline:
         self._node.last_candidates_base = None
         self._node.last_candidate_scores = None
 
+        # ── Phase 0: the robot's transforms must exist ────────────────
+        # Every later phase needs camera -> base_link (obstacles, centroid,
+        # candidates). Without the driver there is no robot_state_publisher
+        # and no such chain; the pick then failed late, silently, and left
+        # the cycle waiting for an executor that never got candidates
+        # (2026-09-09). Say it once, at the start, and end the cycle.
+        try:
+            import rclpy.time as _rt
+            import rclpy.duration as _rd
+            cam_frame = str(getattr(sel.get("header"), "frame_id", "") or "camera_color_optical_frame")
+            if not self._node.tf_buffer.can_transform(
+                    "base_link", cam_frame, _rt.Time(), timeout=_rd.Duration(seconds=0.5)):
+                self._node.get_logger().error(
+                    f"No transform base_link <- {cam_frame}: the robot driver is not running "
+                    "(no robot_state_publisher). Start the driver, then select again.")
+                return False
+        except Exception as exc:
+            self._node.get_logger().warn(f"[tf-precheck] skipped: {exc}")
+
         # ── Phase 1: pre-position to the registration seed pose ───────
         if bool(self._node.get_parameter("registration_enabled").value) and bool(
             self._node.get_parameter("registration_move_to_initial_target").value
@@ -802,7 +821,13 @@ class PickPipeline:
                     f"'{self._node.get_parameter('grasp_candidates_topic').value}'."
                 )
             except Exception as e:
-                self._node.get_logger().warn(f"Failed to publish grasp candidates: {e}")
+                # Nothing reached the executor, so nothing will ever answer
+                # with cycle_done: end the cycle here (2026-09-09, a pick
+                # attempted before the driver was up sat in that wait until
+                # a manual abort).
+                self._node.get_logger().error(
+                    f"Failed to publish grasp candidates: {e} — ending this cycle.")
+                return False
 
         # ── Phase 9: pick the single best grasp ───────────────────────
         best = pick_best_grasp(
