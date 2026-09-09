@@ -6,20 +6,19 @@
 
 ## 🚀 The fast start
 
-```bash
-# 1. Pre-flight: kill any stragglers from earlier sessions
-pkill -f speak_action_server; pkill -f speech_input_node; pkill -f chat_node
-pkill -f intent_router_node; pkill -f gripper_action_server
-pkill -f move_to_named_pose_server; pkill -f ur3e_fast_observation_replay
-sleep 2
+The GUI starts the voice stack ("Start ALL", or the voice button) and stops
+it cleanly; nothing has to be killed by hand. From a terminal instead:
 
-# 2. Launch (one command — brings up everything)
-ros2 launch communication_llm voice_robot.launch.py
+```bash
+cd ~/morty_ws
+./morty.sh --voice-only          # OpenAI provider
+./morty.sh --debug --voice-only  # AWS Bedrock provider
 ```
 
-That's it. Seven processes start, plus AEC auto-loads.
+Either way seven processes start and the echo-cancel module auto-loads.
+Ctrl-C in `morty.sh` stops all of them.
 
-> ⚠️ **One manual step the first time:** open `pavucontrol` and on **Input Devices** + **Output Devices** tabs, pick the "Echo-Cancel..." entries as default. AEC won't actually filter unless your audio is routed through those.
+> ⚠️ **One manual step the first time on a machine:** open `pavucontrol` and on the **Input Devices** and **Output Devices** tabs pick the "Echo-Cancel…" entry as default.
 
 ---
 
@@ -227,7 +226,7 @@ ros2 launch communication_llm voice_robot.launch.py auto_execute_grasp:=true
 | *"The replay node is not running"* | UR driver up, but `ur3e_fast_observation_replay` isn't | Pass `with_replay:=true` (default), or launch `run_grasp_pipeline.launch.py` |
 | *"I can't pick anything because the grasp pipeline isn't running"* | grasp_pipeline isn't launched | `ros2 launch grasp_pipeline run_grasp_pipeline.launch.py enable_tts:=false` |
 | Vosk mishears "Morty" as "morpeth" | Vosk small model is weak | Switch to whisper: `stt_engine:=whisper` |
-| Multiple servers / duplicate output | Stragglers from earlier sessions | `pkill -f` everything (see fast-start above) |
+| Multiple servers / duplicate output | Stragglers from an earlier session | Stop voice in the GUI (it adopts and stops leftovers), or Ctrl-C the `morty.sh` that started them |
 | LLM says nothing | OpenAI key missing | `export ...=YOUR_KEY` before launch |
 
 ---
@@ -283,15 +282,11 @@ gripper_action  move_to_named  /yolo/select_index  Speak
 
 ## ✅ Today's checklist
 
-When opening a fresh terminal in the morning:
-
-1. ☐ `pkill -f speak_action_server; pkill -f speech_input_node; pkill -f chat_node; pkill -f intent_router_node; pkill -f gripper_action_server; pkill -f move_to_named_pose_server; pkill -f ur3e_fast_observation_replay; sleep 2`
-2. ☐ Launch UR driver / MoveIt config (your existing `ros2 launch ur3e_gripper_3d_moveit_config ...`)
-3. ☐ Optional: `ros2 launch grasp_pipeline run_grasp_pipeline.launch.py enable_tts:=false` (only if you want picking + scene awareness — pass `with_replay:=false` to the next step to avoid duplicate replay nodes)
-4. ☐ `export "<key_name>=<openai_key>"` (your normal OpenAI key export)
-5. ☐ `ros2 launch communication_llm voice_robot.launch.py`
-6. ☐ Open `pavucontrol`, set "Echo-Cancel" as default for **Input Devices** AND **Output Devices** tabs
-7. ☐ Test: *"Morty, go to ready"* — arm should move
+1. ☐ Pendant: program with External Control loaded, pendant in Remote mode.
+2. ☐ GUI: `ros2 run morty_gui morty_gui`, then **Start ALL** (driver, pipeline, executor, voice).
+3. ☐ Lights: driver, realsense, robot, play and voice green.
+4. ☐ First time on a machine: `pavucontrol`, "Echo-Cancel" default on Input and Output.
+5. ☐ Test: *"Morty, go home"* — the arm should move.
 
 ---
 

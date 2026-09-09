@@ -84,6 +84,14 @@ ros2 topic pub --once \
 
 Watch the result on `/ur3e_fast_observation_replay/status`.
 
+## Where it runs in Morty
+
+`replay_node` and `move_to_named_pose_server` are started by the voice launch
+(`communication_llm/voice_robot.launch.py`) and used by the intent router
+("go home", "look left"), by the executor for its home/drop moves, and by the
+GUI's Move-to buttons. `observation_poses.yaml` at the workspace root is the
+registry they read.
+
 ## Safety notes
 
 - This package never plans Cartesian motion and never commands the gripper.

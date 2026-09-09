@@ -1,78 +1,37 @@
 # gripper_3d
 
-UR3e description with a mesh-based gripper:
-- 1 mesh for the gripper body/base
-- 1 mesh for the left finger
-- 1 mesh for the right finger
+Description and I/O of Morty's 3D-printed two-finger gripper, with the
+wrist-mounted RealSense.
 
-The fingers are connected with **revolute joints** so you can visualize open/close in RViz using `joint_state_publisher_gui`.
+## What is in here
 
-## Put your meshes here
+| path | content |
+| --- | --- |
+| `urdf/gripper_3d.xacro` | the gripper macro: base, camera mount, two revolute fingers, `gripper_tcp` 12 cm in front of the flange; collision geometry uses the convex hulls, visuals the full meshes |
+| `meshes/` | printed parts (`zusammen_greifer_3_c*.stl`, `finger_*.stl`), RealSense model, `old_*` earlier revisions |
+| `meshes/collision/` | convex hulls (`gripper_base_hull`, `camera_mount_hull`, `finger_*_hull`) — a few thousand triangles instead of 157k, which halves MoveIt's collision-check time |
+| `scripts/gripper_command_adapter` | exposes the `GripperCommand` action MoveIt expects (`/gripper_controller/gripper_cmd`) and drives the UR tool digital outputs with timed pulses (`pulse_hold_s_open` / `pulse_hold_s_close`) |
+| `scripts/gripper_io_bridge` | open/close `Trigger` services on the tool outputs and mirroring of the finger joints for RViz |
+| `scripts/robot_description_publisher` | publishes the combined arm + gripper description |
+| `launch/` | `ur3e_gripper_3d.launch.py` (RViz view), `run_gripper_u3re_camera.launch.py` (view + optional real camera), `realsense_d345_hardware.launch.py` (camera driver only), `gripper_io_hardware.launch.py` (I/O bridge only) |
+| `config/`, `rviz/` | camera and RViz settings |
 
-Place your files in:
-- `gripper_3d/meshes/zusammen_greifer_3_neu_without_camera_fingers.stl`
-- `gripper_3d/meshes/finger_left.stl`
-- `gripper_3d/meshes/finger_right.stl`
+In the running system the `ur3e_gripper_3d_moveit_config` launch starts the
+command adapter and the camera; the launch files here are for viewing the
+model on its own.
 
-If your STL units are **mm**, keep `mesh_scale="0.001 0.001 0.001"`. If they are meters, use `1 1 1`.
+## The gripper's own intelligence
 
-## View in RViz
+The gripper carries force-sensing strips on the fingers and its own logic.
+It reports on two tool digital inputs: TI0 high = holding an object, TI1
+high = slip detected, and on slip it squeezes harder by itself. The executor
+only reacts (slows the arm, narrates); see the commander package.
+
+## View the model
 
 ```bash
-cd ~/ur_ros2_ws
-colcon build --packages-select gripper_3d
-source install/setup.bash
 ros2 launch gripper_3d ur3e_gripper_3d.launch.py
 ```
 
-## One-command demo: UR3e + gripper (+ optional real camera)
-
-Starts the RViz display (with `camera_enabled:=true`). Optionally starts the RealSense driver if real hardware is present.
-
-```bash
-ros2 launch gripper_3d run_gripper_u3re_camera.launch.py
-```
-
-Enable the real camera:
-
-```bash
-ros2 launch gripper_3d run_gripper_u3re_camera.launch.py use_real_camera:=true
-```
-
-## Real hardware: RealSense driver only
-
-`gripper_3d` models the camera as link `camera_camera_link` rigidly attached to `tool0` (see `gripper_3d/urdf/gripper_3d.xacro`).
-
-To run only the RealSense driver (no robot/gripper display):
-
-```bash
-ros2 launch gripper_3d realsense_d345_hardware.launch.py
-```
-
-Notes:
-- `realsense_d345_hardware.launch.py` does not publish any extra static TF; the `tool0 -> camera_camera_link` transform should come from your robot's `robot_state_publisher` using the `gripper_3d` xacro.
-- The RealSense driver usually applies a TF prefix (e.g. `camera_`), so `base_frame_id` is set to `camera_link` and the resulting published base frame becomes `camera_camera_link` (don’t set `base_frame_id` to `camera_camera_link` or you’ll get `camera_camera_camera_link`).
-
-## Real hardware: gripper I/O -> RViz finger joints
-
-`ur_pose_go` toggles UR tool digital outputs to open/close the gripper. `gripper_3d` can mirror that to the finger joints so RViz shows open/close on the model.
-
-Start the bridge node:
-
-```bash
-ros2 launch gripper_3d gripper_io_hardware.launch.py
-```
-
-Then command the gripper:
-
-```bash
-ros2 service call /gripper_io_bridge/open std_srvs/srv/Trigger {}
-ros2 service call /gripper_io_bridge/close std_srvs/srv/Trigger {}
-```
-
-## Tune hinge
-
-Edit these params in `gripper_3d/urdf/gripper_3d.xacro`:
-- `left_hinge_xyz`, `right_hinge_xyz` (hinge locations)
-- `hinge_axis_xyz` (hinge axis)
-- joint limits (`lower`, `upper`)
+Hinge positions, axis and joint limits are the `*_hinge_xyz`,
+`hinge_axis_xyz` and limit parameters at the top of the xacro.
