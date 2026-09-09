@@ -59,3 +59,7 @@ Instructions5
 INSTRUCTIONS_V6.md
 SYSTEM_STATE_LOG.md
 *.jsonl
+
+# --- planning notes and handover documents kept locally only ---
+MORTY_GUI_PLAN.md
+VLA_ASTRA.md
