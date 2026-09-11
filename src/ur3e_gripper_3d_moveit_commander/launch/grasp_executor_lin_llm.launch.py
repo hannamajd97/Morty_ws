@@ -114,6 +114,21 @@ def generate_launch_description():
                 default_value="0.03",
                 description="Distance to back off for pre-grasp (meters)",
             ),
+            # Staged approach (2026-09-11): a joint (PTP) move to a stand-off
+            # point in front of the object along the grasp's approach axis,
+            # then the short straight LIN in. One long straight line from home
+            # crosses the elbow singularity for far objects (Pilz: "Joint
+            # velocity limit of elbow_joint violated"); the short line does not.
+            DeclareLaunchArgument(
+                "use_pregrasp_staging",
+                default_value="false",
+                description="PTP to a stand-off in front of the grasp, then LIN for the last stretch.",
+            ),
+            DeclareLaunchArgument(
+                "pregrasp_approach_distance",
+                default_value="0.10",
+                description="Stand-off distance along the grasp approach axis (meters).",
+            ),
             DeclareLaunchArgument(
                 "lift_height_m",
                 default_value="0.07",
@@ -293,6 +308,8 @@ def generate_launch_description():
                         "max_candidate_tries": LaunchConfiguration("max_candidate_tries"),
                         "candidate_try_all_batches": LaunchConfiguration("candidate_try_all_batches"),
                         "pregrasp_distance": LaunchConfiguration("pregrasp_distance"),
+                        "use_pregrasp_staging": LaunchConfiguration("use_pregrasp_staging"),
+                        "pregrasp_approach_distance": LaunchConfiguration("pregrasp_approach_distance"),
                         "lift_height_m": LaunchConfiguration("lift_height_m"),
                         "lift_table_yaw_deg": LaunchConfiguration("lift_table_yaw_deg"),
                         "lift_table_frame": LaunchConfiguration("lift_table_frame"),

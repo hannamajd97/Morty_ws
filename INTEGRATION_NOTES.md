@@ -146,6 +146,10 @@ about 2.5 MB/s with both cameras compressed).
   each stored set for a straight approach while idle (`[precheck]` lines in
   its log; `lin_precheck_enabled`), so a selection can start moving without
   probing. Both caches drop their results when the arm or the object moves.
+- **Staged approach:** PTP to a stand-off 7 cm in front of the grasp, then
+  the 7 cm straight line (`use_pregrasp_staging`, `pregrasp_approach_distance`
+  in the GUI's executor command). A single straight line from home crossed
+  the elbow singularity for far objects and Pilz refused every candidate.
 - **Probe budget:** the executor probes only the first 10 candidates
   (`candidate_try_all_batches:=false` in the GUI's command) and the MoveIt
   IK timeout is 0.1 s (`kinematics.yaml`), so a selection with no feasible

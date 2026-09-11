@@ -87,3 +87,16 @@ executes at once: `[precheck] HIT` in the log; otherwise `[precheck] MISS:
 The GUI starts the executor with `candidate_try_all_batches:=false` (only
 the first 10 candidates are probed) since the same day.
 
+## Staged approach (2026-09-11)
+
+`use_pregrasp_staging:=true` (the GUI's default since 2026-09-11) replaces the
+single straight line from home with a joint (PTP) move to a stand-off point
+`pregrasp_approach_distance` (7 cm) in front of the grasp along its approach
+axis, followed by the short straight LIN in. The candidate probe checks both
+stages (`candidate probe stage-A PTP`, `stage-B LIN`). Reason: a long
+straight line from home to an object 0.7 m away crosses the elbow
+singularity; Pilz then refuses the line for joint speed ("Joint velocity
+limit of elbow_joint violated", move_group log) and no candidate is
+executed. The last 7 cm are still a straight line along the grasp axis, so
+the grasp itself is unchanged.
+

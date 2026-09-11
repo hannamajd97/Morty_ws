@@ -276,7 +276,17 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 "grasp_executor_lin_llm.launch.py",
                 "best_pose:=true", "use_candidate_pose_array:=true",
                 "execute:=true", "candidate_wait_timeout_s:=20.0",
-                "enable_wrist_twin_rewrite:=false"]
+                "enable_wrist_twin_rewrite:=false",
+                # Probe only the first batch of 10 candidates (Majd
+                # 2026-09-11): the accepted grasp was among the first 6 in
+                # every successful pick that day; the rest only cost time.
+                "candidate_try_all_batches:=false",
+                # Staged approach, 7 cm (Majd 2026-09-11): PTP to a stand-off
+                # in front of the object, then a 7 cm straight line. One long
+                # line from home crossed the elbow singularity on far objects
+                # and Pilz refused every candidate (cycle 18 that day).
+                "use_pregrasp_staging:=true",
+                "pregrasp_approach_distance:=0.07"]
 
 REPLAY_CMD = [
     "ros2", "run", "ur3e_fast_observation", "replay_node", "--ros-args",
