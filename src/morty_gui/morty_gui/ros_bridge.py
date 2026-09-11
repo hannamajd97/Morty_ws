@@ -600,8 +600,34 @@ class MortyGuiBridge(Node):
             elif "Remote Control" in msg:
                 self.status_text = "Play refused: put the pendant in REMOTE control mode"
             elif msg == "Failed to execute: play":
-                self.status_text = ("Play refused by the robot: program already running, "
-                                    "or robot not ready (safety / brakes)")
+                # "Already running" is the usual meaning — and then the
+                # driver's own view (robot_program_running false) says the
+                # program's External Control node lost its link to the
+                # driver (2026-09-11 19:52: the robot reconnected, the old
+                # socket was dropped, every trajectory failed with
+                # CONTROL_FAILED while the dashboard reported PLAYING).
+                # Only a program restart reconnects it: stop, then Play.
+                stop_cli = getattr(self, "_dashboard_stop", None)
+                if _retry and stop_cli is not None and stop_cli.service_is_ready():
+                    self.status_text = ("Play refused: program already running but not linked "
+                                        "to the driver — restarting it (stop, then Play)")
+                    self._last_stop_cmd_t = 0.0
+                    sf = stop_cli.call_async(Trigger.Request())
+
+                    def _after_stop(_f):
+                        # the robot needs a moment to unload the program
+                        self._restart_timer = self.create_timer(1.5, _play_again)
+
+                    def _play_again():
+                        try:
+                            self._restart_timer.cancel()
+                        except Exception:
+                            pass
+                        self.play_program(_retry=False)
+                    sf.add_done_callback(_after_stop)
+                else:
+                    self.status_text = ("Play refused by the robot: program already running, "
+                                        "or robot not ready (safety / brakes)")
             else:
                 self.status_text = f"Play refused: {msg}"[:120]
         fut.add_done_callback(_done)
