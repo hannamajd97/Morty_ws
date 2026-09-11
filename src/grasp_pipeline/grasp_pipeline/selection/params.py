@@ -348,7 +348,9 @@ def declare_all_parameters(node: "Node") -> None:
     # y green, z blue = out of the fingers), applied after the grasp-to-TCP
     # rotation: the measured difference between where the model's gripper
     # and ours put the object. "Move it 5 cm along -x" = [-0.05, 0, 0].
-    node.declare_parameter("grasp2tcp_offset_m", [0.0, 0.0, 0.0])
+    # Measured by Majd on 2026-09-11 (RViz, small bottle): +2 cm along the
+    # closing direction puts the object between the fingers.
+    node.declare_parameter("grasp2tcp_offset_m", [0.02, 0.0, 0.0])
     node.declare_parameter("finger_penetration_finger_length_m", 0.08)
     node.declare_parameter("finger_penetration_finger_thickness_m", 0.012)
     node.declare_parameter("finger_penetration_finger_height_m", 0.025)
