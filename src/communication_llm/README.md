@@ -33,10 +33,10 @@ Normally started by the GUI ("Start ALL" / voice), or by hand:
 ./morty.sh --debug --voice-only  # Bedrock
 ```
 
-## Models on disk (not in git)
+## Models
 
-`models/vosk-model-small-en-us-0.15/` for Vosk; faster-whisper and Kokoro
-download their weights on first use.
+`models/vosk-model-small-en-us-0.15/` for Vosk is in the repository;
+faster-whisper and Kokoro download their weights on first use.
 
 ## Audio setup
 

@@ -35,10 +35,10 @@ use `np.float`), `opencv-python<5` (newer wheels pull NumPy 2),
 | path | what | comes from |
 | --- | --- | --- |
 | `.morty_env` | API keys, region, model ids (mode 600) | written by hand, template in README |
-| `GraspGen/` | NVIDIA GraspGen source checkout | github.com/NVlabs/GraspGen |
-| `models/graspgen/` | `graspgen_robotiq_2f_140.yml`, `_gen.pth`, `_dis.pth` | GraspGen release |
-| `src/grasp_pipeline/yolo26s-seg_24_04.pt` | trained YOLO detector | copied from the lab machine |
-| `src/communication_llm/models/vosk-model-small-en-us-0.15/` | Vosk speech model | alphacephei.com/vosk/models |
+| `GraspGen/` | NVIDIA GraspGen code, `pip install --user -e GraspGen` after cloning | in the repository (NVIDIA licence) |
+| `GraspGen/models/` (+ links in `models/graspgen/`) | `graspgen_robotiq_2f_140.yml`, `_gen.pth` 450 MB, `_dis.pth` 38 MB | in the repository via **Git LFS** — install git-lfs before cloning |
+| `src/grasp_pipeline/yolo26s-seg_24_04.pt` | trained YOLO detector, 23 MB | in the repository |
+| `src/communication_llm/models/vosk-model-small-en-us-0.15/` | Vosk speech model, 68 MB | in the repository |
 | `observation_poses.yaml` | named arm poses (home, drop sides, observation) | in the repository |
 | `config/fastdds_udp_only.xml` | Fast DDS profile used by every launch | in the repository |
 

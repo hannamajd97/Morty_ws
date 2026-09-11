@@ -12,15 +12,23 @@ log/
 logs/
 *.egg-info/
 
-# --- third-party checkouts and model weights (multi-GB, downloaded separately) ---
-GraspGen/
-models/
-*.pt
-*.pth
+# --- models: IN the repository since 2026-09-11 (Majd). The two GraspGen
+# checkpoints (450 MB + 38 MB) travel through Git LFS (GraspGen/.gitattributes);
+# YOLO weights, the MediaPipe hand model and the Vosk model are plain files.
+# From the GraspGen checkout only what runs is kept: no other grippers'
+# checkpoints, no compiled build output, no figures/sample data/editor cache.
+GraspGen/models/*
+!GraspGen/models/README.md
+!GraspGen/models/graspgen_robotiq_2f_140.yml
+!GraspGen/models/graspgen_robotiq_2f_140_dis.pth
+!GraspGen/models/graspgen_robotiq_2f_140_gen.pth
+GraspGen/pointnet2_ops/build/
+GraspGen/**/*.egg-info/
+GraspGen/fig/
+GraspGen/sample_data/
+GraspGen/.vscode/
 *.onnx
 *.engine
-*.task
-src/communication_llm/models/
 
 # --- experiment recordings and data ---
 experiments/

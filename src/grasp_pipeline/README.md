@@ -76,8 +76,8 @@ the ones that matter day to day:
 | `models/hand_landmarker.task` | MediaPipe hand model (shipped) |
 | `scripts/reach_table.py` | regenerates the reach table from the arm kinematics |
 
-The YOLO weights `yolo26s-seg_24_04.pt` live in this package folder but are
-not in git.
+The YOLO weights `yolo26s-seg_24_04.pt` live in this package folder and are
+in the repository (23 MB).
 
 ## Performance notes
 

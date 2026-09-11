@@ -1,0 +1,13 @@
+h5py
+hydra-core
+matplotlib
+meshcat
+numpy
+scikit-learn
+scipy
+tensorboard
+trimesh==4.5.3
+diffusers==0.11.1
+timm
+huggingface-hub==0.25.2
+PyOpenGL==3.1.5

@@ -34,31 +34,39 @@ Other folders: `llm_provider/` (API-key and provider selection sourced by
 `morty.sh`) and `config/` (Fast DDS profiles). How the parts are wired, what a fresh machine needs and a
 troubleshooting table are in [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md).
 
-## What is not in the repository
+## Models and large files
 
-Downloaded or generated on each machine, excluded by `.gitignore`:
+Everything the system needs is in the repository:
 
-- `GraspGen/` — NVIDIA GraspGen checkout; `models/graspgen/` holds its
-  generator/discriminator checkpoints and the gripper config.
-- `src/grasp_pipeline/yolo26s-seg_24_04.pt` — the trained YOLO model.
-- `src/communication_llm/models/` — the Vosk speech model.
-- `build/`, `install/`, `log/`, `logs/`, `experiments*/`, `backups/`.
-- `.morty_env` — API keys (see below).
+- `GraspGen/` — the NVIDIA GraspGen code (NVIDIA licence, see
+  `GraspGen/LICENSE`) with the two checkpoints Morty uses in
+  `GraspGen/models/` (`graspgen_robotiq_2f_140_gen.pth`, 450 MB, and
+  `_dis.pth`, 38 MB) stored through **Git LFS**; `models/graspgen/` links to
+  them. Other grippers' checkpoints, build output and sample data are left out.
+- `src/grasp_pipeline/yolo26s-seg_24_04.pt` — the trained YOLO model (23 MB).
+- `src/grasp_pipeline/grasp_pipeline/models/hand_landmarker.task` — MediaPipe.
+- `src/communication_llm/models/vosk-model-small-en-us-0.15/` — Vosk (68 MB).
+
+Install Git LFS before cloning (`sudo apt install git-lfs && git lfs install`),
+otherwise the two checkpoints arrive as small pointer files.
+
+Not in the repository, generated or private: `build/`, `install/`, `log/`,
+`logs/`, `experiments*/`, `backups/`, and `.morty_env` (API keys, see below).
 
 ## Setting up a machine
 
 ```bash
-# ROS 2 Humble + MoveIt 2 + ros2_control installed from apt
+# ROS 2 Humble + MoveIt 2 + ros2_control installed from apt; git-lfs installed
 git clone git@github.com:hannamajd97/Morty_ws.git ~/morty_ws
 cd ~/morty_ws
 pip install --user -r requirements.txt      # no venv: ROS 2 Python paths need --user
+pip install --user -e GraspGen               # GraspGen + its pointnet2 ops (CUDA build)
 colcon build --symlink-install
 source install/setup.bash
 ```
 
-Then put the GraspGen checkout, its checkpoints and the model files in the
-places listed above. The workspace resolves its own location; if it is not
-at `~/morty_ws`, export `WS_DIR` before launching.
+The workspace resolves its own location; if it is not at `~/morty_ws`,
+export `WS_DIR` before launching.
 
 ### API keys (`.morty_env`)
 
