@@ -375,9 +375,19 @@ class GraspPrecomputer:
                 job = self._next_job()
                 if job is None:
                     continue
-                self._run_job(job)
+                try:
+                    self._run_job(job)
+                except Exception as e:
+                    self._node.get_logger().warn(f"[precompute] job '{job.key}' error: {e}")
+                    self._mark_failed(job.key)
             except Exception as e:
                 self._node.get_logger().warn(f"[precompute] worker error: {e}")
+
+    def _mark_failed(self, key: str) -> None:
+        with self._state:
+            t = self._tracks.get(key)
+            if t is not None:
+                t.failed_t = time.monotonic()
 
     def _run_job(self, tr: _Track) -> None:
         node = self._node
@@ -407,10 +417,7 @@ class GraspPrecomputer:
                 node.get_logger().info(f"[precompute] job '{tr.key}' dropped after {dt_job:.2f} s: operator selected")
             else:
                 node.get_logger().warn(f"[precompute] job '{tr.key}' failed after {dt_job:.2f} s")
-                with self._state:
-                    t = self._tracks.get(tr.key)
-                    if t is not None:
-                        t.failed_t = time.monotonic()
+                self._mark_failed(tr.key)
             return
         t_after = self._tool0()
         if t_after is None:

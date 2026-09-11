@@ -972,8 +972,9 @@ class YoloLiveSelectGrasp(Node):
     # in registration / sweep / dynamic-NBV code keep working.
     # ------------------------------------------------------------------
 
-    def _extract_filtered_object_cloud(self, sel, *, publish_outputs):
-        return self._cloud._extract_filtered_object_cloud(sel, publish_outputs=publish_outputs)
+    def _extract_filtered_object_cloud(self, sel, *, publish_outputs, background=False):
+        return self._cloud._extract_filtered_object_cloud(
+            sel, publish_outputs=publish_outputs, background=background)
 
     def _filter_object_cloud(self, pts_np, cols_np, *, apply_depth_clamp=True,
                              lightweight=False, skip_cluster_filter=False,
