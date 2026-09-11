@@ -60,7 +60,6 @@ _RE_FILTER_START = re.compile(
 _RE_FILTER_STAGE = re.compile(r"\[filter-chain\] after ([a-z-]+): (\d+)")
 _RE_UTILITY = re.compile(r"\[grasp-utility\].*U=([0-9.]+)")
 _RE_BEST = re.compile(r"Best grasp score=([0-9.]+)")
-_RE_CYCLE = re.compile(r"cycle_id=(\d+)")
 
 
 def _cloud_to_numpy(msg: PointCloud2) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
@@ -236,9 +235,17 @@ class MortyGuiBridge(Node):
             String, "/speech/accepted_transcript",
             lambda m: self.trial_mark("transcript", str(m.data)), 10,
         )
+        # The pick cycle id comes from the pipeline's own topic, published
+        # BEFORE its candidates and viewer poses. It used to be scraped from
+        # /rosout text ("cycle_id=N" in any pipeline log line), which broke
+        # the manual EXECUTE button in two ways (2026-09-11): the depth-20
+        # /rosout queue drops lines under load, so the id could be learned
+        # from the later "Waiting for executor completion (cycle_id=N)"
+        # line — AFTER the best pose had armed the button — and lines such
+        # as "Ignoring executor status for different cycle_id=N-1" flipped
+        # it back to the previous cycle. Both disarmed a ready grasp.
         self.create_subscription(
-            Int64, "/graspgen/selection_cycle_id",
-            lambda m: self.trial_mark("selection_cycle_id", str(m.data)),
+            Int64, "/graspgen/selection_cycle_id", self._on_cycle_id,
             QoSProfile(depth=1,
                        reliability=ReliabilityPolicy.RELIABLE,
                        durability=DurabilityPolicy.TRANSIENT_LOCAL),
@@ -756,6 +763,11 @@ class MortyGuiBridge(Node):
             self.chat_events.append(("Rejected", str(msg.data)))
             self.voice_dirty = True
 
+    def _on_cycle_id(self, msg: Int64) -> None:
+        self.trial_mark("selection_cycle_id", str(msg.data))
+        with self._lock:
+            self.cycle_id = int(msg.data)
+
     def _on_llm_cycle_done(self, msg: String) -> None:
         self.trial_mark("cycle_done", str(msg.data))
         self.llm_cycle_active = False
@@ -848,9 +860,6 @@ class MortyGuiBridge(Node):
             if m:
                 self.utility_hist.append(float(m.group(1)))
                 self.utility_dirty = True
-            m = _RE_CYCLE.search(text)
-            if m:
-                self.cycle_id = int(m.group(1))
             m = _RE_BEST.search(text)
             if m:
                 self.best_score = float(m.group(1))
