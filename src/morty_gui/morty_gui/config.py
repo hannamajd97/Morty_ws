@@ -299,10 +299,14 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # in front of the object, then a 7 cm straight line. One long
                 # line from home crossed the elbow singularity on far objects
                 # and Pilz refused every candidate (cycle 18 that day).
-                # 10 cm, not 7: with 8 cm fingers and the TCP at the
-                # fingertips, a 7 cm stand-off put the tips ~5 cm from the
-                # object ("really close", Majd 2026-09-11 16:40).
-                "use_pregrasp_staging:=true",
+                # Off again (Majd 2026-09-11 17:40): the stand-off costs ~2 s
+                # per pick (joint move 3.3 s + 10 cm line 1.4 s + two planning
+                # stops against one 2.2-4.1 s straight line). Price: objects
+                # near 0.7 m whose straight line from home crosses the elbow
+                # limit are refused again ("straight line not drivable" in the
+                # log). Candidate for later: straight line first, stand-off
+                # only as the fallback.
+                "use_pregrasp_staging:=false",
                 "pregrasp_approach_distance:=0.10"]
 
 REPLAY_CMD = [
