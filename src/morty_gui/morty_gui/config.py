@@ -245,7 +245,10 @@ GRASPGEN_SERVICE_CMD = [
 ]
 GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
 GRASPGEN_PGREP = r"graspgen_service\.p[y]"
-PIPELINE_ENV_EXTRA = {"GRASPGEN_MODE": "zmq"}
+# MORTY_GRASP_PRECOMPUTE: the grasp precompute cache is on for every
+# GUI-started pipeline since 2026-09-11 (tested that afternoon: hits publish
+# in 0.3 s; a GUI restarted without the variable silently lost it).
+PIPELINE_ENV_EXTRA = {"GRASPGEN_MODE": "zmq", "MORTY_GRASP_PRECOMPUTE": "true"}
 
 PIPELINE_CMD = ["ros2", "launch", "grasp_pipeline", "run_grasp_pipeline.launch.py",
                 "with_replay:=false",
@@ -285,8 +288,11 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # in front of the object, then a 7 cm straight line. One long
                 # line from home crossed the elbow singularity on far objects
                 # and Pilz refused every candidate (cycle 18 that day).
+                # 10 cm, not 7: with 8 cm fingers and the TCP at the
+                # fingertips, a 7 cm stand-off put the tips ~5 cm from the
+                # object ("really close", Majd 2026-09-11 16:40).
                 "use_pregrasp_staging:=true",
-                "pregrasp_approach_distance:=0.07"]
+                "pregrasp_approach_distance:=0.10"]
 
 REPLAY_CMD = [
     "ros2", "run", "ur3e_fast_observation", "replay_node", "--ros-args",
