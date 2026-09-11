@@ -244,7 +244,11 @@ GRASPGEN_SERVICE_CMD = [
     # 105 mm depth are far closer to the printed gripper (85 mm / 80 mm)
     # than the Robotiq 2F-140 (136 mm / 195 mm) the system ran on before;
     # GraspGen's own FAQ suggests re-targeting to the closest stroke.
-    "--config", os.path.expanduser("~/morty_ws/models/graspgen/graspgen_franka_panda.yml"),
+    # NOTE 2026-09-11 17:00: the Franka checkpoint uses the PTv3 backbone,
+    # which needs the CUDA build of spconv; this machine has the CPU-only
+    # build ("not implemented for CPU ONLY build" on every request), so the
+    # Robotiq model (PointNet++ backbone) stays until spconv-cu121 is in.
+    "--config", os.path.expanduser("~/morty_ws/models/graspgen/graspgen_robotiq_2f_140.yml"),
     "--bind", "tcp://127.0.0.1:5555",
 ]
 GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
