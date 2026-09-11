@@ -387,6 +387,7 @@ public:
       node_, "wait_for_destination", true);
     get_or_declare_param<double>(node_, "pause_before_close_s", 0.0);
     get_or_declare_param<double>(node_, "grasp_stall_max_s", 0.0);
+    lin_slow_retry_factor_ = get_or_declare_param<double>(node_, "lin_slow_retry_factor", 0.5);
     resume_topic_ = get_or_declare_param<std::string>(
       node_, "resume_topic", "/grasp_executor_lin_llm/resume");
     // 120 -> 1800 (2026-08-25, Majd: "even when I don't say where it
@@ -3447,6 +3448,32 @@ private:
       moveit::planning_interface::MoveGroupInterface::Plan plan;
       double wall_s = 0.0;
       auto plan_result = timed_plan(plan, "candidate LIN probe", &wall_s);
+      if (plan_result != moveit::core::MoveItErrorCode::SUCCESS &&
+          plan_result == moveit::core::MoveItErrorCode::PLANNING_FAILED &&
+          lin_slow_retry_factor_ > 0.0 && lin_slow_retry_factor_ < 1.0)
+      {
+        // Pilz refuses a line whose joint acceleration or speed would
+        // exceed a limit at the requested scaling — at 50 % that was the
+        // elbow at the start of the line for 2 of 9 picks on 2026-09-11,
+        // the same object at the same place passing on the next try only
+        // because GraspGen had sampled a slightly different grasp. Its own
+        // hint is "set the scaling factor lower", so do that once for THIS
+        // candidate: the kept plan then runs this one pick slower instead
+        // of refusing it.
+        arm_group_.setMaxVelocityScalingFactor(velocity_scaling_ * lin_slow_retry_factor_);
+        arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_ * lin_slow_retry_factor_);
+        double wall2 = 0.0;
+        const auto slow = timed_plan(plan, "candidate LIN probe (slower retry)", &wall2);
+        arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
+        arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
+        if (slow == moveit::core::MoveItErrorCode::SUCCESS) {
+          RCLCPP_INFO(node_->get_logger(),
+            "LIN refused at %.0f %% but planned at %.0f %% — this pick runs slower.",
+            velocity_scaling_ * 100.0, velocity_scaling_ * lin_slow_retry_factor_ * 100.0);
+          plan_result = slow;
+          wall_s += wall2;
+        }
+      }
       if (plan_result == moveit::core::MoveItErrorCode::SUCCESS) {
         ok = true;
         // KEEP IT (2026-08-28). This trajectory is planned from the
@@ -5401,6 +5428,7 @@ private:
     state_validity_client_;
   int approach_autopsy_samples_ = 4;
   double prefilter_ik_timeout_s_ = 0.02;
+  double lin_slow_retry_factor_ = 0.5;   // second LIN attempt at this fraction of the scaling; 0 = off
   bool clear_stray_scene_objects_ = false;
   // Gripper open started while the candidates are still being probed
   // (2026-09-09): the 0.56 s open used to sit on the critical path after
