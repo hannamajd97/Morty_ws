@@ -143,7 +143,7 @@ class MotionWindow(QtWidgets.QMainWindow):
         # Adapter defaults/maxima per gripper_command_adapter source:
         # open 0.5 s (max 1.0), close 1.2 s (max 1.5).
         self.grip_open_spin = QtWidgets.QDoubleSpinBox()
-        self.grip_open_spin.setRange(0.1, 1.0); self.grip_open_spin.setSingleStep(0.05); self.grip_open_spin.setValue(0.50)  # Majd 2026-08-28 (later): 0.20 — "so the gripper  # 0.50 s open pulse (was 0.20): the fingers did not open before pick 1 on 2026-09-11 18:47
+        self.grip_open_spin.setRange(0.1, 1.0); self.grip_open_spin.setSingleStep(0.05); self.grip_open_spin.setValue(0.30)  # 0.30 s open pulse (Majd 2026-09-11: 0.20 did not open, 0.50 opens too wide and hits neighbours)
         # dont open very wide crashing with other objects". His measured table puts
         # 0.2-0.3 s at ~13 deg, still wide enough for every object on the table.
         self.grip_open_spin.setToolTip(GRIP_HELP)

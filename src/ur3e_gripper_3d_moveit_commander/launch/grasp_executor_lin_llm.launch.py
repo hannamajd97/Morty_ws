@@ -119,6 +119,21 @@ def generate_launch_description():
             # then the short straight LIN in. One long straight line from home
             # crosses the elbow singularity for far objects (Pilz: "Joint
             # velocity limit of elbow_joint violated"); the short line does not.
+            # GUI-only sessions (2026-09-11): with both false a pick runs to
+            # the end on its own — grasp, lift, home, drop at drop_target_name,
+            # open, home — and the pipeline is free for the next click. The
+            # voice router still sets wait_for_destination per pick when it
+            # has a question to ask, so voice picks keep their pauses.
+            DeclareLaunchArgument(
+                "wait_for_destination",
+                default_value="true",
+                description="Pause after the grasp until a destination arrives on the resume topic.",
+            ),
+            DeclareLaunchArgument(
+                "wait_for_release",
+                default_value="true",
+                description="Pause at the drop pose until a release confirmation arrives.",
+            ),
             DeclareLaunchArgument(
                 "use_pregrasp_staging",
                 default_value="false",
@@ -313,6 +328,8 @@ def generate_launch_description():
                         "max_candidate_tries": LaunchConfiguration("max_candidate_tries"),
                         "candidate_try_all_batches": LaunchConfiguration("candidate_try_all_batches"),
                         "pregrasp_distance": LaunchConfiguration("pregrasp_distance"),
+                        "wait_for_destination": LaunchConfiguration("wait_for_destination"),
+                        "wait_for_release": LaunchConfiguration("wait_for_release"),
                         "use_pregrasp_staging": LaunchConfiguration("use_pregrasp_staging"),
                         "pregrasp_approach_distance": LaunchConfiguration("pregrasp_approach_distance"),
                         "lift_height_m": LaunchConfiguration("lift_height_m"),

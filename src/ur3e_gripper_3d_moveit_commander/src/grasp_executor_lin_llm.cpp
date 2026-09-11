@@ -819,6 +819,19 @@ public:
   }
 
   void open_gripper_early() { begin_gripper_open_async(); }
+
+  // A background-verified pick skips the probe, so nothing reached the GUI's
+  // console and its STOP button never armed (it arms on candidate_status).
+  void announce_precheck_hit(int idx, size_t n, const geometry_msgs::msg::PoseStamped & pose)
+  {
+    try {
+      std_msgs::msg::String cs;
+      cs.data = "grasp " + std::to_string(idx + 1) + "/" + std::to_string(n) +
+        ": FEASIBLE (verified in the background) — executing this one";
+      candidate_status_pub_->publish(cs);
+    } catch (...) {}
+    (void)pose;
+  }
   std::atomic<bool> held_object_{false};
   std::chrono::steady_clock::time_point grasp_rise_t_{};
   std::chrono::steady_clock::time_point close_cmd_t_{};
@@ -5962,6 +5975,7 @@ int main(int argc, char ** argv)
         } else {
           selected = cands[static_cast<size_t>(rec->feasible_idx)];
           grasp_executor.apply_precheck(*rec);
+          grasp_executor.announce_precheck_hit(rec->feasible_idx, cands.size(), selected);
           grasp_executor.open_gripper_early();
           feasible = true;
           used_precheck = true;

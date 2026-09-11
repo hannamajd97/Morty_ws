@@ -312,7 +312,15 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # 0.2 / 0.1): arm travel ~3 s -> ~1.8 s per pick. Live-tunable
                 # afterwards: ros2 param set /grasp_executor_lin_llm velocity_scaling X
                 "velocity_scaling:=0.5",
-                "acceleration_scaling:=0.5"]
+                "acceleration_scaling:=0.5",
+                # Run the pick to the end without questions (Majd 2026-09-11
+                # 19:05: with auto-execute every pick ended in Reset because
+                # the executor waited for a drop destination nobody could
+                # give from the GUI): grasp, lift, home, drop_right_side,
+                # open, home. Voice picks still get their pauses from the
+                # router's per-pick parameter.
+                "wait_for_destination:=false",
+                "wait_for_release:=false"]
 
 REPLAY_CMD = [
     "ros2", "run", "ur3e_fast_observation", "replay_node", "--ros-args",
