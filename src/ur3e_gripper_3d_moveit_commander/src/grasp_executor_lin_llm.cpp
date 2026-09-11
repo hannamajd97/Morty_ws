@@ -5815,7 +5815,12 @@ int main(int argc, char ** argv)
       std::optional<std::pair<int64_t, std::vector<geometry_msgs::msg::PoseStamped>>> job;
       {
         std::lock_guard<std::mutex> lock(mutex);
-        if (!processing && !pending_candidates.has_value() && !pending_grasp.has_value() &&
+        // Only a real CANDIDATE set stops a background check. pending_grasp
+        // is the single-pose fallback topic, which the pipeline republishes
+        // continuously (measured 2026-09-11: every check "stopped after 0
+        // candidates" because of it); it is consumed only after the
+        // candidate-wait timeout and never while candidate sets flow.
+        if (!processing && !pending_candidates.has_value() &&
             !pending_prechecks.empty() && !grasp_executor.abort_pending())
         {
           job = std::move(pending_prechecks.front());
@@ -5825,7 +5830,7 @@ int main(int argc, char ** argv)
       if (job.has_value()) {
         auto interrupt = [&]() {
           std::lock_guard<std::mutex> lk(mutex);
-          return pending_candidates.has_value() || pending_grasp.has_value();
+          return pending_candidates.has_value();
         };
         GraspExecutorLin::PrecheckRecord rec;
         const auto t0 = std::chrono::steady_clock::now();
