@@ -2564,6 +2564,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self._manual_execution_pending = False
             self._manual_execution_released = False
             self.bridge.set_grasp_execution_enabled(True)
+            # The executor's own reason for a failed cycle
+            # ("failed|<cycle>|<reason>") belongs in front of the operator:
+            # "still holding the previous object" was only in the log while
+            # Majd pressed Reset three times (2026-09-11 18:50).
+            parts = str(upd["executor_done"]).split("|")
+            if parts[0].strip() == "failed" and len(parts) > 2 and parts[2].strip():
+                self.statusBar().showMessage(f"Executor: {parts[2].strip()}")
         if "joints" in upd:
             names, positions = upd["joints"]
             self._last_joints.update(

@@ -386,6 +386,7 @@ public:
     wait_for_destination_ = get_or_declare_param<bool>(
       node_, "wait_for_destination", true);
     get_or_declare_param<double>(node_, "pause_before_close_s", 0.0);
+    get_or_declare_param<double>(node_, "grasp_stall_max_s", 0.0);
     resume_topic_ = get_or_declare_param<std::string>(
       node_, "resume_topic", "/grasp_executor_lin_llm/resume");
     // 120 -> 1800 (2026-08-25, Majd: "even when I don't say where it
@@ -626,6 +627,9 @@ public:
           if (static_cast<int>(s.pin) == grasp_pin_) grasp = s.state;
         }
         slip_active_.store(slip);
+        if (grasp && !grasp_detected_.load()) {
+          grasp_rise_t_ = std::chrono::steady_clock::now();   // 0 -> 1 edge
+        }
         grasp_detected_.store(grasp);
       });
     speed_slider_client_ =
@@ -816,6 +820,9 @@ public:
 
   void open_gripper_early() { begin_gripper_open_async(); }
   std::atomic<bool> held_object_{false};
+  std::chrono::steady_clock::time_point grasp_rise_t_{};
+  std::chrono::steady_clock::time_point close_cmd_t_{};
+  bool grasp_verdict_holding_ = false;
   // "Holding" = the grasp pin says so AND the gripper is closed. The pin
   // alone would block every pick if it ever stuck HIGH with the fingers
   // open; the gripper joint on /joint_states (0.0 closed, ~0.23 open)
@@ -1199,13 +1206,32 @@ public:
       rclcpp::sleep_for(std::chrono::milliseconds(150));
       // Pump the IO subscriber so the latest pin state is reflected.
       rclcpp::spin_some(node_);
+      // Time from the close command to the pin's rise. The pin only says
+      // "fingers stalled": on an object they stall EARLY, on each other
+      // (empty gripper) LATE, at the end of the stroke (Majd 2026-09-11:
+      // "the fingers are touching each other, that is very common").
+      // grasp_stall_max_s > 0 turns that into the verdict; 0 keeps the
+      // pin alone. Calibrate from the "stall after" values of a few empty
+      // and a few real closes in this log.
+      double stall_s = -1.0;
+      if (grasp_detected_.load() && grasp_rise_t_ >= close_cmd_t_) {
+        stall_s = std::chrono::duration<double>(grasp_rise_t_ - close_cmd_t_).count();
+      }
+      double stall_max = 0.0;
+      try { stall_max = node_->get_parameter("grasp_stall_max_s").as_double(); } catch (...) {}
+      bool holding = grasp_detected_.load();
+      if (holding && stall_max > 0.0 && stall_s > stall_max) {
+        holding = false;   // stalled late = fingers met each other, nothing between them
+      }
       RCLCPP_INFO(node_->get_logger(),
-        "Post-close DI check: grasp_pin(TI0)=%d=%s, slip_pin(TI1)=%d=%s "
+        "Post-close DI check: grasp_pin(TI0)=%d=%s (stall after %.2f s%s), slip_pin(TI1)=%d=%s "
         "(TI1 is informational — gripper hardware self-compensates).",
-        grasp_pin_, grasp_detected_.load() ? "HIGH(holding)" : "low(empty)",
+        grasp_pin_, holding ? "HIGH(holding)" : (grasp_detected_.load() ? "HIGH but LATE(empty)" : "low(empty)"),
+        stall_s, stall_max > 0.0 ? (std::string(", limit ") + std::to_string(stall_max).substr(0, 4) + " s").c_str() : "",
         slip_pin_, slip_active_.load() ? "HIGH(slip→hw retighten)" : "low");
-      held_object_.store(grasp_detected_.load());
-      if (!grasp_detected_.load()) {
+      held_object_.store(holding);
+      grasp_verdict_holding_ = holding;
+      if (!holding) {
         RCLCPP_WARN(node_->get_logger(),
           "No-grasp detected after close (grasp pin %d=LOW). Lifting "
           "clear, then asking before going home (empty gripper).",
@@ -4900,6 +4926,7 @@ private:
       target_pos = gripper_open_position_;
     } else if (target_name == gripper_close_name_) {
       target_pos = gripper_close_position_;
+      close_cmd_t_ = std::chrono::steady_clock::now();
     } else {
       RCLCPP_ERROR(
         node_->get_logger(), "%s: unknown gripper named target '%s'.", step_name.c_str(),
