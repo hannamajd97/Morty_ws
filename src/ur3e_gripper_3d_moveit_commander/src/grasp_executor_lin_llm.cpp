@@ -719,6 +719,7 @@ public:
     double plan_wall_s = 0.0;
     std::vector<double> joints;   // arm joints at probe time, jmg order
     std::chrono::steady_clock::time_point t_done{};
+    std::string reason;           // the search's own verdict when nothing was feasible
   };
 
   // Returns false when the check did not finish (interrupted by a
@@ -738,6 +739,7 @@ public:
     bool ok = false;
     try { ok = choose_first_lin_feasible(cands, &sel); } catch (...) { ok = false; }
     precheck_mode_ = false; precheck_interrupt_ = nullptr;
+    rec->reason = ok ? "" : last_failure_reason_;
     last_failure_reason_ = saved_reason;
     skip_next_precheck_ = false;
     rec->n_tried = precheck_tried_;
@@ -813,6 +815,35 @@ public:
 
   void open_gripper_early() { begin_gripper_open_async(); }
   bool holding_object() const { return grasp_detected_.load(); }
+
+  // Picks start from the reset target ("home"); a background check from
+  // anywhere else verifies nothing and its "none feasible" verdict made the
+  // pipeline recompute good objects (2026-09-11 17:15, checks run while the
+  // arm stood at the drop pose). Joint distance to the named target,
+  // 0.05 rad on every joint.
+  bool arm_at_reset_target(std::string * why = nullptr)
+  {
+    std::vector<double> now;
+    if (!arm_joints_now(&now)) { if (why) { *why = "no fresh joint state"; } return false; }
+    std::map<std::string, double> target;
+    try { target = arm_group_.getNamedTargetValues(reset_target_name_); } catch (...) {}
+    if (target.empty()) { if (why) { *why = "named target '" + reset_target_name_ + "' unknown"; } return false; }
+    const auto names = arm_group_.getJointNames();
+    double worst = 0.0;
+    for (size_t i = 0; i < names.size() && i < now.size(); ++i) {
+      auto it = target.find(names[i]);
+      if (it == target.end()) { continue; }
+      worst = std::max(worst, std::fabs(now[i] - it->second));
+    }
+    if (worst > 0.05) {
+      if (why) {
+        char b[96]; std::snprintf(b, sizeof(b), "arm is %.2f rad from '%s'", worst, reset_target_name_.c_str());
+        *why = b;
+      }
+      return false;
+    }
+    return true;
+  }
 
   static bool same_pose(
     const geometry_msgs::msg::Pose & a, const geometry_msgs::msg::Pose & b,
@@ -3984,7 +4015,7 @@ private:
             : "LIN planner found no complete straight path (-1); no detailed cause was emitted";
           std::string detail, blocker;
           bool goal_clear = false;
-          if (collision_detail_reports_ < collision_detail_max_reports_) {
+          if (!precheck_mode_ && collision_detail_reports_ < collision_detail_max_reports_) {
             ++collision_detail_reports_;
             detail = collision_detail(candidates[orig_idx], &blocker, &goal_clear);
             if (!blocker.empty()) { ++blocker_hits[blocker]; }
@@ -4000,7 +4031,7 @@ private:
           // autopsy round trips; read it again before composing.
           if (hint.empty()) { hint = fresh_moveit_hint(); }
           std::string kin;
-          if (detail.empty() && goal_clear) { kin = approach_kinematic_detail(candidates[orig_idx]); }
+          if (!precheck_mode_ && detail.empty() && goal_clear) { kin = approach_kinematic_detail(candidates[orig_idx]); }
           if (!detail.empty()) {
             short_reason = "LIN path blocked " + detail;
           } else if (goal_clear) {
@@ -5586,6 +5617,7 @@ int main(int argc, char ** argv)
   const bool precheck_enabled =
     get_or_declare_param<bool>(node, "lin_precheck_enabled", true);
   std::deque<std::pair<int64_t, std::vector<geometry_msgs::msg::PoseStamped>>> pending_prechecks;
+  bool precheck_paused_logged = false;
   auto pub_precheck_result = node->create_publisher<std_msgs::msg::String>(
     "/grasp_executor_lin_llm/precheck_result", rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
   auto sub_precheck = node->create_subscription<geometry_msgs::msg::PoseArray>(
@@ -5925,6 +5957,20 @@ int main(int argc, char ** argv)
         }
       }
       if (job.has_value()) {
+        std::string not_home;
+        if (!grasp_executor.arm_at_reset_target(&not_home)) {
+          // Put it back for later, keep the queue order, and say it once.
+          std::lock_guard<std::mutex> lock(mutex);
+          pending_prechecks.push_front(std::move(*job));
+          if (!precheck_paused_logged) {
+            RCLCPP_INFO(node->get_logger(),
+              "[precheck] paused: %s — background checks resume at home.", not_home.c_str());
+            precheck_paused_logged = true;
+          }
+          rate.sleep();
+          continue;
+        }
+        precheck_paused_logged = false;
         auto interrupt = [&]() {
           std::lock_guard<std::mutex> lk(mutex);
           return pending_candidates.has_value();
@@ -5941,6 +5987,7 @@ int main(int argc, char ** argv)
           std_msgs::msg::String r;
           r.data = "key=" + std::to_string(job->first) + " feasible=" + std::to_string(rec.feasible_idx) +
             " tried=" + std::to_string(rec.n_tried);
+          if (rec.feasible_idx < 0 && !rec.reason.empty()) { r.data += " reason=" + rec.reason; }
           pub_precheck_result->publish(r);
           if (rec.feasible_idx >= 0) {
             RCLCPP_INFO(node->get_logger(),

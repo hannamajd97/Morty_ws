@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -94,6 +95,7 @@ class _Track:
     failed_t: float = 0.0          # last failure; the retry waits a short backoff
     attempts: int = 0              # failed attempts so far (resets when the object moves)
     gave_up: bool = False          # logged once when attempts reach the maximum
+    blocked_by: str = ""           # a neighbour box stops every approach; cleared when the scene changes
 
 
 @dataclass
@@ -142,6 +144,14 @@ class GraspPrecomputer:
         self._params_hash_t = 0.0
         self._params_snapshot: Dict[str, Any] = {}   # values behind _params_hash
         self._next_key = 1
+        # One background check in flight at a time: its neighbour boxes are
+        # in the planning scene, and the next object's boxes must not
+        # replace them before the executor has answered (2026-09-11 17:20:
+        # checks ran against the previous selection's boxes, so the checked
+        # object's OWN box was in the scene and every approach "hit" it).
+        self._precheck_free = threading.Event()
+        self._precheck_free.set()
+        self._precheck_inflight = 0
         # Background LIN check (2026-09-11): the executor probes each stored
         # candidate set while the arm is idle and answers with the first
         # feasible index (-1 = none, which counts as a failed attempt here).
@@ -206,6 +216,7 @@ class GraspPrecomputer:
         now = time.monotonic()
         with self._state:
             seen = set()
+            scene_changed = False
             for d in dets:
                 key = str(d.get("display") or d.get("simplified_label") or d.get("label") or "")
                 box = [int(v) for v in d.get("bbox", [])]
@@ -219,6 +230,7 @@ class GraspPrecomputer:
                 else:
                     if tr is not None:
                         self._entries.pop(key, None)       # it moved: the stored grasps are wrong
+                    scene_changed = True
                     self._tracks[key] = tr = _Track(key, str(d.get("simplified_label", d.get("label", ""))),
                                                     box, now, now)
                 tr.reach_state = str(d.get("reach_state") or "")
@@ -228,9 +240,17 @@ class GraspPrecomputer:
                     d["precomputed"] = "lin" if e.lin_idx >= 0 else "grasps"
                 else:
                     d["precomputed"] = ""
-            for key in [k for k in self._tracks if k not in seen]:
+            gone = [k for k in self._tracks if k not in seen]
+            for key in gone:
                 self._tracks.pop(key, None)
                 self._entries.pop(key, None)
+            if gone or scene_changed:
+                # A neighbour moved, left or arrived: objects that a neighbour
+                # box blocked get their attempts back (the block was the
+                # scene, not the grasps).
+                for t in self._tracks.values():
+                    if t.blocked_by:
+                        t.blocked_by = ""; t.attempts = 0; t.gave_up = False
         self._wake.set()
 
     def bump(self, idx: Optional[int]) -> None:
@@ -549,6 +569,22 @@ class GraspPrecomputer:
             self._mark_failed(entry.key, "every candidate below the table clearance")
             return
         pose_array, _scores = built
+        if not self._precheck_free.wait(timeout=15.0):
+            self._node.get_logger().info(
+                f"[precompute] no verdict for set {self._precheck_inflight} within 15 s — sending the next one")
+        if getattr(self._node, "selection_made", False):
+            return                      # a real pick owns the scene now
+        # The scene the executor must check against: every object except
+        # this one, from the live depth frame (the same call the real pick
+        # makes at selection time).
+        live_sel = dict(entry.result["sel_capture"])
+        live_sel["bbox"] = list(entry.box)
+        try:
+            publish_neighbour_obstacles(self._node, live_sel, self._node.fb.depth_frame)
+        except Exception as e:
+            self._node.get_logger().warn(f"[precompute] neighbour boxes for the LIN check failed: {e}")
+        self._precheck_free.clear()
+        self._precheck_inflight = entry.precheck_key
         self._pub_precheck.publish(pose_array)
         self._node.get_logger().info(
             f"[precompute] '{entry.key}' sent {len(pose_array.poses)} candidates for the LIN check (set {entry.precheck_key})")
@@ -556,10 +592,14 @@ class GraspPrecomputer:
     def _on_precheck_result(self, msg: String) -> None:
         """Executor verdict: 'key=K feasible=F tried=N'."""
         try:
-            kv = dict(part.split("=", 1) for part in str(msg.data).split())
+            text = str(msg.data)
+            head, _, reason = text.partition(" reason=")
+            kv = dict(part.split("=", 1) for part in head.split())
             key, feasible, tried = int(kv["key"]), int(kv["feasible"]), int(kv.get("tried", 0))
         except Exception:
             return
+        if key == self._precheck_inflight:
+            self._precheck_free.set()
         with self._state:
             hit = next((e for e in self._entries.values() if e.precheck_key == key), None)
             if hit is not None:
@@ -569,5 +609,24 @@ class GraspPrecomputer:
         if feasible >= 0:
             self._node.get_logger().info(
                 f"[precompute] '{hit.key}' LIN-verified: candidate {feasible + 1} (set {key}, {tried} probed)")
+            return
+        blocker = ""
+        m = re.search(r"hitting (scene_obj_\S+)", reason or "")
+        if m:
+            blocker = m.group(1)
+        if blocker:
+            # A neighbour box, not the grasps: new GraspGen samples cannot
+            # help, so no retry until the scene changes (observe() frees it).
+            with self._state:
+                t = self._tracks.get(hit.key)
+                self._entries.pop(hit.key, None)
+                if t is not None:
+                    t.blocked_by = blocker
+                    t.attempts = int(self._p("precompute_max_retries", 5))
+                    t.gave_up = True
+            self._node.get_logger().warn(
+                f"[precompute] '{hit.key}' blocked by {blocker}: every approach hits it — "
+                "move that object; no retry until the scene changes")
         else:
-            self._mark_failed(hit.key, f"no LIN-feasible grasp among the first {tried} (set {key})")
+            self._mark_failed(hit.key, f"no LIN-feasible grasp among the first {tried} (set {key})"
+                              + (f": {reason}" if reason else ""))
