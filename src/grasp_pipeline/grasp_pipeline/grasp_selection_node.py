@@ -2457,9 +2457,11 @@ class YoloLiveSelectGrasp(Node):
                                             "Executor reported failure. Robot should have recovered to initgrasp via fallback. "
                                             "Restarting detection for next attempt."
                                         )
-                                        # The next try must look again, not
-                                        # replay the grasps that just failed.
-                                        self._precompute.invalidate_all("executor reported failure")
+                                        # Only THIS object's stored grasps are
+                                        # wrong; the others stay valid (the arm
+                                        # is back home). The retry queues behind
+                                        # new objects, five attempts at most.
+                                        self._precompute.note_pick_failed(sel)
                                         # SELF-clear the auto-pick label on failure.
                                         # intent_router normally clears it at
                                         # cycle end, but when the voice stack is

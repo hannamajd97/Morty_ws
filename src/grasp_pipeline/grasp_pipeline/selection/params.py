@@ -405,6 +405,7 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("precompute_pose_tol_m", 0.002)  # arm (tool0) moved more -> all invalid
     node.declare_parameter("precompute_pose_tol_deg", 0.5)
     node.declare_parameter("precompute_request_timeout_s", 5.0)
+    node.declare_parameter("precompute_max_retries", 5)     # failed attempts per object before giving up
     # Hold raised 250 -> 400 ms (2026-08-07, Majd's choice): at 250 ms a
     # pointing ray sweeping across a bbox committed selections the user
     # never meant.

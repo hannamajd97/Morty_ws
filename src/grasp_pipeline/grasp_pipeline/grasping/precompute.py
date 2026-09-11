@@ -24,8 +24,16 @@ Validity of an entry (all must hold at lookup time)
 
 Scheduling
   * a detection must be seen for ``precompute_stable_s`` before it is queued;
-  * hovered (pointed-at) object first, then objects inside the reach
-    envelope, then ``edge`` ones; ``too far`` objects are skipped;
+  * hovered (pointed-at) object first, then objects never computed, then
+    retries of objects that failed — fewest failures first; inside each
+    group objects inside the reach envelope before ``edge`` ones;
+    ``too far`` objects are skipped;
+  * an object is retried up to ``precompute_max_retries`` times after a
+    failure (no grasps from GraspGen, a job error, or a pick the executor
+    could not carry out); a retry never jumps ahead of a new object
+    (Majd 2026-09-11). GraspGen samples differently every run, so a retry
+    can succeed where the previous set failed. An object that moves is a
+    new object: its counter starts from zero;
   * at most ``precompute_max_objects`` entries;
   * the worker never runs while a selection is being served
     (``foreground()`` holds the model lock around the whole pick) and it
@@ -80,7 +88,9 @@ class _Track:
     last_seen: float
     reach_state: str = ""
     score: float = 0.0
-    failed_t: float = 0.0          # last failed job; retried after a backoff
+    failed_t: float = 0.0          # last failure; the retry waits a short backoff
+    attempts: int = 0              # failed attempts so far (resets when the object moves)
+    gave_up: bool = False          # logged once when attempts reach the maximum
 
 
 @dataclass
@@ -374,19 +384,34 @@ class GraspPrecomputer:
     def _next_job(self) -> Optional[_Track]:
         stable = float(self._p("precompute_stable_s", 0.2))
         cap = int(self._p("precompute_max_objects", 8))
+        max_retries = int(self._p("precompute_max_retries", 5))
         now = time.monotonic()
         with self._state:
             if len(self._entries) >= cap:
                 return None
-            todo = [t for k, t in self._tracks.items()
-                    if k not in self._entries and now - t.first_seen >= stable
-                    and now - t.last_seen < 1.0 and t.reach_state != "red"
-                    and now - t.failed_t > 5.0]
+            todo = []
+            for k, t in self._tracks.items():
+                if k in self._entries or now - t.first_seen < stable or now - t.last_seen >= 1.0:
+                    continue
+                if t.reach_state == "red":
+                    continue
+                if t.attempts >= max_retries:
+                    if not t.gave_up:
+                        t.gave_up = True
+                        self._node.get_logger().warn(
+                            f"[precompute] '{k}' gave up after {t.attempts} attempts — "
+                            "move it (or select it for a fresh try)")
+                    continue
+                if t.attempts and now - t.failed_t < 1.0:
+                    continue      # short backoff so a retry does not burn the same frame
+                todo.append(t)
             if not todo:
                 return None
             hover = self._hover_key
             rank = {"green": 0, "": 0, "orange": 1}
-            todo.sort(key=lambda t: (0 if t.key == hover else 1, rank.get(t.reach_state, 2), -t.score))
+            # hovered > never computed > retries (fewest failures first)
+            todo.sort(key=lambda t: (0 if t.key == hover else 1, t.attempts,
+                                     rank.get(t.reach_state, 2), -t.score))
             return copy.copy(todo[0])
 
     def _loop(self) -> None:
@@ -403,15 +428,36 @@ class GraspPrecomputer:
                     self._run_job(job)
                 except Exception as e:
                     self._node.get_logger().warn(f"[precompute] job '{job.key}' error: {e}")
-                    self._mark_failed(job.key)
+                    self._mark_failed(job.key, f"job error: {e}")
             except Exception as e:
                 self._node.get_logger().warn(f"[precompute] worker error: {e}")
 
-    def _mark_failed(self, key: str) -> None:
+    def _mark_failed(self, key: str, why: str) -> None:
+        """One failed attempt for this object; the retry queues behind new
+        objects. Returns nothing; the queue reads the counters."""
         with self._state:
             t = self._tracks.get(key)
-            if t is not None:
-                t.failed_t = time.monotonic()
+            if t is None:
+                return
+            t.failed_t = time.monotonic()
+            t.attempts += 1
+            self._entries.pop(key, None)
+            n, mx = t.attempts, int(self._p("precompute_max_retries", 5))
+        self._node.get_logger().info(f"[precompute] '{key}' {why} — attempt {n}/{mx}"
+                                     + ("; retry queued behind new objects" if n < mx else ""))
+
+    def note_pick_failed(self, sel: Dict[str, Any]) -> None:
+        """The executor could not carry out the pick of this object: its
+        stored grasps are wrong, the others stay (the arm is back home)."""
+        label = str(sel.get("simplified_label", sel.get("label", "")))
+        box = [int(v) for v in sel.get("bbox", [])]
+        shift = float(self._p("precompute_box_shift_px", 8.0))
+        size_tol = float(self._p("precompute_size_tol", 0.15))
+        with self._state:
+            keys = [k for k, t in self._tracks.items()
+                    if t.label == label and len(box) == 4 and _boxes_agree(t.box, box, shift, size_tol)]
+        for k in keys:
+            self._mark_failed(k, "pick failed at the executor")
 
     def _run_job(self, tr: _Track) -> None:
         node = self._node
@@ -441,8 +487,7 @@ class GraspPrecomputer:
             if getattr(node, "selection_made", False):
                 node.get_logger().info(f"[precompute] job '{tr.key}' dropped after {dt_job:.2f} s: operator selected")
             else:
-                node.get_logger().warn(f"[precompute] job '{tr.key}' failed after {dt_job:.2f} s")
-                self._mark_failed(tr.key)
+                self._mark_failed(tr.key, f"job failed after {dt_job:.2f} s")
             return
         t_after = self._tool0()
         if t_after is None:
@@ -450,6 +495,9 @@ class GraspPrecomputer:
         dmove, rmove = _pose_delta(t_before, t_after)
         if dmove > float(self._p("precompute_pose_tol_m", 0.002)) or rmove > float(self._p("precompute_pose_tol_deg", 0.5)):
             node.get_logger().info(f"[precompute] job '{tr.key}' discarded: arm moved during the capture")
+            return
+        if not res.get("grasps"):
+            self._mark_failed(tr.key, f"no grasps survived ({len(res.get('raw_grasps') or [])} generated)")
             return
         obs0 = res.get("obs0") or {}
         mask = obs0.get("selected_mask")

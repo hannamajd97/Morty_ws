@@ -34,7 +34,10 @@ selected object into ranked grasp candidates for the executor.
    replays the captured outputs and publishes at once (`[precompute] HIT`
    in the log; otherwise `MISS: <why>` and the normal path). Precomputed
    objects carry a `*` in the overlay. Nothing is published or moved by the
-   worker itself.
+   worker itself. An object whose grasps failed (none survived, or the
+   executor could not carry out the pick) is recomputed up to
+   `precompute_max_retries` (5) times, always behind objects not yet
+   computed; a moved object starts again from zero.
 5. **Filter chain** — `grasping/filter_pipeline.py`: upright/level band,
    from-behind rejection, height window, roll canonicalisation, front
    preference, centroid and end-effector orientation re-weighting,
