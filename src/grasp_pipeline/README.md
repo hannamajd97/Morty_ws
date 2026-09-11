@@ -26,6 +26,15 @@ selected object into ranked grasp candidates for the executor.
    `grasp_client.py`). One inference is 0.10 s there against 0.3–0.9 s
    inside this node, whose YOLO, hand tracker and camera callbacks compete
    for the interpreter lock. `GRASPGEN_MODE=inprocess` restores the old path.
+   With `graspgen_precompute:=true` (off by default; `MORTY_GRASP_PRECOMPUTE=true`
+   for a GUI-started pipeline) a worker runs steps 3–5 for every detection
+   that has been stable for 0.2 s while nobody has selected
+   (`grasping/precompute.py`). A selection whose stored result is still
+   valid — object box, depth and arm pose unchanged, parameters unchanged —
+   replays the captured outputs and publishes at once (`[precompute] HIT`
+   in the log; otherwise `MISS: <why>` and the normal path). Precomputed
+   objects carry a `*` in the overlay. Nothing is published or moved by the
+   worker itself.
 5. **Filter chain** — `grasping/filter_pipeline.py`: upright/level band,
    from-behind rejection, height window, roll canonicalisation, front
    preference, centroid and end-effector orientation re-weighting,
@@ -58,13 +67,15 @@ the ones that matter day to day:
 | `single_view_multiframe`, `single_view_frames` | depth fusion |
 | `publish_debug_image`, `debug_publish_fps` | overlay |
 | `tf_listener_max_hz` | decimated `/tf` listener rate (see below) |
+| `graspgen_precompute`, `precompute_stable_s` | grasp precompute cache (see step 4) |
 
 ## Files
 
 | path | role |
 | --- | --- |
 | `grasp_selection_node.py` | the node: timers, selection thread, state machine |
-| `grasping/pick_pipeline.py` | one pick cycle from selection to published candidates |
+| `grasping/pick_pipeline.py` | one pick cycle from selection to published candidates (`_compute` = perception phases, `_publish` = candidates and viewer poses) |
+| `grasping/precompute.py` | the precompute worker: object tracks, validity checks, replay |
 | `grasping/filter_pipeline.py`, `grasp_filters.py`, `grasping/orientation.py`, `grasping/grasp_scorer.py` | the filter chain and scoring |
 | `perception/` | cloud extraction, neighbour obstacles, reach envelope |
 | `point_selector.py`, `selection/params.py` | pointing/voice selection and all parameter declarations |

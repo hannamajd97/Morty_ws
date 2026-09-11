@@ -83,6 +83,7 @@ from .grasping import (
     OrientationFilter,
     PickPipeline,
 )
+from .grasping.precompute import GraspPrecomputer
 from .perception import CloudExtractor
 from .registration_pipeline import MultiViewRegistrar
 from .selection import declare_all_parameters
@@ -347,6 +348,11 @@ class YoloLiveSelectGrasp(Node):
         # above via the orchestrator's wrappers, so it must be created
         # last.
         self._pick = PickPipeline(self)
+        # Grasp precompute cache (2026-09-11): a worker that runs the pick's
+        # perception phases for every stable detection while nobody has
+        # selected. Off unless `graspgen_precompute` is true; then a selection
+        # with a valid stored result skips straight to publishing.
+        self._precompute = GraspPrecomputer(self, self._pick)
         overlay_qos = QoSProfile(
             depth=1,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -536,6 +542,7 @@ class YoloLiveSelectGrasp(Node):
                 if label != self._last_pointed_label:
                     self._last_pointed_label = label
                     self._pointed_object_pub.publish(String(data=label))
+                    self._precompute.bump(idx)
             except Exception:
                 pass
 
@@ -843,11 +850,13 @@ class YoloLiveSelectGrasp(Node):
         sel: Dict[str, Any],
         *,
         publish_outputs: bool,
+        keep_state: bool = True,
     ) -> Optional[np.ndarray]:
         selected_mask = None
         segmenter = self._get_segmenter()
         if segmenter is None or self.fb.rgb_frame is None:
-            self.last_selected_mask_np = None
+            if keep_state:
+                self.last_selected_mask_np = None
             return None
         try:
             bbox = [int(v) for v in sel["bbox"]]
@@ -860,7 +869,8 @@ class YoloLiveSelectGrasp(Node):
             seg_ms = (time.time() - t_seg0) * 1000.0
             self.get_logger().info(f"[seg] selected-object segmentation finished in {seg_ms:.1f} ms")
             if selected_mask is None:
-                self.last_selected_mask_np = None
+                if keep_state:
+                    self.last_selected_mask_np = None
                 return None
             dilate_px = int(self.get_parameter("segmentation_mask_dilate_px").value)
             if dilate_px > 0:
@@ -880,17 +890,20 @@ class YoloLiveSelectGrasp(Node):
                 self.get_logger().warn(
                     f"Segmentation mask too small (area={area}px < {min_area}px); falling back to bbox crop."
                 )
-                self.last_selected_mask_np = None
+                if keep_state:
+                    self.last_selected_mask_np = None
                 return None
             self._publish_selected_mask_outputs(
                 sel,
                 selected_mask,
                 publish_outputs=publish_outputs,
                 mask_label="fresh-seg",
+                keep_state=keep_state,
             )
         except Exception as e:
             self.get_logger().warn(f"Segmentation failed; falling back to bbox crop: {e}")
-            self.last_selected_mask_np = None
+            if keep_state:
+                self.last_selected_mask_np = None
             return None
         return selected_mask
 
@@ -901,13 +914,17 @@ class YoloLiveSelectGrasp(Node):
         *,
         publish_outputs: bool,
         mask_label: str = "seg",
+        keep_state: bool = True,
     ) -> None:
-        self.last_selected_mask_np = np.asarray(selected_mask, dtype=bool).copy()
-        if self.fb.rgb_frame is not None:
-            self.last_selected_debug_frame = self.fb.rgb_frame.copy()
-            self.last_selected_debug_header = copy.deepcopy(sel.get("header", self.fb.rgb_header))
-            self.last_selected_debug_source = str(mask_label)
-            self.last_selected_debug_stamp_mono = time.monotonic()
+        # keep_state=False (2026-09-11): a background precompute segments an
+        # object nobody selected — the overlay must not flash its mask.
+        if keep_state:
+            self.last_selected_mask_np = np.asarray(selected_mask, dtype=bool).copy()
+            if self.fb.rgb_frame is not None:
+                self.last_selected_debug_frame = self.fb.rgb_frame.copy()
+                self.last_selected_debug_header = copy.deepcopy(sel.get("header", self.fb.rgb_header))
+                self.last_selected_debug_source = str(mask_label)
+                self.last_selected_debug_stamp_mono = time.monotonic()
         if not publish_outputs:
             return
         try:
@@ -1737,6 +1754,7 @@ class YoloLiveSelectGrasp(Node):
                         self._debug_renderer._annotate_distances(self, simplified_dets)
                     except Exception:
                         pass
+                    self._precompute.observe(simplified_dets)
                     self._last_infer_t = time.time()
                     if self.pub_all_detections is not None:
                         try:
@@ -2438,6 +2456,9 @@ class YoloLiveSelectGrasp(Node):
                                             "Executor reported failure. Robot should have recovered to initgrasp via fallback. "
                                             "Restarting detection for next attempt."
                                         )
+                                        # The next try must look again, not
+                                        # replay the grasps that just failed.
+                                        self._precompute.invalidate_all("executor reported failure")
                                         # SELF-clear the auto-pick label on failure.
                                         # intent_router normally clears it at
                                         # cycle end, but when the voice stack is

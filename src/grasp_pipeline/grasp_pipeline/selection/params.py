@@ -392,6 +392,19 @@ def declare_all_parameters(node: "Node") -> None:
     # the LATEST transform, so 50 samples/s per publisher stream is plenty
     # and costs a few % of a core instead of a whole one (tf_listener_lite).
     node.declare_parameter("tf_listener_max_hz", 50.0)
+    # Grasp precompute cache (2026-09-11, Hamid/Majd): GraspGen for every
+    # detected object while nobody has selected, so a selection publishes
+    # stored candidates at once. Off until tested on the robot; see
+    # grasping/precompute.py for the validity rules.
+    node.declare_parameter("graspgen_precompute", False)
+    node.declare_parameter("precompute_stable_s", 0.2)      # seen this long before it is queued
+    node.declare_parameter("precompute_max_objects", 8)
+    node.declare_parameter("precompute_box_shift_px", 8.0)  # box centre moved more -> recompute
+    node.declare_parameter("precompute_size_tol", 0.15)     # box size changed more (ratio) -> recompute
+    node.declare_parameter("precompute_depth_tol_m", 0.01)  # object median depth moved more -> recompute
+    node.declare_parameter("precompute_pose_tol_m", 0.002)  # arm (tool0) moved more -> all invalid
+    node.declare_parameter("precompute_pose_tol_deg", 0.5)
+    node.declare_parameter("precompute_request_timeout_s", 5.0)
     # Hold raised 250 -> 400 ms (2026-08-07, Majd's choice): at 250 ms a
     # pointing ray sweeping across a bbox committed selections the user
     # never meant.

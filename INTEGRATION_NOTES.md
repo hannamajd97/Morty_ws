@@ -136,6 +136,13 @@ about 2.5 MB/s with both cameras compressed).
 - **Reach warning:** the detection overlay shows `edge N% @A deg` or
   `too far` per object before any planning, from the arm's reach envelope
   (`grasp_pipeline/perception/reach_envelope.py`).
+- **Grasp precompute cache** (pipeline, off by default): with
+  `MORTY_GRASP_PRECOMPUTE=true` in the GUI's environment (or
+  `graspgen_precompute:=true` by hand) the pipeline runs GraspGen for every
+  stable detection before anyone selects; a selection with a valid stored
+  result skips perception. The worker publishes nothing and never moves
+  the arm; `[precompute] HIT/MISS` lines in the pipeline log say what
+  happened. Details in `src/grasp_pipeline/README.md`.
 
 ## 9. Audio
 

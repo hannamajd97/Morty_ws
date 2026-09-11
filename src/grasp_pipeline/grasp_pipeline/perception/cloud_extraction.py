@@ -140,6 +140,7 @@ class CloudExtractor:
         sel: Dict[str, Any],
         *,
         publish_outputs: bool,
+        background: bool = False,
     ) -> Optional[Dict[str, Any]]:
         if self._node.fb.depth_frame is None or self._node.fb.rgb_frame is None:
             return None
@@ -157,7 +158,8 @@ class CloudExtractor:
                 f"Published selected '{capture_sel['label']}' bbox=({x1},{y1},{x2},{y2}) | depth=yes"
             )
 
-        selected_mask = self._node._compute_selected_mask(capture_sel, publish_outputs=publish_outputs)
+        selected_mask = self._node._compute_selected_mask(
+            capture_sel, publish_outputs=publish_outputs, keep_state=not background)
         if selected_mask is not None:
             try:
                 x1, y1, x2, y2 = [int(v) for v in capture_sel["bbox"]]

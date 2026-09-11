@@ -199,6 +199,8 @@ class DebugImagePublisher:
                     tag += f" {score:.2f}"
                 if d.get("dist_note"):
                     tag += f" {d['dist_note']}"
+                if d.get("precomputed"):
+                    tag += " *"          # grasps already computed for this object (precompute cache)
                 (tw, th), baseline = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
                 # Keep long labels inside the image instead of clipping
                 # right-edge objects such as the vitamin tube.

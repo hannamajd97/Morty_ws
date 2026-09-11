@@ -176,6 +176,14 @@ def generate_launch_description():
         # median-fuse N consecutive depth frames while the arm is still.
         DeclareLaunchArgument("single_view_multiframe", default_value="true"),
         DeclareLaunchArgument("single_view_frames", default_value="5"),
+        # Grasp precompute cache (2026-09-11): GraspGen for every stable
+        # detection while nobody has selected. Off by default; the GUI has no
+        # argument slot, so MORTY_GRASP_PRECOMPUTE=true in the environment
+        # turns it on for a GUI-started pipeline. Also settable at run time:
+        #   ros2 param set /yolo_live_select_grasp graspgen_precompute true
+        DeclareLaunchArgument("graspgen_precompute",
+                              default_value=os.environ.get("MORTY_GRASP_PRECOMPUTE", "false")),
+        DeclareLaunchArgument("precompute_stable_s", default_value="0.2"),
         DeclareLaunchArgument("segmentation_mask_topic", default_value="/yolo/selected_mask"),
         DeclareLaunchArgument("segmentation_overlay_topic", default_value="/yolo/selected_mask_overlay"),
         # Default false for the current single-view experiments (2026-08-06).
@@ -455,6 +463,8 @@ def generate_launch_description():
             {"registration_enabled": ParameterValue(LaunchConfiguration("registration_enabled"), value_type=bool)},
             {"single_view_multiframe": ParameterValue(LaunchConfiguration("single_view_multiframe"), value_type=bool)},
             {"single_view_frames": ParameterValue(LaunchConfiguration("single_view_frames"), value_type=int)},
+            {"graspgen_precompute": ParameterValue(LaunchConfiguration("graspgen_precompute"), value_type=bool)},
+            {"precompute_stable_s": ParameterValue(LaunchConfiguration("precompute_stable_s"), value_type=float)},
             {"registration_num_observations": ParameterValue(LaunchConfiguration("registration_num_observations"), value_type=int)},
             {"registration_observation_interval_s": ParameterValue(LaunchConfiguration("registration_observation_interval_s"), value_type=float)},
             {"registration_refresh_detection": ParameterValue(LaunchConfiguration("registration_refresh_detection"), value_type=bool)},

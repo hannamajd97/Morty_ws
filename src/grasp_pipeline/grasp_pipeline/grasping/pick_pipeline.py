@@ -25,9 +25,10 @@ preserved exactly.
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, TYPE_CHECKING, Optional
 
 import numpy as np
+import time as _time
 import rclpy
 import tf2_geometry_msgs
 import tf2_ros
@@ -65,9 +66,20 @@ class PickPipeline:
 
     def __init__(self, node: "Node") -> None:
         self._node = node
+        # True while _compute runs for the precompute worker. Foreground and
+        # background never overlap (GraspPrecomputer.foreground() holds the
+        # model lock around run()), so one flag is enough.
+        self._background = False
 
     def _aborted(self, where: str) -> bool:
-        """Operator stop check at phase boundaries (trial 1001)."""
+        """Operator stop check at phase boundaries (trial 1001).
+
+        A background job is not the operator's pick: a stale stop flag must
+        not kill it, and the operator's SELECTION must — the moment someone
+        chooses an object the worker's job is worthless and only delays the
+        real pick, so it ends quietly at the next phase boundary."""
+        if self._background:
+            return bool(getattr(self._node, "selection_made", False))
         if getattr(self._node, "_pick_abort", False):
             self._node.get_logger().warn(
                 f"[abort] operator stop honoured during {where} — "
@@ -77,11 +89,57 @@ class PickPipeline:
         return False
 
     def run(self, sel: Dict[str, Any]) -> bool:
-        """Run one selection and return whether a grasp command was published."""
+        """Run one selection and return whether a grasp command was published.
+
+        Cache first (2026-09-11): if the precompute worker already holds
+        valid grasps for this object at this arm pose, replay its captured
+        outputs, rebuild the neighbour boxes from the live frame, and publish
+        the stored candidates; otherwise compute as always. The worker's
+        model lock is held for the whole pick so no background job can run
+        in between."""
+        pre = getattr(self._node, "_precompute", None)
+        if pre is None:
+            return self._run_locked(sel, None)
+        with pre.foreground():
+            return self._run_locked(sel, pre)
+
+    def _run_locked(self, sel: Dict[str, Any], pre) -> bool:
+        if pre is not None and pre.enabled and not sel.get("force_fresh", False):
+            entry, why = pre.lookup(sel)
+            if entry is not None:
+                t0 = _time.monotonic()
+                try:
+                    if pre.replay_capture(entry, sel):
+                        ok = self._publish(entry.result, sel)
+                        self._node.get_logger().info(
+                            f"[precompute] HIT '{entry.label}' (age {_time.monotonic() - entry.t_done:.0f} s) "
+                            f"-> published in {_time.monotonic() - t0:.2f} s")
+                        return ok
+                except Exception as exc:
+                    self._node.get_logger().warn(f"[precompute] replay failed ({exc}) — computing fresh.")
+            else:
+                self._node.get_logger().info(f"[precompute] MISS: {why} — fresh path")
+        res = self._compute(sel, background=False)
+        if res is None:
+            return False
+        return self._publish(res, sel)
+
+    def _compute(self, sel: Dict[str, Any], background: bool = False) -> Optional[Dict[str, Any]]:
+        """Phases 0-7: capture the object, run GraspGen, filter. Returns the
+        result dict `_publish` consumes, or None when the cycle must end.
+
+        ``background=True`` (2026-09-11, the precompute cache): the same
+        computation for an object nobody has selected — nothing is
+        published, the arm is never moved (no registration pre-positioning),
+        and no node state that the overlay/voice/GUI read is written."""
         grasps: List[Dict[str, Any]] = []
         raw_grasps: List[Dict[str, Any]] = []
-        self._node.last_candidates_base = None
-        self._node.last_candidate_scores = None
+        self._background = bool(background)
+        centroid_msg = None          # kept in the result so a cache replay
+        centroid_base_msg = None     # publishes exactly what a fresh pick does
+        if not background:
+            self._node.last_candidates_base = None
+            self._node.last_candidate_scores = None
 
         # ── Phase 0: the robot's transforms must exist ────────────────
         # Every later phase needs camera -> base_link (obstacles, centroid,
@@ -103,7 +161,7 @@ class PickPipeline:
             self._node.get_logger().warn(f"[tf-precheck] skipped: {exc}")
 
         # ── Phase 1: pre-position to the registration seed pose ───────
-        if bool(self._node.get_parameter("registration_enabled").value) and bool(
+        if not background and bool(self._node.get_parameter("registration_enabled").value) and bool(
             self._node.get_parameter("registration_move_to_initial_target").value
         ):
             init_target = str(self._node.get_parameter("registration_initial_named_target").value).strip()
@@ -135,7 +193,7 @@ class PickPipeline:
         self._node.get_logger().info(
             f"[timing] refresh-detection {_time.monotonic() - _t_phase:.2f}s")
         _t_phase = _time.monotonic()
-        obs0 = self._node._extract_filtered_object_cloud(sel_capture, publish_outputs=True)
+        obs0 = self._node._extract_filtered_object_cloud(sel_capture, publish_outputs=not background, background=background)
         self._node.get_logger().info(
             f"[timing] capture+segment+cloud {_time.monotonic() - _t_phase:.2f}s")
         _t_phase = _time.monotonic()
@@ -199,7 +257,7 @@ class PickPipeline:
         self._node.get_logger().info(
             f"[timing] registration+downsample {_time.monotonic() - _t_phase:.2f}s")
         _t_phase = _time.monotonic()
-        if bool(self._node.get_parameter("publish_graspgen_input_cloud").value):
+        if not background and bool(self._node.get_parameter("publish_graspgen_input_cloud").value):
             try:
                 out_header = Header()
                 out_header.stamp = self._node.get_clock().now().to_msg()
@@ -238,6 +296,10 @@ class PickPipeline:
                 cx=self._node.fb.cx,
                 cy=self._node.fb.cy,
                 depth_scale=self._node.fb.depth_scale,
+                # A background job must never hold the model lock for long:
+                # a selection made meanwhile waits behind it (2026-09-11).
+                timeout_ms=(int(float(self._node.get_parameter("precompute_request_timeout_s").value) * 1000)
+                            if background else 60000),
             )
         except Exception as e:
             self._node.get_logger().error(
@@ -496,8 +558,10 @@ class PickPipeline:
                 ps.pose.position.y = float(centroid[1])
                 ps.pose.position.z = float(centroid[2])
                 ps.pose.orientation.w = 1.0
-                self._node.pub_centroid.publish(ps)
-                self._node.last_centroid = ps
+                centroid_msg = ps
+                if not background:
+                    self._node.pub_centroid.publish(ps)
+                    self._node.last_centroid = ps
                 target_frame = self._node.get_parameter("target_frame").value
                 try:
                     if ps.header.frame_id == target_frame:
@@ -536,8 +600,10 @@ class PickPipeline:
                         transformed_centroid.pose.orientation.y = 0.0
                         transformed_centroid.pose.orientation.z = 0.0
                         transformed_centroid.pose.orientation.w = 1.0
-                    self._node.pub_centroid_base.publish(transformed_centroid)
-                    self._node.last_centroid_base = transformed_centroid
+                    centroid_base_msg = transformed_centroid
+                    if not background:
+                        self._node.pub_centroid_base.publish(transformed_centroid)
+                        self._node.last_centroid_base = transformed_centroid
                 except Exception as e:
                     self._node.get_logger().warn(f"Centroid transform to {target_frame} failed: {e}")
             except Exception as e:
@@ -594,6 +660,145 @@ class PickPipeline:
         # Feeds grasp_viz_viewer: green = survived the whole filter chain,
         # red = produced by GraspGen but filtered out. Raw grasp frames (no
         # TCP offset) in `frame_for_pick`, same frame as the selected cloud.
+        return {
+            "sel_capture": sel_capture, "obs0": obs0,
+            "grasps": grasps, "raw_grasps": raw_grasps,
+            "pts_np": pts_np, "cols_np": cols_np, "pts_send": pts_send,
+            "cloud_msg": cloud_msg, "frame_for_pick": frame_for_pick,
+            "registration_frame_is_target": registration_frame_is_target,
+            "aabb_min_pick": aabb_min_pick, "aabb_max_pick": aabb_max_pick,
+            "filter_input_count": filter_input_count,
+            # replay-only extras (precompute cache)
+            "cols_send": cols_send, "input_cloud_frame": str(reg["frame_id"]),
+            "centroid_msg": centroid_msg, "centroid_base_msg": centroid_base_msg,
+        }
+
+    def _publish(self, res: Dict[str, Any], sel: Dict[str, Any]) -> bool:
+        """Phases 8-10 on a compute result: candidates to the executor first,
+        then the viewer poses, then the single best pose."""
+        grasps = res["grasps"]; raw_grasps = res["raw_grasps"]
+        pts_np = res["pts_np"]; pts_send = res["pts_send"]; cloud_msg = res["cloud_msg"]
+        frame_for_pick = res["frame_for_pick"]
+        registration_frame_is_target = res["registration_frame_is_target"]
+        aabb_min_pick = res["aabb_min_pick"]; aabb_max_pick = res["aabb_max_pick"]
+        # ── Phase 8: publish top-K candidates as PoseArray ────────────
+        if bool(self._node.get_parameter("publish_grasp_candidates").value):
+            try:
+                target_frame = str(self._node.get_parameter("target_frame").value)
+                top_k = max(int(self._node.get_parameter("grasp_candidates_top_k").value), 1)
+                use_norm = bool(self._node.get_parameter("graspgen_matrix_normalized").value)
+                col_major = bool(self._node.get_parameter("graspgen_column_major").value)
+                fixed_rot = str(self._node.get_parameter("grasp2tcp_rot").value)
+                ordered = sorted(grasps, key=lambda g: float(g.get("score", 0.0)), reverse=True)[:top_k]
+                pose_array = PoseArray()
+                pose_array.header.frame_id = target_frame
+                pose_array.header.stamp = self._node.get_clock().now().to_msg()
+                scores_msg = Float32MultiArray()
+
+                tf_cam_to_target = None
+                if frame_for_pick != target_frame:
+                    tf_cam_to_target = self._node.tf_buffer.lookup_transform(
+                        target_frame,
+                        frame_for_pick,
+                        rclpy.time.Time(),
+                        timeout=rclpy.duration.Duration(seconds=1.0),
+                    )
+                for g in ordered:
+                    M_g = np.asarray(g["matrix"], dtype=np.float32).reshape(4, 4)
+                    if use_norm:
+                        T_g = _denorm_T_from_unit_cube(M_g, aabb_min_pick, aabb_max_pick, column_major=col_major)
+                    else:
+                        T_g = M_g.T if col_major else M_g
+                    try:
+                        T_tcp_g = T_g @ _make_T_grasp_to_tcp(fixed_rot)
+                    except Exception:
+                        T_tcp_g = T_g
+                    qx_g, qy_g, qz_g, qw_g = quaternion_from_matrix(T_tcp_g)
+                    ps_src = PoseStamped()
+                    ps_src.header.frame_id = frame_for_pick
+                    ps_src.header.stamp = pose_array.header.stamp
+                    ps_src.pose.position.x = float(T_tcp_g[0, 3])
+                    ps_src.pose.position.y = float(T_tcp_g[1, 3])
+                    ps_src.pose.position.z = float(T_tcp_g[2, 3])
+                    ps_src.pose.orientation.x = float(qx_g)
+                    ps_src.pose.orientation.y = float(qy_g)
+                    ps_src.pose.orientation.z = float(qz_g)
+                    ps_src.pose.orientation.w = float(qw_g)
+                    if tf_cam_to_target is not None:
+                        pose_target = tf2_geometry_msgs.do_transform_pose(ps_src.pose, tf_cam_to_target)
+                    else:
+                        pose_target = ps_src.pose
+                    pose_array.poses.append(pose_target)
+                    scores_msg.data.append(float(g.get("score", 0.0)))
+                # Table-clearance floor (Majd's "it takes forever", 2026-08-11):
+                # every candidate below the table top + clearance is doomed —
+                # the executor burns ~8 s of LIN planning per rejection. Drop
+                # them here so only physically plannable grasps are sent.
+                min_wz = float(
+                    self._node.get_parameter("candidate_min_world_z").value
+                )
+                if min_wz > 0.0 and pose_array.poses:
+                    try:
+                        tf_t_w = None
+                        if target_frame != "world":
+                            tf_t_w = self._node.tf_buffer.lookup_transform(
+                                "world", target_frame, rclpy.time.Time(),
+                                timeout=rclpy.duration.Duration(seconds=0.5),
+                            )
+                        keep_p, keep_s = [], []
+                        for pose_t, sc in zip(pose_array.poses, scores_msg.data):
+                            if tf_t_w is not None:
+                                z_w = tf2_geometry_msgs.do_transform_pose(
+                                    pose_t, tf_t_w
+                                ).position.z
+                            else:
+                                z_w = pose_t.position.z
+                            if z_w >= min_wz:
+                                keep_p.append(pose_t)
+                                keep_s.append(sc)
+                        if keep_p:
+                            n_drop = len(pose_array.poses) - len(keep_p)
+                            if n_drop:
+                                self._node.get_logger().info(
+                                    f"[cand-floor] dropped {n_drop}/{len(pose_array.poses)} "
+                                    f"candidates below world z={min_wz:.3f} (table clearance)"
+                                )
+                            pose_array.poses = keep_p
+                            scores_msg.data = keep_s
+                        else:
+                            self._node.get_logger().warn(
+                                f"[cand-floor] ALL candidates below world z={min_wz:.3f} — "
+                                "refusing execution to protect the table."
+                            )
+                            return False
+                    except Exception as e:
+                        self._node.get_logger().warn(f"[cand-floor] skipped ({e})")
+                if self._aborted("candidate publishing"):
+                    return False
+                self._node.pub_candidates_base.publish(pose_array)
+                self._node.pub_candidate_scores.publish(scores_msg)
+                self._node.last_candidates_base = copy.deepcopy(pose_array)
+                self._node.last_candidate_scores = copy.deepcopy(scores_msg)
+                # Tag the keep-alive cache with the cycle these belong to —
+                # the republish timer only re-sends them while this is still
+                # the ACTIVE cycle (ghost-pick hardening, 2026-08-12).
+                self._node._candidates_cycle_id = int(
+                    getattr(self._node, "_waiting_cycle_id", -1)
+                )
+                self._node.get_logger().info(
+                    f"Published {len(pose_array.poses)} grasp candidates on "
+                    f"'{self._node.get_parameter('grasp_candidates_topic').value}'."
+                )
+            except Exception as e:
+                # Nothing reached the executor, so nothing will ever answer
+                # with cycle_done: end the cycle here (2026-09-09, a pick
+                # attempted before the driver was up sat in that wait until
+                # a manual abort).
+                self._node.get_logger().error(
+                    f"Failed to publish grasp candidates: {e} — ending this cycle.")
+                return False
+
+        # ── Phase 9: pick the single best grasp ───────────────────────
         try:
             use_norm_v = bool(self._node.get_parameter("graspgen_matrix_normalized").value)
             col_major_v = bool(self._node.get_parameter("graspgen_column_major").value)
@@ -714,125 +919,6 @@ class PickPipeline:
             )
         except Exception as e:
             self._node.get_logger().warn(f"Grasp viz publish failed: {e}")
-
-        # ── Phase 8: publish top-K candidates as PoseArray ────────────
-        if bool(self._node.get_parameter("publish_grasp_candidates").value):
-            try:
-                target_frame = str(self._node.get_parameter("target_frame").value)
-                top_k = max(int(self._node.get_parameter("grasp_candidates_top_k").value), 1)
-                use_norm = bool(self._node.get_parameter("graspgen_matrix_normalized").value)
-                col_major = bool(self._node.get_parameter("graspgen_column_major").value)
-                fixed_rot = str(self._node.get_parameter("grasp2tcp_rot").value)
-                ordered = sorted(grasps, key=lambda g: float(g.get("score", 0.0)), reverse=True)[:top_k]
-                pose_array = PoseArray()
-                pose_array.header.frame_id = target_frame
-                pose_array.header.stamp = self._node.get_clock().now().to_msg()
-                scores_msg = Float32MultiArray()
-
-                tf_cam_to_target = None
-                if frame_for_pick != target_frame:
-                    tf_cam_to_target = self._node.tf_buffer.lookup_transform(
-                        target_frame,
-                        frame_for_pick,
-                        rclpy.time.Time(),
-                        timeout=rclpy.duration.Duration(seconds=1.0),
-                    )
-                for g in ordered:
-                    M_g = np.asarray(g["matrix"], dtype=np.float32).reshape(4, 4)
-                    if use_norm:
-                        T_g = _denorm_T_from_unit_cube(M_g, aabb_min_pick, aabb_max_pick, column_major=col_major)
-                    else:
-                        T_g = M_g.T if col_major else M_g
-                    try:
-                        T_tcp_g = T_g @ _make_T_grasp_to_tcp(fixed_rot)
-                    except Exception:
-                        T_tcp_g = T_g
-                    qx_g, qy_g, qz_g, qw_g = quaternion_from_matrix(T_tcp_g)
-                    ps_src = PoseStamped()
-                    ps_src.header.frame_id = frame_for_pick
-                    ps_src.header.stamp = pose_array.header.stamp
-                    ps_src.pose.position.x = float(T_tcp_g[0, 3])
-                    ps_src.pose.position.y = float(T_tcp_g[1, 3])
-                    ps_src.pose.position.z = float(T_tcp_g[2, 3])
-                    ps_src.pose.orientation.x = float(qx_g)
-                    ps_src.pose.orientation.y = float(qy_g)
-                    ps_src.pose.orientation.z = float(qz_g)
-                    ps_src.pose.orientation.w = float(qw_g)
-                    if tf_cam_to_target is not None:
-                        pose_target = tf2_geometry_msgs.do_transform_pose(ps_src.pose, tf_cam_to_target)
-                    else:
-                        pose_target = ps_src.pose
-                    pose_array.poses.append(pose_target)
-                    scores_msg.data.append(float(g.get("score", 0.0)))
-                # Table-clearance floor (Majd's "it takes forever", 2026-08-11):
-                # every candidate below the table top + clearance is doomed —
-                # the executor burns ~8 s of LIN planning per rejection. Drop
-                # them here so only physically plannable grasps are sent.
-                min_wz = float(
-                    self._node.get_parameter("candidate_min_world_z").value
-                )
-                if min_wz > 0.0 and pose_array.poses:
-                    try:
-                        tf_t_w = None
-                        if target_frame != "world":
-                            tf_t_w = self._node.tf_buffer.lookup_transform(
-                                "world", target_frame, rclpy.time.Time(),
-                                timeout=rclpy.duration.Duration(seconds=0.5),
-                            )
-                        keep_p, keep_s = [], []
-                        for pose_t, sc in zip(pose_array.poses, scores_msg.data):
-                            if tf_t_w is not None:
-                                z_w = tf2_geometry_msgs.do_transform_pose(
-                                    pose_t, tf_t_w
-                                ).position.z
-                            else:
-                                z_w = pose_t.position.z
-                            if z_w >= min_wz:
-                                keep_p.append(pose_t)
-                                keep_s.append(sc)
-                        if keep_p:
-                            n_drop = len(pose_array.poses) - len(keep_p)
-                            if n_drop:
-                                self._node.get_logger().info(
-                                    f"[cand-floor] dropped {n_drop}/{len(pose_array.poses)} "
-                                    f"candidates below world z={min_wz:.3f} (table clearance)"
-                                )
-                            pose_array.poses = keep_p
-                            scores_msg.data = keep_s
-                        else:
-                            self._node.get_logger().warn(
-                                f"[cand-floor] ALL candidates below world z={min_wz:.3f} — "
-                                "refusing execution to protect the table."
-                            )
-                            return False
-                    except Exception as e:
-                        self._node.get_logger().warn(f"[cand-floor] skipped ({e})")
-                if self._aborted("candidate publishing"):
-                    return False
-                self._node.pub_candidates_base.publish(pose_array)
-                self._node.pub_candidate_scores.publish(scores_msg)
-                self._node.last_candidates_base = copy.deepcopy(pose_array)
-                self._node.last_candidate_scores = copy.deepcopy(scores_msg)
-                # Tag the keep-alive cache with the cycle these belong to —
-                # the republish timer only re-sends them while this is still
-                # the ACTIVE cycle (ghost-pick hardening, 2026-08-12).
-                self._node._candidates_cycle_id = int(
-                    getattr(self._node, "_waiting_cycle_id", -1)
-                )
-                self._node.get_logger().info(
-                    f"Published {len(pose_array.poses)} grasp candidates on "
-                    f"'{self._node.get_parameter('grasp_candidates_topic').value}'."
-                )
-            except Exception as e:
-                # Nothing reached the executor, so nothing will ever answer
-                # with cycle_done: end the cycle here (2026-09-09, a pick
-                # attempted before the driver was up sat in that wait until
-                # a manual abort).
-                self._node.get_logger().error(
-                    f"Failed to publish grasp candidates: {e} — ending this cycle.")
-                return False
-
-        # ── Phase 9: pick the single best grasp ───────────────────────
         best = pick_best_grasp(
             grasps,
             pts_np,
@@ -853,7 +939,7 @@ class PickPipeline:
         M = np.asarray(best["matrix"], dtype=np.float32).reshape(4, 4)
         frame_id = cloud_msg.header.frame_id
         stamp = sel["header"].stamp
-        aabb_min, aabb_max = _aabb_min_max(pts_send if 'pts_send' in locals() else pts_np)
+        aabb_min, aabb_max = _aabb_min_max(pts_send if pts_send is not None else pts_np)
         use_norm = bool(self._node.get_parameter("graspgen_matrix_normalized").value)
         col_major = bool(self._node.get_parameter("graspgen_column_major").value)
         if use_norm:
@@ -868,7 +954,7 @@ class PickPipeline:
                 f"y{aabb_min[1]:.3f}..{aabb_max[1]:.3f} "
                 f"z{aabb_min[2]:.3f}..{aabb_max[2]:.3f}; snapping to centroid."
             )
-            c = (pts_send if 'pts_send' in locals() else pts_np).mean(axis=0)
+            c = (pts_send if pts_send is not None else pts_np).mean(axis=0)
             T[:3, 3] = c
 
         fixed_rot = self._node.get_parameter("grasp2tcp_rot").value
