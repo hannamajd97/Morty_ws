@@ -528,19 +528,30 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.grip_close_btn.clicked.connect(lambda: self._on_gripper(False))
         grip_row.addWidget(self.grip_close_btn)
         move_col.addLayout(grip_row)
-        # Answers to the executor's questions after a grasp (2026-09-11):
-        # "where do I drop it?" and, at the drop pose, "release?". The voice
-        # router answers them by speech; these give the GUI the same words.
+        # Drop side (2026-09-11 20:40, Majd: "drop right makes all the
+        # objects the same"): GUI picks run to the end on their own and
+        # drop at the executor's drop_target_name, so the choice is a
+        # setting for the NEXT picks, not an answer to a question. The two
+        # buttons set that parameter (and still answer a voice-mode pause
+        # with the same token). Release only matters when a voice pick is
+        # waiting at the drop pose.
         drop_row = QtWidgets.QHBoxLayout()
-        for label, token, tip in (
-            ("Drop left", "drop_left_side", "Carry the held object to the left drop pose."),
-            ("Drop right", "drop_right_side", "Carry the held object to the right drop pose."),
-            ("Release", "release_home", "Open the gripper at the drop pose and return home."),
-        ):
+        drop_row.addWidget(QtWidgets.QLabel("Drop side:"))
+        self.drop_group = QtWidgets.QButtonGroup(self)
+        self.drop_group.setExclusive(True)
+        for label, token in (("Left", "drop_left_side"), ("Right", "drop_right_side")):
             b = QtWidgets.QPushButton(label)
-            b.setToolTip(tip)
-            b.clicked.connect(lambda _=False, tok=token, lab=label: self._on_resume(tok, lab))
+            b.setCheckable(True)
+            b.setToolTip(f"Next picks are carried to the {label.lower()} drop pose.")
+            b.clicked.connect(lambda _=False, tok=token, lab=label: self._on_drop_side(tok, lab))
+            self.drop_group.addButton(b)
             drop_row.addWidget(b)
+            if token == "drop_right_side":
+                b.setChecked(True)   # the executor's default
+        rel = QtWidgets.QPushButton("Release")
+        rel.setToolTip("Voice picks only: open the gripper at the drop pose and return home.")
+        rel.clicked.connect(lambda _=False: self._on_resume("release_home", "Release"))
+        drop_row.addWidget(rel)
         move_col.addLayout(drop_row)
         bar_lay.addLayout(move_col)
 
@@ -1484,6 +1495,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
         buttons.accepted.connect(dlg.accept)
         lay.addWidget(buttons)
         dlg.exec_()
+
+    def _on_drop_side(self, token: str, label: str) -> None:
+        ok = self.bridge.set_executor_params({"drop_target_name": token})
+        self.bridge.publish_resume(token)   # also answers a voice-mode pause, if one is open
+        self.statusBar().showMessage(
+            f"Drop side: {label.upper()} for the next picks." if ok
+            else "Drop side: executor not reachable — is it running?")
 
     def _on_resume(self, token: str, label: str) -> None:
         if self._software_stop_latched:

@@ -438,6 +438,9 @@ class MortyGuiBridge(Node):
         self._pipe_set_cli = self.create_client(
             SetParameters, f"/{PIPELINE_NODE_NAME}/set_parameters"
         )
+        self._exec_set_cli = self.create_client(
+            SetParameters, "/grasp_executor_lin_llm/set_parameters"
+        )
         # Voice-filter parameters on the live STT node (Advanced ▸ "Voice
         # filters" Apply button, 2026-08-28). Same read+write pair as the
         # pipeline above — the node only exists while the voice stack runs,
@@ -968,6 +971,19 @@ class MortyGuiBridge(Node):
                 self.pipeline_params_dirty = True
 
         fut.add_done_callback(_done)
+        return True
+
+    def set_executor_params(self, mapping: Dict[str, Any]) -> bool:
+        """Runtime parameters of the grasp executor (drop side, speed, ...);
+        it re-reads them at the start of every pick (2026-09-11)."""
+        if not self._exec_set_cli.service_is_ready():
+            if not self._exec_set_cli.wait_for_service(timeout_sec=0.5):
+                return False
+        req = SetParameters.Request()
+        for name, val in mapping.items():
+            req.parameters.append(Parameter(name=name, value=self._py_to_pv(val)))
+        self._exec_set_cli.call_async(req)
+        self.get_logger().info(f"Executor params set: {list(mapping.keys())}")
         return True
 
     def set_pipeline_params(self, mapping: Dict[str, Any]) -> bool:
