@@ -4972,6 +4972,23 @@ private:
         blend_velocity_scaling_ = 0.5;
       }
     } catch (...) {}
+    // Approach speed, live (2026-09-11, Majd: "let us try 50 %"): the
+    // scaling factors were read once at construction, so a parameter set
+    // from the GUI or the shell changed nothing until a restart.
+    try {
+      const double v = node_->get_parameter("velocity_scaling").as_double();
+      const double a = node_->get_parameter("acceleration_scaling").as_double();
+      if (v > 0.0 && v <= 1.0 && std::fabs(v - velocity_scaling_) > 1e-6) {
+        RCLCPP_INFO(node_->get_logger(), "velocity_scaling %.2f -> %.2f (live)", velocity_scaling_, v);
+        velocity_scaling_ = v;
+        arm_group_.setMaxVelocityScalingFactor(v);
+      }
+      if (a > 0.0 && a <= 1.0 && std::fabs(a - acceleration_scaling_) > 1e-6) {
+        RCLCPP_INFO(node_->get_logger(), "acceleration_scaling %.2f -> %.2f (live)", acceleration_scaling_, a);
+        acceleration_scaling_ = a;
+        arm_group_.setMaxAccelerationScalingFactor(a);
+      }
+    } catch (...) {}
     RCLCPP_INFO(node_->get_logger(),
       "refresh_runtime_params: vitamin_mode_active=%s, "
       "wait_for_destination=%s, wait_for_release=%s, drop_target_name='%s', "
