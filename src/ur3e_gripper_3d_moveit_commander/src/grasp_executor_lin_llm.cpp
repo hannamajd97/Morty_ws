@@ -814,7 +814,20 @@ public:
   }
 
   void open_gripper_early() { begin_gripper_open_async(); }
-  bool holding_object() const { return grasp_detected_.load(); }
+  // "Holding" = the grasp pin says so AND the gripper is closed. The pin
+  // alone would block every pick if it ever stuck HIGH with the fingers
+  // open; the gripper joint on /joint_states (0.0 closed, ~0.23 open)
+  // settles it. Unknown joint -> trust the pin.
+  bool holding_object()
+  {
+    if (!grasp_detected_.load()) { return false; }
+    sensor_msgs::msg::JointState js;
+    { std::lock_guard<std::mutex> lk(joint_state_mutex_); js = last_joint_state_; }
+    for (size_t i = 0; i < js.name.size() && i < js.position.size(); ++i) {
+      if (js.name[i] == "gripper_close_open_joint") { return std::fabs(js.position[i]) < 0.1; }
+    }
+    return true;
+  }
 
   // Picks start from the reset target ("home"); a background check from
   // anywhere else verifies nothing and its "none feasible" verdict made the
