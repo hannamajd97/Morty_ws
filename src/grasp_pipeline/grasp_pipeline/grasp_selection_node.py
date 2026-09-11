@@ -2525,6 +2525,17 @@ class YoloLiveSelectGrasp(Node):
             except Exception as e:
                 self._selection_in_progress = False
                 self.get_logger().error(f"Selection thread error: {e}\n{traceback.format_exc()}")
+                # A cycle that died mid-way must not leave selection_made
+                # latched: nothing else clears it, so the node sat with a
+                # dead cycle and Reset had nothing to reset (2026-09-11).
+                self._awaiting_executor_cycle_done = False
+                self.selection_made = False
+                self.selected_idx = None
+                self.detections_cache = []
+                self._selection_prompted = False
+                self._selection_prompt_sig = None
+                self._pending_manual_choice = None
+                self._last_cycle_end_t = time.time()
                 time.sleep(1.0)
 
 

@@ -412,7 +412,7 @@ class GraspPrecomputer:
             self._pick._background = False
             self.model_lock.release()
         dt_job = time.monotonic() - t0
-        if res is None:
+        if not res:
             if getattr(node, "selection_made", False):
                 node.get_logger().info(f"[precompute] job '{tr.key}' dropped after {dt_job:.2f} s: operator selected")
             else:

@@ -120,7 +120,7 @@ class PickPipeline:
             else:
                 self._node.get_logger().info(f"[precompute] MISS: {why} — fresh path")
         res = self._compute(sel, background=False)
-        if res is None:
+        if not res:
             return False
         return self._publish(res, sel)
 
@@ -156,7 +156,7 @@ class PickPipeline:
                 self._node.get_logger().error(
                     f"No transform base_link <- {cam_frame}: the robot driver is not running "
                     "(no robot_state_publisher). Start the driver, then select again.")
-                return False
+                return None
         except Exception as exc:
             self._node.get_logger().warn(f"[tf-precheck] skipped: {exc}")
 
@@ -201,7 +201,7 @@ class PickPipeline:
             self._node.get_logger().warn(
                 "Selected crop produced no valid depth points; cannot run GraspGen for this selection."
             )
-            return False
+            return None
         pts_np = obs0["points"]
         cols_np = obs0["colors"]
         plane_n = obs0["plane_n"]
@@ -225,13 +225,13 @@ class PickPipeline:
             plane_p = None
 
         if self._aborted("capture/registration"):
-            return False
+            return None
 
         # ── Phase 3: sample / downsample for GraspGen ─────────────────
         min_pts = int(self._node.get_parameter("min_points_for_graspgen").value)
         if pts_np is None or pts_np.shape[0] < min_pts:
             self._node.get_logger().warn(f"Not enough points after pre-GraspGen filtering (<{min_pts}).")
-            return False
+            return None
 
         cloud_msg = PointCloud2()
         cloud_msg.header = Header()
@@ -251,7 +251,7 @@ class PickPipeline:
             cols_send = cols_np
 
         if self._aborted("pre-GraspGen filtering"):
-            return False
+            return None
 
         # ── Phase 4: publish input cloud + call GraspGen ──────────────
         self._node.get_logger().info(
@@ -305,10 +305,10 @@ class PickPipeline:
             self._node.get_logger().error(
                 f"Failed contacting GraspGen at {self._node.get_parameter('graspgen_endpoint').value}: {e}"
             )
-            return False
+            return None
         if not resp or not resp.get("ok", False):
             self._node.get_logger().error(f"GraspGen error: {None if resp is None else resp.get('error')}")
-            return False
+            return None
         grasps_obj = resp.get("grasps", [])
         if grasps_obj is None:
             grasps = []
@@ -322,7 +322,7 @@ class PickPipeline:
         raw_grasps = list(grasps)
         if not grasps:
             self._node.get_logger().warn("GraspGen returned no grasps.")
-            return False
+            return None
         # Client-side top-K by score BEFORE the filter chain. Doing this in
         # the GraspGen server (topk_num_grasps) costs 5-7 s; a sort here is
         # free, and the chain's cost scales with grasp count (200→3 s,
@@ -337,7 +337,7 @@ class PickPipeline:
                 "(client-side, ~0 ms)."
             )
         if self._aborted("GraspGen inference"):
-            return False
+            return None
 
         # ── Phase 5: geometric filter chain ───────────────────────────
         filter_input_count = len(grasps)
@@ -518,7 +518,7 @@ class PickPipeline:
             self._node.get_logger().warn(
                 "No grasp candidates available (crop/filters produced no valid cloud or GraspGen did not return candidates)."
             )
-            return False
+            return None
 
         try:
         # ── Phase 6: centroid + EE-orientation reweight ───────────────
@@ -621,12 +621,12 @@ class PickPipeline:
             grasps = raw_grasps
         if not grasps:
             self._node.get_logger().warn("No grasp candidates available after filtering/reweight; skipping.")
-            return False
+            return None
 
         cloud_for_pick = pts_send if 'pts_send' in locals() else pts_np
         if cloud_for_pick is None or getattr(cloud_for_pick, "size", 0) == 0:
             self._node.get_logger().warn("No valid cloud points available for orientation consistency filter.")
-            return False
+            return None
         aabb_min_pick, aabb_max_pick = _aabb_min_max(cloud_for_pick)
         frame_for_pick = cloud_msg.header.frame_id
         grasps = self._node._filter_by_ee_orientation_consistency(
@@ -638,7 +638,7 @@ class PickPipeline:
         self._node.get_logger().info(f"[filter-chain] after orientation-consistency: {len(grasps)}")
         if not grasps:
             self._node.get_logger().warn("No grasp candidates available after orientation consistency filter; skipping.")
-            return False
+            return None
         self._node.get_logger().info(
             f"[filter-chain] SURVIVED: {len(grasps)}/{len(raw_grasps)} generated "
             f"({filter_input_count} entered geometric filters)"
