@@ -74,7 +74,7 @@ the ones that matter day to day:
 | `yolo_world_model`, `conf`, `imgsz`, `device`, `yolo_half` | detector model and thresholds |
 | `pointing_mode` (`3d`/`2d`), `mediapipe_cone_deg`, `mediapipe_hysteresis`, `mediapipe_min_hold_ms` | pointing behaviour |
 | `graspgen_num_grasps`, `grasp_threshold`, `max_graspgen_points` | GraspGen request |
-| `grasp2tcp_offset_m` | calibration translation in the grasp frame (x closing, y up, z approach), measured once on the robot; zeros until then |
+| `grasp2tcp_offset_m` | calibration translation in the executed TCP frame as RViz draws it on `/grasp_executor_lin_llm/selected_pose` (x red = closing, y green, z blue = out of the fingers); zeros until measured |
 | `apply_gripper_width_filter`, `gripper_max_object_width_m` | width check against the printed gripper's opening |
 | `neighbour_obstacle_padding_m` | padding of the neighbour boxes (5 mm) |
 | `single_view_multiframe`, `single_view_frames` | depth fusion |

@@ -343,9 +343,11 @@ def declare_all_parameters(node: "Node") -> None:
     # assume a 105-136 mm opening, the printed gripper opens 85 mm.
     node.declare_parameter("apply_gripper_width_filter", True)
     node.declare_parameter("gripper_max_object_width_m", 0.080)
-    # Translation in the grasp frame (x closing, y up, z approach), metres,
-    # applied before the grasp-to-TCP rotation: the measured difference
-    # between where the model's gripper and ours put the object.
+    # Translation in the executed TCP frame, metres — the axes RViz draws on
+    # /grasp_executor_lin_llm/selected_pose (x red = closing direction,
+    # y green, z blue = out of the fingers), applied after the grasp-to-TCP
+    # rotation: the measured difference between where the model's gripper
+    # and ours put the object. "Move it 5 cm along -x" = [-0.05, 0, 0].
     node.declare_parameter("grasp2tcp_offset_m", [0.0, 0.0, 0.0])
     node.declare_parameter("finger_penetration_finger_length_m", 0.08)
     node.declare_parameter("finger_penetration_finger_thickness_m", 0.012)

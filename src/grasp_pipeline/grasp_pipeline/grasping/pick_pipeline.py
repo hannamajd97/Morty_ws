@@ -675,8 +675,12 @@ class PickPipeline:
         }
 
     def _grasp_offset(self):
-        """``grasp2tcp_offset_m``: the calibration translation in the grasp
-        frame (2026-09-11); zeros until measured on the robot."""
+        """``grasp2tcp_offset_m``: the calibration translation in the EXECUTED
+        TCP frame — the axes RViz shows on /grasp_executor_lin_llm/selected_pose
+        (x red = closing direction, y green, z blue = out of the fingers).
+        Applied after the grasp-to-TCP rotation, so "move it 5 cm along -x
+        (red)" is literally [-0.05, 0, 0] (Majd, 2026-09-11 20:20). Zeros
+        until measured on the robot."""
         try:
             v = list(self._node.get_parameter("grasp2tcp_offset_m").value)
             return v if len(v) == 3 else [0.0, 0.0, 0.0]
@@ -720,7 +724,7 @@ class PickPipeline:
             else:
                 T_g = M_g.T if col_major else M_g
             try:
-                T_tcp_g = T_g @ T_offset @ _make_T_grasp_to_tcp(fixed_rot)
+                T_tcp_g = T_g @ _make_T_grasp_to_tcp(fixed_rot) @ T_offset
             except Exception:
                 T_tcp_g = T_g
             qx_g, qy_g, qz_g, qw_g = quaternion_from_matrix(T_tcp_g)
@@ -982,7 +986,7 @@ class PickPipeline:
 
         fixed_rot = self._node.get_parameter("grasp2tcp_rot").value
         try:
-            T_tcp = T @ _make_T_offset(self._grasp_offset()) @ _make_T_grasp_to_tcp(fixed_rot)
+            T_tcp = T @ _make_T_grasp_to_tcp(fixed_rot) @ _make_T_offset(self._grasp_offset())
         except Exception as e:
             self._node.get_logger().warn(f"Failed to apply grasp2tcp_rot='{fixed_rot}': {e}; using identity.")
             T_tcp = T
