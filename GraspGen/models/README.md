@@ -24,3 +24,15 @@ Abstract: Grasping is a fundamental robot skill, yet despite significant researc
 **Output Format:** Homogenous Transformation matrices; score is a scalar value from 0 to 1 <br>
 **Output Parameters:** [B, 4, 4] where B is the number of generated grasp poses; [B, 1] confidence score <br>
 **Other Properties Related to Output:** <br> 
+
+## Morty (2026-09-11)
+
+The pipeline runs the **Franka Panda** checkpoint since 2026-09-11: its
+105 mm opening and 105 mm depth are the closest of the three shipped
+grippers to the printed gripper (85 mm / 80 mm fingers). The Robotiq 2F-140
+files are in this repository through Git LFS; the Franka checkpoints
+(`graspgen_franka_panda_gen.pth` 866 MB, `graspgen_franka_panda_dis.pth`
+159 MB) are not, because they would exceed the free LFS quota. Download
+them from the GraspGen model release on Hugging Face into this folder;
+`models/graspgen/` at the workspace root holds symlinks to them.
+

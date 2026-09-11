@@ -22,6 +22,10 @@ GraspGen/models/*
 !GraspGen/models/graspgen_robotiq_2f_140.yml
 !GraspGen/models/graspgen_robotiq_2f_140_dis.pth
 !GraspGen/models/graspgen_robotiq_2f_140_gen.pth
+# Franka Panda config is tracked; its checkpoints (866 MB + 159 MB) would
+# exceed the free Git LFS quota — download them from Hugging Face (see
+# GraspGen/models/README.md).
+!GraspGen/models/graspgen_franka_panda.yml
 GraspGen/pointnet2_ops/build/
 GraspGen/**/*.egg-info/
 GraspGen/fig/

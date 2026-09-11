@@ -240,7 +240,11 @@ OFFLINE_LAUNCH = [
 # (GRASPGEN_MODE=zmq, grasp_client.py); the GUI starts it with the pipeline.
 GRASPGEN_SERVICE_CMD = [
     "/usr/bin/python3", "-u", os.path.expanduser("~/morty_ws/GraspGen/scripts/graspgen_service.py"),
-    "--config", os.path.expanduser("~/morty_ws/models/graspgen/graspgen_robotiq_2f_140.yml"),
+    # Franka Panda checkpoint since 2026-09-11 (Majd): 105 mm opening and
+    # 105 mm depth are far closer to the printed gripper (85 mm / 80 mm)
+    # than the Robotiq 2F-140 (136 mm / 195 mm) the system ran on before;
+    # GraspGen's own FAQ suggests re-targeting to the closest stroke.
+    "--config", os.path.expanduser("~/morty_ws/models/graspgen/graspgen_franka_panda.yml"),
     "--bind", "tcp://127.0.0.1:5555",
 ]
 GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
