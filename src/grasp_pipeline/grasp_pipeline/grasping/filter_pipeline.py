@@ -20,6 +20,7 @@ from ..geometry_utils import _aabb_min_max
 from ..grasp_filters import (
     _filter_no_under_grasp,
     _filter_finger_penetration,
+    _filter_gripper_width,
     _filter_reject_from_behind,
     _filter_roll_upright_by_plane,
     _filter_reject_side_grasps,
@@ -123,6 +124,31 @@ class GraspFilterPipeline:
                 log_info(f"after finger-penetration: {len(grasps)}")
         except Exception as e:
             log_warn(f"finger-penetration filter error: {e}")
+        # Gripper width (2026-09-11): the printed gripper opens 85 mm, the
+        # GraspGen checkpoints assume 105-136 mm. Grasps whose closing line
+        # spans more object than the opening are dropped here, before the
+        # executor spends a probe on them.
+        try:
+            if bool(node.get_parameter("apply_gripper_width_filter").value):
+                stats: dict = {}
+                grasps_w = _filter_gripper_width(
+                    grasps,
+                    pts_filter,
+                    matrices_normalized=bool(node.get_parameter("graspgen_matrix_normalized").value),
+                    column_major=False,
+                    aabb_min=np.min(pts_filter, axis=0),
+                    aabb_max=np.max(pts_filter, axis=0),
+                    max_width=float(node.get_parameter("gripper_max_object_width_m").value),
+                    stats=stats,
+                )
+                if grasps_w:
+                    grasps = grasps_w
+                    log_info(f"after gripper-width (<= {float(node.get_parameter('gripper_max_object_width_m').value) * 100:.0f} cm): "
+                             f"{len(grasps)} (cut {stats.get('cut', 0)}, widest {stats.get('widest_m', 0.0) * 100:.1f} cm)")
+                else:
+                    log_warn(f"gripper-width filter would cut every grasp (widest {stats.get('widest_m', 0.0) * 100:.1f} cm) — keeping them")
+        except Exception as e:
+            log_warn(f"gripper-width filter error: {e}")
         try:
             if bool(node.get_parameter("apply_reject_from_behind_filter").value):
                 cz = float(

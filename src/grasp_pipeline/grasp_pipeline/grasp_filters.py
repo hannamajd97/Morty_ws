@@ -1083,3 +1083,74 @@ def _filter_reject_from_behind(
         except Exception:
             keep.append(g)
     return keep
+
+
+def _filter_gripper_width(
+    grasps: List[dict],
+    pts: np.ndarray,
+    *,
+    matrices_normalized: bool = True,
+    column_major: bool = False,
+    aabb_min: Optional[np.ndarray] = None,
+    aabb_max: Optional[np.ndarray] = None,
+    max_width: float = 0.080,
+    slab_half_depth: float = 0.03,
+    finger_half_height: float = 0.02,
+    min_points: int = 10,
+    stats: Optional[dict] = None,
+) -> List[dict]:
+    """Drop grasps the printed gripper cannot make: the object is wider
+    than its opening along the closing axis (2026-09-11).
+
+    GraspGen's checkpoints assume a 105 mm (Franka) or 136 mm (Robotiq)
+    opening; the printed gripper opens 85 mm. A grasp whose closing line
+    spans more object than that ends with the fingers on the object's
+    sides. Measured per grasp in its own frame: cloud points in a slab
+    around the object's centre along the approach axis (the slab sits at
+    the point of the approach axis closest to the cloud centroid, so no
+    assumption about where the frame origin is), within the finger height,
+    and the 3rd-97th percentile span along the closing axis is the width.
+    Fewer than ``min_points`` in the slab: the grasp is kept (no verdict).
+    """
+    if not grasps or pts is None or len(pts) == 0:
+        return grasps
+    pts_w = np.asarray(pts, dtype=np.float32)
+    centroid = pts_w.mean(axis=0)
+    if matrices_normalized:
+        if aabb_min is None or aabb_max is None:
+            return grasps
+        aabb_min = np.asarray(aabb_min, dtype=np.float32)
+        aabb_max = np.asarray(aabb_max, dtype=np.float32)
+        center_t = 0.5 * (aabb_min + aabb_max)
+        scale_t = 0.5 * (aabb_max - aabb_min)
+    kept: List[dict] = []
+    widest = 0.0
+    n_cut = 0
+    for g in grasps:
+        try:
+            M_raw = np.asarray(g.get("matrix"), dtype=np.float32).reshape(4, 4)
+            M = M_raw.T if column_major else M_raw
+            R = M[:3, :3]
+            t_w = M[:3, 3].copy()
+            if matrices_normalized:
+                t_w = center_t + t_w * scale_t
+            local = (pts_w - t_w[None, :]) @ R          # points in the grasp frame
+            z_c = float(((centroid - t_w) @ R)[2])       # object centre along the approach
+            sel = (np.abs(local[:, 2] - z_c) <= slab_half_depth) & (np.abs(local[:, 1]) <= finger_half_height)
+            if int(sel.sum()) < min_points:
+                kept.append(g)
+                continue
+            x = local[sel, 0]
+            width = float(np.percentile(x, 97) - np.percentile(x, 3))
+            widest = max(widest, width)
+            if width > max_width:
+                n_cut += 1
+                continue
+            kept.append(g)
+        except Exception:
+            kept.append(g)
+    if stats is not None:
+        stats["cut"] = n_cut
+        stats["widest_m"] = widest
+    return kept
+

@@ -339,6 +339,14 @@ def declare_all_parameters(node: "Node") -> None:
     # and the measured 12 s CPU hotspot of the whole chain. The close-
     # stall detection + slip watchdog catch a bad pinch at execution.
     node.declare_parameter("apply_finger_penetration_filter", False)
+    # Gripper width and calibration offset (2026-09-11): GraspGen's models
+    # assume a 105-136 mm opening, the printed gripper opens 85 mm.
+    node.declare_parameter("apply_gripper_width_filter", True)
+    node.declare_parameter("gripper_max_object_width_m", 0.080)
+    # Translation in the grasp frame (x closing, y up, z approach), metres,
+    # applied before the grasp-to-TCP rotation: the measured difference
+    # between where the model's gripper and ours put the object.
+    node.declare_parameter("grasp2tcp_offset_m", [0.0, 0.0, 0.0])
     node.declare_parameter("finger_penetration_finger_length_m", 0.08)
     node.declare_parameter("finger_penetration_finger_thickness_m", 0.012)
     node.declare_parameter("finger_penetration_finger_height_m", 0.025)

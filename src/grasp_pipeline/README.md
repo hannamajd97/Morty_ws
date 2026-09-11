@@ -43,7 +43,10 @@ selected object into ranked grasp candidates for the executor.
    `/grasp_executor_lin_llm/precheck_result`); a set with no straight
    approach counts as a failed attempt and is recomputed, a verified one
    shows `**` in the overlay and executes without probing when selected.
-5. **Filter chain** — `grasping/filter_pipeline.py`: upright/level band,
+5. **Filter chain** — `grasping/filter_pipeline.py`: gripper width (the
+   printed gripper opens 85 mm, the GraspGen models assume 105–136 mm:
+   grasps whose closing line spans more than `gripper_max_object_width_m`
+   of object are dropped, 2026-09-11), upright/level band,
    from-behind rejection, height window, roll canonicalisation, front
    preference, centroid and end-effector orientation re-weighting,
    orientation consistency. Survivors are published on
@@ -71,6 +74,8 @@ the ones that matter day to day:
 | `yolo_world_model`, `conf`, `imgsz`, `device`, `yolo_half` | detector model and thresholds |
 | `pointing_mode` (`3d`/`2d`), `mediapipe_cone_deg`, `mediapipe_hysteresis`, `mediapipe_min_hold_ms` | pointing behaviour |
 | `graspgen_num_grasps`, `grasp_threshold`, `max_graspgen_points` | GraspGen request |
+| `grasp2tcp_offset_m` | calibration translation in the grasp frame (x closing, y up, z approach), measured once on the robot; zeros until then |
+| `apply_gripper_width_filter`, `gripper_max_object_width_m` | width check against the printed gripper's opening |
 | `neighbour_obstacle_padding_m` | padding of the neighbour boxes (5 mm) |
 | `single_view_multiframe`, `single_view_frames` | depth fusion |
 | `publish_debug_image`, `debug_publish_fps` | overlay |

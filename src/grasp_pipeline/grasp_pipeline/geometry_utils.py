@@ -139,6 +139,18 @@ def _estimate_view_dir_from_cloud(pts: np.ndarray, trim: float = 0.10) -> np.nda
     return v.astype(np.float32)
 
 
+def _make_T_offset(xyz) -> np.ndarray:
+    """Pure translation in the grasp frame (x = closing, z = approach),
+    applied before the grasp-to-TCP rotation: the measured difference
+    between where GraspGen's gripper and the printed gripper put the
+    object (calibration parameter ``grasp2tcp_offset_m``, 2026-09-11)."""
+    T = np.eye(4, dtype=np.float32)
+    v = np.asarray(list(xyz)[:3], dtype=np.float32) if xyz is not None else np.zeros(3, dtype=np.float32)
+    if v.shape[0] == 3:
+        T[:3, 3] = v
+    return T
+
+
 def _make_T_grasp_to_tcp(rot_name: str = "flipY") -> np.ndarray:
     """Return a correction matrix mapping a grasp frame to the gripper TCP.
 
