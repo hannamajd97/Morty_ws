@@ -385,6 +385,7 @@ public:
     // on the right' commands.
     wait_for_destination_ = get_or_declare_param<bool>(
       node_, "wait_for_destination", true);
+    get_or_declare_param<double>(node_, "pause_before_close_s", 0.0);
     resume_topic_ = get_or_declare_param<std::string>(
       node_, "resume_topic", "/grasp_executor_lin_llm/resume");
     // 120 -> 1800 (2026-08-25, Majd: "even when I don't say where it
@@ -814,12 +815,19 @@ public:
   }
 
   void open_gripper_early() { begin_gripper_open_async(); }
+  std::atomic<bool> held_object_{false};
   // "Holding" = the grasp pin says so AND the gripper is closed. The pin
   // alone would block every pick if it ever stuck HIGH with the fingers
   // open; the gripper joint on /joint_states (0.0 closed, ~0.23 open)
   // settles it. Unknown joint -> trust the pin.
+  // "Holding" (Majd 2026-09-11 18:45): only an object THIS executor closed
+  // on and has not released since. Pin 16 also goes HIGH when the empty
+  // fingers stall on each other, so outside a pick the pin means nothing.
+  // Set after a close whose check said holding, cleared by every gripper
+  // open the executor sends; a GUI open shows as an open gripper joint.
   bool holding_object()
   {
+    if (!held_object_.load()) { return false; }
     if (!grasp_detected_.load()) { return false; }
     sensor_msgs::msg::JointState js;
     { std::lock_guard<std::mutex> lk(joint_state_mutex_); js = last_joint_state_; }
@@ -1139,6 +1147,33 @@ public:
         "Step 3 (partial grip).", vitamin_first_close_s_);
       saved_close_pulse_s = set_gripper_adapter_close_pulse(vitamin_first_close_s_);
     }
+    // Calibration pause (2026-09-11): with pause_before_close_s > 0 the arm
+    // stands at the grasp pose with the gripper open and logs its tool pose,
+    // so the fingers can be measured against the object (GraspGen frame vs
+    // the printed gripper). Off by default; set live:
+    //   ros2 param set /grasp_executor_lin_llm pause_before_close_s 5.0
+    try {
+      const double pause_s = node_->get_parameter("pause_before_close_s").as_double();
+      if (pause_s > 0.0) {
+        moveit::core::RobotState st(arm_group_.getRobotModel());
+        if (robot_state_from_ear(st)) {
+          const Eigen::Isometry3d T = st.getGlobalLinkTransform(arm_group_.getEndEffectorLink());
+          RCLCPP_WARN(node_->get_logger(),
+            "Calibration pause: %.1f s at the grasp pose, gripper open, TCP [%.3f, %.3f, %.3f] in the "
+            "planning frame — measure the fingers against the object now.",
+            pause_s, T.translation().x(), T.translation().y(), T.translation().z());
+        } else {
+          RCLCPP_WARN(node_->get_logger(), "Calibration pause: %.1f s at the grasp pose, gripper open.", pause_s);
+        }
+        const auto t_end = std::chrono::steady_clock::now() +
+          std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(pause_s));
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
+          rclcpp::spin_some(node_);
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        if (aborted_at("the calibration pause")) { return false; }
+      }
+    } catch (...) {}
     if (!execute_gripper_named_target(gripper_close_name_, "Step 3 - Close gripper")) {
       // Restore before bailing.
       if (vitamin_mode_active_ && saved_close_pulse_s > 0.0) {
@@ -1169,6 +1204,7 @@ public:
         "(TI1 is informational — gripper hardware self-compensates).",
         grasp_pin_, grasp_detected_.load() ? "HIGH(holding)" : "low(empty)",
         slip_pin_, slip_active_.load() ? "HIGH(slip→hw retighten)" : "low");
+      held_object_.store(grasp_detected_.load());
       if (!grasp_detected_.load()) {
         RCLCPP_WARN(node_->get_logger(),
           "No-grasp detected after close (grasp pin %d=LOW). Lifting "
@@ -4813,6 +4849,7 @@ private:
     if (!execute_ || !gripper_action_client_) { return; }
     if (!gripper_action_client_->action_server_is_ready()) { return; }   // finish() falls back
     slip_monitor_armed_.store(false);
+    held_object_.store(false);
     control_msgs::action::GripperCommand::Goal goal;
     goal.command.position = gripper_open_position_;
     goal.command.max_effort = 0.0;
@@ -4859,6 +4896,7 @@ private:
       // Opening releases whatever we held — slip monitoring stands down
       // (covers Step 1, Step 5 at drop, and every recovery open).
       slip_monitor_armed_.store(false);
+      held_object_.store(false);
       target_pos = gripper_open_position_;
     } else if (target_name == gripper_close_name_) {
       target_pos = gripper_close_position_;
