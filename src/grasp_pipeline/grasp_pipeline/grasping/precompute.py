@@ -91,6 +91,7 @@ class CacheEntry:
     depth_m: float
     tool0: np.ndarray
     params_hash: str
+    params_snapshot: Dict[str, Any]
     result: Dict[str, Any]
     t_done: float
     n_grasps: int = 0
@@ -98,8 +99,19 @@ class CacheEntry:
 
 
 class GraspPrecomputer:
-    _EXCLUDED_PARAM_PREFIXES = ("precompute_", "graspgen_precompute", "publish_debug",
-                                "debug_", "use_sim_time")
+    # Parameters that cannot change a stored result: the cache's own
+    # switches, overlay/debug output, the selection flow (how an object is
+    # chosen, not what is computed for it), and the neighbour boxes, which a
+    # replay rebuilds from the live frame anyway. Everything else — YOLO,
+    # segmentation, depth fusion, GraspGen request, the filter chain —
+    # invalidates the store when it changes.
+    _EXCLUDED_PARAM_PREFIXES = (
+        "precompute_", "graspgen_precompute", "publish_debug", "debug_", "use_sim_time",
+        "auto_select_label", "selection_", "require_selection", "repeat", "listen_seconds",
+        "mediapipe_", "pointing_", "use_mediapipe_selection", "manual_select_topic",
+        "speak", "tts_", "executor_cycle_done_topic", "suspend_inference_while_selecting",
+        "neighbour_", "publish_grasp_candidates", "grasp_candidates_top_k",
+    )
 
     def __init__(self, node, pick) -> None:
         self._node = node
@@ -113,6 +125,7 @@ class GraspPrecomputer:
         self._wake = threading.Event()
         self._params_hash = ""
         self._params_hash_t = 0.0
+        self._params_snapshot: Dict[str, Any] = {}   # values behind _params_hash
         self._worker = threading.Thread(target=self._loop, name="grasp-precompute", daemon=True)
         self._worker.start()
 
@@ -135,16 +148,26 @@ class GraspPrecomputer:
         if now - self._params_hash_t < 1.0 and self._params_hash:
             return self._params_hash
         h = hashlib.md5()
+        snap: Dict[str, Any] = {}
         try:
             for name, prm in sorted(self._node.get_parameters_by_prefix("").items()):
                 if name.startswith(self._EXCLUDED_PARAM_PREFIXES):
                     continue
-                h.update(f"{name}={prm.value!r};".encode())
+                snap[name] = repr(prm.value)
+                h.update(f"{name}={snap[name]};".encode())
         except Exception:
             pass
         self._params_hash = h.hexdigest()
+        self._params_snapshot = snap
         self._params_hash_t = now
         return self._params_hash
+
+    def _params_diff(self, old: Dict[str, Any]) -> str:
+        """Names of the parameters that differ from the current snapshot —
+        so a 'parameters changed' line says which, not just that."""
+        cur = self._params_snapshot
+        names = sorted(k for k in set(old) | set(cur) if old.get(k) != cur.get(k))
+        return ", ".join(names[:6]) + (" …" if len(names) > 6 else "")
 
     # ── observations from the detector thread ────────────────────────────
     def observe(self, dets: List[Dict[str, Any]]) -> None:
@@ -244,8 +267,9 @@ class GraspPrecomputer:
         if e.n_grasps <= 0:
             return None, f"stored result for '{label}' had no grasps"
         if e.params_hash != self._params_hash_now():
-            self.invalidate_all("parameters changed")
-            return None, "parameters changed since the capture"
+            changed = self._params_diff(e.params_snapshot)
+            self.invalidate_all(f"parameters changed: {changed}")
+            return None, f"parameters changed since the capture ({changed})"
         d_now = self._depth_at(box)
         if d_now is None:
             return None, "no depth at the box centre now"
@@ -399,6 +423,7 @@ class GraspPrecomputer:
         if t_before is None or d_before is None:
             return
         params_hash = self._params_hash_now()
+        params_snapshot = self._params_snapshot
         sel = {"label": tr.label, "simplified_label": tr.label, "display": tr.key,
                "score": tr.score, "bbox": list(tr.box), "header": copy.deepcopy(header)}
         t0 = time.monotonic()
@@ -429,7 +454,8 @@ class GraspPrecomputer:
         obs0 = res.get("obs0") or {}
         mask = obs0.get("selected_mask")
         entry = CacheEntry(key=tr.key, label=tr.label, box=list(tr.box), depth_m=d_before, tool0=t_before,
-                           params_hash=params_hash, result=res, t_done=time.monotonic(),
+                           params_hash=params_hash, params_snapshot=params_snapshot,
+                           result=res, t_done=time.monotonic(),
                            n_grasps=len(res.get("grasps") or []), mask=mask)
         with self._state:
             live = self._tracks.get(tr.key)
