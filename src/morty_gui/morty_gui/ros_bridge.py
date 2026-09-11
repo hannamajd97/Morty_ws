@@ -259,6 +259,7 @@ class MortyGuiBridge(Node):
         # driven grasps too (Majd, 2026-08-20: "stop should directly
         # stop whatever it does — button AND voice").
         self.llm_cycle_active = False
+        self._pub_resume = self.create_publisher(String, "/grasp_executor_lin_llm/resume", 10)
         self._pub_llm_abort = self.create_publisher(
             String, "/grasp_executor_lin_llm/abort", 10
         )
@@ -773,6 +774,16 @@ class MortyGuiBridge(Node):
         self.llm_cycle_active = False
         with self._lock:
             self._executor_done_pending = str(msg.data)
+
+    def publish_resume(self, token: str) -> None:
+        """Answer the executor's interactive pauses the way the voice
+        router does (2026-09-11): after a grasp it waits for a destination
+        ('drop_left_side' / 'drop_right_side' / 'home'), at the drop pose
+        for a release ('release_home'). Without voice the GUI had no way
+        to answer, so every pick ended in a Reset with the object still in
+        the gripper."""
+        self._pub_resume.publish(String(data=str(token)))
+        self.get_logger().info(f"Resume token '{token}' sent to the executor.")
 
     def publish_llm_abort(self) -> None:
         """Abort the pick everywhere: the executor freezes in place, the

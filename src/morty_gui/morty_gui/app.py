@@ -528,6 +528,20 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.grip_close_btn.clicked.connect(lambda: self._on_gripper(False))
         grip_row.addWidget(self.grip_close_btn)
         move_col.addLayout(grip_row)
+        # Answers to the executor's questions after a grasp (2026-09-11):
+        # "where do I drop it?" and, at the drop pose, "release?". The voice
+        # router answers them by speech; these give the GUI the same words.
+        drop_row = QtWidgets.QHBoxLayout()
+        for label, token, tip in (
+            ("Drop left", "drop_left_side", "Carry the held object to the left drop pose."),
+            ("Drop right", "drop_right_side", "Carry the held object to the right drop pose."),
+            ("Release", "release_home", "Open the gripper at the drop pose and return home."),
+        ):
+            b = QtWidgets.QPushButton(label)
+            b.setToolTip(tip)
+            b.clicked.connect(lambda _=False, tok=token, lab=label: self._on_resume(tok, lab))
+            drop_row.addWidget(b)
+        move_col.addLayout(drop_row)
         bar_lay.addLayout(move_col)
 
         # Legend + Reset sit UNDER THE 3D PANE, not glued to the grips
@@ -1470,6 +1484,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
         buttons.accepted.connect(dlg.accept)
         lay.addWidget(buttons)
         dlg.exec_()
+
+    def _on_resume(self, token: str, label: str) -> None:
+        if self._software_stop_latched:
+            self.statusBar().showMessage("Software stop is latched — re-arm before sending a destination.")
+            return
+        self.bridge.publish_resume(token)
+        self.statusBar().showMessage(f"{label}: sent to the executor (only acts while it is waiting after a grasp).")
 
     def _on_gripper(self, open_: bool) -> None:
         if self._software_stop_latched:

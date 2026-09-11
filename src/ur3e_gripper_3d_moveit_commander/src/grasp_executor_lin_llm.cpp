@@ -812,6 +812,7 @@ public:
   }
 
   void open_gripper_early() { begin_gripper_open_async(); }
+  bool holding_object() const { return grasp_detected_.load(); }
 
   static bool same_pose(
     const geometry_msgs::msg::Pose & a, const geometry_msgs::msg::Pose & b,
@@ -5800,6 +5801,23 @@ int main(int argc, char ** argv)
         "Received %zu grasp candidates; evaluating LIN feasibility (cycle_id=%ld).",
         cands.size(), static_cast<long>(cycle_id));
       grasp_executor.clear_abort();
+      if (grasp_executor.holding_object()) {
+        // The previous pick was stopped while holding (Reset during the
+        // "where do I drop it?" wait). Probing would open the gripper early
+        // and drop the object wherever the arm is (2026-09-11: a bottle
+        // released mid-air), and every plan from that pose fails anyway.
+        RCLCPP_ERROR(node->get_logger(),
+          "Still holding an object (grasp pin HIGH) — not starting a new pick. "
+          "Choose where to drop it (Drop left / Drop right / Release in the GUI, "
+          "or say it), or open the gripper yourself.");
+        grasp_executor.set_failure_reason(
+          "still holding the previous object — tell me where to drop it first");
+        last_processed_cycle_id = cycle_id;
+        publish_completion(false, cycle_id);
+        { std::lock_guard<std::mutex> lock(mutex); processing = false; }
+        rate.sleep();
+        continue;
+      }
       bool feasible = false;
       bool used_precheck = false;
       if (precheck_enabled) {

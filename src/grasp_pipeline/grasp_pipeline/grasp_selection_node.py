@@ -2069,6 +2069,10 @@ class YoloLiveSelectGrasp(Node):
             )
             return
         self._executor_cycle_status = status
+        # Third field, when present: the executor's reason for a failure
+        # ("failed|<cycle>|<reason>"); read by the retry logic below.
+        parts = raw.split("|")
+        self._executor_cycle_reason = parts[2].strip() if len(parts) > 2 else ""
         self._executor_cycle_done = True
         if cycle_id is not None:
             self.get_logger().info(
@@ -2461,7 +2465,15 @@ class YoloLiveSelectGrasp(Node):
                                         # wrong; the others stay valid (the arm
                                         # is back home). The retry queues behind
                                         # new objects, five attempts at most.
-                                        self._precompute.note_pick_failed(sel)
+                                        # Not when the executor refused to start
+                                        # because it still holds the previous
+                                        # object: the grasps were never tried.
+                                        if "still holding" in str(getattr(self, "_executor_cycle_reason", "")):
+                                            self.get_logger().warn(
+                                                "Executor still holds the previous object — choose where to "
+                                                "drop it (Drop left / Drop right / Release) before the next pick.")
+                                        else:
+                                            self._precompute.note_pick_failed(sel)
                                         # SELF-clear the auto-pick label on failure.
                                         # intent_router normally clears it at
                                         # cycle end, but when the voice stack is
