@@ -51,6 +51,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import rclpy.duration
 import rclpy.time
+from builtin_interfaces.msg import Time as TimeMsg
+from geometry_msgs.msg import PoseArray
+from std_msgs.msg import String
 
 from ..perception.neighbour_obstacles import publish_neighbour_obstacles
 
@@ -106,6 +109,8 @@ class CacheEntry:
     t_done: float
     n_grasps: int = 0
     mask: Optional[np.ndarray] = field(default=None, repr=False)
+    precheck_key: int = 0          # id sent with the candidate set to the executor
+    lin_idx: int = -2              # -2 unchecked, -1 none feasible, >=0 verified candidate
 
 
 class GraspPrecomputer:
@@ -136,6 +141,13 @@ class GraspPrecomputer:
         self._params_hash = ""
         self._params_hash_t = 0.0
         self._params_snapshot: Dict[str, Any] = {}   # values behind _params_hash
+        self._next_key = 1
+        # Background LIN check (2026-09-11): the executor probes each stored
+        # candidate set while the arm is idle and answers with the first
+        # feasible index (-1 = none, which counts as a failed attempt here).
+        self._pub_precheck = node.create_publisher(PoseArray, "/graspgen/precheck_candidates", 10)
+        self._sub_precheck = node.create_subscription(
+            String, "/grasp_executor_lin_llm/precheck_result", self._on_precheck_result, 10)
         self._worker = threading.Thread(target=self._loop, name="grasp-precompute", daemon=True)
         self._worker.start()
 
@@ -212,8 +224,10 @@ class GraspPrecomputer:
                 tr.reach_state = str(d.get("reach_state") or "")
                 tr.score = float(d.get("score", 0.0))
                 e = self._entries.get(key)
-                d["precomputed"] = bool(e is not None and e.n_grasps > 0
-                                        and _boxes_agree(e.box, box, shift, size_tol))
+                if e is not None and e.n_grasps > 0 and _boxes_agree(e.box, box, shift, size_tol):
+                    d["precomputed"] = "lin" if e.lin_idx >= 0 else "grasps"
+                else:
+                    d["precomputed"] = ""
             for key in [k for k in self._tracks if k not in seen]:
                 self._tracks.pop(key, None)
                 self._entries.pop(key, None)
@@ -511,7 +525,49 @@ class GraspPrecomputer:
                                                 float(self._p("precompute_size_tol", 0.15))):
                 node.get_logger().info(f"[precompute] job '{tr.key}' discarded: object moved during the capture")
                 return
+            entry.precheck_key = self._next_key
+            self._next_key += 1
             self._entries[tr.key] = entry
         node.get_logger().info(
             f"[precompute] '{tr.key}' ready in {dt_job:.2f} s: {entry.n_grasps} grasps kept "
             f"of {len(res.get('raw_grasps') or [])} (stored {len(self._entries)})")
+        self._send_for_precheck(entry)
+
+    def _send_for_precheck(self, entry: CacheEntry) -> None:
+        """Hand the stored candidate set to the executor's background LIN
+        check. The header stamp carries the entry id (seconds field) so the
+        verdict can be matched back; the poses are built by the same code a
+        real selection uses, so the executor recognises the set by content."""
+        if not bool(self._p("precompute_lin_precheck", True)):
+            return
+        try:
+            built = self._pick._build_candidate_array(entry.result, TimeMsg(sec=int(entry.precheck_key), nanosec=0))
+        except Exception as e:
+            self._node.get_logger().warn(f"[precompute] '{entry.key}' candidate array for the LIN check failed: {e}")
+            return
+        if built is None:
+            self._mark_failed(entry.key, "every candidate below the table clearance")
+            return
+        pose_array, _scores = built
+        self._pub_precheck.publish(pose_array)
+        self._node.get_logger().info(
+            f"[precompute] '{entry.key}' sent {len(pose_array.poses)} candidates for the LIN check (set {entry.precheck_key})")
+
+    def _on_precheck_result(self, msg: String) -> None:
+        """Executor verdict: 'key=K feasible=F tried=N'."""
+        try:
+            kv = dict(part.split("=", 1) for part in str(msg.data).split())
+            key, feasible, tried = int(kv["key"]), int(kv["feasible"]), int(kv.get("tried", 0))
+        except Exception:
+            return
+        with self._state:
+            hit = next((e for e in self._entries.values() if e.precheck_key == key), None)
+            if hit is not None:
+                hit.lin_idx = feasible
+        if hit is None:
+            return                     # entry already replaced or dropped
+        if feasible >= 0:
+            self._node.get_logger().info(
+                f"[precompute] '{hit.key}' LIN-verified: candidate {feasible + 1} (set {key}, {tried} probed)")
+        else:
+            self._mark_failed(hit.key, f"no LIN-feasible grasp among the first {tried} (set {key})")

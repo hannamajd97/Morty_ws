@@ -8,6 +8,8 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <deque>
+#include <functional>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -694,6 +696,148 @@ public:
   }
 
   bool is_one_shot() const { return one_shot_; }
+
+  // ── Background LIN check of a stored candidate set (2026-09-11) ─────
+  // The pipeline's precompute cache sends the candidate set of every
+  // object it has grasps for, while the arm waits at home. We run the
+  // very same feasibility search as a real pick — first batch, same
+  // start state, same scene — but with no gripper motion, no
+  // candidate_status lines to the GUI and no failure reason left behind,
+  // and it ends between two candidates the moment a real selection
+  // arrives. The verdict (first feasible index + its verified plan +
+  // the arm joints at probe time) is kept; a later selection whose
+  // candidates match by content, with the arm still where it was,
+  // executes without probing.
+  struct PrecheckRecord {
+    int64_t key = 0;
+    std::vector<geometry_msgs::msg::PoseStamped> poses;
+    int feasible_idx = -1;      // index into poses, -1 = none of the batch
+    size_t n_tried = 0;
+    bool has_plan = false;
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    geometry_msgs::msg::PoseStamped plan_pose;
+    double plan_wall_s = 0.0;
+    std::vector<double> joints;   // arm joints at probe time, jmg order
+    std::chrono::steady_clock::time_point t_done{};
+  };
+
+  // Returns false when the check did not finish (interrupted by a
+  // selection, operator abort, or no joint state); true otherwise, with
+  // the verdict in *rec.
+  bool run_precheck(
+    const std::vector<geometry_msgs::msg::PoseStamped> & cands, int64_t key,
+    std::function<bool()> interrupt, PrecheckRecord * rec)
+  {
+    rec->key = key; rec->poses = cands; rec->feasible_idx = -1;
+    rec->n_tried = 0; rec->has_plan = false;
+    if (!arm_joints_now(&rec->joints)) { return false; }
+    const std::string saved_reason = last_failure_reason_;
+    precheck_mode_ = true; precheck_interrupted_ = false;
+    precheck_interrupt_ = std::move(interrupt); precheck_tried_ = 0;
+    geometry_msgs::msg::PoseStamped sel;
+    bool ok = false;
+    try { ok = choose_first_lin_feasible(cands, &sel); } catch (...) { ok = false; }
+    precheck_mode_ = false; precheck_interrupt_ = nullptr;
+    last_failure_reason_ = saved_reason;
+    skip_next_precheck_ = false;
+    rec->n_tried = precheck_tried_;
+    if (precheck_interrupted_ || abort_requested_.load()) {
+      invalidate_cached_lin_plan("the background check was interrupted");
+      return false;
+    }
+    if (ok) {
+      for (size_t i = 0; i < cands.size(); ++i) {
+        if (same_pose(cands[i].pose, sel.pose, 0.0, 0.0)) { rec->feasible_idx = static_cast<int>(i); break; }
+      }
+      if (cached_lin_plan_valid_) {
+        rec->has_plan = true; rec->plan = cached_lin_plan_;
+        rec->plan_pose = cached_lin_plan_pose_; rec->plan_wall_s = cached_lin_plan_wall_s_;
+      }
+      invalidate_cached_lin_plan("kept in the background-check record instead");
+    }
+    rec->t_done = std::chrono::steady_clock::now();
+    return true;
+  }
+
+  void remember_precheck(PrecheckRecord rec)
+  {
+    // One record per candidate set: a recomputed object replaces its old one.
+    prechecks_.erase(
+      std::remove_if(prechecks_.begin(), prechecks_.end(),
+        [&](const PrecheckRecord & r) { return same_set(r.poses, rec.poses); }),
+      prechecks_.end());
+    prechecks_.push_front(std::move(rec));
+    while (prechecks_.size() > precheck_max_sets_) { prechecks_.pop_back(); }
+  }
+
+  const PrecheckRecord * match_precheck(
+    const std::vector<geometry_msgs::msg::PoseStamped> & cands) const
+  {
+    for (const auto & r : prechecks_) {
+      if (same_set(r.poses, cands)) { return &r; }
+    }
+    return nullptr;
+  }
+
+  // The stored verdict holds only from the same arm pose: a plan is a
+  // joint-space command and the probe's start state was those joints.
+  bool precheck_usable(const PrecheckRecord & rec, std::string * why)
+  {
+    std::vector<double> now;
+    if (!arm_joints_now(&now)) { if (why) { *why = "no fresh joint state"; } return false; }
+    if (now.size() != rec.joints.size()) { if (why) { *why = "joint layout changed"; } return false; }
+    double worst = 0.0;
+    for (size_t i = 0; i < now.size(); ++i) { worst = std::max(worst, std::fabs(now[i] - rec.joints[i])); }
+    if (worst > cached_plan_start_joint_tol_rad_) {
+      if (why) {
+        char b[96]; std::snprintf(b, sizeof(b), "arm moved %.3f rad since the check", worst);
+        *why = b;
+      }
+      return false;
+    }
+    return true;
+  }
+
+  // Put the record's verified plan back where Step 2 looks for it and
+  // skip the duplicate pre-check, exactly as after a live probe.
+  void apply_precheck(const PrecheckRecord & rec)
+  {
+    if (rec.has_plan) { cache_lin_plan(rec.plan_pose, rec.plan, rec.plan_wall_s); }
+    skip_next_precheck_ = true;
+  }
+
+  double precheck_age_s(const PrecheckRecord & rec) const
+  {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - rec.t_done).count();
+  }
+
+  void open_gripper_early() { begin_gripper_open_async(); }
+
+  static bool same_pose(
+    const geometry_msgs::msg::Pose & a, const geometry_msgs::msg::Pose & b,
+    double tol_pos, double tol_q)
+  {
+    const auto & pa = a.position; const auto & pb = b.position;
+    const auto & qa = a.orientation; const auto & qb = b.orientation;
+    return std::fabs(pa.x - pb.x) <= tol_pos && std::fabs(pa.y - pb.y) <= tol_pos &&
+           std::fabs(pa.z - pb.z) <= tol_pos &&
+           std::fabs(qa.x - qb.x) <= tol_q && std::fabs(qa.y - qb.y) <= tol_q &&
+           std::fabs(qa.z - qb.z) <= tol_q && std::fabs(qa.w - qb.w) <= tol_q;
+  }
+
+  // Same candidate set: same count, every pose within 2 mm / 5e-3 in the
+  // quaternion. The pipeline rebuilds the array from the stored grasps
+  // with the live transform, so a still arm gives identical numbers.
+  static bool same_set(
+    const std::vector<geometry_msgs::msg::PoseStamped> & a,
+    const std::vector<geometry_msgs::msg::PoseStamped> & b)
+  {
+    if (a.size() != b.size() || a.empty()) { return false; }
+    for (size_t i = 0; i < a.size(); ++i) {
+      if (!same_pose(a[i].pose, b[i].pose, 2e-3, 5e-3)) { return false; }
+    }
+    return true;
+  }
 
   bool select_first_lin_feasible(
     const std::vector<geometry_msgs::msg::PoseStamped> & candidates,
@@ -3557,7 +3701,9 @@ private:
     // negatives (today: 0/15 then 15/22 on the same object), and every
     // false negative used to cost a grasp. Candidates that fail the quick
     // probe go to the END of the probe order; the LIN probe stays the judge.
-    begin_gripper_open_async();   // overlaps the 0.5 s open with the probing below
+    if (!precheck_mode_) {
+      begin_gripper_open_async();   // overlaps the 0.5 s open with the probing below
+    }
     size_t ik_demoted = 0;
     std::vector<std::pair<double, size_t>> demoted;
     for (size_t i = 0; i < total_in; ++i) {
@@ -3681,6 +3827,14 @@ private:
         "Evaluating candidate batch %zu/%zu (indices %zu..%zu).",
         batch_idx, batch_count, batch_start + 1, batch_end);
       for (size_t i = batch_start; i < batch_end; ++i) {
+        if (precheck_mode_) {
+          // Let a real selection in, and stop for it between candidates.
+          rclcpp::spin_some(node_);
+          if (precheck_interrupt_ && precheck_interrupt_()) {
+            precheck_interrupted_ = true;
+            return false;
+          }
+        }
         if (abort_requested_.load()) {
           last_failure_reason_ = "stopped by your command";
           // INVALIDATION: abort mid-evaluation.
@@ -3716,11 +3870,13 @@ private:
             cs.data = "grasp " + std::to_string(i + 1) + "/" +
               std::to_string(total) + ": FEASIBLE — executing this one (" +
               describe_candidate(candidates[orig_idx]) + ")";
-            candidate_status_pub_->publish(cs);
+            if (!precheck_mode_) { candidate_status_pub_->publish(cs); }
           } catch (...) {}
+          precheck_tried_ = n_tried + 1;
           return true;
         }
         ++n_tried;
+        precheck_tried_ = n_tried;
         // MoveGroup returns only a broad error code. Its useful detail (for
         // example the exact joint and measured limit, or a collision pair)
         // is emitted separately on /rosout, often a few ms later.
@@ -3786,7 +3942,7 @@ private:
           cs.data = "grasp " + std::to_string(i + 1) + "/" +
             std::to_string(total) + ": rejected — " + short_reason +
             " (" + describe_candidate(candidates[orig_idx]) + ")";
-          candidate_status_pub_->publish(cs);
+          if (!precheck_mode_) { candidate_status_pub_->publish(cs); }
         } catch (...) {}
         RCLCPP_WARN(
           node_->get_logger(),
@@ -5061,6 +5217,29 @@ private:
   int cached_plan_validate_samples_{5};
   double cached_plan_validate_timeout_s_{0.5};
 
+  // background LIN check state (see PrecheckRecord)
+  bool precheck_mode_ = false;
+  bool precheck_interrupted_ = false;
+  std::function<bool()> precheck_interrupt_;
+  size_t precheck_tried_ = 0;
+  std::deque<PrecheckRecord> prechecks_;
+  size_t precheck_max_sets_ = 8;
+
+  bool arm_joints_now(std::vector<double> * out)
+  {
+    sensor_msgs::msg::JointState js;
+    if (!wait_fresh_arm_joint_state(0.5, js)) { return false; }
+    out->clear();
+    for (const auto & name : arm_group_.getJointNames()) {
+      bool found = false;
+      for (size_t i = 0; i < js.name.size() && i < js.position.size(); ++i) {
+        if (js.name[i] == name) { out->push_back(js.position[i]); found = true; break; }
+      }
+      if (!found) { return false; }
+    }
+    return true;
+  }
+
   // Sensor-direct joint feed for execute_fast_joint_lift (see there).
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_states_sub_;
   std::mutex joint_state_mutex_;
@@ -5320,6 +5499,35 @@ int main(int argc, char ** argv)
     pub_completion->publish(msg);
   };
 
+  // Background LIN check (2026-09-11): candidate sets from the pipeline's
+  // precompute cache, checked while the arm is idle; verdicts back to the
+  // pipeline so a set with no feasible grasp is recomputed before anyone
+  // selects it. Off with lin_precheck_enabled:=false.
+  const bool precheck_enabled =
+    get_or_declare_param<bool>(node, "lin_precheck_enabled", true);
+  std::deque<std::pair<int64_t, std::vector<geometry_msgs::msg::PoseStamped>>> pending_prechecks;
+  auto pub_precheck_result = node->create_publisher<std_msgs::msg::String>(
+    "/grasp_executor_lin_llm/precheck_result", rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
+  auto sub_precheck = node->create_subscription<geometry_msgs::msg::PoseArray>(
+    "/graspgen/precheck_candidates", rclcpp::QoS(rclcpp::KeepLast(10)).reliable(),
+    [&](const geometry_msgs::msg::PoseArray::SharedPtr msg) {
+      if (!precheck_enabled || msg->poses.empty()) { return; }
+      const int64_t key = static_cast<int64_t>(msg->header.stamp.sec);   // the pipeline's entry id
+      std::vector<geometry_msgs::msg::PoseStamped> cands;
+      cands.reserve(msg->poses.size());
+      for (const auto & p : msg->poses) {
+        geometry_msgs::msg::PoseStamped ps; ps.header = msg->header; ps.pose = p;
+        cands.push_back(ps);
+      }
+      std::lock_guard<std::mutex> lock(mutex);
+      pending_prechecks.erase(
+        std::remove_if(pending_prechecks.begin(), pending_prechecks.end(),
+          [&](const auto & j) { return j.first == key; }),
+        pending_prechecks.end());
+      pending_prechecks.emplace_back(key, std::move(cands));
+      while (pending_prechecks.size() > 16) { pending_prechecks.pop_front(); }
+    });
+
   auto sub = node->create_subscription<geometry_msgs::msg::PoseStamped>(
     grasp_pose_topic,
     latched_qos,
@@ -5513,7 +5721,35 @@ int main(int argc, char ** argv)
         "Received %zu grasp candidates; evaluating LIN feasibility (cycle_id=%ld).",
         cands.size(), static_cast<long>(cycle_id));
       grasp_executor.clear_abort();
-      bool feasible = grasp_executor.select_first_lin_feasible(cands, &selected);
+      bool feasible = false;
+      bool used_precheck = false;
+      if (precheck_enabled) {
+        const auto * rec = grasp_executor.match_precheck(cands);
+        std::string why;
+        if (rec == nullptr) {
+          RCLCPP_INFO(node->get_logger(),
+            "[precheck] MISS: no background check for this candidate set — probing now.");
+        } else if (!grasp_executor.precheck_usable(*rec, &why)) {
+          RCLCPP_INFO(node->get_logger(), "[precheck] MISS: %s — probing now.", why.c_str());
+        } else if (rec->feasible_idx < 0) {
+          RCLCPP_INFO(node->get_logger(),
+            "[precheck] HIT but none of the first %zu candidates was feasible %.0f s ago — probing again.",
+            rec->n_tried, grasp_executor.precheck_age_s(*rec));
+        } else {
+          selected = cands[static_cast<size_t>(rec->feasible_idx)];
+          grasp_executor.apply_precheck(*rec);
+          grasp_executor.open_gripper_early();
+          feasible = true;
+          used_precheck = true;
+          RCLCPP_INFO(node->get_logger(),
+            "[precheck] HIT: candidate %d of %zu was LIN-verified %.0f s ago — executing without probing (%s).",
+            rec->feasible_idx + 1, cands.size(), grasp_executor.precheck_age_s(*rec),
+            rec->has_plan ? "plan reused" : "plan recomputed");
+        }
+      }
+      if (!used_precheck) {
+        feasible = grasp_executor.select_first_lin_feasible(cands, &selected);
+      }
       bool ok = false;
       if (!feasible) {
         RCLCPP_ERROR(node->get_logger(), "No LIN-feasible grasp candidate found.");
@@ -5572,6 +5808,49 @@ int main(int argc, char ** argv)
       if (grasp_executor.is_one_shot()) {
         RCLCPP_INFO(node->get_logger(), "One-shot mode: exiting after first execution.");
         break;
+      }
+    }
+
+    if (precheck_enabled && !grasp_candidates.has_value() && !grasp.has_value()) {
+      std::optional<std::pair<int64_t, std::vector<geometry_msgs::msg::PoseStamped>>> job;
+      {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!processing && !pending_candidates.has_value() && !pending_grasp.has_value() &&
+            !pending_prechecks.empty() && !grasp_executor.abort_pending())
+        {
+          job = std::move(pending_prechecks.front());
+          pending_prechecks.pop_front();
+        }
+      }
+      if (job.has_value()) {
+        auto interrupt = [&]() {
+          std::lock_guard<std::mutex> lk(mutex);
+          return pending_candidates.has_value() || pending_grasp.has_value();
+        };
+        GraspExecutorLin::PrecheckRecord rec;
+        const auto t0 = std::chrono::steady_clock::now();
+        const bool done = grasp_executor.run_precheck(job->second, job->first, interrupt, &rec);
+        const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        if (!done) {
+          RCLCPP_INFO(node->get_logger(),
+            "[precheck] set %ld stopped after %zu candidates (%.2f s): a selection or a stop came first.",
+            static_cast<long>(job->first), rec.n_tried, dt);
+        } else {
+          std_msgs::msg::String r;
+          r.data = "key=" + std::to_string(job->first) + " feasible=" + std::to_string(rec.feasible_idx) +
+            " tried=" + std::to_string(rec.n_tried);
+          pub_precheck_result->publish(r);
+          if (rec.feasible_idx >= 0) {
+            RCLCPP_INFO(node->get_logger(),
+              "[precheck] set %ld: candidate %d of %zu is LIN-feasible (%zu probed, %.2f s) — verdict kept.",
+              static_cast<long>(job->first), rec.feasible_idx + 1, job->second.size(), rec.n_tried, dt);
+          } else {
+            RCLCPP_WARN(node->get_logger(),
+              "[precheck] set %ld: none of the first %zu candidates is LIN-feasible (%.2f s) — pipeline told to recompute.",
+              static_cast<long>(job->first), rec.n_tried, dt);
+          }
+          grasp_executor.remember_precheck(std::move(rec));
+        }
       }
     }
 

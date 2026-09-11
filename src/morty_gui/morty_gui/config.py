@@ -186,7 +186,10 @@ EXECUTOR_CMDS: Dict[str, List[str]] = {
         "best_pose:=true",
         "use_candidate_pose_array:=true",
         "max_candidate_tries:=10",
-        "candidate_try_all_batches:=true",
+        # First batch only (Majd 2026-09-11): in every successful pick of
+        # that day the accepted grasp was among the first 6; when the first
+        # 10 fail the rest fail too and only cost 5-10 s more.
+        "candidate_try_all_batches:=false",
         # Pulse holds are appended DYNAMICALLY at EXECUTE press from the
         # Advanced spinboxes (Majd 2026-08-26: "does the manual execution
         # know?" — it didn't; these were hardcoded 0.5/1.5).

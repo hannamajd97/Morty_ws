@@ -142,7 +142,14 @@ about 2.5 MB/s with both cameras compressed).
   stable detection before anyone selects; a selection with a valid stored
   result skips perception. The worker publishes nothing and never moves
   the arm; `[precompute] HIT/MISS` lines in the pipeline log say what
-  happened. Details in `src/grasp_pipeline/README.md`.
+  happened. Details in `src/grasp_pipeline/README.md`. The executor checks
+  each stored set for a straight approach while idle (`[precheck]` lines in
+  its log; `lin_precheck_enabled`), so a selection can start moving without
+  probing. Both caches drop their results when the arm or the object moves.
+- **Probe budget:** the executor probes only the first 10 candidates
+  (`candidate_try_all_batches:=false` in the GUI's command) and the MoveIt
+  IK timeout is 0.1 s (`kinematics.yaml`), so a selection with no feasible
+  grasp fails in about 1.5 s instead of 10 s.
 
 ## 9. Audio
 

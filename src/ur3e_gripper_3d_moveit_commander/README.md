@@ -69,3 +69,21 @@ colcon build --packages-select ur3e_gripper_3d_moveit_commander --cmake-args -DC
 ```
 
 About 2.5 minutes; the running executor must be restarted afterwards.
+
+## Background LIN check (2026-09-11)
+
+While the arm is idle the executor probes the candidate sets the pipeline's
+precompute cache sends on `/graspgen/precheck_candidates`: the same
+feasibility search as a real pick (first batch of `max_candidate_tries`,
+same start state, same scene), but without gripper motion or
+`candidate_status` lines, and it stops between two candidates when a real
+selection arrives. The verdict — first feasible index, its verified plan and
+the arm joints at probe time — is kept (8 sets) and reported on
+`/grasp_executor_lin_llm/precheck_result` as `key=K feasible=F tried=N`.
+A later selection whose candidates match a stored set by content (2 mm /
+5e-3 in the quaternion), with the arm within 0.01 rad of where it was,
+executes at once: `[precheck] HIT` in the log; otherwise `[precheck] MISS:
+<why>` and the normal probe. `lin_precheck_enabled:=false` turns it off.
+The GUI starts the executor with `candidate_try_all_batches:=false` (only
+the first 10 candidates are probed) since the same day.
+

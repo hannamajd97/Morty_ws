@@ -199,7 +199,9 @@ class DebugImagePublisher:
                     tag += f" {score:.2f}"
                 if d.get("dist_note"):
                     tag += f" {d['dist_note']}"
-                if d.get("precomputed"):
+                if d.get("precomputed") == "lin":
+                    tag += " **"         # grasps computed AND a straight approach verified
+                elif d.get("precomputed"):
                     tag += " *"          # grasps already computed for this object (precompute cache)
                 (tw, th), baseline = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
                 # Keep long labels inside the image instead of clipping

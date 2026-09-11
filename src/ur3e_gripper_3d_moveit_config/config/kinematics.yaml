@@ -22,3 +22,10 @@ ur3e_manipulator:
   # what the working weeks ran on. Do not re-tune these blind — measure
   # with /compute_ik first (see the sweep above for the method).
   kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  # 2026-09-11 (measured, executor log of that day, 224 LIN probes): every
+  # candidate that had a solution planned in 0.03-0.37 s round trip, every
+  # candidate without one waited the full 0.5 s default before NO_IK_SOLUTION
+  # (97 of 224 probes). 0.1 s keeps the solutions and cuts a failed candidate
+  # from 0.5 s to 0.1 s. Revert to the default (delete the line) if picks
+  # that used to succeed start reporting "no IK".
+  kinematics_solver_timeout: 0.1

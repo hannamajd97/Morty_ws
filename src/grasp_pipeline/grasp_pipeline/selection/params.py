@@ -406,6 +406,7 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("precompute_pose_tol_deg", 0.5)
     node.declare_parameter("precompute_request_timeout_s", 5.0)
     node.declare_parameter("precompute_max_retries", 5)     # failed attempts per object before giving up
+    node.declare_parameter("precompute_lin_precheck", True)  # hand stored sets to the executor's background LIN check
     # Hold raised 250 -> 400 ms (2026-08-07, Majd's choice): at 250 ms a
     # pointing ray sweeping across a bbox committed selections the user
     # never meant.
