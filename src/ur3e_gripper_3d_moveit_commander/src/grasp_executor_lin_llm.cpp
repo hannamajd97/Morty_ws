@@ -3583,6 +3583,77 @@ private:
     return "";
   }
 
+  // Straight-line KINEMATICS along the whole approach (2026-09-11). Pilz
+  // LIN refuses a line whose joint-space path exceeds a joint velocity or
+  // acceleration limit — in practice the elbow sweeping past a singularity
+  // ("Joint velocity limit of elbow_joint violated ... 12.6 rad/s", move_group
+  // log, cycle 18 of that day; the limit is about 3.1). That message comes
+  // from a free logger and never reaches /rosout, so the executor used to
+  // call it "something along the straight line blocks it", which sent Majd
+  // looking for an obstacle that does not exist. Measure it instead: IK at
+  // one point per 2 cm from the current TCP to the grasp (position and
+  // orientation interpolated like LIN does, each solve seeded by the
+  // previous one), and the sharpest joint turn per centimetre on the way.
+  std::string approach_kinematic_detail(const geometry_msgs::msg::PoseStamped & target)
+  {
+    moveit::core::RobotState state(arm_group_.getRobotModel());
+    if (!robot_state_from_ear(state)) { return ""; }
+    const auto * jmg = state.getJointModelGroup(arm_group_.getName());
+    if (!jmg) { return ""; }
+    const std::string & eef = arm_group_.getEndEffectorLink();
+    const Eigen::Isometry3d T0 = state.getGlobalLinkTransform(eef);
+    const Eigen::Vector3d p0 = T0.translation();
+    const Eigen::Vector3d p1(target.pose.position.x, target.pose.position.y, target.pose.position.z);
+    const double len = (p1 - p0).norm();
+    if (len < 0.02) { return ""; }
+    const Eigen::Quaterniond q0(T0.rotation());
+    const Eigen::Quaterniond q1(target.pose.orientation.w, target.pose.orientation.x,
+                                target.pose.orientation.y, target.pose.orientation.z);
+    const int n = std::max(8, static_cast<int>(len / 0.02));
+    const double step_cm = len / n * 100.0;
+    std::vector<double> prev;
+    state.copyJointGroupPositions(jmg, prev);
+    const auto & names = jmg->getVariableNames();
+    double worst = 0.0; size_t worst_j = 0; double worst_t = 0.0;
+    for (int k = 1; k <= n; ++k) {
+      const double t = static_cast<double>(k) / n;
+      geometry_msgs::msg::Pose pose;
+      const Eigen::Vector3d p = p0 + t * (p1 - p0);
+      const Eigen::Quaterniond q = q0.slerp(t, q1);
+      pose.position.x = p.x(); pose.position.y = p.y(); pose.position.z = p.z();
+      pose.orientation.x = q.x(); pose.orientation.y = q.y();
+      pose.orientation.z = q.z(); pose.orientation.w = q.w();
+      if (!state.setFromIK(jmg, pose, eef, 0.05)) {
+        char b[160];
+        std::snprintf(b, sizeof(b),
+          "no joint solution %.0f cm before the grasp — the straight line leaves the arm's workspace",
+          (1.0 - t) * len * 100.0);
+        return b;
+      }
+      std::vector<double> cur;
+      state.copyJointGroupPositions(jmg, cur);
+      for (size_t j = 0; j < cur.size() && j < prev.size(); ++j) {
+        const double d = std::fabs(cur[j] - prev[j]) / step_cm;   // rad per cm of line
+        if (d > worst) { worst = d; worst_j = j; worst_t = t; }
+      }
+      prev = cur;
+    }
+    char b[240];
+    const char * jname = worst_j < names.size() ? names[worst_j].c_str() : "a joint";
+    if (worst > 0.15) {
+      std::snprintf(b, sizeof(b),
+        "%s would turn %.2f rad per cm of line, %.0f cm before the grasp — the straight line "
+        "passes a singularity, so the joint speed limit is exceeded (a pre-grasp approach or a "
+        "lower velocity scaling avoids this)",
+        jname, worst, (1.0 - worst_t) * len * 100.0);
+    } else {
+      std::snprintf(b, sizeof(b),
+        "no collision and no sharp joint turn found on the line (worst %s %.2f rad/cm); "
+        "MoveIt gave no reason", jname, worst);
+    }
+    return b;
+  }
+
   bool choose_first_lin_feasible(
     const std::vector<geometry_msgs::msg::PoseStamped> & candidates_in,
     geometry_msgs::msg::PoseStamped * selected)
@@ -3920,12 +3991,13 @@ private:
           // The /rosout hint (joint-limit lines) may have landed during the
           // autopsy round trips; read it again before composing.
           if (hint.empty()) { hint = fresh_moveit_hint(); }
+          std::string kin;
+          if (detail.empty() && goal_clear) { kin = approach_kinematic_detail(candidates[orig_idx]); }
           if (!detail.empty()) {
             short_reason = "LIN path blocked " + detail;
           } else if (goal_clear) {
-            short_reason =
-              "LIN path blocked mid-approach (goal pose itself is collision-free; "
-              "something along the straight line blocks it)";
+            short_reason = "straight line not drivable: " +
+              (kin.empty() ? std::string("goal pose is collision-free and nothing was found on the line") : kin);
             if (!hint.empty()) { short_reason += " — MoveIt: " + hint; }
           } else {
             // Budget spent, IK failed, or move_group's service is down:
