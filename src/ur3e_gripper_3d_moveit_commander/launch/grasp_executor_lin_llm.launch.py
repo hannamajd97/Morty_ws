@@ -14,7 +14,7 @@ chat / intent-routing flow. For non-voice usage where the drop is fixed,
 prefer ``grasp_executor_lin.launch.py`` instead.
 """
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, Shutdown
 from launch.substitutions import LaunchConfiguration, PythonExpression
 
 from launch_ros.actions import Node
@@ -286,6 +286,11 @@ def generate_launch_description():
             Node(
                 package="ur3e_gripper_3d_moveit_commander",
                 executable="grasp_executor_lin_llm",
+                # A dead executor must take its launch down with it: the GUI
+                # watches the launch process, and a wrapper that outlives a
+                # crashed node hid the crash (2026-09-11: exit -11, "no
+                # logs, nothing moves") and blocked the GUI's self-heal restart.
+                on_exit=Shutdown(),
                 # name= REMOVED (2026-08-26): a launch name override is a
                 # GLOBAL __node remap — it renamed the in-process helper
                 # node too, creating a bare twin "/grasp_executor_lin_llm"

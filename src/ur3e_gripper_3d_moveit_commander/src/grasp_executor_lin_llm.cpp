@@ -2728,9 +2728,16 @@ private:
     // Stage B — short LIN from the stand-off state to the grasp.
     const auto & pts = pre_plan.trajectory_.joint_trajectory.points;
     if (!pts.empty()) {
-      auto start_state = *arm_group_.getCurrentState();
-      start_state.setJointGroupPositions(
-        arm_group_.getName(), pts.back().positions);
+      // Stage B starts where stage A ends. getCurrentState() can never
+      // work in this single-threaded program (its monitor needs someone
+      // to spin while it waits) — it returned null and the executor
+      // crashed on the first staged probe (2026-09-11, exit -11). Seed
+      // from our own /joint_states ear, then overwrite the arm joints
+      // with the PTP's last point.
+      moveit::core::RobotState start_state(arm_group_.getRobotModel());
+      if (!robot_state_from_ear(start_state)) { start_state.setToDefaultValues(); }
+      start_state.setJointGroupPositions(arm_group_.getName(), pts.back().positions);
+      start_state.update();
       arm_group_.setStartState(start_state);
     }
     arm_group_.clearPoseTargets();
