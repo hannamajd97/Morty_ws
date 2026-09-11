@@ -81,6 +81,20 @@ def main():
 
     print(f"[INFO] Loading GraspGen config: {args.config}")
     sampler = GraspGenSampler(load_grasp_cfg(args.config))
+    # Warm-up (2026-09-11): the PTv3 backbone (Franka checkpoint) compiles
+    # its sparse-convolution kernels on the first inference — measured 50 s,
+    # then 0.3 s per request. Pay it here, before the socket exists, so the
+    # first real selection never waits for it; the PointNet++ models take
+    # about a second. A synthetic 3 cm cylinder 40 cm from the camera.
+    try:
+        t_warm = time.time()
+        th = np.random.rand(1500) * 2 * np.pi
+        z = np.random.rand(1500) * 0.08
+        warm = np.stack([0.015 * np.cos(th), z - 0.04, 0.4 + 0.015 * np.sin(th)], 1).astype(np.float32)
+        GraspGenSampler.run_inference(warm, sampler, args.threshold, 50, -1, 10, 1, False)
+        print(f"[INFO] Warm-up inference done in {time.time() - t_warm:.1f} s")
+    except Exception as e:
+        print(f"[WARN] Warm-up inference failed: {e}")
     print(f"[INFO] Service ready on {args.bind} (default thr={args.threshold})")
 
     vis = None

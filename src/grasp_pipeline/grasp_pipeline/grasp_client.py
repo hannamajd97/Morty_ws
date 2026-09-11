@@ -53,7 +53,7 @@ _LOG = logging.getLogger(__name__)
 # historical name. Alienware workspace is ~/morty_ws. (2026-08-06)
 _DEFAULT_CONFIG = os.path.join(
     os.environ.get("WS_DIR", os.path.expanduser("~/morty_ws")),
-    "models/graspgen/graspgen_robotiq_2f_140.yml",
+    "models/graspgen/graspgen_franka_panda.yml",
 )
 
 # Module-level singleton: the GraspGen sampler is expensive to build (loads two
