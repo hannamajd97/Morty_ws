@@ -345,6 +345,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._driver = ManagedLaunch(self)
         self._pipeline = ManagedLaunch(self)
         self._graspgen = ManagedLaunch(self)   # GraspGen service, lives with the pipeline (2026-09-09)
+        self._exec_holding = False              # executor holds an object and waits for a drop side
         self._naming = ManagedLaunch(self)     # naming service (Qwen3-VL-8B), lives with the pipeline (2026-09-15)
         self._rviz_extra = ManagedLaunch(self)
         self._camera_extra = ManagedLaunch(self)
@@ -529,26 +530,19 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.grip_close_btn.clicked.connect(lambda: self._on_gripper(False))
         grip_row.addWidget(self.grip_close_btn)
         move_col.addLayout(grip_row)
-        # Drop side (2026-09-11 20:40, Majd: "drop right makes all the
-        # objects the same"): GUI picks run to the end on their own and
-        # drop at the executor's drop_target_name, so the choice is a
-        # setting for the NEXT picks, not an answer to a question. The two
-        # buttons set that parameter (and still answer a voice-mode pause
-        # with the same token). Release only matters when a voice pick is
-        # waiting at the drop pose.
+        # Drop side (2026-09-15, Majd: "executed one time when I press
+        # it"): the executor now holds the object after grasp + lift and
+        # waits (wait_for_destination in EXECUTOR_CMD). Left / Right answer
+        # that wait once — plain buttons, nothing stays highlighted. The
+        # same token also becomes the default side for a voice pick.
         drop_row = QtWidgets.QHBoxLayout()
         drop_row.addWidget(QtWidgets.QLabel("Drop side:"))
-        self.drop_group = QtWidgets.QButtonGroup(self)
-        self.drop_group.setExclusive(True)
         for label, token in (("Left", "drop_left_side"), ("Right", "drop_right_side")):
             b = QtWidgets.QPushButton(label)
-            b.setCheckable(True)
-            b.setToolTip(f"Next picks are carried to the {label.lower()} drop pose.")
+            b.setToolTip(f"Drop the held object at the {label.lower()} side, once. "
+                         "Acts while the robot holds an object and waits.")
             b.clicked.connect(lambda _=False, tok=token, lab=label: self._on_drop_side(tok, lab))
-            self.drop_group.addButton(b)
             drop_row.addWidget(b)
-            if token == "drop_right_side":
-                b.setChecked(True)   # the executor's default
         rel = QtWidgets.QPushButton("Release")
         rel.setToolTip("Voice picks only: open the gripper at the drop pose and return home.")
         rel.clicked.connect(lambda _=False: self._on_resume("release_home", "Release"))
@@ -1498,11 +1492,15 @@ class OperatorWindow(QtWidgets.QMainWindow):
         dlg.exec_()
 
     def _on_drop_side(self, token: str, label: str) -> None:
-        ok = self.bridge.set_executor_params({"drop_target_name": token})
-        self.bridge.publish_resume(token)   # also answers a voice-mode pause, if one is open
+        if self._software_stop_latched:
+            self.statusBar().showMessage("Software stop is latched — re-arm before sending a drop side.")
+            return
+        self.bridge.publish_resume(token)            # the one-time answer to the executor's wait
+        self.bridge.set_executor_params({"drop_target_name": token})   # default side for voice picks
         self.statusBar().showMessage(
-            f"Drop side: {label.upper()} for the next picks." if ok
-            else "Drop side: executor not reachable — is it running?")
+            f"Drop {label.upper()}: sent — the robot drops there once it holds an object."
+            if self._exec_holding else
+            f"Drop {label.upper()}: noted; the robot is not holding anything right now.")
 
     def _on_resume(self, token: str, label: str) -> None:
         if self._software_stop_latched:
@@ -2591,7 +2589,19 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.statusBar().showMessage(upd["status"])
         if "cycle_done" in upd:
             self.exp_win.record_cycle(upd["cycle_done"])
+        if upd.get("exec_interactive"):
+            st = str(upd["exec_interactive"])
+            if st == "paused":
+                self._exec_holding = True
+                self.statusBar().showMessage("Holding the object above the table — press Left or Right to drop it.")
+            elif st.startswith("resumed:"):
+                self._exec_holding = False
+                side = st.split(":", 1)[1].replace("drop_", "").replace("_side", "")
+                self.statusBar().showMessage(f"Going home, then dropping {side}.")
+            elif st in ("no_grasp", "awaiting_release"):
+                self._exec_holding = False
         if upd.get("executor_done"):
+            self._exec_holding = False
             self._manual_execution_pending = False
             self._manual_execution_released = False
             self.bridge.set_grasp_execution_enabled(True)

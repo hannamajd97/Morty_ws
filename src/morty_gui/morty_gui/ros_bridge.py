@@ -150,6 +150,20 @@ class MortyGuiBridge(Node):
         self._voice_seen_t = 0.0
 
         self.create_subscription(Image, "/yolo/debug_image", self._on_image, 2)
+        # The bare camera in the same panel while the pipeline is not
+        # running (Majd 2026-09-15): the RealSense publishes RELIABLE, so
+        # the subscription must too (a BEST_EFFORT one never matches it).
+        # Shown only while no debug image arrived in the last second, and
+        # every 3rd frame (10 Hz is plenty for a preview).
+        self._debug_img_t = 0.0
+        self._raw_count = 0
+        self.create_subscription(
+            Image, "/camera/camera/color/image_raw", self._on_raw_image,
+            QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE))
+        # Executor pause states ("paused" = holding, waiting for a drop side).
+        self._exec_interactive_pending = ""
+        self.create_subscription(
+            String, "/grasp_executor_lin_llm/interactive_status", self._on_exec_interactive, 10)
         self.create_subscription(PointCloud2, "/graspgen/final_cloud", self._on_cloud, 2)
         self.create_subscription(
             PointCloud2, "/yolo/selected_cloud_rgb", self._on_frame_cloud, 2
@@ -504,8 +518,27 @@ class MortyGuiBridge(Node):
         except Exception:
             return
         with self._lock:
+            self._debug_img_t = time.monotonic()
             self.image_bgr = img
             self.image_dirty = True
+
+    def _on_raw_image(self, msg: Image) -> None:
+        self._raw_count += 1
+        if self._raw_count % 3 or time.monotonic() - self._debug_img_t < 1.0:
+            return
+        try:
+            img = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except Exception:
+            return
+        with self._lock:
+            if time.monotonic() - self._debug_img_t < 1.0:
+                return
+            self.image_bgr = img
+            self.image_dirty = True
+
+    def _on_exec_interactive(self, msg: String) -> None:
+        with self._lock:
+            self._exec_interactive_pending = str(msg.data)
 
     def _on_cloud(self, msg: PointCloud2) -> None:
         pts, cols = _cloud_to_numpy(msg)
@@ -1327,6 +1360,9 @@ class MortyGuiBridge(Node):
             if self._executor_done_pending:
                 out["executor_done"] = self._executor_done_pending
                 self._executor_done_pending = ""
+            if self._exec_interactive_pending:
+                out["exec_interactive"] = self._exec_interactive_pending
+                self._exec_interactive_pending = ""
         return out
 
 

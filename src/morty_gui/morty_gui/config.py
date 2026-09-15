@@ -337,7 +337,12 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # give from the GUI): grasp, lift, home, drop_right_side,
                 # open, home. Voice picks still get their pauses from the
                 # router's per-pick parameter.
-                "wait_for_destination:=false",
+                # wait_for_destination back to true (Majd 2026-09-15: "I
+                # want the drop executed one time when I press it"): after
+                # grasp + lift the executor holds above the table and waits
+                # for Left / Right from the GUI, then goes home and drops
+                # there. Nothing is asked by voice; Release stays automatic.
+                "wait_for_destination:=true",
                 "wait_for_release:=false"]
 
 REPLAY_CMD = [

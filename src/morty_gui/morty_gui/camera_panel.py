@@ -24,7 +24,7 @@ class CameraPanel(QtWidgets.QLabel):
     clicked_px = QtCore.pyqtSignal(float, float)
 
     def __init__(self) -> None:
-        super().__init__("waiting for /yolo/debug_image ...")
+        super().__init__("waiting for the camera (start the driver with realsense) ...")
         self.setAlignment(QtCore.Qt.AlignCenter)
         self.setMinimumSize(400, 300)
         self.setStyleSheet("background:#141418; color:#888;")
