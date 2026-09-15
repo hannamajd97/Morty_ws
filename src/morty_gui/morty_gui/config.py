@@ -44,6 +44,7 @@ __all__ = [
     "PERCEPTION_PARAMS",
     "PIPELINE_CMD",
     "GRASPGEN_SERVICE_CMD", "GRASPGEN_LOG", "GRASPGEN_PGREP", "PIPELINE_ENV_EXTRA",
+    "NAMING_SERVICE_CMD", "NAMING_LOG", "NAMING_PGREP", "LLAMA_SERVER_BIN",
     "PLANNER_LIBS",
     "PROFILE_HELP",
     "RED",
@@ -255,6 +256,23 @@ GRASPGEN_SERVICE_CMD = [
     "--bind", "tcp://127.0.0.1:5555",
 ]
 GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
+# Naming service for open-set detection (2026-09-15): Qwen3-VL-8B behind
+# llama.cpp's server, started with the pipeline like the GraspGen service.
+# The pipeline asks it for a name for every object the trained YOLO does
+# not know (perception/open_set.py; 0.15 s per object). 6 GB on the card;
+# models and the build of llama-server are described in models/vlm/README.md.
+LLAMA_SERVER_BIN = os.environ.get("LLAMA_SERVER_BIN", os.path.expanduser("~/vlm/llama.cpp/build/bin/llama-server"))
+NAMING_SERVICE_CMD = [
+    LLAMA_SERVER_BIN,
+    "-m", os.path.expanduser("~/morty_ws/models/vlm/qwen3-vl-8b-q4_k_m.gguf"),
+    "--mmproj", os.path.expanduser("~/morty_ws/models/vlm/qwen3-vl-8b-mmproj.gguf"),
+    # One slot, 1024 context, 256 batch: the crops are tiny and the answer is
+    # 6 tokens; the defaults (4 slots x 2048) cost 240 MB more on a card
+    # that has 550 MB spare with everything running (7.6 of 8.2 GB).
+    "--port", "8090", "-ngl", "99", "-c", "1024", "-np", "1", "-ub", "256", "-b", "512", "-fa", "on",
+]
+NAMING_LOG = os.path.expanduser("~/morty_ws/logs/naming_gui.log")
+NAMING_PGREP = r"llama-server.*qwen3-vl-8b-q4_k_[m]"
 GRASPGEN_PGREP = r"graspgen_service\.p[y]"
 # MORTY_GRASP_PRECOMPUTE: the grasp precompute cache is on for every
 # GUI-started pipeline since 2026-09-11 (tested that afternoon: hits publish
@@ -353,6 +371,8 @@ MOVE_CMD_BASE = [
 # The Filter-parameters tab shows two titled sections (Majd, 2026-08-11):
 # grasp filters on top, perception/capture knobs below.
 PERCEPTION_PARAMS = [
+    "open_set_enabled",
+    "identity_check_enabled",
     "max_graspgen_points",
     "graspgen_num_grasps",
     "graspgen_topk_num_grasps",
@@ -430,6 +450,12 @@ VOICE_FILTER_PARAMS = [
 # Hover documentation for the filter parameters (Majd's request):
 # what each one actually does, in operator language.
 PARAM_DOCS = {
+    "open_set_enabled": "Open-set detection (2026-09-15): YOLOE draws a box around every object on the "
+                        "table, the trained YOLO keeps its own ten, the rest are named once by the naming "
+                        "service (q8b in the overlay; ys = trained YOLO). Off = detection exactly as before.",
+    "identity_check_enabled": "A trained-YOLO detection must look like the reference photos of its class "
+                              "(DINOv2 similarity, 10 ms) or it is treated as an unknown object and renamed. "
+                              "Needs models/identity_refs (tools/build_identity_refs.py); inactive without them.",
     # ── thesis §4.6.14 cascade (2026-08-24) ──
     "support_min_height_m": "Thesis stage 2: minimum gripper-TCP height above the table plane (m). Grasps below are rejected.",
     "support_from_below_dot": "Thesis stage 2: reject approaches that ASCEND more than asin(this) — 0.2 ≈ 11.5°. Stops 'up through the object' grasps; raise to ~0.4 if too strict for the low camera pose.",

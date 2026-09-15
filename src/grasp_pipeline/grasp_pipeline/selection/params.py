@@ -326,6 +326,35 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("self_filter_pad_px", 16)
     node.declare_parameter("self_filter_drop_overlap", 0.3)
     node.declare_parameter("self_filter_draw_overlay", True)
+    # Open-set detection (2026-09-15): YOLOE proposes a box for every object,
+    # the trained YOLO keeps its own, the rest are tracked and named once by
+    # the naming service (Qwen3-VL-8B behind llama-server, started by the
+    # GUI). See perception/open_set.py for the measurements behind the
+    # defaults (m model at 416 px: 26 ms; 224 px crop + 6 tokens: 0.15 s).
+    node.declare_parameter("open_set_enabled", True)
+    node.declare_parameter("open_set_weights", "")
+    node.declare_parameter("open_set_imgsz", 416)
+    node.declare_parameter("open_set_conf", 0.10)
+    # Every 2nd detection frame (measured 2026-09-15): inside the loaded
+    # pipeline process YOLOE costs ~140 ms like the trained YOLO itself, not
+    # the 26 ms of a bare process; every 2nd frame keeps the detection loop
+    # near its old rate while a new object still gets its box within 0.5 s.
+    node.declare_parameter("open_set_every_n_frames", 2)
+    node.declare_parameter("open_set_min_box_px", 12)
+    node.declare_parameter("open_set_max_box_frac", 0.25)
+    node.declare_parameter("open_set_max_depth_m", 1.0)
+    node.declare_parameter("open_set_stable_s", 0.2)
+    node.declare_parameter("open_set_forget_s", 1.0)
+    node.declare_parameter("open_set_naming_url", "http://127.0.0.1:8090/v1/chat/completions")
+    node.declare_parameter("open_set_naming_timeout_s", 10.0)
+    node.declare_parameter("open_set_crop_px", 224)
+    node.declare_parameter("open_set_name_tokens", 6)
+    # Identity check (2026-09-15): a YOLO detection must look like the
+    # reference crops of its class (DINOv2 similarity) or it is handed to
+    # the open-set path. Inactive until models/identity_refs exists.
+    node.declare_parameter("identity_check_enabled", True)
+    node.declare_parameter("identity_ref_dir", "")
+    node.declare_parameter("identity_threshold", 0.5)
     node.declare_parameter("min_depth_m", 0.0)
     node.declare_parameter("max_depth_m", 0.6)
     node.declare_parameter("apply_depth_clamp", True)

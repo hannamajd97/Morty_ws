@@ -182,7 +182,10 @@ class DebugImagePublisher:
                     cv2.LINE_AA,
                 )
 
-                tag = label
+                # Who named it (2026-09-15, Majd): "ys" = the trained YOLO,
+                # "q8b" = the naming model on a YOLOE box.
+                source = str(d.get("source") or "")
+                tag = f"{source} {label}" if source else label
                 if is_sel:
                     tag = "[CHOSEN] " + tag
                 # Majd 2026-08-25: "I can't see which vitamin tube is

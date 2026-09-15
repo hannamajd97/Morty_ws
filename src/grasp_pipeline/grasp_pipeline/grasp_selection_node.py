@@ -56,6 +56,8 @@ from cv_bridge import CvBridge
 
 from .frame_buffer import FrameBuffer
 from .perception.self_filter import GripperSelfFilter
+from .perception.open_set import OpenSetDetector
+from .perception.identity_check import IdentityCheck
 from .yolo_detector import YoloWorldDetector
 from .grasp_client import send_points_to_graspgen
 from .crop_utils import crop_depth_to_cloud_and_numpy
@@ -400,6 +402,13 @@ class YoloLiveSelectGrasp(Node):
         # before the URDF arrives, everything behaves exactly as before.
         self._self_filter = GripperSelfFilter(self)
         self.fb.depth_mask_fn = self._self_filter.depth_mask
+        # Open-set detection + identity check (2026-09-15): the trained YOLO
+        # keeps naming its ten objects; a detection that does not look like
+        # its class is rejected, and everything else on the table gets a box
+        # from YOLOE and a name from the naming service, once, in the
+        # background. Both off = the detection thread as before.
+        self._identity = IdentityCheck(self)
+        self._open_set = OpenSetDetector(self)
         
         # Create additional publisher for base_link transformed pose
         self.pub_best_base = self.create_publisher(PoseStamped, "/graspgen/best_pose_base_link", best_pose_qos)
@@ -1687,6 +1696,11 @@ class YoloLiveSelectGrasp(Node):
                         dets, rgb.shape[:2], str(header.frame_id) if header is not None else "")
                     if self._allowed_classes:
                         dets = [d for d in dets if d["label"].lower() in self._allowed_classes]
+                    for d in dets:
+                        d["source"] = "ys"          # trained YOLO ("yolo standard")
+                    dets, rejected = self._identity.check(rgb, dets)
+                    dets = dets + self._open_set.detect(
+                        rgb, depth, header, dets, [r["bbox"] for r in rejected])
                     self._perf_infer_count += 1
                     self._perf_infer_ms_acc += infer_ms
                     # Annotate every detection with its simplified label.
@@ -1705,7 +1719,9 @@ class YoloLiveSelectGrasp(Node):
                         d_copy = d.copy()
                         simple_name = _simplify_object_name(d["label"])
                         d_copy["simplified_label"] = simple_name
-                        if simple_name.lower() in MULTI_INSTANCE_LABELS:
+                        # Named unknown objects are all kept: two "white box"
+                        # on the table are two objects, not a ghost.
+                        if simple_name.lower() in MULTI_INSTANCE_LABELS or d_copy.get("source") == "q8b":
                             multi_instance.append(d_copy)
                         else:
                             prev = by_label_best.get(simple_name)
@@ -1780,6 +1796,7 @@ class YoloLiveSelectGrasp(Node):
                                     "reach_state": d.get("reach_state"),
                                     "reach_angle_deg": d.get("reach_angle_deg"),
                                     "reach_closer_cm": d.get("reach_closer_cm"),
+                                    "source": str(d.get("source", "ys")),
                                     "colour": (
                                         _bbox_colour_name(
                                             frame_for_colour, d.get("bbox", [])

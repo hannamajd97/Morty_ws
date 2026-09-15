@@ -19,6 +19,25 @@ selected object into ranked grasp candidates for the executor.
    depth frame the node stores, so a finger never enters an object cloud or
    a neighbour box. The overlay draws the projection as a thin red outline.
    `self_filter_enabled:=false` restores the raw data everywhere.
+   Objects the trained YOLO does not know get a box and a name too
+   (open-set detection, `perception/open_set.py`, 2026-09-15): YOLOE-26m at
+   416 px proposes a box for everything (26 ms bare, ~140 ms inside this
+   loaded process, so every 2nd detection frame by default), the boxes are
+   cleaned with the gripper mask, the depth image, the reach envelope
+   (out-of-reach objects are dropped, never named) and overlap with YOLO's
+   own boxes, and each new box is tracked and named once by the naming
+   service — Qwen3-VL-8B behind `llama-server` on port 8090, started by the
+   GUI with the pipeline (`models/vlm/README.md`) — from a 224 px crop with
+   a 6-token answer, 0.15–0.3 s. The overlay and `/yolo/all_detections`
+   carry `source`: `ys` = trained YOLO, `q8b` = named by the model. A YOLO
+   name can also be checked against reference crops of its class with
+   DINOv2 (`perception/identity_check.py`, 10 ms; measured gap on this
+   table: correct detections 0.68–0.85, wrong ones and unknown objects
+   0.23–0.49); it is inactive until `models/identity_refs` exists (build it
+   from the training set with `tools/build_identity_refs.py`). Both are on
+   by default (`open_set_enabled`, `identity_check_enabled`; also in the
+   GUI's Advanced ▸ Filters list; `MORTY_OPEN_SET=false` turns them off at
+   launch). With them off the detection thread is exactly as before.
 2. **Selection** — finger pointing with MediaPipe (`point_selector.py`,
    3D ray from the index finger through the depth image, dwell to commit),
    a click in the debug window, or a voice/LLM choice on `/yolo/select_index`
@@ -99,7 +118,8 @@ the ones that matter day to day:
 | `grasping/pick_pipeline.py` | one pick cycle from selection to published candidates (`_compute` = perception phases, `_publish` = candidates and viewer poses) |
 | `grasping/precompute.py` | the precompute worker: object tracks, validity checks, replay |
 | `grasping/filter_pipeline.py`, `grasp_filters.py`, `grasping/orientation.py`, `grasping/grasp_scorer.py` | the filter chain and scoring |
-| `perception/` | cloud extraction, neighbour obstacles, reach envelope, robot self-filter |
+| `perception/` | cloud extraction, neighbour obstacles, reach envelope, robot self-filter, open-set detection (YOLOE + naming client), identity check (DINOv2) |
+| `tools/build_identity_refs.py` | reference crops for the identity check, from a YOLO training set |
 | `point_selector.py`, `selection/params.py` | pointing/voice selection and all parameter declarations |
 | `debug/debug_renderer.py`, `debug_image_publisher.py` | the overlay |
 | `tf_listener_lite.py` | raw `/tf` drained at 50 Hz on its own thread; the stock tf2 listener at 830 Hz starved the whole process |
@@ -111,6 +131,9 @@ the ones that matter day to day:
 
 The YOLO weights `yolo26s-seg_24_04.pt` live in this package folder and are
 in the repository (23 MB).
+The YOLOE proposal weights `grasp_pipeline/models/yoloe-26m-seg-pf.pt` (73 MB)
+are not; the node downloads them on first start. DINOv2 comes from the torch
+hub cache (84 MB, downloaded on first use).
 
 ## Performance notes
 

@@ -184,6 +184,12 @@ def generate_launch_description():
         DeclareLaunchArgument("graspgen_precompute",
                               default_value=os.environ.get("MORTY_GRASP_PRECOMPUTE", "false")),
         DeclareLaunchArgument("precompute_stable_s", default_value="0.2"),
+        # Open-set detection and the identity check (2026-09-15); on by
+        # default, MORTY_OPEN_SET=false in the environment turns both off.
+        DeclareLaunchArgument("open_set_enabled",
+                              default_value=os.environ.get("MORTY_OPEN_SET", "true")),
+        DeclareLaunchArgument("identity_check_enabled",
+                              default_value=os.environ.get("MORTY_OPEN_SET", "true")),
         DeclareLaunchArgument("segmentation_mask_topic", default_value="/yolo/selected_mask"),
         DeclareLaunchArgument("segmentation_overlay_topic", default_value="/yolo/selected_mask_overlay"),
         # Default false for the current single-view experiments (2026-08-06).
@@ -465,6 +471,8 @@ def generate_launch_description():
             {"single_view_frames": ParameterValue(LaunchConfiguration("single_view_frames"), value_type=int)},
             {"graspgen_precompute": ParameterValue(LaunchConfiguration("graspgen_precompute"), value_type=bool)},
             {"precompute_stable_s": ParameterValue(LaunchConfiguration("precompute_stable_s"), value_type=float)},
+            {"open_set_enabled": ParameterValue(LaunchConfiguration("open_set_enabled"), value_type=bool)},
+            {"identity_check_enabled": ParameterValue(LaunchConfiguration("identity_check_enabled"), value_type=bool)},
             {"registration_num_observations": ParameterValue(LaunchConfiguration("registration_num_observations"), value_type=int)},
             {"registration_observation_interval_s": ParameterValue(LaunchConfiguration("registration_observation_interval_s"), value_type=float)},
             {"registration_refresh_detection": ParameterValue(LaunchConfiguration("registration_refresh_detection"), value_type=bool)},

@@ -345,6 +345,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._driver = ManagedLaunch(self)
         self._pipeline = ManagedLaunch(self)
         self._graspgen = ManagedLaunch(self)   # GraspGen service, lives with the pipeline (2026-09-09)
+        self._naming = ManagedLaunch(self)     # naming service (Qwen3-VL-8B), lives with the pipeline (2026-09-15)
         self._rviz_extra = ManagedLaunch(self)
         self._camera_extra = ManagedLaunch(self)
         self._replay_extra = ManagedLaunch(self)
@@ -1705,6 +1706,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self._pipeline.stop()
             if self._graspgen.running():
                 self._graspgen.stop()
+            if self._naming.running():
+                self._naming.stop()
             if self._executor.running():
                 self._executor.stop()
             self.pipeline_btn.setText("stopping…")
@@ -1723,6 +1726,16 @@ class OperatorWindow(QtWidgets.QMainWindow):
             else:
                 self._graspgen.start(list(GRASPGEN_SERVICE_CMD), env=os.environ.copy(),
                                      log_path=GRASPGEN_LOG)
+        # Naming service for unknown objects (2026-09-15): loads in ~5 s,
+        # the pipeline retries a name until it answers.
+        if not self._naming.running() and os.environ.get("MORTY_OPEN_SET", "true").lower() != "false":
+            pid = self._pgrep_oldest(NAMING_PGREP)
+            if pid is not None:
+                self._naming.adopt(pid)
+            elif os.path.exists(NAMING_SERVICE_CMD[0]):
+                self._naming.start(list(NAMING_SERVICE_CMD), env=os.environ.copy(), log_path=NAMING_LOG)
+            else:
+                self.statusBar().showMessage(f"naming service not started: {NAMING_SERVICE_CMD[0]} missing")
         pipeline_env = os.environ.copy()
         pipeline_env.update(PIPELINE_ENV_EXTRA)
         # Timestamped log for post-trial timing analysis (Majd, 2026-08-12:
@@ -2791,6 +2804,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
             pid = self._pgrep_oldest(GRASPGEN_PGREP)
             if pid is not None:
                 self._graspgen.adopt(pid)
+        if not self._naming.running():
+            pid = self._pgrep_oldest(NAMING_PGREP)
+            if pid is not None:
+                self._naming.adopt(pid)
         if not self._pipeline.running():
             pid = self._pgrep_oldest(r"ros2 launch grasp_pipeline run_grasp_pipelin[e]")
             if pid is not None:

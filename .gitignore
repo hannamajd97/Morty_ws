@@ -80,3 +80,10 @@ VLA_ASTRA.md
 /docs/
 /tools/
 src/rosgraph2.png
+
+# Open-set detection models (2026-09-15): the naming model (5.6 GB, see
+# models/vlm/README.md) and the YOLOE proposal weights (73 MB, downloaded by
+# the pipeline on first start) stay out of the repository.
+models/vlm/*.gguf
+src/grasp_pipeline/grasp_pipeline/models/yoloe-*.pt
+src/grasp_pipeline/grasp_pipeline/models/identity_refs/
