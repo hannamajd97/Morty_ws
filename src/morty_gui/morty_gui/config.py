@@ -264,7 +264,10 @@ GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
 LLAMA_SERVER_BIN = os.environ.get("LLAMA_SERVER_BIN", os.path.expanduser("~/vlm/llama.cpp/build/bin/llama-server"))
 NAMING_SERVICE_CMD = [
     LLAMA_SERVER_BIN,
-    "-m", os.path.expanduser("~/morty_ws/models/vlm/qwen3-vl-8b-q4_k_m.gguf"),
+    # Q3_K_M since the evening of 2026-09-15: 4.0 GB on the card with the
+    # vision encoder on the CPU (Q4: 4.8 GB), same names on the test crops,
+    # 0.35 s per name. The Q4 file stays next to it for comparison.
+    "-m", os.path.expanduser("~/morty_ws/models/vlm/qwen3-vl-8b-q3_k_m.gguf"),
     "--mmproj", os.path.expanduser("~/morty_ws/models/vlm/qwen3-vl-8b-mmproj.gguf"),
     # One slot, 1024 context, 256 batch: the crops are tiny and the answer is
     # 6 tokens; the defaults (4 slots x 2048) cost 240 MB more on a card

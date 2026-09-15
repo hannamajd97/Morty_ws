@@ -215,7 +215,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # always"). Two switches, remembered between sessions, applied
         # live to a running pipeline and used at the next pipeline start.
         # Off = the trained YOLO alone, the naming service is not even
-        # loaded (it takes ~5 GB of the 8 GB card).
+        # loaded (it takes ~4 GB of the 8 GB card).
         det_tab = QtWidgets.QWidget()
         df = QtWidgets.QVBoxLayout(det_tab)
         _qs = QtCore.QSettings("morty", "morty_gui")
@@ -225,7 +225,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.cb_open_set.setToolTip(
             "On: every object on the table gets a box and a name; the trained YOLO keeps its own "
             "ten (ys in the overlay), the rest are named by the model (q8b). The naming service "
-            "is started with the pipeline and holds ~5 GB of the graphics card. "
+            "is started with the pipeline and holds ~4 GB of the graphics card. "
             "Off: the trained YOLO alone, exactly the system as before, nothing else loaded.")
         self.cb_open_set.toggled.connect(self._on_open_set_toggle)
         df.addWidget(self.cb_open_set)
