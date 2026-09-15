@@ -86,6 +86,11 @@ class FrameBuffer:
         self.depth_scale: float = 1000.0  # mm → m for uint16
         self.have_color_K: bool = False
         self.have_depth_K: bool = False
+        # Robot self-filter hook (2026-09-15): (shape, frame_id) -> uint8 mask
+        # or None. Pixels under the mask are zeroed in every stored depth
+        # frame, so the gripper never reaches a cloud, a neighbour box or a
+        # distance readout. Set by the node once the filter exists.
+        self.depth_mask_fn = None
 
         # Subscriptions
         #
@@ -140,6 +145,15 @@ class FrameBuffer:
         Stores the depth image as a numpy array and infers the scale.
         """
         arr = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+        mask_fn = self.depth_mask_fn
+        if mask_fn is not None:
+            try:
+                m = mask_fn(arr.shape[:2], str(msg.header.frame_id))
+            except Exception:
+                m = None
+            if m is not None:
+                arr = arr.copy()          # cv_bridge may hand back a read-only view
+                arr[m > 0] = 0
         self.depth_frame = arr
         self.depth_header = msg.header
         self.depth_ring.append((time.monotonic(), arr))   # a new array per message: no copy needed

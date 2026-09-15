@@ -55,6 +55,7 @@ from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge
 
 from .frame_buffer import FrameBuffer
+from .perception.self_filter import GripperSelfFilter
 from .yolo_detector import YoloWorldDetector
 from .grasp_client import send_points_to_graspgen
 from .crop_utils import crop_depth_to_cloud_and_numpy
@@ -393,6 +394,12 @@ class YoloLiveSelectGrasp(Node):
             self.tf_buffer, self,
             max_hz=float(self.get_parameter("tf_listener_max_hz").value),
         )
+        # Robot self-filter (2026-09-15): the gripper's own hulls projected
+        # into the image. Detections on it are dropped in the detection
+        # thread; depth under it is zeroed in the frame buffer. Off, or
+        # before the URDF arrives, everything behaves exactly as before.
+        self._self_filter = GripperSelfFilter(self)
+        self.fb.depth_mask_fn = self._self_filter.depth_mask
         
         # Create additional publisher for base_link transformed pose
         self.pub_best_base = self.create_publisher(PoseStamped, "/graspgen/best_pose_base_link", best_pose_qos)
@@ -794,6 +801,7 @@ class YoloLiveSelectGrasp(Node):
             return None
         try:
             dets = self.detector.predict(rgb)
+            dets = self._self_filter.filter_detections(dets, rgb.shape[:2], str(header.frame_id))
         except Exception as e:
             self.get_logger().warn(f"Registration refresh detection failed: {e}")
             return None
@@ -1675,6 +1683,8 @@ class YoloLiveSelectGrasp(Node):
                     t_infer0 = time.time()
                     dets = self.detector.predict(rgb)
                     infer_ms = (time.time() - t_infer0) * 1000.0
+                    dets = self._self_filter.filter_detections(
+                        dets, rgb.shape[:2], str(header.frame_id) if header is not None else "")
                     if self._allowed_classes:
                         dets = [d for d in dets if d["label"].lower() in self._allowed_classes]
                     self._perf_infer_count += 1

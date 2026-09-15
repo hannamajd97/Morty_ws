@@ -317,6 +317,15 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("orientation_score_reweight", False)
     node.declare_parameter("orientation_score_weight", 1.0)
     node.declare_parameter("orientation_score_ref_deg", 45.0)
+    # Robot self-filter (2026-09-15): the gripper's own collision hulls,
+    # projected through TF into the image, are removed from detections and
+    # zeroed in every depth frame. See perception/self_filter.py.
+    node.declare_parameter("self_filter_enabled", True)
+    node.declare_parameter("self_filter_links",
+                           ["gripper_base", "gripper_finger_left", "gripper_finger_right"])
+    node.declare_parameter("self_filter_pad_px", 16)
+    node.declare_parameter("self_filter_drop_overlap", 0.3)
+    node.declare_parameter("self_filter_draw_overlay", True)
     node.declare_parameter("min_depth_m", 0.0)
     node.declare_parameter("max_depth_m", 0.6)
     node.declare_parameter("apply_depth_clamp", True)

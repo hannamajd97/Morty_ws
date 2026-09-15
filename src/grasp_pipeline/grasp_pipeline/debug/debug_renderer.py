@@ -74,6 +74,13 @@ class DebugRenderer:
         header = node.fb.rgb_header
         if rgb is None or header is None:
             return
+        # Where the robot believes its own gripper is (thin red outline).
+        self_filter = getattr(node, "_self_filter", None)
+        if self_filter is not None:
+            try:
+                rgb = self_filter.draw_outline(rgb, str(header.frame_id))
+            except Exception:
+                pass
 
         dets = list(node.detections_cache) if node.detections_cache else []
         sel_idx = node.selected_idx if node.selection_made else None

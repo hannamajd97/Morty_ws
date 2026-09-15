@@ -9,7 +9,16 @@ selected object into ranked grasp candidates for the executor.
 1. **Detection** — YOLO on every colour frame (`yolo_detector.py`), detections
    published on `/yolo/all_detections` with a base-frame distance and a
    reach verdict per object (`perception/reach_envelope.py`: green, `edge N%`,
-   `too far`).
+   `too far`). The gripper's own fingers, always in the wrist camera's view,
+   are removed first by the robot self-filter (`perception/self_filter.py`,
+   2026-09-15): the collision hulls of the gripper links from the running
+   robot's URDF are projected through TF into the image (about 1 ms, cached
+   while the fingers do not move), detections mostly inside that projection
+   are dropped (`[self-filter] dropped ...` in the log; before it, a finger
+   was a `small_bottle` at 0.88), and the same pixels are zeroed in every
+   depth frame the node stores, so a finger never enters an object cloud or
+   a neighbour box. The overlay draws the projection as a thin red outline.
+   `self_filter_enabled:=false` restores the raw data everywhere.
 2. **Selection** — finger pointing with MediaPipe (`point_selector.py`,
    3D ray from the index finger through the depth image, dwell to commit),
    a click in the debug window, or a voice/LLM choice on `/yolo/select_index`
@@ -90,7 +99,7 @@ the ones that matter day to day:
 | `grasping/pick_pipeline.py` | one pick cycle from selection to published candidates (`_compute` = perception phases, `_publish` = candidates and viewer poses) |
 | `grasping/precompute.py` | the precompute worker: object tracks, validity checks, replay |
 | `grasping/filter_pipeline.py`, `grasp_filters.py`, `grasping/orientation.py`, `grasping/grasp_scorer.py` | the filter chain and scoring |
-| `perception/` | cloud extraction, neighbour obstacles, reach envelope |
+| `perception/` | cloud extraction, neighbour obstacles, reach envelope, robot self-filter |
 | `point_selector.py`, `selection/params.py` | pointing/voice selection and all parameter declarations |
 | `debug/debug_renderer.py`, `debug_image_publisher.py` | the overlay |
 | `tf_listener_lite.py` | raw `/tf` drained at 50 Hz on its own thread; the stock tf2 listener at 830 Hz starved the whole process |
