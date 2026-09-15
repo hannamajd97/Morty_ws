@@ -162,6 +162,7 @@ class MortyGuiBridge(Node):
             QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE))
         # Executor pause states ("paused" = holding, waiting for a drop side).
         self._exec_interactive_pending = ""
+        self.exec_interactive_state = ""
         self.create_subscription(
             String, "/grasp_executor_lin_llm/interactive_status", self._on_exec_interactive, 10)
         self.create_subscription(PointCloud2, "/graspgen/final_cloud", self._on_cloud, 2)
@@ -539,6 +540,11 @@ class MortyGuiBridge(Node):
     def _on_exec_interactive(self, msg: String) -> None:
         with self._lock:
             self._exec_interactive_pending = str(msg.data)
+            self.exec_interactive_state = str(msg.data)
+
+    def executor_waiting_with_object(self) -> bool:
+        """True while the executor holds an object and waits for a drop side."""
+        return self.exec_interactive_state == "paused"
 
     def _on_cloud(self, msg: PointCloud2) -> None:
         pts, cols = _cloud_to_numpy(msg)
@@ -1148,11 +1154,20 @@ class MortyGuiBridge(Node):
         job). After this the pipeline returns to "Waiting for selection"
         as if no detection had been chosen yet.
         """
-        self.publish_llm_abort()
-        # ALSO stop the arm (2026-08-25, Majd: "he can't reset the pick"
-        # — the reset felt dead while a trajectory was executing, because
-        # the abort only takes effect at the next phase boundary).
-        self.stop_motion()
+        if self.executor_waiting_with_object():
+            # Holding an object and waiting for Left / Right (2026-09-15):
+            # "abort" would freeze the arm in the air (the voice rule for
+            # "stop"); reset means go home with the object and be ready.
+            # Nothing is moving, so no motion stop is sent.
+            self.publish_resume("reset_home")
+            self.exec_interactive_state = ""
+            self.llm_cycle_active = False
+        else:
+            self.publish_llm_abort()
+            # ALSO stop the arm (2026-08-25, Majd: "he can't reset the pick"
+            # — the reset felt dead while a trajectory was executing, because
+            # the abort only takes effect at the next phase boundary).
+            self.stop_motion()
         try:
             self.set_pipeline_params({"auto_select_label": ""})
         except Exception as exc:

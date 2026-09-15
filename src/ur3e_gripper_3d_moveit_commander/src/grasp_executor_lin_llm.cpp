@@ -1556,6 +1556,24 @@ public:
         slip_monitor_armed_.store(false);
         return false;
       }
+      // The GUI's Reset pick while the robot holds and waits (Majd
+      // 2026-09-15: "reset pick doesn't work" — it froze in the air):
+      // reset means "go home with the object, be ready again", not
+      // "freeze". Distinct from stop/abort so the voice rule stays.
+      if (dest_lc == "reset_home" || dest_lc == "reset") {
+        RCLCPP_WARN(node_->get_logger(),
+          "Interactive drop: operator RESET — returning home with the "
+          "object, gripper as-is; the cycle ends here.");
+        last_failure_reason_ = "reset by the operator";
+        slip_monitor_armed_.store(false);
+        try {
+          std_msgs::msg::String s_evt;
+          s_evt.data = "reset_home";
+          interactive_status_pub_->publish(s_evt);
+        } catch (...) {}
+        recover_to_reset_target("Operator reset while holding");
+        return false;
+      }
       if (dest_lc == "stop" || dest_lc == "cancel") {
         RCLCPP_INFO(node_->get_logger(),
           "Interactive drop: keep-holding stop received. Leaving gripper "

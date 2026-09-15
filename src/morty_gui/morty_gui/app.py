@@ -1623,10 +1623,18 @@ class OperatorWindow(QtWidgets.QMainWindow):
         """Soft reset of the current pick/detection cycle (Majd,
         2026-08-25). Everything stays running; only the cycle state is
         wiped so detection starts over."""
+        holding = self.bridge.executor_waiting_with_object()
         self.bridge.reset_cycle()
+        self._exec_holding = False
         self._manual_execution_pending = False
         self._manual_execution_released = False
         self._grasp_ready = False
+        if holding:
+            self.statusBar().showMessage("Reset: the robot returns home with the object; open the gripper when you want.")
+            if not self._software_stop_latched:
+                self.exec_btn.setEnabled(True)
+                self.exec_btn.setText("▶ EXECUTE")
+            return
         if not self._software_stop_latched:
             self.exec_btn.setEnabled(True)
             self.exec_btn.setText("▶ EXECUTE")
@@ -2684,7 +2692,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self._exec_holding = False
                 side = st.split(":", 1)[1].replace("drop_", "").replace("_side", "")
                 self.statusBar().showMessage(f"Going home, then dropping {side}.")
-            elif st in ("no_grasp", "awaiting_release"):
+            elif st in ("no_grasp", "awaiting_release", "reset_home", "stopped_holding"):
                 self._exec_holding = False
         if upd.get("executor_done"):
             self._exec_holding = False
