@@ -120,7 +120,15 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("cx", 320.0)
     node.declare_parameter("cy", 240.0)
     node.declare_parameter("depth_scale", 1000.0)
-    node.declare_parameter("graspgen_matrix_normalized", True)
+    # False since 2026-09-15: the service returns METRES (its grasp_server
+    # adds the cloud centre back); "normalised" treatment multiplied them by
+    # the object's half-size and put every grasp 2-4 cm from the AABB
+    # centre, differently for every object position. The origin is then
+    # carried from GraspGen's gripper-base frame to the fingertips
+    # (Franka Panda hand: 0.1034 m along the approach), see
+    # geometry_utils._shift_grasp_origins. True restores the old behaviour.
+    node.declare_parameter("graspgen_matrix_normalized", False)
+    node.declare_parameter("graspgen_origin_to_fingertip_m", 0.1034)
     node.declare_parameter("graspgen_column_major", False)
     node.declare_parameter("grasp2tcp_rot", "flipY")
     node.declare_parameter("prefer_side_grasps", False)

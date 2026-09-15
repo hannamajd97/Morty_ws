@@ -94,6 +94,28 @@ def _denorm_T_from_unit_cube(
     return T
 
 
+def _shift_grasp_origins(grasps, dist_m: float, column_major: bool) -> None:
+    """Move every grasp origin ``dist_m`` along its own approach axis (+z),
+    in place.
+
+    GraspGen's checkpoints describe a grasp in the gripper-BASE frame of
+    the gripper they were trained for; for the Franka Panda hand the
+    fingertip centre lies 0.1034 m ahead of that frame along +z. Measured
+    on the service (2026-09-15, synthetic tube): grasp origins sit 8.8-14.8
+    cm from the object, median 10.5 cm. The executor moves ``gripper_tcp``
+    (the printed gripper's fingertip centre) to the pose, so the origin
+    has to be carried to the fingertips once, here, before any filter or
+    consumer looks at it.
+    """
+    if not dist_m:
+        return
+    for g in grasps:
+        m = np.asarray(g.get("matrix"), dtype=np.float64).reshape(4, 4)
+        T = m.T.copy() if column_major else m.copy()
+        T[:3, 3] += float(dist_m) * T[:3, 2]
+        g["matrix"] = (T.T if column_major else T).reshape(-1).tolist()
+
+
 def _inside_aabb(
     p: np.ndarray, aabb_min: np.ndarray, aabb_max: np.ndarray, margin: float = 1e-3
 ) -> bool:

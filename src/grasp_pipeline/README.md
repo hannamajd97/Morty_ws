@@ -62,6 +62,17 @@ selected object into ranked grasp candidates for the executor.
    `grasp_client.py`). One inference is 0.10 s there against 0.3–0.9 s
    inside this node, whose YOLO, hand tracker and camera callbacks compete
    for the interpreter lock. `GRASPGEN_MODE=inprocess` restores the old path.
+   The service returns grasp poses in metres, in the cloud's frame, with
+   the origin in GraspGen's gripper-base frame; the pipeline carries every
+   origin 0.1034 m along its approach axis to the fingertips
+   (`graspgen_origin_to_fingertip_m`, the Franka Panda hand) before any
+   filter sees it, and the executor moves `gripper_tcp` there. Until
+   2026-09-15 `graspgen_matrix_normalized` was true and those metres were
+   multiplied by the object's half-size: every executed grasp sat 2–4 cm
+   from the object's centre, with an error that depended on where the
+   object was in the camera frame (measured on the service with a
+   synthetic tube: origins 8.8–14.8 cm from the object, squashed to
+   2.4–3.9 cm). `graspgen_matrix_normalized:=true` restores that.
    With `graspgen_precompute:=true` (off by default; `MORTY_GRASP_PRECOMPUTE=true`
    for a GUI-started pipeline) a worker runs steps 3–5 for every detection
    that has been stable for 0.2 s while nobody has selected

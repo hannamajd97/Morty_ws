@@ -44,6 +44,7 @@ from ..geometry_utils import (
     _make_T_grasp_to_tcp,
     _make_T_offset,
     _publish_marker,
+    _shift_grasp_origins,
 )
 from ..grasp_client import send_points_to_graspgen
 from ..grasp_filters import (
@@ -320,6 +321,20 @@ class PickPipeline:
                 grasps = list(grasps_obj)
             except Exception:
                 grasps = []
+        # The service returns METRES in the cloud's frame (grasp_server.py adds
+        # the cloud centre back). With graspgen_matrix_normalized false they
+        # are used as such; the origin is carried from GraspGen's gripper-base
+        # frame to the fingertips right here, so every filter, the viewer,
+        # the pre-check and the executor see fingertip-centred poses. (With
+        # the flag true, the metric values were multiplied by the object's
+        # half-size and every grasp collapsed to 2-4 cm from the AABB centre
+        # — the 2026-09-11 finding, measured on the service 2026-09-15.)
+        if not bool(self._node.get_parameter("graspgen_matrix_normalized").value):
+            _shift_grasp_origins(
+                grasps,
+                float(self._node.get_parameter("graspgen_origin_to_fingertip_m").value),
+                bool(self._node.get_parameter("graspgen_column_major").value),
+            )
         raw_grasps = list(grasps)
         if not grasps:
             self._node.get_logger().warn("GraspGen returned no grasps.")
@@ -974,7 +989,7 @@ class PickPipeline:
         else:
             T = M.T if col_major else M
         t = T[:3, 3].copy()
-        if not _inside_aabb(t, aabb_min, aabb_max, margin=5e-3):
+        if not _inside_aabb(t, aabb_min, aabb_max, margin=0.02):
             self._node.get_logger().warn(
                 f"[guard] t={t.round(3)} outside AABB "
                 f"x{aabb_min[0]:.3f}..{aabb_max[0]:.3f} "
