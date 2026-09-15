@@ -210,6 +210,47 @@ class OperatorWindow(QtWidgets.QMainWindow):
                    self.vf_max_utt, self.vf_min_chars):
             _w.valueChanged.connect(self._mark_vf_stale)
         self.adv_tabs.addTab(voice_tab, "Voice filters")
+        # Detection tab (Majd 2026-09-15: "a button if I would like to apply
+        # the unknown-object thing or not; if not, use the trained YOLO as
+        # always"). Two switches, remembered between sessions, applied
+        # live to a running pipeline and used at the next pipeline start.
+        # Off = the trained YOLO alone, the naming service is not even
+        # loaded (it takes ~5 GB of the 8 GB card).
+        det_tab = QtWidgets.QWidget()
+        df = QtWidgets.QVBoxLayout(det_tab)
+        _qs = QtCore.QSettings("morty", "morty_gui")
+        self.cb_open_set = QtWidgets.QCheckBox(
+            "Detect unknown objects  (YOLOE draws the boxes, Qwen3-VL-8B names them)")
+        self.cb_open_set.setChecked(_qs.value("open_set_enabled", True, type=bool))
+        self.cb_open_set.setToolTip(
+            "On: every object on the table gets a box and a name; the trained YOLO keeps its own "
+            "ten (ys in the overlay), the rest are named by the model (q8b). The naming service "
+            "is started with the pipeline and holds ~5 GB of the graphics card. "
+            "Off: the trained YOLO alone, exactly the system as before, nothing else loaded.")
+        self.cb_open_set.toggled.connect(self._on_open_set_toggle)
+        df.addWidget(self.cb_open_set)
+        self.cb_identity = QtWidgets.QCheckBox(
+            "Check the trained YOLO's names against the reference photos  (DINOv2, 10 ms)")
+        self.cb_identity.setChecked(_qs.value("identity_check_enabled", True, type=bool))
+        self.cb_identity.setToolTip(
+            "A detection that does not look like its class (the carton called wooden_maze_puzzle 0.87) "
+            "is renamed to the known object it does look like, or handed to the unknown-object path. "
+            "References: grasp_pipeline/models/identity_refs (74-80 photos per object).")
+        self.cb_identity.toggled.connect(self._on_identity_toggle)
+        df.addWidget(self.cb_identity)
+        det_note = QtWidgets.QLabel(
+            "Both switches act at once on a running pipeline and are used when the pipeline "
+            "next starts. Turning unknown-object detection off also stops the naming service "
+            "and frees its memory on the graphics card.")
+        det_note.setWordWrap(True)
+        det_note.setStyleSheet("color:#888; font-size:10px;")
+        df.addWidget(det_note)
+        self.det_status = QtWidgets.QLabel("")
+        self.det_status.setWordWrap(True)
+        self.det_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        df.addWidget(self.det_status)
+        df.addStretch(1)
+        self.adv_tabs.addTab(det_tab, "Detection")
         self.adv_win.setCentralWidget(self.adv_tabs)
         self.adv_win.resize(980, 800)
         self.adv_action = QtWidgets.QAction("Advanced ▸", self)
@@ -1491,6 +1532,54 @@ class OperatorWindow(QtWidgets.QMainWindow):
         lay.addWidget(buttons)
         dlg.exec_()
 
+    # ── Detection tab ─────────────────────────────────────────────────
+    def _on_open_set_toggle(self, on: bool) -> None:
+        QtCore.QSettings("morty", "morty_gui").setValue("open_set_enabled", bool(on))
+        if self._pipeline.running():
+            self.bridge.set_pipeline_params({"open_set_enabled": bool(on)})
+            if on:
+                self._start_naming_service()
+            elif self._naming.running():
+                self._naming.stop()
+        self.statusBar().showMessage(
+            "Unknown-object detection ON: boxes from YOLOE, names from the model (q8b)."
+            if on else "Unknown-object detection OFF: the trained YOLO alone, as before.")
+
+    def _on_identity_toggle(self, on: bool) -> None:
+        QtCore.QSettings("morty", "morty_gui").setValue("identity_check_enabled", bool(on))
+        if self._pipeline.running():
+            self.bridge.set_pipeline_params({"identity_check_enabled": bool(on)})
+        self.statusBar().showMessage(
+            "Name check ON: YOLO's names are compared with the reference photos."
+            if on else "Name check OFF: YOLO's names are taken as they are.")
+
+    def _start_naming_service(self) -> None:
+        """Qwen3-VL-8B behind llama-server, adopted if a previous session
+        left one running; loads in ~5 s, the pipeline retries until then."""
+        if self._naming.running():
+            return
+        pid = self._pgrep_oldest(NAMING_PGREP)
+        if pid is not None:
+            self._naming.adopt(pid)
+        elif os.path.exists(NAMING_SERVICE_CMD[0]):
+            self._naming.start(list(NAMING_SERVICE_CMD), env=os.environ.copy(), log_path=NAMING_LOG)
+        else:
+            self.statusBar().showMessage(f"naming service not started: {NAMING_SERVICE_CMD[0]} missing")
+
+    def _refresh_detection_status(self) -> None:
+        if not hasattr(self, "det_status"):
+            return
+        naming = "running" if self._naming.running() else "stopped"
+        try:
+            used = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total",
+                                   "--format=csv,noheader,nounits"],
+                                  capture_output=True, text=True, timeout=2).stdout.strip()
+            u, t = [int(v) for v in used.split(",")]
+            gpu = f"graphics card memory {u} of {t} MB" + ("  ⚠ nearly full" if t - u < 600 else "")
+        except Exception:
+            gpu = "graphics card memory: n/a"
+        self.det_status.setText(f"naming service: {naming}   ·   {gpu}")
+
     def _on_drop_side(self, token: str, label: str) -> None:
         if self._software_stop_latched:
             self.statusBar().showMessage("Software stop is latched — re-arm before sending a drop side.")
@@ -1715,6 +1804,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         cmd = list(PIPELINE_CMD)
         if self.cb_multiview.isChecked():
             cmd.append("registration_enabled:=true")
+        cmd.append(f"open_set_enabled:={'true' if self.cb_open_set.isChecked() else 'false'}")
+        cmd.append(f"identity_check_enabled:={'true' if self.cb_identity.isChecked() else 'false'}")
         # GraspGen service first (it preloads the model in ~6 s; ZMQ queues
         # the pipeline's first request until the service is bound).
         if not self._graspgen.running():
@@ -1724,16 +1815,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
             else:
                 self._graspgen.start(list(GRASPGEN_SERVICE_CMD), env=os.environ.copy(),
                                      log_path=GRASPGEN_LOG)
-        # Naming service for unknown objects (2026-09-15): loads in ~5 s,
-        # the pipeline retries a name until it answers.
-        if not self._naming.running() and os.environ.get("MORTY_OPEN_SET", "true").lower() != "false":
-            pid = self._pgrep_oldest(NAMING_PGREP)
-            if pid is not None:
-                self._naming.adopt(pid)
-            elif os.path.exists(NAMING_SERVICE_CMD[0]):
-                self._naming.start(list(NAMING_SERVICE_CMD), env=os.environ.copy(), log_path=NAMING_LOG)
-            else:
-                self.statusBar().showMessage(f"naming service not started: {NAMING_SERVICE_CMD[0]} missing")
+        # Naming service for unknown objects (2026-09-15), only when the
+        # Detection tab asks for it: it holds ~5 GB of the card.
+        if self.cb_open_set.isChecked():
+            self._start_naming_service()
         pipeline_env = os.environ.copy()
         pipeline_env.update(PIPELINE_ENV_EXTRA)
         # Timestamped log for post-trial timing analysis (Majd, 2026-08-12:
@@ -2364,6 +2449,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._refresh_start_all_btn()
         if self._poll_count % 50 == 0:
             self._tune_priorities()
+            self._refresh_detection_status()
         # One-shot: apply the Advanced hold times as soon as the adapter
         # exists, so VOICE picks (which never press EXECUTE) also grip
         # with what the GUI shows instead of the adapter's launch

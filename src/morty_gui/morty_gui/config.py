@@ -270,6 +270,10 @@ NAMING_SERVICE_CMD = [
     # 6 tokens; the defaults (4 slots x 2048) cost 240 MB more on a card
     # that has 550 MB spare with everything running (7.6 of 8.2 GB).
     "--port", "8090", "-ngl", "99", "-c", "1024", "-np", "1", "-ub", "256", "-b", "512", "-fa", "on",
+    # Vision encoder on the CPU (measured 2026-09-15): 4.8 GB on the card
+    # instead of 5.9, same names, 0.37 s instead of 0.22 s per object. The
+    # evening the full stack hit 8.88 MiB free and froze the desktop.
+    "--no-mmproj-offload",
 ]
 NAMING_LOG = os.path.expanduser("~/morty_ws/logs/naming_gui.log")
 NAMING_PGREP = r"llama-server.*qwen3-vl-8b-q4_k_[m]"
@@ -376,8 +380,6 @@ MOVE_CMD_BASE = [
 # The Filter-parameters tab shows two titled sections (Majd, 2026-08-11):
 # grasp filters on top, perception/capture knobs below.
 PERCEPTION_PARAMS = [
-    "open_set_enabled",
-    "identity_check_enabled",
     "max_graspgen_points",
     "graspgen_num_grasps",
     "graspgen_topk_num_grasps",
