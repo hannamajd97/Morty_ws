@@ -41,6 +41,8 @@ class IdentityCheck:
         self._device = "cpu"
         self._refs: Dict[str, np.ndarray] = {}
         self._tried = False
+        self._next_try = 0.0
+        self._warned_empty = False
         self._rejected_total = 0
         self._last_log = 0.0
 
@@ -63,15 +65,23 @@ class IdentityCheck:
 
     # ---- loading ----------------------------------------------------------------
     def _load(self) -> bool:
-        if self._tried:
-            return bool(self._refs)
+        if self._refs:
+            return True
+        # No references yet: look again every 30 s, so a folder built while
+        # the pipeline runs (tools/enroll_identity_refs.py) is picked up.
+        now = time.monotonic()
+        if self._tried and now - self._next_try < 0.0:
+            return False
         self._tried = True
+        self._next_try = now + 30.0
         log = self._node.get_logger()
         ref_dir = self._ref_dir()
         classes = sorted(d for d in glob.glob(os.path.join(ref_dir, "*")) if os.path.isdir(d))
         if not classes:
-            log.info(f"[identity] no references in {ref_dir}; YOLO names are not checked "
-                     "(build them with tools/build_identity_refs.py)")
+            if not self._warned_empty:
+                self._warned_empty = True
+                log.info(f"[identity] no references in {ref_dir}; YOLO names are not checked "
+                         "(build them with tools/enroll_identity_refs.py or build_identity_refs.py)")
             return False
         try:
             import torch
@@ -136,19 +146,28 @@ class IdentityCheck:
             return dets, []
         rejected_idx = set()
         rejected: List[Dict[str, Any]] = []
+        notes: List[str] = []
         for (i, d), e in zip(todo, emb):
-            sim = float((self._refs[str(d["label"])] @ e).max())
+            sims = {k: float((v @ e).max()) for k, v in self._refs.items()}
+            sim = sims[str(d["label"])]
             d["identity_sim"] = round(sim, 2)
-            if sim < thr:
-                rejected_idx.add(i)
-                rejected.append(d)
-        if rejected:
+            if sim >= thr:
+                continue
+            best = max(sims, key=sims.get)
+            if best != d["label"] and sims[best] >= thr:
+                # A known object under the wrong name (the B12 tube as
+                # "tape_dispenser", 0.40, while 0.80 like vitamin_c): rename.
+                notes.append(f"{d['label']} {float(d.get('score', 0)):.2f} is {best} ({sims[best]:.2f})")
+                d["label"] = best
+                d["identity_sim"] = round(sims[best], 2)
+                continue
+            rejected_idx.add(i)
+            rejected.append(d)
+            notes.append(f"{d['label']} {float(d.get('score', 0)):.2f} rejected (looks {sim:.2f} like it)")
+        if notes:
             self._rejected_total += len(rejected)
             now = time.monotonic()
             if now - self._last_log > 5.0:
                 self._last_log = now
-                self._node.get_logger().info(
-                    "[identity] rejected " + "; ".join(
-                        f"{d['label']} {float(d.get('score', 0)):.2f} (looks {d['identity_sim']:.2f} like it)" for d in rejected)
-                    + f"  (total {self._rejected_total})")
+                self._node.get_logger().info("[identity] " + "; ".join(notes) + f"  (rejected so far {self._rejected_total})")
         return [d for i, d in enumerate(dets) if i not in rejected_idx], rejected

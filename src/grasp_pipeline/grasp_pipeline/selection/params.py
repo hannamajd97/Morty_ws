@@ -354,7 +354,9 @@ def declare_all_parameters(node: "Node") -> None:
     # the open-set path. Inactive until models/identity_refs exists.
     node.declare_parameter("identity_check_enabled", True)
     node.declare_parameter("identity_ref_dir", "")
-    node.declare_parameter("identity_threshold", 0.5)
+    # 0.6 sits in the measured gap (2026-09-15, references from the stick's
+    # captures): correct detections 0.76-0.88, wrong ones 0.35-0.52.
+    node.declare_parameter("identity_threshold", 0.6)
     node.declare_parameter("min_depth_m", 0.0)
     node.declare_parameter("max_depth_m", 0.6)
     node.declare_parameter("apply_depth_clamp", True)

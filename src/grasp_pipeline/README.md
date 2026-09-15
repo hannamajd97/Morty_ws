@@ -33,8 +33,16 @@ selected object into ranked grasp candidates for the executor.
    name can also be checked against reference crops of its class with
    DINOv2 (`perception/identity_check.py`, 10 ms; measured gap on this
    table: correct detections 0.68–0.85, wrong ones and unknown objects
-   0.23–0.49); it is inactive until `models/identity_refs` exists (build it
-   from the training set with `tools/build_identity_refs.py`). Both are on
+   0.23–0.49). The references in `grasp_pipeline/models/identity_refs/`
+   (74–80 crops per object, built from the stick's `dataset_capture`
+   rounds with `tools/enroll_identity_refs.py`, which lets the trained YOLO
+   mark its own objects and DINOv2 drop the crops that disagree with their
+   class; `tools/build_identity_refs.py` does the same from a labelled set)
+   give correct detections 0.76–0.88 and wrong ones 0.35–0.52, threshold
+   0.6. A wrong name that matches another known object strongly is renamed
+   (the B12 tube called `tape_dispenser` becomes `vitamin_c`); otherwise
+   the box goes to the open-set path. Without references the check is
+   inactive and looks again every 30 s. Both are on
    by default (`open_set_enabled`, `identity_check_enabled`; also in the
    GUI's Advanced ▸ Filters list; `MORTY_OPEN_SET=false` turns them off at
    launch). With them off the detection thread is exactly as before.

@@ -86,4 +86,3 @@ src/rosgraph2.png
 # the pipeline on first start) stay out of the repository.
 models/vlm/*.gguf
 src/grasp_pipeline/grasp_pipeline/models/yoloe-*.pt
-src/grasp_pipeline/grasp_pipeline/models/identity_refs/
