@@ -28,6 +28,26 @@ _GLYPH_PTS = np.array(
 )
 _GLYPH_SEGS = np.array([[0, 1], [2, 3], [2, 4], [3, 5]], dtype=np.int64)
 
+# The executed pick (orange) drawn TRUE TO THE PRINTED GRIPPER (2026-09-16,
+# Majd: "how will the gripper behave?"): the pose's origin is the TCP, i.e.
+# where the fingertips close, so the closing line sits at the origin
+# (85 mm wide, the printed gripper's opening), the two fingers run 80 mm
+# BACK to the palm along -z, and a short wrist stub continues to the base.
+# The stylised glyph above points its fingers +z beyond the origin, which
+# suggested the fingers reach 9 cm further than they do.
+_EXEC_GLYPH_PTS = np.array(
+    [
+        [-0.0425, 0.0, 0.0],      # 0 left fingertip
+        [0.0425, 0.0, 0.0],       # 1 right fingertip
+        [-0.0425, 0.0, -0.08],    # 2 left finger root (palm)
+        [0.0425, 0.0, -0.08],     # 3 right finger root
+        [0.0, 0.0, -0.08],        # 4 palm centre
+        [0.0, 0.0, -0.12],        # 5 gripper base
+    ],
+    dtype=np.float64,
+)
+_EXEC_GLYPH_SEGS = np.array([[0, 1], [0, 2], [1, 3], [2, 3], [4, 5]], dtype=np.int64)
+
 COLORS = {
     "kept": (0.10, 0.80, 0.20, 1.0),
     "rejected": (0.85, 0.15, 0.15, 0.6),
@@ -35,7 +55,7 @@ COLORS = {
     "exec": (1.00, 0.55, 0.05, 1.0),
 }
 FLIP_Z = {"kept": True, "rejected": True, "best": True, "exec": False}
-SCALE = {"kept": 1.0, "rejected": 1.0, "best": 1.4, "exec": 2.0}
+SCALE = {"kept": 1.0, "rejected": 1.0, "best": 1.4, "exec": 1.0}   # exec: real size
 
 
 # ── Display-only frame correction ────────────────────────────────────
@@ -112,11 +132,12 @@ def _quat_to_R(x: float, y: float, z: float, w: float) -> np.ndarray:
     )
 
 
-def _poses_to_segments(poses: List, flip_z: bool, scale: float) -> Optional[np.ndarray]:
-    """One glyph per pose, flattened to a (M*8, 3) 'lines'-mode vertex array."""
+def _poses_to_segments(poses: List, flip_z: bool, scale: float, kind: str = "kept") -> Optional[np.ndarray]:
+    """One glyph per pose, flattened to a 'lines'-mode vertex array."""
     if not poses:
         return None
-    glyph = _GLYPH_PTS * scale
+    base_pts, segs = (_EXEC_GLYPH_PTS, _EXEC_GLYPH_SEGS) if kind == "exec" else (_GLYPH_PTS, _GLYPH_SEGS)
+    glyph = base_pts * scale
     if flip_z:
         glyph = glyph * np.array([-1.0, 1.0, -1.0])
     out = []
@@ -124,7 +145,7 @@ def _poses_to_segments(poses: List, flip_z: bool, scale: float) -> Optional[np.n
         R = _quat_to_R(p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w)
         t = np.array([p.position.x, p.position.y, p.position.z])
         pts = glyph @ R.T + t
-        out.append(pts[_GLYPH_SEGS.reshape(-1)])
+        out.append(pts[segs.reshape(-1)])
     return np.vstack(out).astype(np.float32)
 
 
@@ -256,7 +277,7 @@ class CloudGLView(gl.GLViewWidget):
             self.update()
 
     def set_poses(self, kind: str, poses: List) -> None:
-        segs = _poses_to_segments(poses, FLIP_Z[kind], SCALE[kind])
+        segs = _poses_to_segments(poses, FLIP_Z[kind], SCALE[kind], kind)
         self._segs[kind] = segs
         item = self._lines[kind]
         if segs is None:
