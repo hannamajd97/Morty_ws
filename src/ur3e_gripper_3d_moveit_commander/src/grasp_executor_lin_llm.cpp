@@ -43,6 +43,8 @@
 #include <moveit_msgs/srv/get_motion_sequence.hpp>
 #include <moveit_msgs/msg/motion_sequence_request.hpp>
 #include <moveit/kinematic_constraints/utils.h>
+#include <moveit/robot_trajectory/robot_trajectory.h>
+#include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 // Pure comparison predicates for the probe-plan reuse cache. Kept in a
@@ -210,6 +212,14 @@ public:
     // Needs move_group's MoveGroupSequenceService; without it the executor
     // falls back to "lin" (two separate lines).
     blend_radius_m_ = get_or_declare_param<double>(node_, "pregrasp_blend_radius_m", 0.02);
+    // "cartesian" (2026-09-16, Majd: "it must feel like one line, like a
+    // human hand"): the Cartesian path home -> pre-grasp -> grasp is
+    // computed as ONE path and time-parameterised once (time-optimal, within
+    // the joint limits), so there is no seam at the corner — the arm slows
+    // there only as much as its joints require. Corner rounding in joint
+    // space is bounded by cartesian_path_tolerance_rad.
+    cartesian_path_tolerance_rad_ = get_or_declare_param<double>(node_, "cartesian_path_tolerance_rad", 0.02);
+    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.005);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -1140,7 +1150,8 @@ public:
     }
     bool staged_lin_done = false;
     bool staged_lin_ok = false;
-    if (use_pregrasp_staging_ && staging_mode_ == "blend" && cached_lin_plan_valid_ && !cached_final_plan_valid_) {
+    if (use_pregrasp_staging_ && (staging_mode_ == "blend" || staging_mode_ == "cartesian") &&
+        cached_lin_plan_valid_ && !cached_final_plan_valid_) {
       // One blended trajectory (home -> pre-grasp corner -> grasp), from the
       // probe / background check, or planned now when nothing matches.
       moveit::planning_interface::MoveGroupInterface::Plan blended;
@@ -1148,8 +1159,10 @@ public:
       if (!try_reuse_cached_lin_plan(grasp_pose_world, blended, &reuse_reject)) {
         RCLCPP_INFO(node_->get_logger(), "Step 2 - blended two-line plan not reusable (%s); planning now.", reuse_reject.c_str());
         std::string why;
-        if (!plan_blended_two_lines(grasp_pose_world, &why)) {
-          RCLCPP_ERROR(node_->get_logger(), "Step 2 - blended planning failed: %s", why.c_str());
+        bool planned = (staging_mode_ == "cartesian") && plan_cartesian_two_lines(grasp_pose_world, &why);
+        if (!planned) { planned = plan_blended_two_lines(grasp_pose_world, &why); }
+        if (!planned) {
+          RCLCPP_ERROR(node_->get_logger(), "Step 2 - one-motion planning failed: %s", why.c_str());
           recover_to_reset_target("Step 2 (blended two lines) planning failed");
           return false;
         }
@@ -1174,7 +1187,7 @@ public:
           staged_lin_ok = true;
         }
       }
-    } else if (use_pregrasp_staging_ && (staging_mode_ == "lin" || staging_mode_ == "blend")) {
+    } else if (use_pregrasp_staging_ && (staging_mode_ == "lin" || staging_mode_ == "blend" || staging_mode_ == "cartesian")) {
       // Two straight lines: LIN to the pre-grasp (fingers apart on arrival),
       // then LIN the last stretch along the gripper's z. Both plans come from
       // the probe / background check when they match; otherwise planned now.
@@ -3047,6 +3060,53 @@ private:
     return 0.0;
   }
 
+  // ONE Cartesian path home -> pre-grasp -> grasp, one time profile over it
+  // (TOTG within the joint limits x the scaling). Cached under the grasp
+  // pose like a plain line. Retries at 1/2 and 1/4 scaling like the others.
+  bool plan_cartesian_two_lines(
+    const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason)
+  {
+    const auto pre_pose = compute_pregrasp_pose(target_pose, pregrasp_approach_distance_);
+    moveit::core::RobotState start_state(arm_group_.getRobotModel());
+    if (!robot_state_from_ear(start_state)) { start_state.setToDefaultValues(); }
+    arm_group_.setStartState(start_state);
+    arm_group_.setPoseReferenceFrame(target_pose.header.frame_id);
+    std::vector<geometry_msgs::msg::Pose> waypoints = {pre_pose.pose, target_pose.pose};
+    moveit_msgs::msg::RobotTrajectory path_msg;
+    const auto t0 = std::chrono::steady_clock::now();
+    const double fraction = arm_group_.computeCartesianPath(
+      waypoints, cartesian_eef_step_m_, 2.0 /* jump threshold, joint-space IK flips */, path_msg, true);
+    arm_group_.setStartStateToCurrentState();
+    if (fraction < 0.999) {
+      if (reason) {
+        *reason = "cartesian path covers only " + std::to_string(static_cast<int>(fraction * 100.0)) + " % (collision or IK)";
+      }
+      return false;
+    }
+    robot_trajectory::RobotTrajectory rt(arm_group_.getRobotModel(), arm_group_.getName());
+    rt.setRobotTrajectoryMsg(start_state, path_msg);
+    trajectory_processing::TimeOptimalTrajectoryGeneration totg(cartesian_path_tolerance_rad_, 0.01);
+    const double factors[3] = {1.0, 0.5, 0.25};
+    for (double f : factors) {
+      if (!totg.computeTimeStamps(rt, velocity_scaling_ * f, acceleration_scaling_ * f)) { continue; }
+      moveit::planning_interface::MoveGroupInterface::Plan plan;
+      rt.getRobotTrajectoryMsg(plan.trajectory_);
+      moveit::core::robotStateToRobotStateMsg(start_state, plan.start_state_);
+      const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+      plan.planning_time_ = wall;
+      cache_lin_plan(target_pose, plan, wall);
+      cached_final_plan_valid_ = false;
+      const auto & pts = plan.trajectory_.joint_trajectory.points;
+      const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
+      RCLCPP_INFO(node_->get_logger(),
+        "one-motion approach OK: %zu points, %.2f s, one time profile over home -> pre-grasp -> grasp, scaling x%.2f, planned in %.2f s.",
+        pts.size(), dur, f, wall);
+      return true;
+    }
+    if (reason) { *reason = "time parameterisation failed"; }
+    return false;
+  }
+
   // ONE blended trajectory for home -> pre-grasp -> grasp (Pilz sequence,
   // LIN + LIN, blend radius at the corner). Retries at 1/2 and 1/4 scaling
   // like the separate lines. On success the trajectory is cached under the
@@ -3817,9 +3877,16 @@ private:
     arm_group_.setNumPlanningAttempts(lin_feasibility_attempts_);
     if (use_pregrasp_staging_) {
       bool staged_ok = false;
-      if (staging_mode_ == "blend") {
+      if (staging_mode_ == "cartesian" || staging_mode_ == "blend") {
         std::string why;
-        staged_ok = plan_blended_two_lines(target_pose, &why);
+        staged_ok = false;
+        if (staging_mode_ == "cartesian") {
+          staged_ok = plan_cartesian_two_lines(target_pose, &why);
+          if (!staged_ok) {
+            RCLCPP_INFO(node_->get_logger(), "one-motion approach not planned (%s) — trying the blend.", why.c_str());
+          }
+        }
+        if (!staged_ok) { staged_ok = plan_blended_two_lines(target_pose, &why); }
         if (!staged_ok) {
           // Whatever the sequence planner disliked (service missing, timed
           // out, blend impossible here), the two separate lines decide the
@@ -5750,6 +5817,8 @@ private:
   bool use_pregrasp_staging_{true};
   std::string staging_mode_{"ptp"};
   double blend_radius_m_{0.02};
+  double cartesian_path_tolerance_rad_{0.02};
+  double cartesian_eef_step_m_{0.005};
   rclcpp::Client<moveit_msgs::srv::GetMotionSequence>::SharedPtr sequence_client_;
   moveit::planning_interface::MoveGroupInterface::Plan cached_final_plan_;   // pre-grasp -> grasp (staging_mode lin)
   bool cached_final_plan_valid_{false};
