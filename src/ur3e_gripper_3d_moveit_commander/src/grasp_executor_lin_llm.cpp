@@ -304,7 +304,10 @@ public:
     // 2026-09-16): open pulse + finger travel, plus a margin. A faster plan
     // is stretched to this duration, see stretch_plan_to_min_duration.
     gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.7);   // Majd 2026-09-16
-    open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.2);
+    // Margin 0.5 s (2026-09-16): the adapter starts the pulse ~0.25 s after
+    // the goal is sent (measured 741.43 -> 741.69), and the fingers need a
+    // little settle. So the arm arrives no earlier than 1.2 s after the send.
+    open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.5);
     gripper_adapter_node_name_ = get_or_declare_param<std::string>(
       node_, "gripper_adapter_node_name", "/gripper_controller/gripper_command_adapter");
     override_gripper_pulse_from_executor_ =
@@ -1180,7 +1183,7 @@ public:
     // (a stretched plan, a fallback plan, a cached one): wait out the rest.
     {
       const auto ready_at = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::duration<double>(gripper_open_time_s_));
+        std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_));
       while (rclcpp::ok() && std::chrono::steady_clock::now() < ready_at && !abort_requested_.load()) {
         rclcpp::spin_some(node_);
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -5434,7 +5437,7 @@ private:
   std::string gripper_action_name_;
   double gripper_action_timeout_s_;
   double gripper_open_time_s_{0.7};
-  double open_before_arrival_margin_s_{0.2};
+  double open_before_arrival_margin_s_{0.5};
   double min_exec_duration_s_{0.0};   // consumed by execute_arm_lin_pose for the approach
   std::chrono::steady_clock::time_point open_sent_t_{};
   std::string gripper_adapter_node_name_;
