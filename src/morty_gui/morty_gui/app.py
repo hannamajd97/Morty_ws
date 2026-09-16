@@ -3032,7 +3032,6 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self._camera_extra.stop()
                 self._replay_extra.stop()
                 self._named_pose_extra.stop()
-            self._named_pose_extra.stop()
                 # The escalation timers die with the GUI; SIGINT is usually
                 # enough, and a reopened GUI re-adopts any survivor.
         # Never leave an adopted executor latched in manual-wait mode after
