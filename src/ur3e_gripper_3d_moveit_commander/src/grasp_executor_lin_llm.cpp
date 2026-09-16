@@ -1283,7 +1283,7 @@ public:
       }
       min_exec_duration_s_ = 0.0;
     }
-    if (step2_ok && !approach_planned) {
+    if (step2_ok && !approach_planned && !staged_lin_done) {
       log_arrival_error(grasp_pose_world, "Step 2 - Grasp LIN");
     }
     if (!step2_ok) {
@@ -3065,18 +3065,23 @@ private:
     moveit_msgs::msg::RobotState start_msg;
     moveit::core::robotStateToRobotStateMsg(start_state, start_msg);
 
-    const double factors[3] = {1.0, 0.5, 0.25};
+    // Per-line factors (2026-09-16, Majd: "the first LIN is slow"): only the
+    // short last stretch needs the slow-down for the joint acceleration
+    // limits; the long line keeps its speed as long as it can.
+    const double pairs[5][2] = {{1.0, 1.0}, {1.0, 0.5}, {1.0, 0.25}, {0.5, 0.25}, {0.25, 0.25}};
     const auto t0 = std::chrono::steady_clock::now();
     std::string last_err;
-    for (double f : factors) {
+    for (const auto & pr : pairs) {
+      const double f = pr[1];
       auto req = std::make_shared<moveit_msgs::srv::GetMotionSequence::Request>();
       for (int k = 0; k < 2; ++k) {
+        const double fk = pr[k];
         moveit_msgs::msg::MotionSequenceItem item;
         item.req.group_name = arm_group_.getName();
         item.req.pipeline_id = "pilz_industrial_motion_planner";
         item.req.planner_id = "LIN";
-        item.req.max_velocity_scaling_factor = velocity_scaling_ * f;
-        item.req.max_acceleration_scaling_factor = acceleration_scaling_ * f;
+        item.req.max_velocity_scaling_factor = velocity_scaling_ * fk;
+        item.req.max_acceleration_scaling_factor = acceleration_scaling_ * fk;
         item.req.allowed_planning_time = std::max(2.0, lin_feasibility_planning_time_);
         if (k == 0) { item.req.start_state = start_msg; }
         item.req.goal_constraints.push_back(
@@ -3109,8 +3114,8 @@ private:
         const auto & pts = plan.trajectory_.joint_trajectory.points;
         const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
         RCLCPP_INFO(node_->get_logger(),
-          "blended two-line plan OK: %zu points, %.2f s of motion, blend %.0f mm, scaling x%.2f, planned in %.2f s.",
-          pts.size(), dur, blend_radius_m_ * 1000.0, f, wall);
+          "blended two-line plan OK: %zu points, %.2f s of motion, blend %.0f mm, scaling x%.2f / x%.2f (line / last stretch), planned in %.2f s.",
+          pts.size(), dur, blend_radius_m_ * 1000.0, pr[0], f, wall);
         return true;
       }
       last_err = "sequence planning failed: " + moveit::core::error_code_to_string(resp->response.error_code) +
