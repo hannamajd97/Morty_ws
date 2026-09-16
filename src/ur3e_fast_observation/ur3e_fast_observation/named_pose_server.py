@@ -361,6 +361,14 @@ class MoveToNamedPoseServer(Node):
 
         self._default_timeout = float(self.get_parameter("default_timeout_s").value)
         self._collision_check = bool(self.get_parameter("collision_check").value)
+        # Blended transport (lift -> home -> drop): the pipeline has already
+        # cleared the neighbour boxes and the arc runs between taught poses
+        # over free space, so a coarser sampling suffices. MoveIt answers
+        # the validity calls one by one (~0.15 s each under load): 22 checks
+        # were ~3 s of standing still after "Drop right" (2026-09-16).
+        self.declare_parameter("blend_collision_waypoints", 3)
+        self._blend_collision_waypoints = max(
+            2, int(self.get_parameter("blend_collision_waypoints").value))
         self._collision_waypoints = max(
             2, int(self.get_parameter("collision_waypoints").value)
         )
@@ -788,7 +796,7 @@ class MoveToNamedPoseServer(Node):
         there is a warn-and-continue, exactly as in the single-segment
         path (the robot is already standing in it — refusing cannot help).
         """
-        n = self._collision_waypoints
+        n = self._blend_collision_waypoints
         n_seg = len(nodes) - 1
         if n_seg < 1:
             return True, ""
@@ -1189,11 +1197,13 @@ class MoveToNamedPoseServer(Node):
         # Collision-check EVERY segment, all requests pipelined together.
         if self._collision_check:
             self._publish_phase(goal_handle, "checking_collision", 0.05)
+            t_chk = time.monotonic()
             clean, reason = self._path_collision_free_multi(nodes)
             if not clean:
                 return self._fail(goal_handle, f"refusing: {reason}")
             self.get_logger().info(
-                f"Collision pre-check passed for blended path {path_desc}."
+                f"Collision pre-check passed for blended path {path_desc} "
+                f"({n_seg * self._blend_collision_waypoints + 1} states in {time.monotonic() - t_chk:.2f} s)."
             )
 
         # One tier duration per segment — no new speeds are invented, the
