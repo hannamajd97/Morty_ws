@@ -79,6 +79,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # live apply is silent, so the operator had no way to check).
         self.motion_win.neigh_apply_btn.clicked.connect(
             self._apply_neighbour_obstacles)
+        self.motion_win.speed_apply_btn.clicked.connect(self._apply_pick_speeds)
         self.motion_win.grip_apply_btn.clicked.connect(
             self._apply_gripper_holds)
         self.exp_win = ExperimentsWindow(bridge)
@@ -227,7 +228,6 @@ class OperatorWindow(QtWidgets.QMainWindow):
             "ten (ys in the overlay), the rest are named by the model (q8b). The naming service "
             "is started with the pipeline and holds ~4 GB of the graphics card. "
             "Off: the trained YOLO alone, exactly the system as before, nothing else loaded.")
-        self.cb_open_set.toggled.connect(self._on_open_set_toggle)
         df.addWidget(self.cb_open_set)
         self.cb_identity = QtWidgets.QCheckBox(
             "Check the trained YOLO's names against the reference photos  (DINOv2, 10 ms)")
@@ -236,15 +236,24 @@ class OperatorWindow(QtWidgets.QMainWindow):
             "A detection that does not look like its class (the carton called wooden_maze_puzzle 0.87) "
             "is renamed to the known object it does look like, or handed to the unknown-object path. "
             "References: grasp_pipeline/models/identity_refs (74-80 photos per object).")
-        self.cb_identity.toggled.connect(self._on_identity_toggle)
         df.addWidget(self.cb_identity)
         det_note = QtWidgets.QLabel(
-            "Both switches act at once on a running pipeline and are used when the pipeline "
-            "next starts. Turning unknown-object detection off also stops the naming service "
-            "and frees its memory on the graphics card.")
+            "Apply sends both switches to the running pipeline and reads them back; they are "
+            "also used when the pipeline next starts. Turning unknown-object detection off "
+            "also stops the naming service and frees its memory on the graphics card.")
         det_note.setWordWrap(True)
         det_note.setStyleSheet("color:#888; font-size:10px;")
         df.addWidget(det_note)
+        self.det_apply_status = QtWidgets.QLabel("")
+        self.det_apply_status.setWordWrap(True)
+        self.det_apply_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        self.det_apply_btn = MotionWindow._small_apply_button(
+            "Send the two switches to the running pipeline, then read them back to verify."
+        )
+        self.det_apply_btn.clicked.connect(self._apply_detection)
+        df.addLayout(MotionWindow._apply_row(self.det_apply_btn, self.det_apply_status))
+        for _cb in (self.cb_open_set, self.cb_identity):
+            _cb.toggled.connect(lambda _on: self.det_apply_status.setText("changed — press Apply"))
         self.det_status = QtWidgets.QLabel("")
         self.det_status.setWordWrap(True)
         self.det_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
@@ -984,6 +993,35 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.statusBar().showMessage(
                 f"⚠ voice filters sent, but node reports {detail}")
 
+    def _executor_cmd(self) -> list:
+        """EXECUTOR_CMD with the Motion tab's pick speeds as launch overrides."""
+        want = self.motion_win.pick_speed_values()
+        cmd = [a for a in EXECUTOR_CMD if not any(a.startswith(f"{k}:=") for k in want)]
+        return cmd + self.motion_win.pick_speed_launch_args()
+
+    def _apply_pick_speeds(self) -> None:
+        """Apply button for "Pick speeds": set on the executor, read back."""
+        want = self.motion_win.pick_speed_values()
+        self.motion_win.save_pick_speeds()
+        if not self._executor.running() and not self.bridge.executor_alive():
+            self.motion_win.show_speed_apply("sent", "executor not running — saved for its next start")
+            return
+        if not self.bridge.set_executor_params(want):
+            self.motion_win.show_speed_apply("fail", "executor parameter service unreachable")
+            return
+        time.sleep(0.2)
+        got = self.bridge.get_executor_params(list(want))
+        if not got or any(got.get(k) is None for k in want):
+            self.motion_win.show_speed_apply("sent", "executor did not answer the read-back")
+            return
+        detail = (f"approach {float(got['velocity_scaling']):.2f}/{float(got['acceleration_scaling']):.2f}, "
+                  f"arc {float(got['blend_velocity_scaling']):.1f}, return {float(got['fast_replay_duration_s']):.1f} s, "
+                  f"open {float(got['gripper_open_time_s']):.1f}+{float(got['open_before_arrival_margin_s']):.1f} s")
+        if self._readback_matches(got, want):
+            self.motion_win.show_speed_apply("ok", detail)
+        else:
+            self.motion_win.show_speed_apply("mismatch", detail)
+
     def _apply_gripper_holds(self) -> None:
         """Apply button for "Gripper pulse holds": set, then READ BACK off
         /gripper_controller/gripper_command_adapter."""
@@ -1539,25 +1577,33 @@ class OperatorWindow(QtWidgets.QMainWindow):
         dlg.exec_()
 
     # ── Detection tab ─────────────────────────────────────────────────
-    def _on_open_set_toggle(self, on: bool) -> None:
-        QtCore.QSettings("morty", "morty_gui").setValue("open_set_enabled", bool(on))
-        if self._pipeline.running():
-            self.bridge.set_pipeline_params({"open_set_enabled": bool(on)})
-            if on:
-                self._start_naming_service()
-            elif self._naming.running():
-                self._naming.stop()
-        self.statusBar().showMessage(
-            "Unknown-object detection ON: boxes from YOLOE, names from the model (q8b)."
-            if on else "Unknown-object detection OFF: the trained YOLO alone, as before.")
-
-    def _on_identity_toggle(self, on: bool) -> None:
-        QtCore.QSettings("morty", "morty_gui").setValue("identity_check_enabled", bool(on))
-        if self._pipeline.running():
-            self.bridge.set_pipeline_params({"identity_check_enabled": bool(on)})
-        self.statusBar().showMessage(
-            "Name check ON: YOLO's names are compared with the reference photos."
-            if on else "Name check OFF: YOLO's names are taken as they are.")
+    def _apply_detection(self) -> None:
+        """Apply button of the Detection tab: save, push both switches onto
+        the running pipeline, read them back, start/stop the naming service."""
+        want = {"open_set_enabled": bool(self.cb_open_set.isChecked()),
+                "identity_check_enabled": bool(self.cb_identity.isChecked())}
+        qs = QtCore.QSettings("morty", "morty_gui")
+        for k, v in want.items():
+            qs.setValue(k, v)
+        if not self._pipeline.running():
+            self.det_apply_status.setText("saved — used when the pipeline next starts")
+            return
+        if not self.bridge.set_pipeline_params(want):
+            self.det_apply_status.setText("✗ NOT applied — pipeline parameter service unreachable")
+            return
+        if want["open_set_enabled"]:
+            self._start_naming_service()
+        elif self._naming.running():
+            self._naming.stop()
+        time.sleep(0.2)
+        got = self.bridge.get_pipeline_params(list(want))
+        if got and self._readback_matches(got, want):
+            self.det_apply_status.setText(
+                f"✓ applied {time.strftime('%H:%M:%S')} — unknown objects "
+                f"{'ON' if want['open_set_enabled'] else 'OFF'}, name check "
+                f"{'ON' if want['identity_check_enabled'] else 'OFF'}")
+        else:
+            self.det_apply_status.setText("✓ sent, but the pipeline's read-back did not match")
 
     def _start_naming_service(self) -> None:
         """Qwen3-VL-8B behind llama-server, adopted if a previous session
@@ -1864,7 +1910,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             cmd, env=pipeline_env, log_path=os.path.expanduser("~/morty_ws/logs/pipeline_gui.log")
         )
         if not self._executor.running():
-            exec_cmd = list(EXECUTOR_CMD)
+            exec_cmd = self._executor_cmd()
             if self.mode_combo.currentIndex() == 1:
                 exec_cmd.append("use_fake_hardware:=true")
             self._executor.start(
@@ -2592,7 +2638,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             # Same self-heal for the LLM grasp executor: a pipeline without
             # it selects grasps and then waits on cycle_done forever.
             if self._pipeline.running() and not self._executor.running():
-                exec_cmd = list(EXECUTOR_CMD)
+                exec_cmd = self._executor_cmd()
                 if self.mode_combo.currentIndex() == 1:
                     exec_cmd.append("use_fake_hardware:=true")
                 self._executor.start(

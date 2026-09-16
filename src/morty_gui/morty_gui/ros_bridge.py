@@ -456,6 +456,8 @@ class MortyGuiBridge(Node):
         self._exec_set_cli = self.create_client(
             SetParameters, "/grasp_executor_lin_llm/set_parameters"
         )
+        self._exec_get_cli = self.create_client(
+            GetParameters, "/grasp_executor_lin_llm/get_parameters")
         # Voice-filter parameters on the live STT node (Advanced ▸ "Voice
         # filters" Apply button, 2026-08-28). Same read+write pair as the
         # pipeline above — the node only exists while the voice stack runs,
@@ -1096,6 +1098,10 @@ class MortyGuiBridge(Node):
         values so the caller can show what the node actually holds.
         """
         return self._get_params_sync(self._pipe_get_cli, names, "Pipeline")
+
+    def get_executor_params(self, names: List[str]) -> Optional[Dict[str, Any]]:
+        """Synchronous read-back off the grasp executor (Apply button)."""
+        return self._get_params_sync(self._exec_get_cli, names, "Executor")
 
     def get_gripper_holds(self) -> Optional[Dict[str, Any]]:
         """Synchronous read-back of the adapter's pulse holds (Apply button)."""

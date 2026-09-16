@@ -166,6 +166,66 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.grip_close_spin.valueChanged.connect(self._mark_grip_stale)
         layout.addWidget(grip_box)
 
+        # Pick speeds on the grasp executor (Majd 2026-09-16: "add those to
+        # the Advanced motion config, with an Apply button"). Apply pushes
+        # them onto the running executor and reads them back; they are also
+        # passed as launch arguments when the executor next starts.
+        speed_box = QtWidgets.QGroupBox("Pick speeds (grasp executor)")
+        speed_form = self._compact_form(speed_box)
+        qs = QtCore.QSettings("morty", "morty_gui")
+        self.speed_vel_spin = QtWidgets.QDoubleSpinBox()
+        self.speed_vel_spin.setRange(0.10, 0.50); self.speed_vel_spin.setSingleStep(0.05)
+        self.speed_vel_spin.setValue(qs.value("pick_speed/velocity_scaling", 0.40, type=float))
+        self.speed_vel_spin.setToolTip("Home → grasp straight line: fraction of the arm's joint speed limits. 0.5 is the ceiling.")
+        speed_form.addRow("Approach speed:", self.speed_vel_spin)
+        self.speed_acc_spin = QtWidgets.QDoubleSpinBox()
+        self.speed_acc_spin.setRange(0.10, 0.50); self.speed_acc_spin.setSingleStep(0.05)
+        self.speed_acc_spin.setValue(qs.value("pick_speed/acceleration_scaling", 0.50, type=float))
+        self.speed_acc_spin.setToolTip("Home → grasp: fraction of the acceleration limits. Refusals 'joint would turn X rad per cm' come from here.")
+        speed_form.addRow("Approach accel.:", self.speed_acc_spin)
+        self.speed_transport_combo = QtWidgets.QComboBox()
+        self._transport_tiers = [("slow  0.2 — 8.0 s, ~30 % of joint limits", 0.2),
+                                 ("normal  0.3 — 5.4 s, 45 %", 0.3),
+                                 ("fast  0.4 — 4.0 s, 61 %", 0.4),
+                                 ("very fast  0.5 — 3.2 s, 76 % (ceiling)", 0.5)]
+        for label, _v in self._transport_tiers:
+            self.speed_transport_combo.addItem(label)
+        self._select_tier(self.speed_transport_combo, self._transport_tiers,
+                          qs.value("pick_speed/blend_velocity_scaling", 0.3, type=float))
+        self.speed_transport_combo.setToolTip("Lift → home → drop, one blended arc (blend_velocity_scaling). Above 0.5 the arm protective-stops.")
+        speed_form.addRow("Transport (arc):", self.speed_transport_combo)
+        self.speed_return_combo = QtWidgets.QComboBox()
+        self._return_tiers = [("slow — 4.0 s", 4.0), ("normal — 2.7 s", 2.7), ("fast — 2.0 s", 2.0), ("very fast — 1.6 s", 1.6)]
+        for label, _v in self._return_tiers:
+            self.speed_return_combo.addItem(label)
+        self._select_tier(self.speed_return_combo, self._return_tiers,
+                          qs.value("pick_speed/fast_replay_duration_s", 2.7, type=float))
+        self.speed_return_combo.setToolTip("Drop → home, and every other named-pose move of the executor (fast_replay_duration_s).")
+        speed_form.addRow("Return home:", self.speed_return_combo)
+        self.speed_open_spin = QtWidgets.QDoubleSpinBox()
+        self.speed_open_spin.setRange(0.3, 2.0); self.speed_open_spin.setSingleStep(0.1)
+        self.speed_open_spin.setValue(qs.value("pick_speed/gripper_open_time_s", 1.2, type=float))
+        self.speed_open_spin.setToolTip("Time the fingers need to be fully apart after the open pulse (measured 1.0–1.3 s).")
+        speed_form.addRow("Gripper open time (s):", self.speed_open_spin)
+        self.speed_margin_spin = QtWidgets.QDoubleSpinBox()
+        self.speed_margin_spin.setRange(0.0, 1.0); self.speed_margin_spin.setSingleStep(0.1)
+        self.speed_margin_spin.setValue(qs.value("pick_speed/open_before_arrival_margin_s", 0.5, type=float))
+        self.speed_margin_spin.setToolTip("Extra time before the arm may arrive: open time + margin. Covers the 0.25 s until the pulse really starts.")
+        speed_form.addRow("Open margin (s):", self.speed_margin_spin)
+        self.speed_status = QtWidgets.QLabel("")
+        self.speed_status.setWordWrap(True)
+        self.speed_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        self.speed_apply_btn = self._small_apply_button(
+            "Send these speeds to the running grasp executor, then read\n"
+            "them back to verify. They are also used when the executor next starts."
+        )
+        speed_form.addRow("", self._apply_row(self.speed_apply_btn, self.speed_status))
+        for _w in (self.speed_vel_spin, self.speed_acc_spin, self.speed_open_spin, self.speed_margin_spin):
+            _w.valueChanged.connect(self._mark_speed_stale)
+        for _c in (self.speed_transport_combo, self.speed_return_combo):
+            _c.currentIndexChanged.connect(self._mark_speed_stale)
+        layout.addWidget(speed_box)
+
         joints_box = QtWidgets.QGroupBox("Group joints of goal state (like RViz Joints tab)")
         joints_lay = QtWidgets.QVBoxLayout(joints_box)
         self._joint_spins: List[QtWidgets.QDoubleSpinBox] = []
@@ -273,6 +333,37 @@ class MotionWindow(QtWidgets.QMainWindow):
 
     def show_grip_apply(self, kind: str, detail: str) -> None:
         self._set_status(self.grip_status, *self._apply_status_text(kind, detail))
+
+    # ── pick speeds (2026-09-16) ─────────────────────────────────────
+    @staticmethod
+    def _select_tier(combo: QtWidgets.QComboBox, tiers, value: float) -> None:
+        best = min(range(len(tiers)), key=lambda i: abs(tiers[i][1] - float(value)))
+        combo.setCurrentIndex(best)
+
+    def _mark_speed_stale(self, *_a) -> None:
+        self._set_status(self.speed_status, self.STALE_TEXT, GREY)
+
+    def show_speed_apply(self, kind: str, detail: str) -> None:
+        self._set_status(self.speed_status, *self._apply_status_text(kind, detail))
+
+    def pick_speed_values(self) -> Dict[str, float]:
+        """The six executor parameters as the tab shows them."""
+        return {
+            "velocity_scaling": float(self.speed_vel_spin.value()),
+            "acceleration_scaling": float(self.speed_acc_spin.value()),
+            "blend_velocity_scaling": float(self._transport_tiers[self.speed_transport_combo.currentIndex()][1]),
+            "fast_replay_duration_s": float(self._return_tiers[self.speed_return_combo.currentIndex()][1]),
+            "gripper_open_time_s": float(self.speed_open_spin.value()),
+            "open_before_arrival_margin_s": float(self.speed_margin_spin.value()),
+        }
+
+    def pick_speed_launch_args(self) -> List[str]:
+        return [f"{k}:={v:.2f}" for k, v in self.pick_speed_values().items()]
+
+    def save_pick_speeds(self) -> None:
+        qs = QtCore.QSettings("morty", "morty_gui")
+        for k, v in self.pick_speed_values().items():
+            qs.setValue(f"pick_speed/{k}", float(v))
 
     def gui_state(self) -> Dict[str, object]:
         """The Motion tab's pure-GUI tunables (nothing on a node holds
