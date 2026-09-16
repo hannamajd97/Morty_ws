@@ -48,7 +48,7 @@ __all__ = [
     "PLANNER_LIBS",
     "PROFILE_HELP",
     "RED",
-    "REPLAY_CMD",
+    "REPLAY_CMD", "NAMED_POSE_SERVER_CMD",
     "ROBOT_IP",
     "SHUTTLE_IP",
     "RVIZ_STANDALONE",
@@ -82,7 +82,7 @@ VOICE_BASE = {
                        "--debug", "--voice-only"],
     "openai": ["bash", os.path.expanduser("~/morty_ws/morty.sh"), "--voice-only"],
 }
-VOICE_COMMON_ARGS = ["mic_visualizer:=false", "with_replay:=false"]
+VOICE_COMMON_ARGS = ["mic_visualizer:=false", "with_replay:=false", "with_named_pose_server:=false"]
 # Whisper large-v3-turbo (CT2 conversion, loadable by faster-whisper 1.0.1)
 # on the GPU: benchmarked 2026-08-12 on this box — 0.93 s per utterance,
 # word-perfect DE, ~1.5 GB VRAM next to YOLO's 0.9 GB. The old `base` model
@@ -352,6 +352,15 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 "wait_for_destination:=true",
                 "wait_for_release:=false"]
 
+# The named-pose action server rides with the driver too (2026-09-16): the
+# grasp executor moves home / to the drop through /move_to_named_pose with a
+# collision pre-check; without the server it fell back to the bare replay
+# topic, whose status came late — 8 s timeouts and a second trip to the
+# drop side. It used to exist only while the voice stack ran.
+NAMED_POSE_SERVER_CMD = [
+    "ros2", "run", "ur3e_fast_observation", "move_to_named_pose_server", "--ros-args",
+    "-p", "collision_check:=true",
+]
 REPLAY_CMD = [
     "ros2", "run", "ur3e_fast_observation", "replay_node", "--ros-args",
     "-p", "poses_file:=" + os.path.expanduser("~/morty_ws/observation_poses.yaml"),

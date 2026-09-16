@@ -391,6 +391,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._rviz_extra = ManagedLaunch(self)
         self._camera_extra = ManagedLaunch(self)
         self._replay_extra = ManagedLaunch(self)
+        self._named_pose_extra = ManagedLaunch(self)   # /move_to_named_pose server, with the driver (2026-09-16)
         self._voice = ManagedLaunch(self)
         self._executor = ManagedLaunch(self)
         sys_bar = QtWidgets.QWidget()
@@ -1760,6 +1761,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if self._driver.running():
             self._driver.stop()
             self._replay_extra.stop()
+            self._named_pose_extra.stop()
             self.driver_btn.setText("stopping…")
             self.driver_btn.setEnabled(False)
             self.statusBar().showMessage("Stopping driver stack (escalating if it hangs)…")
@@ -1785,6 +1787,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # skip if one already exists (e.g. a terminal-started pipeline).
         if not self.bridge.fast_replay_available():
             self._replay_extra.start(list(REPLAY_CMD))
+        if not self.bridge.named_pose_server_available():
+            self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD))
         self.driver_btn.setText("Stop driver")
         self.mode_combo.setEnabled(False)
         self.statusBar().showMessage(
@@ -2556,6 +2560,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
             if (self._driver.running() and not self._replay_extra.running()
                     and not self.bridge.fast_replay_available()):
                 self._replay_extra.start(list(REPLAY_CMD))
+            if (self._driver.running() and not self._named_pose_extra.running()
+                    and not self.bridge.named_pose_server_available()):
+                self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD))
             # Same self-heal for the LLM grasp executor: a pipeline without
             # it selects grasps and then waits on cycle_done forever.
             if self._pipeline.running() and not self._executor.running():
@@ -3024,6 +3031,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self._rviz_extra.stop()
                 self._camera_extra.stop()
                 self._replay_extra.stop()
+                self._named_pose_extra.stop()
+            self._named_pose_extra.stop()
                 # The escalation timers die with the GUI; SIGINT is usually
                 # enough, and a reopened GUI re-adopts any survivor.
         # Never leave an adopted executor latched in manual-wait mode after

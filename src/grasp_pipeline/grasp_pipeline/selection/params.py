@@ -127,7 +127,10 @@ def declare_all_parameters(node: "Node") -> None:
     # carried from GraspGen's gripper-base frame to the fingertips
     # (Franka Panda hand: 0.1034 m along the approach), see
     # geometry_utils._shift_grasp_origins. True restores the old behaviour.
-    node.declare_parameter("graspgen_matrix_normalized", False)
+    # Back to True on 2026-09-16: the metric path went live with the morning
+    # restart before its pause test, and two picks closed on air. False +
+    # the pause test is the plan; until then the old behaviour.
+    node.declare_parameter("graspgen_matrix_normalized", True)
     node.declare_parameter("graspgen_origin_to_fingertip_m", 0.1034)
     node.declare_parameter("graspgen_column_major", False)
     node.declare_parameter("grasp2tcp_rot", "flipY")

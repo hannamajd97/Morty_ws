@@ -1231,6 +1231,18 @@ class MortyGuiBridge(Node):
         )
         return dashboard_sent
 
+    def named_pose_server_available(self) -> bool:
+        """True when /move_to_named_pose has an action server (ours, or the
+        voice stack's)."""
+        try:
+            if getattr(self, "_named_pose_probe", None) is None:
+                from rclpy.action import ActionClient
+                from morty_interfaces.action import MoveToNamedPose
+                self._named_pose_probe = ActionClient(self, MoveToNamedPose, "/move_to_named_pose")
+            return bool(self._named_pose_probe.server_is_ready())
+        except Exception:
+            return True          # cannot probe: never start a duplicate blindly
+
     def fast_replay_available(self) -> bool:
         """True when the pipeline's replay node is subscribed and listening."""
         return self._pub_fast_replay.get_subscription_count() > 0

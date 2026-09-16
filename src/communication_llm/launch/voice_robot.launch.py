@@ -78,6 +78,7 @@ def generate_launch_description() -> LaunchDescription:
     whisper_max_utterance_s = LaunchConfiguration("whisper_max_utterance_s")
     min_chars = LaunchConfiguration("min_chars")
     with_replay = LaunchConfiguration("with_replay")
+    with_named_pose_server = LaunchConfiguration("with_named_pose_server")
     replay_poses_file = LaunchConfiguration("replay_poses_file")
     replay_controller_ns = LaunchConfiguration("replay_controller_ns")
     replay_move_duration_s = LaunchConfiguration("replay_move_duration_s")
@@ -145,12 +146,16 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
     )
 
+    # with_named_pose_server:=false when the GUI already runs the server
+    # with the driver (2026-09-16): the grasp executor needs it for every
+    # drop, voice or not, and two instances would race for the replay node.
     named_pose = Node(
         package="ur3e_fast_observation",
         executable="move_to_named_pose_server",
         name="move_to_named_pose_server",
         output="screen",
         parameters=[{"collision_check": collision_check}],
+        condition=IfCondition(with_named_pose_server),
     )
 
     router = Node(
@@ -443,6 +448,8 @@ def generate_launch_description() -> LaunchDescription:
                 "DEFAULT, multilingual), small (~470MB), medium (~1.5GB), "
                 "large-v3 (~2.9GB, GPU recommended).",
             ),
+            DeclareLaunchArgument("with_named_pose_server", default_value="true",
+                              description="Start move_to_named_pose_server (false when the GUI runs it with the driver)."),
             DeclareLaunchArgument(
                 "with_replay",
                 default_value="true",

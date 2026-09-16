@@ -1419,40 +1419,6 @@ public:
 
     // Clear collision objects — the object is now in the gripper, so
     // perception obstacles are stale and would block the lift.
-    {
-      moveit::planning_interface::PlanningSceneInterface psi;
-      auto obj_ids = psi.getKnownObjectNames();
-      // NEVER wipe the static environment (table/wall/mount/...): the
-      // planner needs it for every transport move — wiping it sent the
-      // arm THROUGH the table on the way to drop right (2026-08-26).
-      // Only stale perception boxes are fair game here.
-      // "scene_obj_*" are the per-object neighbour boxes the pipeline
-      // publishes for the OTHER objects on the table (2026-08-27) — the
-      // planner must keep avoiding them, so preserve them as well.
-      obj_ids.erase(
-        std::remove_if(obj_ids.begin(), obj_ids.end(),
-          [](const std::string & oid) {
-            return oid == "table" || oid == "wall" ||
-                   oid == "mount_surface" || oid == "flower" ||
-                   oid == "static_table" ||
-                   oid.rfind("scene_obj_", 0) == 0;
-          }),
-        obj_ids.end());
-      if (!obj_ids.empty()) {
-        RCLCPP_INFO(node_->get_logger(),
-          "Clearing %zu collision objects before lift.", obj_ids.size());
-        psi.removeCollisionObjects(obj_ids);
-        rclcpp::sleep_for(std::chrono::milliseconds(300));
-      }
-    }
-
-    // ─── Post-grasp lift (immediate) ───────────────────────────────────
-    // The lift belongs to the GRASP, not to the transport (Majd,
-    // 2026-08-26: "when I press execute it should go to the object,
-    // grasp it and then lift it up"). It used to live after the
-    // destination pause, so a manual EXECUTE — or any voice pick before
-    // the operator named a destination — sat at table level holding the
-    // object. Step 3a below is skipped when this succeeds.
     bool lifted_after_grasp = false;
     if (lift_height_m_ > 0.0) {
       rclcpp::sleep_for(std::chrono::milliseconds(150));
@@ -1477,6 +1443,43 @@ public:
     // is set to false at goal dispatch and we skip the pause entirely.
     // Compound-plan flags — set while parsing the destination answer,
     // consumed at the release/home stages below (function scope!).
+    // Scene objects are cleared AFTER the planner-free lift (2026-09-16,
+    // Majd: "a lot of time until it lifts"): the two planning-scene calls
+    // and their 300 ms settle used to sit between the close and the lift.
+    {
+      moveit::planning_interface::PlanningSceneInterface psi;
+      auto obj_ids = psi.getKnownObjectNames();
+      // NEVER wipe the static environment (table/wall/mount/...): the
+      // planner needs it for every transport move — wiping it sent the
+      // arm THROUGH the table on the way to drop right (2026-08-26).
+      // Only stale perception boxes are fair game here.
+      // "scene_obj_*" are the per-object neighbour boxes the pipeline
+      // publishes for the OTHER objects on the table (2026-08-27) — the
+      // planner must keep avoiding them, so preserve them as well.
+      obj_ids.erase(
+        std::remove_if(obj_ids.begin(), obj_ids.end(),
+          [](const std::string & oid) {
+            return oid == "table" || oid == "wall" ||
+                   oid == "mount_surface" || oid == "flower" ||
+                   oid == "static_table" ||
+                   oid.rfind("scene_obj_", 0) == 0;
+          }),
+        obj_ids.end());
+      if (!obj_ids.empty()) {
+        RCLCPP_INFO(node_->get_logger(),
+          "Clearing %zu collision objects after the lift.", obj_ids.size());
+        psi.removeCollisionObjects(obj_ids);
+        rclcpp::sleep_for(std::chrono::milliseconds(300));
+      }
+    }
+
+    // ─── Post-grasp lift (immediate) ───────────────────────────────────
+    // The lift belongs to the GRASP, not to the transport (Majd,
+    // 2026-08-26: "when I press execute it should go to the object,
+    // grasp it and then lift it up"). It used to live after the
+    // destination pause, so a manual EXECUTE — or any voice pick before
+    // the operator named a destination — sat at table level holding the
+    // object. Step 3a below is skipped when this succeeds.
     bool auto_release = false;
     bool auto_home = false;
     if (wait_for_destination_) {
