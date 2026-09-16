@@ -2969,6 +2969,40 @@ private:
   // grasp, then a SHORT straight-line approach from there. Mirrors what
   // execute_grasp() actually drives, so a candidate that passes here is
   // genuinely executable (2026-08-21).
+  // Plan the LIN already set up on arm_group_ (target + start state), and
+  // if the planner refuses for the joint acceleration/velocity limits — a
+  // SHORT line at full scaling wants the elbow at 10 rad/s^2 (2026-09-16:
+  // every 5 cm final stretch failed in 0 ms) — plan again at 1/2, then 1/4
+  // of the scaling. Returns the factor that worked (1.0 = full).
+  double plan_lin_with_slowdown(
+    moveit::planning_interface::MoveGroupInterface::Plan & plan, const std::string & what,
+    double * wall_s, moveit::core::MoveItErrorCode * code_out)
+  {
+    const double factors[3] = {1.0, 0.5, 0.25};
+    moveit::core::MoveItErrorCode code = moveit::core::MoveItErrorCode::FAILURE;
+    double wall_total = 0.0;
+    for (double f : factors) {
+      arm_group_.setMaxVelocityScalingFactor(velocity_scaling_ * f);
+      arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_ * f);
+      double w = 0.0;
+      code = timed_plan(plan, f == 1.0 ? what : what + " (scaling x" + std::to_string(f).substr(0, 4) + ")", &w);
+      wall_total += w;
+      if (code == moveit::core::MoveItErrorCode::SUCCESS) {
+        arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
+        arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
+        if (wall_s) { *wall_s = wall_total; }
+        if (code_out) { *code_out = code; }
+        return f;
+      }
+      if (code != moveit::core::MoveItErrorCode::PLANNING_FAILED) { break; }
+    }
+    arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
+    arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
+    if (wall_s) { *wall_s = wall_total; }
+    if (code_out) { *code_out = code; }
+    return 0.0;
+  }
+
   bool can_reach_via_pregrasp(
     const geometry_msgs::msg::PoseStamped & target_pose,
     std::string * reason = nullptr)
@@ -2989,8 +3023,15 @@ private:
     }
     moveit::planning_interface::MoveGroupInterface::Plan pre_plan;
     double wall_a = 0.0;
-    const auto pre_result = timed_plan(pre_plan, lin_staging ? "candidate probe stage-A LIN to pre-grasp"
-                                                             : "candidate probe stage-A PTP", &wall_a);
+    moveit::core::MoveItErrorCode pre_result = moveit::core::MoveItErrorCode::FAILURE;
+    if (lin_staging) {
+      const double f = plan_lin_with_slowdown(pre_plan, "candidate probe stage-A LIN to pre-grasp", &wall_a, &pre_result);
+      if (f > 0.0 && f < 1.0) {
+        RCLCPP_INFO(node_->get_logger(), "stage-A line planned at x%.2f of the scaling (limits at full speed).", f);
+      }
+    } else {
+      pre_result = timed_plan(pre_plan, "candidate probe stage-A PTP", &wall_a);
+    }
     if (pre_result != moveit::core::MoveItErrorCode::SUCCESS) {
       if (reason) {
         *reason = "stand-off unreachable: " +
@@ -3023,7 +3064,11 @@ private:
     } else {
       moveit::planning_interface::MoveGroupInterface::Plan lin_plan;
       double wall_b = 0.0;
-      const auto lin_result = timed_plan(lin_plan, "candidate probe stage-B LIN", &wall_b);
+      moveit::core::MoveItErrorCode lin_result = moveit::core::MoveItErrorCode::FAILURE;
+      const double fb = plan_lin_with_slowdown(lin_plan, "candidate probe stage-B LIN", &wall_b, &lin_result);
+      if (fb > 0.0 && fb < 1.0) {
+        RCLCPP_INFO(node_->get_logger(), "stage-B line (last stretch) planned at x%.2f of the scaling.", fb);
+      }
       if (lin_result == moveit::core::MoveItErrorCode::SUCCESS) {
         ok = true;
         if (lin_staging) {
