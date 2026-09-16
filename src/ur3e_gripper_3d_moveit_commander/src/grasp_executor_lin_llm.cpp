@@ -226,6 +226,13 @@ public:
     // along the gripper's z, so the curve arrives along the fingers' axis
     // with no corner; the last stretch is straight by construction.
     cartesian_curve_lead_m_ = get_or_declare_param<double>(node_, "cartesian_curve_lead_m", 0.12);
+    // Close on the way in (2026-09-16, Majd: "it stops before it grasps"):
+    // the close pulse is sent close_lead_s before the motion ends, so the
+    // fingers meet the object as the arm stops instead of 1.1 s later. The
+    // fingers only get narrower than a 3 cm object ~0.6 s after the pulse
+    // begins (+0.25 s adapter delay), so 0.4 s is safe. 0 = close after
+    // arrival, as before.
+    close_lead_s_ = get_or_declare_param<double>(node_, "close_lead_s", 0.4);
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 24);
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.005);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
@@ -1180,13 +1187,44 @@ public:
       if (!execute_) {
         staged_lin_ok = true;
       } else {
-        // The fingers must be apart at the CORNER, ~0.5 s before the end.
-        stretch_plan_to_min_duration(
-          blended, gripper_open_time_s_ + open_before_arrival_margin_s_ + 0.5, "Step 2 - blended two lines");
+        // Fingers apart BEFORE the motion (2026-09-16): a stretched plan
+        // crept into the object; the missing open time is waited out here
+        // at home instead, and the arm then moves at full speed.
+        {
+          const auto & pts = blended.trajectory_.joint_trajectory.points;
+          const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
+          const double need = gripper_open_time_s_ + open_before_arrival_margin_s_ - dur;
+          if (need > 0.0) {
+            RCLCPP_INFO(node_->get_logger(), "Step 2 - waiting %.2f s for the fingers before moving (plan %.2f s).", need, dur);
+            const auto t_end = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_ - dur));
+            while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
+              rclcpp::spin_some(node_);
+              std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+          }
+          if (!finish_gripper_open("Step 1 - Open gripper") || !ensure_fingers_open("Step 1b - Fingers apart?")) {
+            recover_to_reset_target("Step 1: the fingers did not open");
+            return false;
+          }
+          // Close on the way in: the pulse goes out close_lead_s before the end.
+          double pause_s = 0.0;
+          try { pause_s = node_->get_parameter("pause_before_close_s").as_double(); } catch (...) {}
+          if (close_lead_s_ > 0.0 && pause_s <= 0.0 && !vitamin_mode_active_ && dur > close_lead_s_ + 0.2) {
+            if (early_close_thread_.joinable()) { early_close_thread_.join(); }
+            const double fire_after = dur - close_lead_s_;
+            early_close_thread_ = std::thread([this, fire_after]() {
+              std::this_thread::sleep_for(std::chrono::duration<double>(fire_after));
+              if (!abort_requested_.load()) { begin_gripper_close_async(); }
+            });
+          }
+        }
         const auto t2 = std::chrono::steady_clock::now();
         auto r = execute_with_deadline(blended, __func__);
+        if (early_close_thread_.joinable()) { early_close_thread_.join(); }
         const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t2).count();
         if (r != moveit::core::MoveItErrorCode::SUCCESS) {
+          if (close_pending_) { finish_gripper_close("Step 3 - Close gripper (after a failed approach)"); }
           RCLCPP_ERROR(node_->get_logger(), "Step 2 - blended two lines: execution failed: %s (%d)",
             moveit::core::error_code_to_string(r).c_str(), r.val);
         } else {
@@ -1375,7 +1413,7 @@ public:
         if (aborted_at("the calibration pause")) { return false; }
       }
     } catch (...) {}
-    if (!execute_gripper_named_target(gripper_close_name_, "Step 3 - Close gripper")) {
+    if (!finish_gripper_close("Step 3 - Close gripper")) {
       // Restore before bailing.
       if (vitamin_mode_active_ && saved_close_pulse_s > 0.0) {
         set_gripper_adapter_close_pulse(saved_close_pulse_s);
@@ -5439,6 +5477,49 @@ private:
       "Gripper open sent (target=%.3f) — it opens while the arm travels.", gripper_open_position_);
   }
 
+  void begin_gripper_close_async()
+  {
+    close_pending_ = false;
+    if (!execute_ || !gripper_action_client_) { return; }
+    if (!gripper_action_client_->action_server_is_ready()) { return; }
+    control_msgs::action::GripperCommand::Goal goal;
+    goal.command.position = gripper_close_position_;
+    goal.command.max_effort = 0.0;
+    close_cmd_t_ = std::chrono::steady_clock::now();
+    close_goal_future_ = gripper_action_client_->async_send_goal(goal);
+    close_pending_ = true;
+    RCLCPP_INFO(node_->get_logger(), "Gripper close sent on the way in (%.2f s before the arm stops).", close_lead_s_);
+  }
+
+  bool finish_gripper_close(const std::string & step_name)
+  {
+    if (!close_pending_) {
+      return execute_gripper_named_target(gripper_close_name_, step_name);
+    }
+    close_pending_ = false;
+    const auto wait_timeout = std::chrono::duration<double>(gripper_action_timeout_s_);
+    if (rclcpp::spin_until_future_complete(node_, close_goal_future_, wait_timeout) !=
+      rclcpp::FutureReturnCode::SUCCESS || !close_goal_future_.get())
+    {
+      RCLCPP_WARN(node_->get_logger(), "%s: early close goal not accepted — sending it again.", step_name.c_str());
+      return execute_gripper_named_target(gripper_close_name_, step_name);
+    }
+    auto result_future = gripper_action_client_->async_get_result(close_goal_future_.get());
+    if (rclcpp::spin_until_future_complete(node_, result_future, wait_timeout) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "%s: timed out waiting for the early close result.", step_name.c_str());
+      return false;
+    }
+    const auto wrapped = result_future.get();
+    if (wrapped.code != rclcpp_action::ResultCode::SUCCEEDED) {
+      RCLCPP_WARN(node_->get_logger(), "%s: early close failed (code %d) — sending it again.", step_name.c_str(), static_cast<int>(wrapped.code));
+      return execute_gripper_named_target(gripper_close_name_, step_name);
+    }
+    RCLCPP_INFO(node_->get_logger(), "%s: closed on the way in (reached=%.3f).", step_name.c_str(), wrapped.result->position);
+    return true;
+  }
+
   bool finish_gripper_open(const std::string & step_name)
   {
     if (!open_pending_) {
@@ -5864,6 +5945,9 @@ private:
   double blend_radius_m_{0.02};
   double cartesian_path_tolerance_rad_{0.05};
   double cartesian_curve_lead_m_{0.12};
+  double close_lead_s_{0.4};
+  bool close_pending_{false};
+  std::thread early_close_thread_;
   int cartesian_curve_samples_{24};
   double cartesian_eef_step_m_{0.005};
   rclcpp::Client<moveit_msgs::srv::GetMotionSequence>::SharedPtr sequence_client_;
@@ -6008,6 +6092,7 @@ private:
   using GripperGoalHandle = rclcpp_action::ClientGoalHandle<control_msgs::action::GripperCommand>;
   bool open_pending_ = false;
   std::shared_future<GripperGoalHandle::SharedPtr> open_goal_future_;
+  std::shared_future<GripperGoalHandle::SharedPtr> close_goal_future_;   // close sent on the way in
   rclcpp_action::Client<moveit_msgs::action::ExecuteTrajectory>::SharedPtr exec_traj_client_;
   int collision_detail_max_reports_{5};
   int collision_detail_reports_ = 0;
