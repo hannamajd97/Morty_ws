@@ -41,8 +41,13 @@ selected object into ranked grasp candidates for the executor.
    give correct detections 0.76–0.88 and wrong ones 0.35–0.52, threshold
    0.6. A wrong name that matches another known object strongly is renamed
    (the B12 tube called `tape_dispenser` becomes `vitamin_c`); otherwise
-   the box goes to the open-set path. Without references the check is
-   inactive and looks again every 30 s. Both are on
+   the box goes to the open-set path. Every reference is also embedded
+   turned 90° either way and upside down (a tube lying on its side scored
+   0.58 against standing photos, 0.90 with the turned ones), and every
+   open-set box is compared with the references before the naming model
+   is asked: a match is named after the known object (`id` in the
+   overlay). Without references the check is inactive and looks again
+   every 30 s. Both are on
    by default (`open_set_enabled`, `identity_check_enabled`; also in the
    GUI's Advanced ▸ Filters list; `MORTY_OPEN_SET=false` turns them off at
    launch). With them off the detection thread is exactly as before.

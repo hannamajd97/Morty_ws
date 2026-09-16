@@ -348,7 +348,7 @@ def declare_all_parameters(node: "Node") -> None:
     # the 26 ms of a bare process; every 2nd frame keeps the detection loop
     # near its old rate while a new object still gets its box within 0.5 s.
     node.declare_parameter("open_set_every_n_frames", 2)
-    node.declare_parameter("open_set_min_box_px", 12)
+    node.declare_parameter("open_set_min_box_px", 20)
     node.declare_parameter("open_set_max_box_frac", 0.25)
     node.declare_parameter("open_set_max_depth_m", 1.0)
     node.declare_parameter("open_set_stable_s", 0.2)

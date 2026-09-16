@@ -1700,7 +1700,8 @@ class YoloLiveSelectGrasp(Node):
                         d["source"] = "ys"          # trained YOLO ("yolo standard")
                     dets, rejected = self._identity.check(rgb, dets)
                     dets = dets + self._open_set.detect(
-                        rgb, depth, header, dets, [r["bbox"] for r in rejected])
+                        rgb, depth, header, dets,
+                        [list(r["bbox"]) + [float(r.get("score", 0.5))] for r in rejected])
                     self._perf_infer_count += 1
                     self._perf_infer_ms_acc += infer_ms
                     # Annotate every detection with its simplified label.
@@ -1721,7 +1722,7 @@ class YoloLiveSelectGrasp(Node):
                         d_copy["simplified_label"] = simple_name
                         # Named unknown objects are all kept: two "white box"
                         # on the table are two objects, not a ghost.
-                        if simple_name.lower() in MULTI_INSTANCE_LABELS or d_copy.get("source") == "q8b":
+                        if simple_name.lower() in MULTI_INSTANCE_LABELS or d_copy.get("source") in ("q8b", "id"):
                             multi_instance.append(d_copy)
                         else:
                             prev = by_label_best.get(simple_name)

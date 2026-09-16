@@ -98,15 +98,15 @@ class IdentityCheck:
                 crops = [cv2.imread(f) for f in files]
                 crops = [c for c in crops if c is not None and c.size]
                 if crops:
-                    self._refs[os.path.basename(cdir)] = self._embed(crops)
-            stats = []
-            for k, e in self._refs.items():
-                if len(e) > 1:
-                    sim = e @ e.T
-                    np.fill_diagonal(sim, -1.0)
-                    stats.append(f"{k} ({len(e)} refs, own-min {sim.max(axis=1).min():.2f})")
-                else:
-                    stats.append(f"{k} (1 ref)")
+                    # The captures show every object standing; a tube lying
+                    # on its side scored 0.3 against them and was renamed by
+                    # the naming model ("golden horizontal bar", 2026-09-16).
+                    # DINOv2 is not rotation-invariant, so each reference is
+                    # also embedded turned 90° either way and upside down.
+                    turned = [cv2.rotate(c, r) for c in crops
+                              for r in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE, cv2.ROTATE_180)]
+                    self._refs[os.path.basename(cdir)] = self._embed(crops + turned)
+            stats = [f"{k} ({len(e) // 4} refs x 4 orientations)" for k, e in self._refs.items()]
             log.info(f"[identity] DINOv2 ready in {time.monotonic() - t:.1f} s; references: " + ", ".join(stats)
                      + f"; threshold {float(self._p('identity_threshold', 0.5)):.2f}")
         except Exception as e:  # noqa: BLE001
@@ -124,6 +124,23 @@ class IdentityCheck:
             f = self._model(torch.from_numpy(np.stack(batch)).to(self._device)).float()
             f = f / f.norm(dim=-1, keepdim=True)
         return f.cpu().numpy()
+
+    # ---- identify a crop nobody has named --------------------------------------------
+    def identify(self, crop: np.ndarray) -> Tuple[str, float]:
+        """The known object a crop looks like, with its similarity; ("", 0)
+        when the check is inactive or nothing reaches the threshold. Used
+        for open-set boxes before the naming model is asked (2026-09-16):
+        a known object the trained YOLO missed, e.g. the tube lying down,
+        keeps its real name instead of a guess."""
+        if crop is None or crop.size == 0 or not self.enabled or not self._load():
+            return "", 0.0
+        try:
+            e = self._embed([crop])[0]
+        except Exception:
+            return "", 0.0
+        sims = {k: float((v @ e).max()) for k, v in self._refs.items()}
+        best = max(sims, key=sims.get)
+        return (best, sims[best]) if sims[best] >= float(self._p("identity_threshold", 0.6)) else ("", sims[best])
 
     # ---- the check ------------------------------------------------------------------
     def check(self, rgb: np.ndarray, dets: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:

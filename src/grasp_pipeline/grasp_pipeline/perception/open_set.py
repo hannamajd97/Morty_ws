@@ -69,7 +69,7 @@ def clean_name(text: str) -> str:
 
 
 class _Track:
-    __slots__ = ("bbox", "score", "first", "last", "name", "pending", "tries", "next_try", "reach")
+    __slots__ = ("bbox", "score", "first", "last", "name", "pending", "tries", "next_try", "reach", "source")
 
     def __init__(self, bbox: List[int], score: float, now: float) -> None:
         self.bbox, self.score, self.first, self.last = bbox, score, now, now
@@ -78,6 +78,7 @@ class _Track:
         self.tries = 0
         self.next_try = 0.0
         self.reach = ""
+        self.source = "q8b"
 
 
 class OpenSetDetector:
@@ -189,7 +190,10 @@ class OpenSetDetector:
                 if valid.size < 40 or float(np.median(valid)) > max_depth:
                     continue
             box = [x1, y1, x2, y2]
-            if any(_iou(box, k) >= 0.4 or _contained(box, k) >= 0.8 for k in known_boxes):
+            # A cap or a label on a known object is not a new object: a
+            # 66x14 px sliver on top of the tube was 75 % inside the tube's
+            # box and got its own name ("yellow pencil tip", 2026-09-16).
+            if any(_iou(box, k) >= 0.4 or _contained(box, k) >= 0.6 for k in known_boxes):
                 continue
             if any(_contained(box, k) >= 0.8 or _iou(box, k) > 0.5 for k, _ in kept):
                 continue
@@ -212,7 +216,8 @@ class OpenSetDetector:
         every = max(1, int(self._p("open_set_every_n_frames", 1)))
         if self._frame % every == 0 or not self._last_props:
             self._last_props = self._propose(rgb)
-        props = list(self._last_props) + [([int(v) for v in b], 1.0) for b in extra_boxes]
+        props = list(self._last_props) + [([int(v) for v in b[:4]], float(b[4]) if len(b) > 4 else 0.5)
+                                          for b in extra_boxes]
         props = self._filter(props, depth, shape, frame_id, known)
         now = time.monotonic()
         with self._lock:
@@ -249,9 +254,20 @@ class OpenSetDetector:
                 continue
             if tr.name is None and not tr.pending and now - tr.first >= stable and now >= tr.next_try:
                 x1, y1, x2, y2 = tr.bbox
-                tr.pending = True
-                self._jobs.put((tr, rgb[y1:y2, x1:x2].copy()))
+                crop = rgb[y1:y2, x1:x2].copy()
+                # A known object the trained YOLO missed (the tube lying on
+                # its side) is recognised from the reference photos first,
+                # 10 ms; only what matches nothing is sent to the naming model.
+                ident = getattr(self._node, "_identity", None)
+                label, sim = ident.identify(crop) if ident is not None else ("", 0.0)
+                if label:
+                    tr.name, tr.source = label, "id"
+                    d["label"], d["source"], d["named"] = label, "id", True
+                else:
+                    tr.pending = True
+                    self._jobs.put((tr, crop))
             if tr.name is not None or tr.tries >= 3:
+                d["source"] = tr.source
                 out.append(d)
         self._log_stats()
         return out
