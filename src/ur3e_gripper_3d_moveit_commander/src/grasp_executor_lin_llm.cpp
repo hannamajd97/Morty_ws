@@ -303,7 +303,7 @@ public:
     // The approach may never end before the fingers are apart (Majd
     // 2026-09-16): open pulse + finger travel, plus a margin. A faster plan
     // is stretched to this duration, see stretch_plan_to_min_duration.
-    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.5);
+    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.7);   // Majd 2026-09-16
     open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.2);
     gripper_adapter_node_name_ = get_or_declare_param<std::string>(
       node_, "gripper_adapter_node_name", "/gripper_controller/gripper_command_adapter");
@@ -1175,6 +1175,16 @@ public:
     if (!finish_gripper_open("Step 1 - Open gripper")) {
       recover_to_reset_target("Step 1 (open gripper) failed");
       return false;
+    }
+    // The fingers get their full opening time whatever the approach did
+    // (a stretched plan, a fallback plan, a cached one): wait out the rest.
+    {
+      const auto ready_at = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(gripper_open_time_s_));
+      while (rclcpp::ok() && std::chrono::steady_clock::now() < ready_at && !abort_requested_.load()) {
+        rclcpp::spin_some(node_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      }
     }
     if (!ensure_fingers_open("Step 1b - Fingers apart?")) {
       recover_to_reset_target("Step 1b: the fingers did not open");
@@ -4987,6 +4997,7 @@ private:
     goal.command.max_effort = 0.0;
     open_goal_future_ = gripper_action_client_->async_send_goal(goal);
     open_pending_ = true;
+    open_sent_t_ = std::chrono::steady_clock::now();
     RCLCPP_INFO(node_->get_logger(),
       "Gripper open sent early (target=%.3f) — overlapping with the candidate probing.",
       gripper_open_position_);
@@ -5422,9 +5433,10 @@ private:
   double gripper_close_position_;
   std::string gripper_action_name_;
   double gripper_action_timeout_s_;
-  double gripper_open_time_s_{0.5};
+  double gripper_open_time_s_{0.7};
   double open_before_arrival_margin_s_{0.2};
   double min_exec_duration_s_{0.0};   // consumed by execute_arm_lin_pose for the approach
+  std::chrono::steady_clock::time_point open_sent_t_{};
   std::string gripper_adapter_node_name_;
   bool override_gripper_pulse_from_executor_;
   double executor_pulse_hold_s_open_;
