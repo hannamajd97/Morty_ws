@@ -1147,6 +1147,7 @@ public:
         step2_ok = (exec_result == moveit::core::MoveItErrorCode::SUCCESS);
         if (step2_ok) {
           RCLCPP_INFO(node_->get_logger(), "Step 2 - Grasp LIN: execution OK.");
+          log_arrival_error(grasp_pose_world, "Step 2 - Grasp LIN");
         } else {
           RCLCPP_ERROR(node_->get_logger(),
             "Step 2 - Grasp LIN: execution failed: %s (%d)",
@@ -1167,6 +1168,9 @@ public:
         step2_ok = execute_arm_lin_pose(grasp_pose_world, "Step 2 - Grasp LIN");
       }
       min_exec_duration_s_ = 0.0;
+    }
+    if (step2_ok && !approach_planned) {
+      log_arrival_error(grasp_pose_world, "Step 2 - Grasp LIN");
     }
     if (!step2_ok) {
       if (aborted_at("the approach")) {
@@ -3118,6 +3122,29 @@ private:
   // while waiting, honours the operator abort, and gives up after
   // 2 × planned duration + 5 s (at least 10 s) with a reason that names the
   // likely cause.
+  // Where did the arm really stop, against what was commanded? (Majd
+  // 2026-09-16: "I think it is mostly the LIN when it arrives".) The TCP
+  // from the joint-state ear versus the target, in millimetres, so the
+  // arrival error of the straight line is a number in the log, not a guess.
+  void log_arrival_error(const geometry_msgs::msg::PoseStamped & target, const std::string & step_name)
+  {
+    try {
+      moveit::core::RobotState st(arm_group_.getRobotModel());
+      if (!robot_state_from_ear(st)) { return; }
+      const Eigen::Isometry3d T = st.getGlobalLinkTransform(arm_group_.getEndEffectorLink());
+      const auto & p = target.pose.position;
+      const double dx = (T.translation().x() - p.x) * 1000.0;
+      const double dy = (T.translation().y() - p.y) * 1000.0;
+      const double dz = (T.translation().z() - p.z) * 1000.0;
+      RCLCPP_INFO(node_->get_logger(),
+        "[arrival] %s: commanded TCP [%.3f, %.3f, %.3f], reached [%.3f, %.3f, %.3f] (%s) — "
+        "error %.1f mm (dx %+.1f, dy %+.1f, dz %+.1f)",
+        step_name.c_str(), p.x, p.y, p.z,
+        T.translation().x(), T.translation().y(), T.translation().z(), target.header.frame_id.c_str(),
+        std::sqrt(dx * dx + dy * dy + dz * dz), dx, dy, dz);
+    } catch (...) {}
+  }
+
   // Slow a planned trajectory down to at least min_s: times scale by k,
   // velocities by 1/k, accelerations by 1/k^2, the path itself is untouched.
   void stretch_plan_to_min_duration(
