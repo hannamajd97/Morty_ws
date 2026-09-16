@@ -303,7 +303,10 @@ public:
     // The approach may never end before the fingers are apart (Majd
     // 2026-09-16): open pulse + finger travel, plus a margin. A faster plan
     // is stretched to this duration, see stretch_plan_to_min_duration.
-    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.7);   // Majd 2026-09-16
+    // 1.2 s (measured 2026-09-16): with the close pulse 1.03 s after the open
+    // pulse began the fingers were still opening (Majd saw them touch the
+    // object); at 1.29 s the close stalled on the object after 0.73 s.
+    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 1.2);
     // Margin 0.5 s (2026-09-16): the adapter starts the pulse ~0.25 s after
     // the goal is sent (measured 741.43 -> 741.69), and the fingers need a
     // little settle. So the arm arrives no earlier than 1.2 s after the send.
@@ -5436,7 +5439,7 @@ private:
   double gripper_close_position_;
   std::string gripper_action_name_;
   double gripper_action_timeout_s_;
-  double gripper_open_time_s_{0.7};
+  double gripper_open_time_s_{1.2};
   double open_before_arrival_margin_s_{0.5};
   double min_exec_duration_s_{0.0};   // consumed by execute_arm_lin_pose for the approach
   std::chrono::steady_clock::time_point open_sent_t_{};
