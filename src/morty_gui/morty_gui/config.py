@@ -332,7 +332,7 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # limit are refused again ("straight line not drivable" in the
                 # log). Candidate for later: straight line first, stand-off
                 # only as the fallback.
-                "use_pregrasp_staging:=true", "staging_mode:=blend", "pregrasp_blend_radius_m:=0.02",
+                "use_pregrasp_staging:=true", "staging_mode:=blend", "pregrasp_blend_radius_m:=0.035",
                 "pregrasp_approach_distance:=0.05",
                 # 50 % (Majd 2026-09-11 18:30; the launch defaults gave
                 # 0.2 / 0.1): arm travel ~3 s -> ~1.8 s per pick. Live-tunable
