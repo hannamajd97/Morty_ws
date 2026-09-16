@@ -300,6 +300,11 @@ public:
     gripper_action_name_ = get_or_declare_param<std::string>(
       node_, "gripper_action_name", "/gripper_controller/gripper_cmd");
     gripper_action_timeout_s_ = get_or_declare_param<double>(node_, "gripper_action_timeout_s", 5.0);
+    // The approach may never end before the fingers are apart (Majd
+    // 2026-09-16): open pulse + finger travel, plus a margin. A faster plan
+    // is stretched to this duration, see stretch_plan_to_min_duration.
+    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.5);
+    open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.2);
     gripper_adapter_node_name_ = get_or_declare_param<std::string>(
       node_, "gripper_adapter_node_name", "/gripper_controller/gripper_command_adapter");
     override_gripper_pulse_from_executor_ =
@@ -1124,6 +1129,8 @@ public:
           "Step 2 - Grasp LIN: execute:=false, skipping execution.");
         step2_ok = true;
       } else {
+        stretch_plan_to_min_duration(
+          approach_plan, gripper_open_time_s_ + open_before_arrival_margin_s_, "Step 2 - Grasp LIN");
         auto exec_result = execute_with_deadline(approach_plan, __func__);
         step2_ok = (exec_result == moveit::core::MoveItErrorCode::SUCCESS);
         if (step2_ok) {
@@ -1138,6 +1145,7 @@ public:
     } else {
       // Pregrasp-staging path: the LIN start pose only exists after the
       // stand-off PTP, so plan+execute here (3 attempts, flake guard).
+      min_exec_duration_s_ = gripper_open_time_s_ + open_before_arrival_margin_s_;
       for (int s2 = 0; s2 < 3 && !step2_ok; ++s2) {
         if (s2 > 0) {
           RCLCPP_WARN(node_->get_logger(),
@@ -1146,6 +1154,7 @@ public:
         }
         step2_ok = execute_arm_lin_pose(grasp_pose_world, "Step 2 - Grasp LIN");
       }
+      min_exec_duration_s_ = 0.0;
     }
     if (!step2_ok) {
       if (aborted_at("the approach")) {
@@ -2783,6 +2792,9 @@ private:
     }
 
     RCLCPP_INFO(node_->get_logger(), "%s: plan OK.", step_name.c_str());
+    if (min_exec_duration_s_ > 0.0) {
+      stretch_plan_to_min_duration(plan, min_exec_duration_s_, step_name);
+    }
     if (!execute_) {
       RCLCPP_INFO(node_->get_logger(), "%s: execute:=false, skipping execution.", step_name.c_str());
       return true;
@@ -3074,6 +3086,27 @@ private:
   // while waiting, honours the operator abort, and gives up after
   // 2 × planned duration + 5 s (at least 10 s) with a reason that names the
   // likely cause.
+  // Slow a planned trajectory down to at least min_s: times scale by k,
+  // velocities by 1/k, accelerations by 1/k^2, the path itself is untouched.
+  void stretch_plan_to_min_duration(
+    moveit::planning_interface::MoveGroupInterface::Plan & plan, double min_s, const std::string & step_name)
+  {
+    auto & pts = plan.trajectory_.joint_trajectory.points;
+    if (pts.empty() || min_s <= 0.0) { return; }
+    const double dur = rclcpp::Duration(pts.back().time_from_start).seconds();
+    if (dur <= 0.0 || dur >= min_s) { return; }
+    const double k = min_s / dur;
+    for (auto & pt : pts) {
+      pt.time_from_start = rclcpp::Duration::from_seconds(rclcpp::Duration(pt.time_from_start).seconds() * k);
+      for (auto & v : pt.velocities) { v /= k; }
+      for (auto & a : pt.accelerations) { a /= (k * k); }
+    }
+    RCLCPP_INFO(node_->get_logger(),
+      "%s: approach %.2f s is shorter than open %.2f s + margin %.2f s — stretched to %.2f s (x%.2f slower) "
+      "so the fingers are apart before the arm arrives.",
+      step_name.c_str(), dur, gripper_open_time_s_, open_before_arrival_margin_s_, min_s, k);
+  }
+
   moveit::core::MoveItErrorCode execute_with_deadline(
     const moveit::planning_interface::MoveGroupInterface::Plan & plan, const char * what)
   {
@@ -5389,6 +5422,9 @@ private:
   double gripper_close_position_;
   std::string gripper_action_name_;
   double gripper_action_timeout_s_;
+  double gripper_open_time_s_{0.5};
+  double open_before_arrival_margin_s_{0.2};
+  double min_exec_duration_s_{0.0};   // consumed by execute_arm_lin_pose for the approach
   std::string gripper_adapter_node_name_;
   bool override_gripper_pulse_from_executor_;
   double executor_pulse_hold_s_open_;
