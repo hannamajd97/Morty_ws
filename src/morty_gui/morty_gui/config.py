@@ -336,7 +336,8 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # 50 % (Majd 2026-09-11 18:30; the launch defaults gave
                 # 0.2 / 0.1): arm travel ~3 s -> ~1.8 s per pick. Live-tunable
                 # afterwards: ros2 param set /grasp_executor_lin_llm velocity_scaling X
-                "velocity_scaling:=0.5",
+                # 0.4 since 2026-09-16 (Majd: "0.4 would be enough, no need to be that aggressive").
+                "velocity_scaling:=0.4",
                 "acceleration_scaling:=0.5",
                 # Run the pick to the end without questions (Majd 2026-09-11
                 # 19:05: with auto-execute every pick ended in Reset because
