@@ -339,7 +339,9 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # afterwards: ros2 param set /grasp_executor_lin_llm velocity_scaling X
                 # 0.4 since 2026-09-16 (Majd: "0.4 would be enough, no need to be that aggressive").
                 "velocity_scaling:=0.4",
-                "acceleration_scaling:=0.5",
+                # 1.0 since 2026-09-16: braking distance = v^2 / 2a; at half the
+                # allowance the arm crept the last centimetres into the object.
+                "acceleration_scaling:=1.0",
                 # Run the pick to the end without questions (Majd 2026-09-11
                 # 19:05: with auto-execute every pick ended in Reset because
                 # the executor waited for a drop destination nobody could
