@@ -3072,8 +3072,12 @@ private:
     // stretch violates is the joint ACCELERATION, so its velocity is kept and
     // only its acceleration comes down first — it brakes into the object
     // instead of crawling (Majd: "it stops then moves again").
-    const double pairs[6][4] = {{1.0, 1.0, 1.0, 1.0}, {1.0, 1.0, 1.0, 0.5}, {1.0, 1.0, 1.0, 0.25},
-                                {1.0, 1.0, 0.5, 0.25}, {1.0, 0.5, 0.5, 0.25}, {0.5, 0.5, 0.25, 0.25}};
+    // Both lines share one acceleration setting first (Majd 2026-09-16:
+    // "get them both synced"): the same ramps on both sides of the corner
+    // read as one motion. Mixed settings only when the shared ones fail.
+    const double pairs[7][4] = {{1.0, 1.0, 1.0, 1.0}, {1.0, 0.5, 1.0, 0.5}, {1.0, 0.25, 1.0, 0.25},
+                                {1.0, 0.25, 0.5, 0.25}, {0.5, 0.25, 0.5, 0.25}, {0.5, 0.5, 0.25, 0.25},
+                                {0.25, 0.25, 0.25, 0.25}};
     const auto t0 = std::chrono::steady_clock::now();
     std::string last_err;
     for (const auto & pr : pairs) {
