@@ -678,8 +678,15 @@ class MortyGuiBridge(Node):
     def _dashboard_lost(self, resp) -> bool:
         """True when a dashboard reply reports a dead socket; reconnects once
         per 10 s as a side effect."""
-        msg = getattr(resp, "message", "") if resp is not None else ""
-        if getattr(resp, "success", True) or "Dashboard Server" not in msg:
+        # The dashboard answers carry the text in `message` (Trigger) OR in
+        # `answer` (IsProgramRunning, IsInRemoteControl); reading only
+        # `message` meant the two 5-s polls never triggered the reconnect
+        # and the driver log filled with "non-connected socket" (2026-09-16,
+        # 316 times in one session). Any failed answer counts.
+        if resp is None or getattr(resp, "success", True):
+            return False
+        msg = str(getattr(resp, "message", "") or getattr(resp, "answer", "") or "")
+        if "Dashboard Server" not in msg and "socket" not in msg.lower() and msg:
             return False
         now = time.monotonic()
         if now - self._last_dash_reconnect_t >= 10.0 and self._dashboard_connect.service_is_ready():

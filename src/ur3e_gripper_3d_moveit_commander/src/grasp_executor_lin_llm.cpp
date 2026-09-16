@@ -1086,11 +1086,13 @@ public:
       }
     }
 
-    // 1) Open gripper (usually already opened during the probing)
-    if (!finish_gripper_open("Step 1 - Open gripper")) {
-      recover_to_reset_target("Step 1 (open gripper) failed");
-      return false;
-    }
+    // 1) Open gripper, sent WITH the approach (Majd 2026-09-16: "let the
+    // gripper open while it is moving"): the 0.2 s pulse and the finger
+    // travel hide inside the 2-3 s motion, and a search that finds no line
+    // never opens the gripper. Whether the fingers really parted is checked
+    // by the finger sensor right before closing (ensure_fingers_open).
+    begin_gripper_open_async();
+    RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: sent with the approach (opens while the arm travels).");
 
     // 2) LIN-only approach to grasp (no PTP retries in this stage).
     if (aborted_at("the approach")) {
@@ -1159,6 +1161,14 @@ public:
     // the harder re-close happens mid-trajectory during the move to
     // drop_target. See vitamin block further down.
     if (aborted_at("before closing the gripper")) {
+      return false;
+    }
+    if (!finish_gripper_open("Step 1 - Open gripper")) {
+      recover_to_reset_target("Step 1 (open gripper) failed");
+      return false;
+    }
+    if (!ensure_fingers_open("Step 1b - Fingers apart?")) {
+      recover_to_reset_target("Step 1b: the fingers did not open");
       return false;
     }
     double saved_close_pulse_s = -1.0;
@@ -2264,7 +2274,8 @@ public:
     already_at_reset_pose = (drop_target_name_ == reset_target_name_);
     // 5) Open gripper at drop pose, then return to initgrasp and close gripper.
     if (sequence_ok && !skip_release) {
-      if (execute_gripper_named_target(gripper_open_name_, "Step 5 - Open gripper at drop")) {
+      if (execute_gripper_named_target(gripper_open_name_, "Step 5 - Open gripper at drop") &&
+          ensure_fingers_open("Step 5b - Object released?")) {
         // Only now is "The gripper is open." true.
         try {
           std_msgs::msg::String s_ok;
@@ -3945,7 +3956,8 @@ private:
     // false negative used to cost a grasp. Candidates that fail the quick
     // probe go to the END of the probe order; the LIN probe stays the judge.
     if (!precheck_mode_) {
-      begin_gripper_open_async();   // overlaps the 0.5 s open with the probing below
+      // (2026-09-16) the open is no longer sent here: when no line was
+      // drivable the gripper had opened for nothing. It goes with the approach.
     }
     size_t ik_demoted = 0;
     std::vector<std::pair<double, size_t>> demoted;
@@ -4971,6 +4983,35 @@ private:
     }
     RCLCPP_INFO(node_->get_logger(), "%s: already open (reached=%.3f, opened during the probing).", step_name.c_str(), wrapped.result->position);
     return true;
+  }
+
+  // The finger sensor (pin 16) is HIGH whenever the fingers are stalled —
+  // on an object or on each other. Before a close nothing is held, so HIGH
+  // means the open pulse did not part them (2026-09-16: the arm went,
+  // closed on air, "empty"). One more pulse, then give up rather than
+  // grasp nothing.
+  bool ensure_fingers_open(const std::string & step_name)
+  {
+    if (!execute_) { return true; }
+    auto settled_low = [this](double window_s) {
+      const auto t_end = std::chrono::steady_clock::now() +
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(window_s));
+      while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end) {
+        rclcpp::spin_some(node_);
+        if (!grasp_detected_.load()) { return true; }
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+      }
+      return !grasp_detected_.load();
+    };
+    if (settled_low(0.3)) { return true; }
+    RCLCPP_WARN(node_->get_logger(),
+      "%s: pin %d still HIGH — the fingers are still touching; opening again.", step_name.c_str(), grasp_pin_);
+    if (!execute_gripper_named_target(gripper_open_name_, step_name + " (second pulse)")) { return false; }
+    if (settled_low(0.8)) { return true; }
+    RCLCPP_ERROR(node_->get_logger(),
+      "%s: the fingers did not open after two pulses (pin %d HIGH) — not closing on air.", step_name.c_str(), grasp_pin_);
+    last_failure_reason_ = "the gripper did not open";
+    return false;
   }
 
   bool execute_gripper_named_target(const std::string & target_name, const std::string & step_name)
@@ -6022,7 +6063,6 @@ int main(int argc, char ** argv)
           selected = cands[static_cast<size_t>(rec->feasible_idx)];
           grasp_executor.apply_precheck(*rec);
           grasp_executor.announce_precheck_hit(rec->feasible_idx, cands.size(), selected);
-          grasp_executor.open_gripper_early();
           feasible = true;
           used_precheck = true;
           RCLCPP_INFO(node->get_logger(),
