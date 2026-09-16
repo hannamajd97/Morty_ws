@@ -3147,7 +3147,11 @@ private:
     arm_group_.clearPoseTargets();
     arm_group_.setStartStateToCurrentState();
     arm_group_.setPlanningPipelineId("pilz_industrial_motion_planner");
-    const bool lin_staging = (staging_mode_ == "lin");
+    // "blend" falls back here when the sequence planner refuses: the two
+    // separate lines must then be planned AND cached exactly as in "lin"
+    // (2026-09-16: a "blend" fallback used the PTP stand-off and cached
+    // nothing, so a candidate the probe verified failed at execution).
+    const bool lin_staging = (staging_mode_ == "lin" || staging_mode_ == "blend");
     arm_group_.setPlannerId(lin_staging ? "LIN" : "PTP");
     if (!arm_group_.setPoseTarget(pre_pose, ee)) {
       if (reason) { *reason = "LIN planning failed: NO_IK_SOLUTION (-31)"; }
@@ -5320,8 +5324,7 @@ private:
     open_pending_ = true;
     open_sent_t_ = std::chrono::steady_clock::now();
     RCLCPP_INFO(node_->get_logger(),
-      "Gripper open sent early (target=%.3f) — overlapping with the candidate probing.",
-      gripper_open_position_);
+      "Gripper open sent (target=%.3f) — it opens while the arm travels.", gripper_open_position_);
   }
 
   bool finish_gripper_open(const std::string & step_name)
