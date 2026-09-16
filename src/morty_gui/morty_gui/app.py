@@ -80,6 +80,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.motion_win.neigh_apply_btn.clicked.connect(
             self._apply_neighbour_obstacles)
         self.motion_win.speed_apply_btn.clicked.connect(self._apply_pick_speeds)
+        self.motion_win.cal_apply_btn.clicked.connect(self._apply_calibration)
+        self._calib_pushed = False
         self.motion_win.grip_apply_btn.clicked.connect(
             self._apply_gripper_holds)
         self.exp_win = ExperimentsWindow(bridge)
@@ -998,6 +1000,26 @@ class OperatorWindow(QtWidgets.QMainWindow):
         want = self.motion_win.pick_speed_values()
         cmd = [a for a in EXECUTOR_CMD if not any(a.startswith(f"{k}:=") for k in want)]
         return cmd + self.motion_win.pick_speed_launch_args()
+
+    def _apply_calibration(self) -> bool:
+        """Apply for the pick calibration offset: set on the pipeline, read back."""
+        want = {"grasp2tcp_offset_m": self.motion_win.calibration_offset()}
+        self.motion_win.save_calibration()
+        if not self._pipeline.running():
+            self.motion_win.show_cal_apply("sent", "pipeline not running — saved for its next start")
+            return False
+        if not self.bridge.set_pipeline_params(want):
+            self.motion_win.show_cal_apply("fail", "pipeline parameter service unreachable")
+            return False
+        time.sleep(0.2)
+        got = self.bridge.get_pipeline_params(["grasp2tcp_offset_m"])
+        have = list(got.get("grasp2tcp_offset_m") or []) if got else []
+        detail = "offset " + ", ".join(f"{float(v):+.3f}" for v in have) + " m" if have else "no answer"
+        if len(have) == 3 and all(abs(float(h) - float(w)) < 1e-6 for h, w in zip(have, want["grasp2tcp_offset_m"])):
+            self.motion_win.show_cal_apply("ok", detail)
+            return True
+        self.motion_win.show_cal_apply("sent" if not have else "mismatch", detail)
+        return False
 
     def _apply_pick_speeds(self) -> None:
         """Apply button for "Pick speeds": set on the executor, read back."""
@@ -2763,6 +2785,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.statusBar().showMessage(upd["status"])
         if "cycle_done" in upd:
             self.exp_win.record_cycle(upd["cycle_done"])
+        if upd.get("pipeline_alive") and not self._calib_pushed:
+            self._calib_pushed = self._apply_calibration()
+        elif not self._pipeline.running():
+            self._calib_pushed = False
         if upd.get("exec_interactive"):
             st = str(upd["exec_interactive"])
             if st == "paused":

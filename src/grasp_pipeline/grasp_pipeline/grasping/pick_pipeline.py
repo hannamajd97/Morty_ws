@@ -1001,7 +1001,12 @@ class PickPipeline:
 
         fixed_rot = self._node.get_parameter("grasp2tcp_rot").value
         try:
-            T_tcp = T @ _make_T_grasp_to_tcp(fixed_rot) @ _make_T_offset(self._grasp_offset())
+            off = self._grasp_offset()
+            self._node.get_logger().info(
+                f"[calib] executed pose = GraspGen pose × {fixed_rot} × offset "
+                f"[{off[0]:+.3f}, {off[1]:+.3f}, {off[2]:+.3f}] m (TCP frame), "
+                f"matrix_normalized={bool(self._node.get_parameter('graspgen_matrix_normalized').value)}")
+            T_tcp = T @ _make_T_grasp_to_tcp(fixed_rot) @ _make_T_offset(off)
         except Exception as e:
             self._node.get_logger().warn(f"Failed to apply grasp2tcp_rot='{fixed_rot}': {e}; using identity.")
             T_tcp = T
