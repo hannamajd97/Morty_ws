@@ -361,6 +361,10 @@ class MortyGuiBridge(Node):
         # then retry once.
         self._dashboard_quit = self.create_client(Trigger, "/dashboard_client/quit")
         self._dashboard_connect = self.create_client(Trigger, "/dashboard_client/connect")
+        # The pendant's "connection to the remote PC ... refused" popup
+        # (2026-09-16): External Control keeps running while the driver is
+        # away and complains; it is closed before every Play.
+        self._dashboard_close_popup = self.create_client(Trigger, "/dashboard_client/close_popup")
         # Pendant Play state on demand (2026-09-03): robot_program_running
         # only publishes on CHANGE, so a GUI started after the driver can
         # sit at "unknown" forever. The dashboard answers immediately.
@@ -610,6 +614,27 @@ class MortyGuiBridge(Node):
             return False
 
     # ── pendant Play state ───────────────────────────────────────────
+    def stop_program(self) -> bool:
+        """Stop the pendant program through the dashboard (before the driver
+        goes away, so External Control does not lose its PC mid-run and
+        throw the popup). Auto-Play holds off for 10 s afterwards."""
+        if not self._dashboard_stop.service_is_ready():
+            return False
+        try:
+            self._dashboard_stop.call_async(Trigger.Request())
+            self._last_stop_cmd_t = time.monotonic()
+            return True
+        except Exception:
+            return False
+
+    def close_popup(self) -> None:
+        """Dismiss a pendant popup (fire-and-forget)."""
+        try:
+            if self._dashboard_close_popup.service_is_ready():
+                self._dashboard_close_popup.call_async(Trigger.Request())
+        except Exception:
+            pass
+
     def play_program(self, _retry: bool = True) -> bool:
         """Start the pendant program through the UR dashboard (needs Remote
         control mode). Result lands in status_text; the Play LED follows
@@ -620,6 +645,7 @@ class MortyGuiBridge(Node):
             self.status_text = "Play: UR dashboard not available (driver down?)"
             return False
         self.status_text = "Play sent to the pendant..."
+        self.close_popup()
         fut = self._dashboard_play.call_async(Trigger.Request())
 
         def _reconnect_then_retry():

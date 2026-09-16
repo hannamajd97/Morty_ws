@@ -398,6 +398,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._pipeline = ManagedLaunch(self)
         self._graspgen = ManagedLaunch(self)   # GraspGen service, lives with the pipeline (2026-09-09)
         self._exec_holding = False              # executor holds an object and waits for a drop side
+        self._driver_restart_pending = False
+        self._driver_retries = 0
+        self._driver_start_t = 0.0
         self._naming = ManagedLaunch(self)     # naming service (Qwen3-VL-8B), lives with the pipeline (2026-09-15)
         self._rviz_extra = ManagedLaunch(self)
         self._camera_extra = ManagedLaunch(self)
@@ -1853,13 +1856,32 @@ class OperatorWindow(QtWidgets.QMainWindow):
 
     def _on_driver_btn(self) -> None:
         if self._driver.running():
-            self._driver.stop()
-            self._replay_extra.stop()
-            self._named_pose_extra.stop()
+            # Pendant program first (2026-09-16): External Control still
+            # running when the PC side vanishes = "connection to the remote
+            # PC ... refused" on the pendant, and the next driver start finds
+            # a robot busy with that error (primary stream dropped, control
+            # node dead in 1 s). Stop it, give it 0.8 s, then stop the stack.
+            self._driver_restart_pending = False
+            self._driver_retries = 99          # a manual stop is not retried
+            stopped = self.bridge.stop_program()
             self.driver_btn.setText("stopping…")
             self.driver_btn.setEnabled(False)
-            self.statusBar().showMessage("Stopping driver stack (escalating if it hangs)…")
+            self.statusBar().showMessage(
+                "Stopping the pendant program, then the driver stack…" if stopped
+                else "Stopping driver stack (escalating if it hangs)…")
+            QtCore.QTimer.singleShot(800 if stopped else 0, self._stop_driver_stack)
             return
+        self._driver_retries = 0
+        self._start_driver()
+
+    def _stop_driver_stack(self) -> None:
+        self._driver.stop()
+        self._replay_extra.stop()
+        self._named_pose_extra.stop()
+
+    def _start_driver(self) -> None:
+        self._driver_restart_pending = False
+        self._driver_start_t = time.monotonic()
         offline = self.mode_combo.currentIndex() == 1
         if self.cb_camera.isChecked():
             # The driver launch will bring its own RealSense node — a
@@ -2412,6 +2434,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
     # ── UI refresh ───────────────────────────────────────────────────
     def _reap_system(self) -> None:
         rc = self._driver.reap()
+        if rc is not None and getattr(self, "_driver_restart_pending", False):
+            QtCore.QTimer.singleShot(3000, self._start_driver)
         if rc is not None:
             self.driver_btn.setText("Start driver")
             self.driver_btn.setEnabled(True)
@@ -2557,6 +2581,20 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self._tune_priorities()
             self._refresh_detection_status()
             self._refresh_ready_parts()
+        # Driver start watchdog (2026-09-16): the control node dies within a
+        # second when the robot does not answer at that moment; nothing in the
+        # launch restarts it. 25 s without joint states after a start = stop
+        # the stack and start it again, twice at most.
+        if (self._driver.running() and not self._driver_restart_pending
+                and self.mode_combo.currentIndex() != 1
+                and time.monotonic() - getattr(self, "_driver_start_t", 0.0) > 25.0
+                and time.monotonic() - self.bridge._joint_state_t > 5.0
+                and self._driver_retries < 2):
+            self._driver_retries += 1
+            self._driver_restart_pending = True
+            self.statusBar().showMessage(
+                f"Robot did not answer the driver in time — restarting the driver (attempt {self._driver_retries + 1} of 3)")
+            self._stop_driver_stack()
         # One-shot: apply the Advanced hold times as soon as the adapter
         # exists, so VOICE picks (which never press EXECUTE) also grip
         # with what the GUI shows instead of the adapter's launch
@@ -3138,6 +3176,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self.mmhri_win.vla_shutdown()   # the recorder we launched, if any
                 self._pipeline.stop()
                 self._graspgen.stop()
+                self.bridge.stop_program()
                 self._driver.stop()
                 self._rviz_extra.stop()
                 self._camera_extra.stop()
