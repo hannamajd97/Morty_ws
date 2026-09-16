@@ -1016,7 +1016,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
             return
         detail = (f"approach {float(got['velocity_scaling']):.2f}/{float(got['acceleration_scaling']):.2f}, "
                   f"arc {float(got['blend_velocity_scaling']):.1f}, return {float(got['fast_replay_duration_s']):.1f} s, "
-                  f"open {float(got['gripper_open_time_s']):.1f}+{float(got['open_before_arrival_margin_s']):.1f} s")
+                  f"open {float(got['gripper_open_time_s']):.1f}+{float(got['open_before_arrival_margin_s']):.1f} s, "
+                  f"drop hold {float(got['drop_hold_s']):.1f} s, after release {float(got['post_release_wait_s']):.1f} s")
         if self._readback_matches(got, want):
             self.motion_win.show_speed_apply("ok", detail)
         else:
@@ -1859,7 +1860,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if not self.bridge.fast_replay_available():
             self._replay_extra.start(list(REPLAY_CMD))
         if not self.bridge.named_pose_server_available():
-            self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD))
+            self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD), log_path=NAMED_POSE_LOG)
         self.driver_btn.setText("Stop driver")
         self.mode_combo.setEnabled(False)
         self.statusBar().showMessage(
@@ -2634,7 +2635,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self._replay_extra.start(list(REPLAY_CMD))
             if (self._driver.running() and not self._named_pose_extra.running()
                     and not self.bridge.named_pose_server_available()):
-                self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD))
+                self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD), log_path=NAMED_POSE_LOG)
             # Same self-heal for the LLM grasp executor: a pipeline without
             # it selects grasps and then waits on cycle_done forever.
             if self._pipeline.running() and not self._executor.running():

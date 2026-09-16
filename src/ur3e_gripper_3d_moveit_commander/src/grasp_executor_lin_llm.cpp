@@ -264,7 +264,13 @@ public:
     one_shot_ = get_or_declare_param<bool>(node_, "one_shot", true);
     velocity_scaling_ = get_or_declare_param<double>(node_, "velocity_scaling", 0.5);
     acceleration_scaling_ = get_or_declare_param<double>(node_, "acceleration_scaling", 0.5);
-    drop_hold_s_ = get_or_declare_param<double>(node_, "drop_hold_s", 5.0);
+    // 0.5 s since 2026-09-16 (was 5.0: Majd "how long does it take before
+    // opening?" — five seconds of standing at the drop). Just a settle.
+    drop_hold_s_ = get_or_declare_param<double>(node_, "drop_hold_s", 0.5);
+    // After the release the arm STAYS for this long before going home (Majd
+    // 2026-09-16: "it should wait 2 s until I took the object, before it
+    // hits me"). The voice flow's home-confirm has its own 3 s.
+    post_release_wait_s_ = get_or_declare_param<double>(node_, "post_release_wait_s", 2.0);
     drop_target_name_ = get_or_declare_param<std::string>(node_, "drop_target_name", "drop_right_side");
     reset_target_name_ = get_or_declare_param<std::string>(node_, "reset_target_name", "home");
     // Fast-replay short-circuit: when enabled, named-target moves
@@ -2310,6 +2316,16 @@ public:
           s_ok.data = "released";
           interactive_status_pub_->publish(s_ok);
         } catch (...) {}
+        if (execute_ && post_release_wait_s_ > 0.0 && !ask_home_before_reset) {
+          RCLCPP_INFO(node_->get_logger(),
+            "Step 5c - Released; staying %.1f s at the drop pose before going home.", post_release_wait_s_);
+          const auto t_end = std::chrono::steady_clock::now() +
+            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(post_release_wait_s_));
+          while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
+            rclcpp::spin_some(node_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+          }
+        }
       } else {
         try {
           std_msgs::msg::String s_bad;
@@ -5182,6 +5198,21 @@ private:
     try {
       blend_velocity_scaling_ =
         node_->get_parameter("blend_velocity_scaling").as_double();
+    if (node_->has_parameter("drop_hold_s")) {
+      drop_hold_s_ = node_->get_parameter("drop_hold_s").as_double();
+    }
+    if (node_->has_parameter("post_release_wait_s")) {
+      post_release_wait_s_ = node_->get_parameter("post_release_wait_s").as_double();
+    }
+    if (node_->has_parameter("fast_replay_duration_s")) {
+      fast_replay_duration_s_ = node_->get_parameter("fast_replay_duration_s").as_double();
+    }
+    if (node_->has_parameter("gripper_open_time_s")) {
+      gripper_open_time_s_ = node_->get_parameter("gripper_open_time_s").as_double();
+    }
+    if (node_->has_parameter("open_before_arrival_margin_s")) {
+      open_before_arrival_margin_s_ = node_->get_parameter("open_before_arrival_margin_s").as_double();
+    }
       if (blend_velocity_scaling_ > 0.5) {
         RCLCPP_WARN(node_->get_logger(),
           "blend_velocity_scaling=%.2f exceeds the 0.50 UR3e ceiling; "
@@ -5440,6 +5471,7 @@ private:
   std::string gripper_action_name_;
   double gripper_action_timeout_s_;
   double gripper_open_time_s_{1.2};
+  double post_release_wait_s_{2.0};
   double open_before_arrival_margin_s_{0.5};
   double min_exec_duration_s_{0.0};   // consumed by execute_arm_lin_pose for the approach
   std::chrono::steady_clock::time_point open_sent_t_{};

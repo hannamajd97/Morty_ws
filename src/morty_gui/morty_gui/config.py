@@ -44,7 +44,7 @@ __all__ = [
     "PERCEPTION_PARAMS",
     "PIPELINE_CMD",
     "GRASPGEN_SERVICE_CMD", "GRASPGEN_LOG", "GRASPGEN_PGREP", "PIPELINE_ENV_EXTRA",
-    "NAMING_SERVICE_CMD", "NAMING_LOG", "NAMING_PGREP", "LLAMA_SERVER_BIN",
+    "NAMING_SERVICE_CMD", "NAMING_LOG", "NAMING_PGREP", "LLAMA_SERVER_BIN", "NAMED_POSE_LOG",
     "PLANNER_LIBS",
     "PROFILE_HELP",
     "RED",
@@ -279,6 +279,7 @@ NAMING_SERVICE_CMD = [
     "--no-mmproj-offload",
 ]
 NAMING_LOG = os.path.expanduser("~/morty_ws/logs/naming_gui.log")
+NAMED_POSE_LOG = os.path.expanduser("~/morty_ws/logs/named_pose_gui.log")
 NAMING_PGREP = r"llama-server.*qwen3-vl-8b-q4_k_[m]"
 GRASPGEN_PGREP = r"graspgen_service\.p[y]"
 # MORTY_GRASP_PRECOMPUTE: the grasp precompute cache is on for every

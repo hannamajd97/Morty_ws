@@ -212,6 +212,16 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.speed_margin_spin.setValue(qs.value("pick_speed/open_before_arrival_margin_s", 0.5, type=float))
         self.speed_margin_spin.setToolTip('Safety on top of the open time. It also covers the ~0.25 s between sending the\nopen and the pulse really starting on the robot. Arrival ≥ open time + margin after the send.')
         speed_form.addRow("Open margin (s):", self.speed_margin_spin)
+        self.speed_hold_spin = QtWidgets.QDoubleSpinBox()
+        self.speed_hold_spin.setRange(0.0, 5.0); self.speed_hold_spin.setSingleStep(0.1)
+        self.speed_hold_spin.setValue(qs.value("pick_speed/drop_hold_s", 0.5, type=float))
+        self.speed_hold_spin.setToolTip("At the drop pose: how long the arm stands still BEFORE the gripper opens (a settle). Was 5 s.")
+        speed_form.addRow("Hold at drop (s):", self.speed_hold_spin)
+        self.speed_after_spin = QtWidgets.QDoubleSpinBox()
+        self.speed_after_spin.setRange(0.0, 10.0); self.speed_after_spin.setSingleStep(0.5)
+        self.speed_after_spin.setValue(qs.value("pick_speed/post_release_wait_s", 2.0, type=float))
+        self.speed_after_spin.setToolTip("AFTER the gripper opens: how long the arm stays at the drop pose before going home,\nso you can take the object without the arm swinging at you.")
+        speed_form.addRow("Wait after release (s):", self.speed_after_spin)
         self.speed_status = QtWidgets.QLabel("")
         self.speed_status.setWordWrap(True)
         self.speed_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
@@ -222,11 +232,13 @@ class MotionWindow(QtWidgets.QMainWindow):
         )
         speed_form.addRow("", self._apply_row(self.speed_apply_btn, self.speed_status))
         for _w in (self.speed_vel_spin, self.speed_acc_spin, self.speed_transport_combo,
-                   self.speed_return_combo, self.speed_open_spin, self.speed_margin_spin):
+                   self.speed_return_combo, self.speed_open_spin, self.speed_margin_spin,
+                   self.speed_hold_spin, self.speed_after_spin):
             _lab = speed_form.labelForField(_w)
             if _lab is not None:
                 _lab.setToolTip(_w.toolTip())
-        for _w in (self.speed_vel_spin, self.speed_acc_spin, self.speed_open_spin, self.speed_margin_spin):
+        for _w in (self.speed_vel_spin, self.speed_acc_spin, self.speed_open_spin, self.speed_margin_spin,
+                   self.speed_hold_spin, self.speed_after_spin):
             _w.valueChanged.connect(self._mark_speed_stale)
         for _c in (self.speed_transport_combo, self.speed_return_combo):
             _c.currentIndexChanged.connect(self._mark_speed_stale)
@@ -361,6 +373,8 @@ class MotionWindow(QtWidgets.QMainWindow):
             "fast_replay_duration_s": float(self._return_tiers[self.speed_return_combo.currentIndex()][1]),
             "gripper_open_time_s": float(self.speed_open_spin.value()),
             "open_before_arrival_margin_s": float(self.speed_margin_spin.value()),
+            "drop_hold_s": float(self.speed_hold_spin.value()),
+            "post_release_wait_s": float(self.speed_after_spin.value()),
         }
 
     def pick_speed_launch_args(self) -> List[str]:
