@@ -993,6 +993,16 @@ class MortyGuiBridge(Node):
             return float(pv.double_value)
         if t == ParameterType.PARAMETER_STRING:
             return str(pv.string_value)
+        # Arrays (2026-09-16): grasp2tcp_offset_m is a double array; the
+        # read-back returned None for it, so Apply reported "no answer".
+        if t == ParameterType.PARAMETER_DOUBLE_ARRAY:
+            return [float(x) for x in pv.double_array_value]
+        if t == ParameterType.PARAMETER_INTEGER_ARRAY:
+            return [int(x) for x in pv.integer_array_value]
+        if t == ParameterType.PARAMETER_BOOL_ARRAY:
+            return [bool(x) for x in pv.bool_array_value]
+        if t == ParameterType.PARAMETER_STRING_ARRAY:
+            return [str(x) for x in pv.string_array_value]
         return None
 
     @staticmethod
@@ -1000,6 +1010,17 @@ class MortyGuiBridge(Node):
         # bool must be checked before int (bool is an int subclass).
         if isinstance(v, bool):
             return ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=v)
+        # A list was sent as its str() before, which the node rejected as a
+        # type mismatch: the GUI's -0.010 offset never reached the pipeline.
+        if isinstance(v, (list, tuple)):
+            if all(isinstance(x, bool) for x in v):
+                return ParameterValue(type=ParameterType.PARAMETER_BOOL_ARRAY, bool_array_value=list(v))
+            if all(isinstance(x, int) for x in v):
+                return ParameterValue(type=ParameterType.PARAMETER_INTEGER_ARRAY, integer_array_value=list(v))
+            if all(isinstance(x, (int, float)) for x in v):
+                return ParameterValue(type=ParameterType.PARAMETER_DOUBLE_ARRAY,
+                                      double_array_value=[float(x) for x in v])
+            return ParameterValue(type=ParameterType.PARAMETER_STRING_ARRAY, string_array_value=[str(x) for x in v])
         if isinstance(v, int):
             return ParameterValue(type=ParameterType.PARAMETER_INTEGER, integer_value=v)
         if isinstance(v, float):
