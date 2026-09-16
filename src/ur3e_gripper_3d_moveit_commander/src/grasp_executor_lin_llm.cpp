@@ -194,6 +194,13 @@ public:
     // staging from #181.
     use_pregrasp_staging_ = get_or_declare_param<bool>(
       node_, "use_pregrasp_staging", false);
+    // "ptp" = the 2026-09-11 stand-off (PTP to the pre-grasp, then LIN);
+    // "lin" = two straight lines (Majd 2026-09-16: the V of the fingers
+    // swept into the object on the direct line): LIN to a point
+    // pregrasp_approach_distance behind the grasp along the gripper's z,
+    // then LIN the last stretch along z. Both lines are planned in the
+    // probe / background check and reused at the click.
+    staging_mode_ = get_or_declare_param<std::string>(node_, "staging_mode", "ptp");
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -740,6 +747,8 @@ public:
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     geometry_msgs::msg::PoseStamped plan_pose;
     double plan_wall_s = 0.0;
+    bool has_final_plan = false;  // staging_mode lin: the last stretch pre-grasp -> grasp
+    moveit::planning_interface::MoveGroupInterface::Plan final_plan;
     std::vector<double> joints;   // arm joints at probe time, jmg order
     std::chrono::steady_clock::time_point t_done{};
     std::string reason;           // the search's own verdict when nothing was feasible
@@ -776,6 +785,8 @@ public:
       }
       if (cached_lin_plan_valid_) {
         rec->has_plan = true; rec->plan = cached_lin_plan_;
+        rec->has_final_plan = cached_final_plan_valid_;
+        if (cached_final_plan_valid_) { rec->final_plan = cached_final_plan_; }
         rec->plan_pose = cached_lin_plan_pose_; rec->plan_wall_s = cached_lin_plan_wall_s_;
       }
       invalidate_cached_lin_plan("kept in the background-check record instead");
@@ -828,6 +839,8 @@ public:
   void apply_precheck(const PrecheckRecord & rec)
   {
     if (rec.has_plan) { cache_lin_plan(rec.plan_pose, rec.plan, rec.plan_wall_s); }
+    cached_final_plan_valid_ = rec.has_final_plan;
+    if (rec.has_final_plan) { cached_final_plan_ = rec.final_plan; }
     skip_next_precheck_ = true;
   }
 
@@ -1115,7 +1128,62 @@ public:
     if (aborted_at("the approach")) {
       return false;
     }
-    if (use_pregrasp_staging_) {
+    bool staged_lin_done = false;
+    bool staged_lin_ok = false;
+    if (use_pregrasp_staging_ && staging_mode_ == "lin") {
+      // Two straight lines: LIN to the pre-grasp (fingers apart on arrival),
+      // then LIN the last stretch along the gripper's z. Both plans come from
+      // the probe / background check when they match; otherwise planned now.
+      const auto pre_pose = compute_pregrasp_pose(grasp_pose_world, pregrasp_approach_distance_);
+      moveit::planning_interface::MoveGroupInterface::Plan pre_plan, final_plan;
+      std::string reuse_reject;
+      bool have_plans = try_reuse_cached_lin_plan(grasp_pose_world, pre_plan, &reuse_reject) && cached_final_plan_valid_;
+      if (have_plans) {
+        final_plan = cached_final_plan_;
+        RCLCPP_INFO(node_->get_logger(), "Step 2a/2b - both lines reused from the probe.");
+      } else {
+        RCLCPP_INFO(node_->get_logger(), "Step 2a/2b - planning both lines now (%s).",
+          reuse_reject.empty() ? "no final plan held" : reuse_reject.c_str());
+        std::string why;
+        if (!can_reach_via_pregrasp(grasp_pose_world, &why) || !cached_final_plan_valid_) {
+          RCLCPP_ERROR(node_->get_logger(), "Step 2a/2b planning failed: %s", why.c_str());
+          recover_to_reset_target("Step 2a/2b (two lines) planning failed");
+          return false;
+        }
+        pre_plan = cached_lin_plan_;
+        final_plan = cached_final_plan_;
+      }
+      staged_lin_done = true;
+      if (!execute_) {
+        RCLCPP_INFO(node_->get_logger(), "Step 2a/2b: execute:=false, skipping execution.");
+        staged_lin_ok = true;
+      } else {
+        stretch_plan_to_min_duration(
+          pre_plan, gripper_open_time_s_ + open_before_arrival_margin_s_, "Step 2a - LIN to pre-grasp");
+        RCLCPP_INFO(node_->get_logger(), "Step 2a - LIN to the pre-grasp %.0f cm behind the grasp.",
+          pregrasp_approach_distance_ * 100.0);
+        auto r1 = execute_with_deadline(pre_plan, __func__);
+        if (r1 != moveit::core::MoveItErrorCode::SUCCESS) {
+          RCLCPP_ERROR(node_->get_logger(), "Step 2a - LIN to pre-grasp: execution failed: %s (%d)",
+            moveit::core::error_code_to_string(r1).c_str(), r1.val);
+        } else {
+          log_arrival_error(pre_pose, "Step 2a - LIN to pre-grasp");
+          if (aborted_at("the pre-grasp")) { return false; }
+          const auto t2 = std::chrono::steady_clock::now();
+          auto r2 = execute_with_deadline(final_plan, __func__);
+          const double dt2 = std::chrono::duration<double>(std::chrono::steady_clock::now() - t2).count();
+          if (r2 != moveit::core::MoveItErrorCode::SUCCESS) {
+            RCLCPP_ERROR(node_->get_logger(), "Step 2b - LIN to the grasp: execution failed: %s (%d)",
+              moveit::core::error_code_to_string(r2).c_str(), r2.val);
+          } else {
+            RCLCPP_INFO(node_->get_logger(), "Step 2b - LIN to the grasp: execution OK (%.2f s for the last %.0f cm).",
+              dt2, pregrasp_approach_distance_ * 100.0);
+            log_arrival_error(grasp_pose_world, "Step 2b - LIN to the grasp");
+            staged_lin_ok = true;
+          }
+        }
+      }
+    } else if (use_pregrasp_staging_) {
       const auto pre_pose =
         compute_pregrasp_pose(grasp_pose_world, pregrasp_approach_distance_);
       RCLCPP_INFO(node_->get_logger(),
@@ -1133,8 +1201,10 @@ public:
         return false;
       }
     }
-    bool step2_ok = false;
-    if (approach_planned) {
+    bool step2_ok = staged_lin_ok;
+    if (staged_lin_done) {
+      // both lines already ran above
+    } else if (approach_planned) {
       // Execute the PRE-COMPUTED plan immediately — no thinking pause.
       if (!execute_) {
         RCLCPP_INFO(node_->get_logger(),
@@ -2517,6 +2587,7 @@ public:
     cached_lin_plan_valid_ = false;
     cached_lin_plan_.trajectory_ = moveit_msgs::msg::RobotTrajectory();
     cached_lin_plan_wall_s_ = 0.0;
+    cached_final_plan_valid_ = false;
     RCLCPP_INFO(node_->get_logger(), "Probe-plan cache dropped: %s.", why);
   }
   bool has_cached_lin_plan() const { return cached_lin_plan_valid_; }
@@ -2910,13 +2981,16 @@ private:
     arm_group_.clearPoseTargets();
     arm_group_.setStartStateToCurrentState();
     arm_group_.setPlanningPipelineId("pilz_industrial_motion_planner");
-    arm_group_.setPlannerId("PTP");
+    const bool lin_staging = (staging_mode_ == "lin");
+    arm_group_.setPlannerId(lin_staging ? "LIN" : "PTP");
     if (!arm_group_.setPoseTarget(pre_pose, ee)) {
       if (reason) { *reason = "LIN planning failed: NO_IK_SOLUTION (-31)"; }
       return false;
     }
     moveit::planning_interface::MoveGroupInterface::Plan pre_plan;
-    const auto pre_result = timed_plan(pre_plan, "candidate probe stage-A PTP");
+    double wall_a = 0.0;
+    const auto pre_result = timed_plan(pre_plan, lin_staging ? "candidate probe stage-A LIN to pre-grasp"
+                                                             : "candidate probe stage-A PTP", &wall_a);
     if (pre_result != moveit::core::MoveItErrorCode::SUCCESS) {
       if (reason) {
         *reason = "stand-off unreachable: " +
@@ -2948,9 +3022,17 @@ private:
       if (reason) { *reason = "LIN planning failed: NO_IK_SOLUTION (-31)"; }
     } else {
       moveit::planning_interface::MoveGroupInterface::Plan lin_plan;
-      const auto lin_result = timed_plan(lin_plan, "candidate probe stage-B LIN");
+      double wall_b = 0.0;
+      const auto lin_result = timed_plan(lin_plan, "candidate probe stage-B LIN", &wall_b);
       if (lin_result == moveit::core::MoveItErrorCode::SUCCESS) {
         ok = true;
+        if (lin_staging) {
+          // Keyed by the GRASP pose so plan reuse and the background record
+          // match as before; the plan itself ends at the pre-grasp point.
+          cache_lin_plan(target_pose, pre_plan, wall_a + wall_b);
+          cached_final_plan_ = lin_plan;
+          cached_final_plan_valid_ = true;
+        }
       } else if (reason) {
         *reason = "LIN planning failed: " +
           moveit::core::error_code_to_string(lin_result) +
@@ -5473,6 +5555,9 @@ private:
   bool execute_;
   double pregrasp_distance_;
   bool use_pregrasp_staging_{true};
+  std::string staging_mode_{"ptp"};
+  moveit::planning_interface::MoveGroupInterface::Plan cached_final_plan_;   // pre-grasp -> grasp (staging_mode lin)
+  bool cached_final_plan_valid_{false};
   double pregrasp_approach_distance_{0.10};
   std::string target_frame_;
   double tf_timeout_;

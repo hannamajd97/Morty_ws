@@ -139,6 +139,8 @@ def generate_launch_description():
                 default_value="false",
                 description="PTP to a stand-off in front of the grasp, then LIN for the last stretch.",
             ),
+            DeclareLaunchArgument("staging_mode", default_value="ptp",
+                              description="ptp = PTP to the stand-off then LIN; lin = two straight lines (pre-grasp, then the last stretch)."),
             DeclareLaunchArgument(
                 "pregrasp_approach_distance",
                 default_value="0.10",
@@ -332,6 +334,7 @@ def generate_launch_description():
                         "wait_for_release": LaunchConfiguration("wait_for_release"),
                         "use_pregrasp_staging": LaunchConfiguration("use_pregrasp_staging"),
                         "pregrasp_approach_distance": LaunchConfiguration("pregrasp_approach_distance"),
+                        "staging_mode": LaunchConfiguration("staging_mode"),
                         "lift_height_m": LaunchConfiguration("lift_height_m"),
                         "lift_table_yaw_deg": LaunchConfiguration("lift_table_yaw_deg"),
                         "lift_table_frame": LaunchConfiguration("lift_table_frame"),

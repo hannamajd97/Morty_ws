@@ -332,8 +332,8 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # limit are refused again ("straight line not drivable" in the
                 # log). Candidate for later: straight line first, stand-off
                 # only as the fallback.
-                "use_pregrasp_staging:=false",
-                "pregrasp_approach_distance:=0.10",
+                "use_pregrasp_staging:=true", "staging_mode:=lin",
+                "pregrasp_approach_distance:=0.05",
                 # 50 % (Majd 2026-09-11 18:30; the launch defaults gave
                 # 0.2 / 0.1): arm travel ~3 s -> ~1.8 s per pick. Live-tunable
                 # afterwards: ros2 param set /grasp_executor_lin_llm velocity_scaling X
