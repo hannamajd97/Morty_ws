@@ -176,12 +176,12 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.speed_vel_spin = QtWidgets.QDoubleSpinBox()
         self.speed_vel_spin.setRange(0.10, 0.50); self.speed_vel_spin.setSingleStep(0.05)
         self.speed_vel_spin.setValue(qs.value("pick_speed/velocity_scaling", 0.40, type=float))
-        self.speed_vel_spin.setToolTip("Home → grasp straight line: fraction of the arm's joint speed limits. 0.5 is the ceiling.")
+        self.speed_vel_spin.setToolTip("Home → grasp, the straight line to the object.\nHow fast the arm moves along it, as a fraction of the joints' speed limits:\n0.5 = half of the maximum (the ceiling, above it the arm protective-stops), 0.4 = a bit calmer,\n0.2 = slow. Typical approach: 1.3–3 s. A plan shorter than open time + margin is stretched.")
         speed_form.addRow("Approach speed:", self.speed_vel_spin)
         self.speed_acc_spin = QtWidgets.QDoubleSpinBox()
         self.speed_acc_spin.setRange(0.10, 0.50); self.speed_acc_spin.setSingleStep(0.05)
         self.speed_acc_spin.setValue(qs.value("pick_speed/acceleration_scaling", 0.50, type=float))
-        self.speed_acc_spin.setToolTip("Home → grasp: fraction of the acceleration limits. Refusals 'joint would turn X rad per cm' come from here.")
+        self.speed_acc_spin.setToolTip("Home → grasp: how hard the arm may accelerate on that line, fraction of the limits.\nLower it if the log says 'joint would turn X rad per cm — speed limit exceeded';\nthe executor already retries a refused line once at half of this.")
         speed_form.addRow("Approach accel.:", self.speed_acc_spin)
         self.speed_transport_combo = QtWidgets.QComboBox()
         self._transport_tiers = [("slow  0.2 — 8.0 s, ~30 % of joint limits", 0.2),
@@ -192,7 +192,7 @@ class MotionWindow(QtWidgets.QMainWindow):
             self.speed_transport_combo.addItem(label)
         self._select_tier(self.speed_transport_combo, self._transport_tiers,
                           qs.value("pick_speed/blend_velocity_scaling", 0.3, type=float))
-        self.speed_transport_combo.setToolTip("Lift → home → drop, one blended arc (blend_velocity_scaling). Above 0.5 the arm protective-stops.")
+        self.speed_transport_combo.setToolTip("Lift → home → drop, one blended arc with the object in the gripper.\nEach tier is a fixed time per segment, measured against the joints' limits on the taught poses:\nslow 8.0 s (~30 %), normal 5.4 s (45 %), fast 4.0 s (61 %), very fast 3.2 s (76 %).\nAbove 0.5 the elbow overspeeds and the robot protective-stops.")
         speed_form.addRow("Transport (arc):", self.speed_transport_combo)
         self.speed_return_combo = QtWidgets.QComboBox()
         self._return_tiers = [("slow — 4.0 s", 4.0), ("normal — 2.7 s", 2.7), ("fast — 2.0 s", 2.0), ("very fast — 1.6 s", 1.6)]
@@ -200,26 +200,32 @@ class MotionWindow(QtWidgets.QMainWindow):
             self.speed_return_combo.addItem(label)
         self._select_tier(self.speed_return_combo, self._return_tiers,
                           qs.value("pick_speed/fast_replay_duration_s", 2.7, type=float))
-        self.speed_return_combo.setToolTip("Drop → home, and every other named-pose move of the executor (fast_replay_duration_s).")
+        self.speed_return_combo.setToolTip('Drop → home after the release, and any other named-pose move of the executor\n(recovery to home too). One fixed duration per tier.')
         speed_form.addRow("Return home:", self.speed_return_combo)
         self.speed_open_spin = QtWidgets.QDoubleSpinBox()
         self.speed_open_spin.setRange(0.3, 2.0); self.speed_open_spin.setSingleStep(0.1)
         self.speed_open_spin.setValue(qs.value("pick_speed/gripper_open_time_s", 1.2, type=float))
-        self.speed_open_spin.setToolTip("Time the fingers need to be fully apart after the open pulse (measured 1.0–1.3 s).")
+        self.speed_open_spin.setToolTip('How long the fingers need to be fully apart after the open pulse is sent.\nMeasured 2026-09-16: still opening at 1.0 s, open at 1.3 s. The arm may not reach the object\nbefore open time + margin has passed, and the close waits for it as well.')
         speed_form.addRow("Gripper open time (s):", self.speed_open_spin)
         self.speed_margin_spin = QtWidgets.QDoubleSpinBox()
         self.speed_margin_spin.setRange(0.0, 1.0); self.speed_margin_spin.setSingleStep(0.1)
         self.speed_margin_spin.setValue(qs.value("pick_speed/open_before_arrival_margin_s", 0.5, type=float))
-        self.speed_margin_spin.setToolTip("Extra time before the arm may arrive: open time + margin. Covers the 0.25 s until the pulse really starts.")
+        self.speed_margin_spin.setToolTip('Safety on top of the open time. It also covers the ~0.25 s between sending the\nopen and the pulse really starting on the robot. Arrival ≥ open time + margin after the send.')
         speed_form.addRow("Open margin (s):", self.speed_margin_spin)
         self.speed_status = QtWidgets.QLabel("")
         self.speed_status.setWordWrap(True)
         self.speed_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
         self.speed_apply_btn = self._small_apply_button(
-            "Send these speeds to the running grasp executor, then read\n"
-            "them back to verify. They are also used when the executor next starts."
+            "Send these six values to the running grasp executor and read them back.\n"
+            "Green = the executor confirmed them. They are remembered and used again\n"
+            "when the executor next starts, so a restart keeps them."
         )
         speed_form.addRow("", self._apply_row(self.speed_apply_btn, self.speed_status))
+        for _w in (self.speed_vel_spin, self.speed_acc_spin, self.speed_transport_combo,
+                   self.speed_return_combo, self.speed_open_spin, self.speed_margin_spin):
+            _lab = speed_form.labelForField(_w)
+            if _lab is not None:
+                _lab.setToolTip(_w.toolTip())
         for _w in (self.speed_vel_spin, self.speed_acc_spin, self.speed_open_spin, self.speed_margin_spin):
             _w.valueChanged.connect(self._mark_speed_stale)
         for _c in (self.speed_transport_combo, self.speed_return_combo):
