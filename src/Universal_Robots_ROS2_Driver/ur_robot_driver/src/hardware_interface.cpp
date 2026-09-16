@@ -38,6 +38,8 @@
 //----------------------------------------------------------------------
 #include <algorithm>
 #include <memory>
+#include <thread>
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -596,7 +598,31 @@ URPositionHardwareInterface::on_configure(const rclcpp_lifecycle::State& previou
     driver_config.tool_comm_setup = std::move(tool_comm_setup);
     driver_config.handle_program_state =
         std::bind(&URPositionHardwareInterface::handleRobotProgramState, this, std::placeholders::_1);
-    ur_driver_ = std::make_unique<urcl::UrDriver>(driver_config);
+    // Retry the connection instead of dying (Morty, 2026-09-16): the client
+    // library waits one second for the robot's configuration package and
+    // throws; a robot still busy with a just-broken External Control
+    // connection misses that window, the control node died with
+    // "Could not get configuration package within timeout" and the whole
+    // stack had to be restarted by hand. Eight attempts, two seconds apart.
+    {
+      const int max_attempts = 8;
+      for (int attempt = 1;; ++attempt) {
+        try {
+          ur_driver_ = std::make_unique<urcl::UrDriver>(driver_config);
+          break;
+        } catch (urcl::ToolCommNotAvailable&) {
+          throw;
+        } catch (urcl::UrException& e) {
+          if (attempt >= max_attempts) {
+            throw;
+          }
+          RCLCPP_WARN(rclcpp::get_logger("URPositionHardwareInterface"),
+                      "Robot did not answer (%s) — attempt %d of %d, retrying in 2 s.", e.what(), attempt,
+                      max_attempts);
+          std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+      }
+    }
   } catch (urcl::ToolCommNotAvailable& e) {
     RCLCPP_FATAL_STREAM(rclcpp::get_logger("URPositionHardwareInterface"), "See parameter use_tool_communication");
 
