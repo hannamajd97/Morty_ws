@@ -285,9 +285,9 @@ class MortyGuiBridge(Node):
         self._pub_pipeline_abort = self.create_publisher(
             String, "/grasp_pipeline/abort", 10
         )
+        self._dets_t = 0.0
         self.create_subscription(
-            String, "/yolo/all_detections",
-            lambda m: self.trial_mark("detections", str(m.data)[:400]), 5,
+            String, "/yolo/all_detections", self._on_all_detections, 5,
         )
         # Typed text gets its own topic (2026-08-27): the chat node must
         # NOT acoustic-echo-check keyboard input — deliberate typed
@@ -536,6 +536,13 @@ class MortyGuiBridge(Node):
                 return
             self.image_bgr = img
             self.image_dirty = True
+
+    def _on_all_detections(self, msg: String) -> None:
+        self._dets_t = time.monotonic()
+        self.trial_mark("detections", str(msg.data)[:400])
+
+    def executor_alive(self) -> bool:
+        return self.count_publishers("/grasp_executor_lin_llm/cycle_done") > 0
 
     def _on_exec_interactive(self, msg: String) -> None:
         with self._lock:
@@ -1340,6 +1347,7 @@ class MortyGuiBridge(Node):
                 self._voice_stop_pending = False
             now = time.monotonic()
             out["hw_alive"] = (now - self._joint_state_t) < 1.5
+            out["pipeline_alive"] = (now - self._dets_t) < 2.5
             out["camera_alive"] = (now - self._camera_t) < 1.5
             # 3 s, not 1.5: 10 Hz over the shuttle network link.
             out["astra_alive"] = (now - self._astra_t) < 3.0

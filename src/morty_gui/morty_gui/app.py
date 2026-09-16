@@ -492,9 +492,14 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.led_robot = QtWidgets.QLabel("● robot")
         self.led_play = QtWidgets.QLabel("● play")
         self.led_voice = QtWidgets.QLabel("● voice")
+        # "ready" (Majd 2026-09-16): green only when a pick can actually run —
+        # pipeline detecting, GraspGen service warmed up, executor up, and the
+        # naming service answering when unknown-object detection is on.
+        self.led_ready = QtWidgets.QLabel("● ready")
+        self._ready_parts = {}
         for led in (self.led_driver, self.led_camera, self.led_astra,
                     self.led_shuttle, self.led_rviz,
-                    self.led_robot, self.led_play, self.led_voice):
+                    self.led_robot, self.led_play, self.led_voice, self.led_ready):
             led.setStyleSheet(f"color:{GREY}; font-weight:bold; padding:0 5px;")
             toolbar.addWidget(led)
 
@@ -1567,6 +1572,26 @@ class OperatorWindow(QtWidgets.QMainWindow):
         else:
             self.statusBar().showMessage(f"naming service not started: {NAMING_SERVICE_CMD[0]} missing")
 
+    def _refresh_ready_parts(self) -> None:
+        """Every 5 s: the slow checks behind the ready LED."""
+        parts = {}
+        parts["graspgen"] = False
+        if self._graspgen.running():
+            try:
+                with open(GRASPGEN_LOG, "rb") as f:
+                    parts["graspgen"] = b"Service ready" in f.read(65536)
+            except Exception:
+                parts["graspgen"] = False
+        parts["executor"] = self.bridge.executor_alive()
+        if self.cb_open_set.isChecked():
+            try:
+                import urllib.request
+                with urllib.request.urlopen("http://127.0.0.1:8090/health", timeout=0.5) as r:
+                    parts["naming"] = (r.status == 200)
+            except Exception:
+                parts["naming"] = False
+        self._ready_parts = parts
+
     def _refresh_detection_status(self) -> None:
         if not hasattr(self, "det_status"):
             return
@@ -2462,6 +2487,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if self._poll_count % 50 == 0:
             self._tune_priorities()
             self._refresh_detection_status()
+            self._refresh_ready_parts()
         # One-shot: apply the Advanced hold times as soon as the adapter
         # exists, so VOICE picks (which never press EXECUTE) also grip
         # with what the GUI shows instead of the adapter's launch
@@ -2967,6 +2993,18 @@ class OperatorWindow(QtWidgets.QMainWindow):
             paint(self.led_rviz, GREEN, "rviz2 process running")
         else:
             paint(self.led_rviz, GREY, "rviz2 not running")
+        parts = dict(self._ready_parts)
+        parts["pipeline"] = bool(upd.get("pipeline_alive"))
+        missing = [k for k, v in parts.items() if not v]
+        if not self._pipeline.running():
+            paint(self.led_ready, GREY, "pipeline not running")
+        elif not missing:
+            paint(self.led_ready, GREEN, "ready to execute: pipeline detecting, GraspGen warmed up, executor up"
+                  + (", naming service answering" if "naming" in parts else ""))
+        else:
+            names = {"pipeline": "pipeline not detecting yet", "graspgen": "GraspGen still warming up (~80 s)",
+                     "executor": "executor not up", "naming": "naming service still loading"}
+            paint(self.led_ready, RED, "not ready: " + "; ".join(names.get(m, m) for m in missing))
         if upd.get("voice_alive"):
             paint(self.led_voice, GREEN, "voice stack up (/chat/state publishing)")
         elif self._voice.running():
