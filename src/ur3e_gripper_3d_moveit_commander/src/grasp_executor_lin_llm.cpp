@@ -57,6 +57,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
 
 template <typename T>
 T get_or_declare_param(
@@ -218,7 +219,14 @@ public:
     // the joint limits), so there is no seam at the corner — the arm slows
     // there only as much as its joints require. Corner rounding in joint
     // space is bounded by cartesian_path_tolerance_rad.
-    cartesian_path_tolerance_rad_ = get_or_declare_param<double>(node_, "cartesian_path_tolerance_rad", 0.02);
+    cartesian_path_tolerance_rad_ = get_or_declare_param<double>(node_, "cartesian_path_tolerance_rad", 0.05);
+    // The approach is a CURVE, not two lines (2026-09-16, Majd: "like a
+    // human hand"): a quadratic Bezier from the current TCP to the grasp
+    // whose control point lies cartesian_curve_lead_m behind the grasp
+    // along the gripper's z, so the curve arrives along the fingers' axis
+    // with no corner; the last stretch is straight by construction.
+    cartesian_curve_lead_m_ = get_or_declare_param<double>(node_, "cartesian_curve_lead_m", 0.12);
+    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 24);
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.005);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
@@ -3066,12 +3074,49 @@ private:
   bool plan_cartesian_two_lines(
     const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason)
   {
-    const auto pre_pose = compute_pregrasp_pose(target_pose, pregrasp_approach_distance_);
     moveit::core::RobotState start_state(arm_group_.getRobotModel());
     if (!robot_state_from_ear(start_state)) { start_state.setToDefaultValues(); }
     arm_group_.setStartState(start_state);
     arm_group_.setPoseReferenceFrame(target_pose.header.frame_id);
-    std::vector<geometry_msgs::msg::Pose> waypoints = {pre_pose.pose, target_pose.pose};
+    // P0 = current TCP, P2 = grasp, P1 = a point behind the grasp on its
+    // approach axis. The Bezier's final tangent is P2 - P1 = the gripper's
+    // z: the curve lands along the fingers. Orientation is slerped, so the
+    // wrist turns gradually over the whole path instead of at a corner.
+    const std::string ee = arm_group_.getEndEffectorLink();
+    Eigen::Isometry3d T0 = start_state.getGlobalLinkTransform(ee);
+    if (target_pose.header.frame_id != arm_group_.getPlanningFrame()) {
+      try {
+        const auto tf = tf_buffer_.lookupTransform(target_pose.header.frame_id, arm_group_.getPlanningFrame(), tf2::TimePointZero);
+        T0 = tf2::transformToEigen(tf.transform) * T0;
+      } catch (const std::exception & e) {
+        if (reason) { *reason = std::string("no TF for the curve: ") + e.what(); }
+        return false;
+      }
+    }
+    const auto lead_pose = compute_pregrasp_pose(target_pose, cartesian_curve_lead_m_);
+    const Eigen::Vector3d P0 = T0.translation();
+    const Eigen::Vector3d P1(lead_pose.pose.position.x, lead_pose.pose.position.y, lead_pose.pose.position.z);
+    const Eigen::Vector3d P2(target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
+    tf2::Quaternion q0, q2;
+    {
+      const Eigen::Quaterniond eq0(T0.rotation());
+      q0 = tf2::Quaternion(eq0.x(), eq0.y(), eq0.z(), eq0.w());
+      const auto & o = target_pose.pose.orientation;
+      q2 = tf2::Quaternion(o.x, o.y, o.z, o.w);
+    }
+    std::vector<geometry_msgs::msg::Pose> waypoints;
+    const int n = std::max(4, cartesian_curve_samples_);
+    for (int i = 1; i <= n; ++i) {
+      const double u = static_cast<double>(i) / n;
+      const Eigen::Vector3d P = (1 - u) * (1 - u) * P0 + 2 * (1 - u) * u * P1 + u * u * P2;
+      // orientation: reach the grasp orientation by 60 % of the path, then hold it
+      const double w = std::min(1.0, u / 0.6);
+      const tf2::Quaternion q = q0.slerp(q2, w).normalized();
+      geometry_msgs::msg::Pose wp;
+      wp.position.x = P.x(); wp.position.y = P.y(); wp.position.z = P.z();
+      wp.orientation.x = q.x(); wp.orientation.y = q.y(); wp.orientation.z = q.z(); wp.orientation.w = q.w();
+      waypoints.push_back(wp);
+    }
     moveit_msgs::msg::RobotTrajectory path_msg;
     const auto t0 = std::chrono::steady_clock::now();
     const double fraction = arm_group_.computeCartesianPath(
@@ -3099,7 +3144,7 @@ private:
       const auto & pts = plan.trajectory_.joint_trajectory.points;
       const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
       RCLCPP_INFO(node_->get_logger(),
-        "one-motion approach OK: %zu points, %.2f s, one time profile over home -> pre-grasp -> grasp, scaling x%.2f, planned in %.2f s.",
+        "one-motion approach OK: %zu points, %.2f s, one curve from the current TCP into the grasp along the fingers' axis, scaling x%.2f, planned in %.2f s.",
         pts.size(), dur, f, wall);
       return true;
     }
@@ -5817,7 +5862,9 @@ private:
   bool use_pregrasp_staging_{true};
   std::string staging_mode_{"ptp"};
   double blend_radius_m_{0.02};
-  double cartesian_path_tolerance_rad_{0.02};
+  double cartesian_path_tolerance_rad_{0.05};
+  double cartesian_curve_lead_m_{0.12};
+  int cartesian_curve_samples_{24};
   double cartesian_eef_step_m_{0.005};
   rclcpp::Client<moveit_msgs::srv::GetMotionSequence>::SharedPtr sequence_client_;
   moveit::planning_interface::MoveGroupInterface::Plan cached_final_plan_;   // pre-grasp -> grasp (staging_mode lin)
