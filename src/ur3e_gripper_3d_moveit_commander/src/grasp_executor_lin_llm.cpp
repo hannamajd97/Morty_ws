@@ -3077,7 +3077,7 @@ private:
         item.req.planner_id = "LIN";
         item.req.max_velocity_scaling_factor = velocity_scaling_ * f;
         item.req.max_acceleration_scaling_factor = acceleration_scaling_ * f;
-        item.req.allowed_planning_time = lin_feasibility_planning_time_;
+        item.req.allowed_planning_time = std::max(2.0, lin_feasibility_planning_time_);
         if (k == 0) { item.req.start_state = start_msg; }
         item.req.goal_constraints.push_back(
           kinematic_constraints::constructGoalConstraints(ee, k == 0 ? pre_pose : target_pose));
@@ -3802,11 +3802,12 @@ private:
       if (staging_mode_ == "blend") {
         std::string why;
         staged_ok = plan_blended_two_lines(target_pose, &why);
-        if (!staged_ok && why.find("not available") != std::string::npos) {
-          RCLCPP_WARN_ONCE(node_->get_logger(), "%s — falling back to two separate lines.", why.c_str());
+        if (!staged_ok) {
+          // Whatever the sequence planner disliked (service missing, timed
+          // out, blend impossible here), the two separate lines decide the
+          // candidate — a blend problem must never reject a reachable grasp.
+          RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the two separate lines.", why.c_str());
           staged_ok = can_reach_via_pregrasp(target_pose, reason);
-        } else if (!staged_ok && reason) {
-          *reason = why;
         }
       } else {
         staged_ok = can_reach_via_pregrasp(target_pose, reason);

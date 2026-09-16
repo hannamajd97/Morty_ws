@@ -41,7 +41,7 @@ def generate_launch_description():
         .trajectory_execution(file_path="config/moveit_controllers.yaml", moveit_manage_controllers=False)
         .planning_pipelines(
             pipelines=["ompl", "pilz_industrial_motion_planner"],
-            default_planning_pipeline="ompl",
+            default_planning_pipeline="pilz_industrial_motion_planner",   # Pilz sequence service (blended LIN+LIN) plans with the DEFAULT pipeline in Humble (2026-09-16); every other caller names its pipeline explicitly
             load_all=False,
         )
         .to_moveit_configs()
@@ -60,7 +60,7 @@ def generate_launch_description():
         )
         .planning_pipelines(
             pipelines=["ompl", "pilz_industrial_motion_planner"],
-            default_planning_pipeline="ompl",
+            default_planning_pipeline="pilz_industrial_motion_planner",   # Pilz sequence service (blended LIN+LIN) plans with the DEFAULT pipeline in Humble (2026-09-16); every other caller names its pipeline explicitly
             load_all=False,
         )
         .to_moveit_configs()
