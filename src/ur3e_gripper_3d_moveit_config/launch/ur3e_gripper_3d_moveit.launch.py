@@ -355,6 +355,10 @@ def generate_launch_description():
             "use_fake_hardware": use_fake_hardware,
             "use_ur_driver": use_ur_driver,
             "camera_enabled": camera_enabled,
+            # Pilz sequence planning (2026-09-16): the grasp executor plans
+            # home -> pre-grasp -> grasp as ONE blended LIN+LIN trajectory.
+            "capabilities": "pilz_industrial_motion_planner/MoveGroupSequenceAction "
+                            "pilz_industrial_motion_planner/MoveGroupSequenceService",
         }.items(),
     )
 

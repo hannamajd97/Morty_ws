@@ -17,6 +17,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, Shutdown
 from launch.substitutions import LaunchConfiguration, PythonExpression
 
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.actions import Node
 
 from moveit_configs_utils import MoveItConfigsBuilder
@@ -139,6 +140,7 @@ def generate_launch_description():
                 default_value="false",
                 description="PTP to a stand-off in front of the grasp, then LIN for the last stretch.",
             ),
+            DeclareLaunchArgument("pregrasp_blend_radius_m", default_value="0.02"),
             DeclareLaunchArgument("staging_mode", default_value="ptp",
                               description="ptp = PTP to the stand-off then LIN; lin = two straight lines (pre-grasp, then the last stretch)."),
             DeclareLaunchArgument(
@@ -335,6 +337,7 @@ def generate_launch_description():
                         "use_pregrasp_staging": LaunchConfiguration("use_pregrasp_staging"),
                         "pregrasp_approach_distance": LaunchConfiguration("pregrasp_approach_distance"),
                         "staging_mode": LaunchConfiguration("staging_mode"),
+                        "pregrasp_blend_radius_m": ParameterValue(LaunchConfiguration("pregrasp_blend_radius_m"), value_type=float),
                         "lift_height_m": LaunchConfiguration("lift_height_m"),
                         "lift_table_yaw_deg": LaunchConfiguration("lift_table_yaw_deg"),
                         "lift_table_frame": LaunchConfiguration("lift_table_frame"),

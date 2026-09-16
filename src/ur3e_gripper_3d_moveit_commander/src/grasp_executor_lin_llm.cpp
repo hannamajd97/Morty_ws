@@ -40,6 +40,9 @@
 #include <moveit_msgs/msg/contact_information.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <moveit_msgs/srv/get_state_validity.hpp>
+#include <moveit_msgs/srv/get_motion_sequence.hpp>
+#include <moveit_msgs/msg/motion_sequence_request.hpp>
+#include <moveit/kinematic_constraints/utils.h>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 
 // Pure comparison predicates for the probe-plan reuse cache. Kept in a
@@ -201,6 +204,12 @@ public:
     // then LIN the last stretch along z. Both lines are planned in the
     // probe / background check and reused at the click.
     staging_mode_ = get_or_declare_param<std::string>(node_, "staging_mode", "ptp");
+    // "blend": the two lines planned as ONE Pilz sequence with a blend
+    // radius at the pre-grasp corner, so the arm rounds it instead of
+    // stopping (Majd 2026-09-16: "how can we go smoother than the 2 lins").
+    // Needs move_group's MoveGroupSequenceService; without it the executor
+    // falls back to "lin" (two separate lines).
+    blend_radius_m_ = get_or_declare_param<double>(node_, "pregrasp_blend_radius_m", 0.02);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -525,6 +534,7 @@ public:
       get_or_declare_param<bool>(node_, "clear_stray_scene_objects", false);
     // Created ONCE: a client per candidate would be slow and would
     // leak service endpoints for the life of the node.
+    sequence_client_ = node_->create_client<moveit_msgs::srv::GetMotionSequence>("/plan_sequence_path");
     state_validity_client_ =
       node_->create_client<moveit_msgs::srv::GetStateValidity>(
         "/check_state_validity");
@@ -1130,7 +1140,41 @@ public:
     }
     bool staged_lin_done = false;
     bool staged_lin_ok = false;
-    if (use_pregrasp_staging_ && staging_mode_ == "lin") {
+    if (use_pregrasp_staging_ && staging_mode_ == "blend" && cached_lin_plan_valid_ && !cached_final_plan_valid_) {
+      // One blended trajectory (home -> pre-grasp corner -> grasp), from the
+      // probe / background check, or planned now when nothing matches.
+      moveit::planning_interface::MoveGroupInterface::Plan blended;
+      std::string reuse_reject;
+      if (!try_reuse_cached_lin_plan(grasp_pose_world, blended, &reuse_reject)) {
+        RCLCPP_INFO(node_->get_logger(), "Step 2 - blended two-line plan not reusable (%s); planning now.", reuse_reject.c_str());
+        std::string why;
+        if (!plan_blended_two_lines(grasp_pose_world, &why)) {
+          RCLCPP_ERROR(node_->get_logger(), "Step 2 - blended planning failed: %s", why.c_str());
+          recover_to_reset_target("Step 2 (blended two lines) planning failed");
+          return false;
+        }
+        blended = cached_lin_plan_;
+      }
+      staged_lin_done = true;
+      if (!execute_) {
+        staged_lin_ok = true;
+      } else {
+        // The fingers must be apart at the CORNER, ~0.5 s before the end.
+        stretch_plan_to_min_duration(
+          blended, gripper_open_time_s_ + open_before_arrival_margin_s_ + 0.5, "Step 2 - blended two lines");
+        const auto t2 = std::chrono::steady_clock::now();
+        auto r = execute_with_deadline(blended, __func__);
+        const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t2).count();
+        if (r != moveit::core::MoveItErrorCode::SUCCESS) {
+          RCLCPP_ERROR(node_->get_logger(), "Step 2 - blended two lines: execution failed: %s (%d)",
+            moveit::core::error_code_to_string(r).c_str(), r.val);
+        } else {
+          RCLCPP_INFO(node_->get_logger(), "Step 2 - blended two lines: execution OK (%.2f s, no stop at the corner).", dt);
+          log_arrival_error(grasp_pose_world, "Step 2 - blended two lines");
+          staged_lin_ok = true;
+        }
+      }
+    } else if (use_pregrasp_staging_ && (staging_mode_ == "lin" || staging_mode_ == "blend")) {
       // Two straight lines: LIN to the pre-grasp (fingers apart on arrival),
       // then LIN the last stretch along the gripper's z. Both plans come from
       // the probe / background check when they match; otherwise planned now.
@@ -3003,6 +3047,80 @@ private:
     return 0.0;
   }
 
+  // ONE blended trajectory for home -> pre-grasp -> grasp (Pilz sequence,
+  // LIN + LIN, blend radius at the corner). Retries at 1/2 and 1/4 scaling
+  // like the separate lines. On success the trajectory is cached under the
+  // GRASP pose (plan reuse and the background record work unchanged).
+  bool plan_blended_two_lines(
+    const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason)
+  {
+    if (!sequence_client_ || !sequence_client_->wait_for_service(std::chrono::milliseconds(300))) {
+      if (reason) { *reason = "sequence planning service /plan_sequence_path not available"; }
+      return false;
+    }
+    const auto pre_pose = compute_pregrasp_pose(target_pose, pregrasp_approach_distance_);
+    const std::string ee = arm_group_.getEndEffectorLink();
+    moveit::core::RobotState start_state(arm_group_.getRobotModel());
+    if (!robot_state_from_ear(start_state)) { start_state.setToDefaultValues(); }
+    moveit_msgs::msg::RobotState start_msg;
+    moveit::core::robotStateToRobotStateMsg(start_state, start_msg);
+
+    const double factors[3] = {1.0, 0.5, 0.25};
+    const auto t0 = std::chrono::steady_clock::now();
+    std::string last_err;
+    for (double f : factors) {
+      auto req = std::make_shared<moveit_msgs::srv::GetMotionSequence::Request>();
+      for (int k = 0; k < 2; ++k) {
+        moveit_msgs::msg::MotionSequenceItem item;
+        item.req.group_name = arm_group_.getName();
+        item.req.pipeline_id = "pilz_industrial_motion_planner";
+        item.req.planner_id = "LIN";
+        item.req.max_velocity_scaling_factor = velocity_scaling_ * f;
+        item.req.max_acceleration_scaling_factor = acceleration_scaling_ * f;
+        item.req.allowed_planning_time = lin_feasibility_planning_time_;
+        if (k == 0) { item.req.start_state = start_msg; }
+        item.req.goal_constraints.push_back(
+          kinematic_constraints::constructGoalConstraints(ee, k == 0 ? pre_pose : target_pose));
+        item.blend_radius = (k == 0) ? blend_radius_m_ : 0.0;
+        req->request.items.push_back(item);
+      }
+      auto fut = sequence_client_->async_send_request(req);
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline &&
+             fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+      {
+        rclcpp::spin_some(node_);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      }
+      if (fut.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+        last_err = "sequence planning timed out";
+        break;
+      }
+      const auto resp = fut.get();
+      const int code = resp->response.error_code.val;
+      if (code == moveit_msgs::msg::MoveItErrorCodes::SUCCESS && !resp->response.planned_trajectories.empty()) {
+        moveit::planning_interface::MoveGroupInterface::Plan plan;
+        plan.trajectory_ = resp->response.planned_trajectories.front();
+        plan.start_state_ = start_msg;
+        const double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        plan.planning_time_ = wall;
+        cache_lin_plan(target_pose, plan, wall);
+        cached_final_plan_valid_ = false;
+        const auto & pts = plan.trajectory_.joint_trajectory.points;
+        const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
+        RCLCPP_INFO(node_->get_logger(),
+          "blended two-line plan OK: %zu points, %.2f s of motion, blend %.0f mm, scaling x%.2f, planned in %.2f s.",
+          pts.size(), dur, blend_radius_m_ * 1000.0, f, wall);
+        return true;
+      }
+      last_err = "sequence planning failed: " + moveit::core::error_code_to_string(resp->response.error_code) +
+                 " (" + std::to_string(code) + ")";
+      if (code != moveit_msgs::msg::MoveItErrorCodes::PLANNING_FAILED) { break; }
+    }
+    if (reason) { *reason = last_err; }
+    return false;
+  }
+
   bool can_reach_via_pregrasp(
     const geometry_msgs::msg::PoseStamped & target_pose,
     std::string * reason = nullptr)
@@ -3680,7 +3798,19 @@ private:
     arm_group_.setPlanningTime(lin_feasibility_planning_time_);
     arm_group_.setNumPlanningAttempts(lin_feasibility_attempts_);
     if (use_pregrasp_staging_) {
-      const bool staged_ok = can_reach_via_pregrasp(target_pose, reason);
+      bool staged_ok = false;
+      if (staging_mode_ == "blend") {
+        std::string why;
+        staged_ok = plan_blended_two_lines(target_pose, &why);
+        if (!staged_ok && why.find("not available") != std::string::npos) {
+          RCLCPP_WARN_ONCE(node_->get_logger(), "%s — falling back to two separate lines.", why.c_str());
+          staged_ok = can_reach_via_pregrasp(target_pose, reason);
+        } else if (!staged_ok && reason) {
+          *reason = why;
+        }
+      } else {
+        staged_ok = can_reach_via_pregrasp(target_pose, reason);
+      }
       arm_group_.setPlanningTime(planning_time_);
       arm_group_.setNumPlanningAttempts(num_attempts_);
       arm_group_.setStartStateToCurrentState();
@@ -5601,6 +5731,8 @@ private:
   double pregrasp_distance_;
   bool use_pregrasp_staging_{true};
   std::string staging_mode_{"ptp"};
+  double blend_radius_m_{0.02};
+  rclcpp::Client<moveit_msgs::srv::GetMotionSequence>::SharedPtr sequence_client_;
   moveit::planning_interface::MoveGroupInterface::Plan cached_final_plan_;   // pre-grasp -> grasp (staging_mode lin)
   bool cached_final_plan_valid_{false};
   double pregrasp_approach_distance_{0.10};
