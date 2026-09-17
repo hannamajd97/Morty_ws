@@ -1361,23 +1361,25 @@ public:
     if (aborted_at("before closing the gripper")) {
       return false;
     }
-    if (!finish_gripper_open("Step 1 - Open gripper")) {
-      recover_to_reset_target("Step 1 (open gripper) failed");
-      return false;
-    }
-    // The fingers get their full opening time whatever the approach did
-    // (a stretched plan, a fallback plan, a cached one): wait out the rest.
-    {
-      const auto ready_at = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_));
-      while (rclcpp::ok() && std::chrono::steady_clock::now() < ready_at && !abort_requested_.load()) {
-        rclcpp::spin_some(node_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    if (!staged_lin_done) {   // the one-plan branch verified the fingers before moving
+      if (!finish_gripper_open("Step 1 - Open gripper")) {
+        recover_to_reset_target("Step 1 (open gripper) failed");
+        return false;
       }
-    }
-    if (!ensure_fingers_open("Step 1b - Fingers apart?")) {
-      recover_to_reset_target("Step 1b: the fingers did not open");
-      return false;
+      // The fingers get their full opening time whatever the approach did
+      // (a stretched plan, a fallback plan, a cached one): wait out the rest.
+      {
+        const auto ready_at = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_));
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < ready_at && !abort_requested_.load()) {
+          rclcpp::spin_some(node_);
+          std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+      }
+      if (!ensure_fingers_open("Step 1b - Fingers apart?")) {
+        recover_to_reset_target("Step 1b: the fingers did not open");
+        return false;
+      }
     }
     double saved_close_pulse_s = -1.0;
     if (vitamin_mode_active_) {
@@ -5463,6 +5465,7 @@ private:
   void begin_gripper_open_async()
   {
     open_pending_ = false;
+    open_done_ = false;
     if (!execute_ || !gripper_action_client_) { return; }
     if (!gripper_action_client_->action_server_is_ready()) { return; }   // finish() falls back
     slip_monitor_armed_.store(false);
@@ -5522,8 +5525,14 @@ private:
 
   bool finish_gripper_open(const std::string & step_name)
   {
+    // Once the open of this pick has completed, a second call is a no-op
+    // (2026-09-17: the pre-close check re-sent an OPEN after the close had
+    // been sent on the way in — it released the object just grasped).
+    if (open_done_) { return true; }
     if (!open_pending_) {
-      return execute_gripper_named_target(gripper_open_name_, step_name);
+      const bool ok = execute_gripper_named_target(gripper_open_name_, step_name);
+      open_done_ = ok;
+      return ok;
     }
     open_pending_ = false;
     const auto wait_timeout = std::chrono::duration<double>(gripper_action_timeout_s_);
@@ -5545,6 +5554,7 @@ private:
       RCLCPP_WARN(node_->get_logger(), "%s: early open failed (code %d) — sending it again.", step_name.c_str(), static_cast<int>(wrapped.code));
       return execute_gripper_named_target(gripper_open_name_, step_name);
     }
+    open_done_ = true;
     RCLCPP_INFO(node_->get_logger(), "%s: already open (reached=%.3f, opened during the probing).", step_name.c_str(), wrapped.result->position);
     return true;
   }
@@ -5947,6 +5957,7 @@ private:
   double cartesian_curve_lead_m_{0.12};
   double close_lead_s_{0.4};
   bool close_pending_{false};
+  bool open_done_{false};      // the open of this pick has completed
   std::thread early_close_thread_;
   int cartesian_curve_samples_{24};
   double cartesian_eef_step_m_{0.005};
