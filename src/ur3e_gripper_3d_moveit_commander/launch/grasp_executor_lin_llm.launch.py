@@ -144,7 +144,7 @@ def generate_launch_description():
             DeclareLaunchArgument("check_grasp_sensor", default_value="true"),
             DeclareLaunchArgument("check_slip", default_value="true"),
             DeclareLaunchArgument("staging_mode", default_value="ptp",
-                              description="ptp = PTP to the stand-off then LIN; lin = two straight lines (pre-grasp, then the last stretch)."),
+                              description="ptp = PTP to the stand-off, stop, then LIN; lin = two straight lines; blend = the two lines rounded at the corner; cartesian = one curve into the grasp; swing = a free joint move blended into the straight last stretch (one motion, no stop)."),
             DeclareLaunchArgument(
                 "pregrasp_approach_distance",
                 default_value="0.10",

@@ -1186,7 +1186,7 @@ public:
     }
     bool staged_lin_done = false;
     bool staged_lin_ok = false;
-    if (use_pregrasp_staging_ && (staging_mode_ == "blend" || staging_mode_ == "cartesian") &&
+    if (use_pregrasp_staging_ && (staging_mode_ == "blend" || staging_mode_ == "cartesian" || staging_mode_ == "swing") &&
         cached_lin_plan_valid_ && !cached_final_plan_valid_) {
       // One blended trajectory (home -> pre-grasp corner -> grasp), from the
       // probe / background check, or planned now when nothing matches.
@@ -1196,6 +1196,7 @@ public:
         RCLCPP_INFO(node_->get_logger(), "Step 2 - blended two-line plan not reusable (%s); planning now.", reuse_reject.c_str());
         std::string why;
         bool planned = (staging_mode_ == "cartesian") && plan_cartesian_two_lines(grasp_pose_world, &why);
+        if (!planned && staging_mode_ == "swing") { planned = plan_blended_two_lines(grasp_pose_world, &why, "PTP"); }
         if (!planned) { planned = plan_blended_two_lines(grasp_pose_world, &why); }
         if (!planned) {
           RCLCPP_ERROR(node_->get_logger(), "Step 2 - one-motion planning failed: %s", why.c_str());
@@ -1261,7 +1262,7 @@ public:
           staged_lin_ok = true;
         }
       }
-    } else if (use_pregrasp_staging_ && (staging_mode_ == "lin" || staging_mode_ == "blend" || staging_mode_ == "cartesian")) {
+    } else if (use_pregrasp_staging_ && (staging_mode_ == "lin" || staging_mode_ == "blend" || staging_mode_ == "cartesian" || staging_mode_ == "swing")) {
       // Two straight lines: LIN to the pre-grasp (fingers apart on arrival),
       // then LIN the last stretch along the gripper's z. Both plans come from
       // the probe / background check when they match; otherwise planned now.
@@ -3205,8 +3206,15 @@ private:
   // LIN + LIN, blend radius at the corner). Retries at 1/2 and 1/4 scaling
   // like the separate lines. On success the trajectory is cached under the
   // GRASP pose (plan reuse and the background record work unchanged).
+  // first_planner "LIN": two straight lines blended at the corner (mode
+  // "blend"). first_planner "PTP": swing-then-slide (mode "swing", Majd
+  // 2026-09-17, "like your own hand"): a free joint move to the pre-grasp
+  // point, blended into the straight last stretch between the fingers —
+  // one trajectory, no stop at the corner, reach wherever the pre-grasp
+  // has a joint solution, planned in a fraction of the curve's time.
   bool plan_blended_two_lines(
-    const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason)
+    const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason,
+    const char * first_planner = "LIN")
   {
     if (!sequence_client_ || !sequence_client_->wait_for_service(std::chrono::milliseconds(300))) {
       if (reason) { *reason = "sequence planning service /plan_sequence_path not available"; }
@@ -3241,7 +3249,7 @@ private:
         moveit_msgs::msg::MotionSequenceItem item;
         item.req.group_name = arm_group_.getName();
         item.req.pipeline_id = "pilz_industrial_motion_planner";
-        item.req.planner_id = "LIN";
+        item.req.planner_id = (k == 0) ? first_planner : "LIN";
         item.req.max_velocity_scaling_factor = velocity_scaling_ * pr[k == 0 ? 0 : 2];
         item.req.max_acceleration_scaling_factor = acceleration_scaling_ * pr[k == 0 ? 1 : 3];
         item.req.allowed_planning_time = std::max(2.0, lin_feasibility_planning_time_);
@@ -3276,9 +3284,11 @@ private:
         const auto & pts = plan.trajectory_.joint_trajectory.points;
         const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
         RCLCPP_INFO(node_->get_logger(),
-          "blended two-line plan OK: %zu points, %.2f s of motion, blend %.0f mm, "
-          "line vel x%.2f acc x%.2f / last stretch vel x%.2f acc x%.2f, planned in %.2f s.",
-          pts.size(), dur, blend_radius_m_ * 1000.0, pr[0], pr[1], pr[2], pr[3], wall);
+          "%s plan OK: %zu points, %.2f s of motion, blend %.0f mm, "
+          "%s vel x%.2f acc x%.2f / last stretch vel x%.2f acc x%.2f, planned in %.2f s.",
+          std::string(first_planner) == "PTP" ? "swing-then-slide (PTP+LIN blended)" : "blended two-line",
+          pts.size(), dur, blend_radius_m_ * 1000.0,
+          std::string(first_planner) == "PTP" ? "swing" : "line", pr[0], pr[1], pr[2], pr[3], wall);
         return true;
       }
       last_err = "sequence planning failed: " + moveit::core::error_code_to_string(resp->response.error_code) +
@@ -4027,13 +4037,18 @@ private:
     arm_group_.setNumPlanningAttempts(lin_feasibility_attempts_);
     if (use_pregrasp_staging_) {
       bool staged_ok = false;
-      if (staging_mode_ == "cartesian" || staging_mode_ == "blend") {
+      if (staging_mode_ == "cartesian" || staging_mode_ == "blend" || staging_mode_ == "swing") {
         std::string why;
         staged_ok = false;
         if (staging_mode_ == "cartesian") {
           staged_ok = plan_cartesian_two_lines(target_pose, &why);
           if (!staged_ok) {
             RCLCPP_INFO(node_->get_logger(), "one-motion approach not planned (%s) — trying the blend.", why.c_str());
+          }
+        } else if (staging_mode_ == "swing") {
+          staged_ok = plan_blended_two_lines(target_pose, &why, "PTP");
+          if (!staged_ok) {
+            RCLCPP_INFO(node_->get_logger(), "swing-then-slide not planned (%s) — trying the blended lines.", why.c_str());
           }
         }
         // A click outranks the rest of this chain (background check only).
@@ -5803,6 +5818,15 @@ private:
         arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
         arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
         invalidate_cached_lin_plan("approach speed changed in the GUI");
+        prechecks_.clear();
+      }
+    }
+    if (node_->has_parameter("staging_mode")) {
+      const std::string m = node_->get_parameter("staging_mode").as_string();
+      if (!m.empty() && m != staging_mode_) {
+        RCLCPP_INFO(node_->get_logger(), "staging_mode changed: %s -> %s (cached plans dropped).", staging_mode_.c_str(), m.c_str());
+        staging_mode_ = m;
+        invalidate_cached_lin_plan("staging_mode changed");
         prechecks_.clear();
       }
     }
