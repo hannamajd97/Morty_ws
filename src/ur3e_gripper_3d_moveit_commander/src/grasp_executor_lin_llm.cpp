@@ -244,7 +244,8 @@ public:
     // open then removes the "waiting for the fingers" pause on a cache
     // miss. Only a selection triggers it, never a background check.
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 40);   // over the bend; the slide at the same spacing
-    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.015);   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
+    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.015);
+    cartesian_max_joint_step_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_step_rad", 0.35);   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -1205,7 +1206,6 @@ public:
         bool planned = (staging_mode_ == "cartesian") && plan_cartesian_two_lines(grasp_pose_world, &why);
         if (!planned && staging_mode_ == "swing") { planned = plan_blended_two_lines(grasp_pose_world, &why, "PTP"); }
         if (!planned) { planned = plan_blended_two_lines(grasp_pose_world, &why); }
-        if (!planned && staging_mode_ != "swing") { planned = plan_blended_two_lines(grasp_pose_world, &why, "PTP"); }
         if (!planned) {
           RCLCPP_ERROR(node_->get_logger(), "Step 2 - one-motion planning failed: %s", why.c_str());
           recover_to_reset_target("Step 2 (blended two lines) planning failed");
@@ -3199,8 +3199,15 @@ private:
     }
     moveit_msgs::msg::RobotTrajectory path_msg;
     const auto t0 = std::chrono::steady_clock::now();
+    // Jump test: MoveIt's own is RELATIVE (a step larger than 2x the mean
+    // step of the path), and at the bend the joints legitimately move
+    // faster than on the straight parts — the post-mortem showed refused
+    // points that were reachable and collision-free. Disabled here (0.0)
+    // and replaced by an absolute check below: a real configuration flip
+    // moves a joint by far more than cartesian_max_joint_step_rad in one
+    // 15 mm step.
     const double fraction = arm_group_.computeCartesianPath(
-      waypoints, cartesian_eef_step_m_, 2.0 /* jump threshold, joint-space IK flips */, path_msg, true);
+      waypoints, cartesian_eef_step_m_, 0.0, path_msg, true);
     arm_group_.setStartStateToCurrentState();
     if (fraction < 0.999) {
       if (reason) {
@@ -3208,6 +3215,24 @@ private:
           curve_autopsy(start_state, path_msg, waypoints, fraction);
       }
       return false;
+    }
+    {
+      const auto & jp = path_msg.joint_trajectory.points;
+      for (size_t i = 1; i < jp.size(); ++i) {
+        double dmax = 0.0;
+        for (size_t k = 0; k < jp[i].positions.size() && k < jp[i - 1].positions.size(); ++k) {
+          dmax = std::max(dmax, std::fabs(jp[i].positions[k] - jp[i - 1].positions[k]));
+        }
+        if (dmax > cartesian_max_joint_step_rad_) {
+          if (reason) {
+            char buf[160];
+            std::snprintf(buf, sizeof(buf), "joint flip of %.2f rad in one step at %d %% of the curve", dmax,
+                          static_cast<int>(100.0 * i / std::max<size_t>(1, jp.size() - 1)));
+            *reason = buf;
+          }
+          return false;
+        }
+      }
     }
     robot_trajectory::RobotTrajectory rt(arm_group_.getRobotModel(), arm_group_.getName());
     rt.setRobotTrajectoryMsg(start_state, path_msg);
@@ -4160,13 +4185,16 @@ private:
         // crawl), and "swing" mode simply starts at its own step.
         if (!staged_ok && staging_mode_ != "blend" && staging_mode_ != "swing" && !yield_to_selection()) {
           staged_ok = plan_blended_two_lines(target_pose, &why);
-          if (!staged_ok) { RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the swing.", why.c_str()); }
+          if (!staged_ok) { RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — candidate rejected.", why.c_str()); }
         } else if (!staged_ok && staging_mode_ == "blend" && !yield_to_selection()) {
           staged_ok = plan_blended_two_lines(target_pose, &why);
         }
-        if (!staged_ok && staging_mode_ != "swing" && !yield_to_selection()) {
-          staged_ok = plan_blended_two_lines(target_pose, &why, "PTP");
-        } else if (!staged_ok && staging_mode_ == "swing" && !yield_to_selection()) {
+        // The swing is NOT in the default chain (2026-09-17 late: 0 of 28
+        // planned even with the seeded joint goal — from this home pose the
+        // joint path to any pre-grasp sweeps the upper arm through the wall
+        // object — at 1.7 s per candidate). It remains the first step of
+        // "swing" mode only.
+        if (!staged_ok && staging_mode_ == "swing" && !yield_to_selection()) {
           staged_ok = plan_blended_two_lines(target_pose, &why);
         }
         if (!staged_ok && reason && reason->empty()) { *reason = why; }
@@ -6193,6 +6221,7 @@ private:
   double cartesian_curve_lead_m_{0.12};
   double close_lead_s_{0.4};
   double approach_duration_s_{2.5};
+  double cartesian_max_joint_step_rad_{0.35};
   double approach_floor_s() const { return std::max(approach_duration_s_, gripper_open_time_s_ + open_before_arrival_margin_s_); }
   bool check_grasp_sensor_{true};
   bool check_slip_{true};
