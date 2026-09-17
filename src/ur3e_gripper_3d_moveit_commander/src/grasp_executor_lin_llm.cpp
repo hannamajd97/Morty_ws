@@ -244,7 +244,7 @@ public:
     // open then removes the "waiting for the fingers" pause on a cache
     // miss. Only a selection triggers it, never a background check.
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 40);   // over the bend; the slide at the same spacing
-    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.008);
+    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.015);   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
