@@ -211,8 +211,8 @@ class GraspPrecomputer:
                 with self._state:
                     self._entries.clear(); self._tracks.clear()
             return
-        shift = float(self._p("precompute_box_shift_px", 8.0))
-        size_tol = float(self._p("precompute_size_tol", 0.15))
+        shift = float(self._p("precompute_box_shift_px", 15.0))
+        size_tol = float(self._p("precompute_size_tol", 0.25))
         now = time.monotonic()
         with self._state:
             seen = set()
@@ -296,8 +296,8 @@ class GraspPrecomputer:
             return None, "off"
         label = str(sel.get("simplified_label", sel.get("label", "")))
         box = [int(v) for v in sel.get("bbox", [])]
-        shift = float(self._p("precompute_box_shift_px", 8.0))
-        size_tol = float(self._p("precompute_size_tol", 0.15))
+        shift = float(self._p("precompute_box_shift_px", 15.0))
+        size_tol = float(self._p("precompute_size_tol", 0.25))
         with self._state:
             cands = [e for e in self._entries.values()
                      if e.label == label and _boxes_agree(e.box, box, shift, size_tol)]
@@ -485,8 +485,8 @@ class GraspPrecomputer:
         stored grasps are wrong, the others stay (the arm is back home)."""
         label = str(sel.get("simplified_label", sel.get("label", "")))
         box = [int(v) for v in sel.get("bbox", [])]
-        shift = float(self._p("precompute_box_shift_px", 8.0))
-        size_tol = float(self._p("precompute_size_tol", 0.15))
+        shift = float(self._p("precompute_box_shift_px", 15.0))
+        size_tol = float(self._p("precompute_size_tol", 0.25))
         with self._state:
             keys = [k for k, t in self._tracks.items()
                     if t.label == label and len(box) == 4 and _boxes_agree(t.box, box, shift, size_tol)]
@@ -541,8 +541,8 @@ class GraspPrecomputer:
                            n_grasps=len(res.get("grasps") or []), mask=mask)
         with self._state:
             live = self._tracks.get(tr.key)
-            if live is None or not _boxes_agree(live.box, tr.box, float(self._p("precompute_box_shift_px", 8.0)),
-                                                float(self._p("precompute_size_tol", 0.15))):
+            if live is None or not _boxes_agree(live.box, tr.box, float(self._p("precompute_box_shift_px", 15.0)),
+                                                float(self._p("precompute_size_tol", 0.25))):
                 node.get_logger().info(f"[precompute] job '{tr.key}' discarded: object moved during the capture")
                 return
             entry.precheck_key = self._next_key

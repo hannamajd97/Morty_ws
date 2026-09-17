@@ -72,6 +72,7 @@ class PickPipeline:
         # background never overlap (GraspPrecomputer.foreground() holds the
         # model lock around run()), so one flag is enough.
         self._background = False
+        self._bg_committed = False
 
     def _aborted(self, where: str) -> bool:
         """Operator stop check at phase boundaries (trial 1001).
@@ -81,7 +82,13 @@ class PickPipeline:
         chooses an object the worker's job is worthless and only delays the
         real pick, so it ends quietly at the next phase boundary."""
         if self._background:
-            return bool(getattr(self._node, "selection_made", False))
+            # A click ends a background job only while it is still cheap to
+            # end. Once the images are captured and the GraspGen request is
+            # about to go out, the result is a second away and reusable —
+            # the click on that object then finds it stored (HIT), and a
+            # click on another object waits that second for the model lock
+            # (Majd 2026-09-17: "no cancel on click").
+            return bool(getattr(self._node, "selection_made", False)) and not self._bg_committed
         if getattr(self._node, "_pick_abort", False):
             self._node.get_logger().warn(
                 f"[abort] operator stop honoured during {where} — "
@@ -137,6 +144,7 @@ class PickPipeline:
         grasps: List[Dict[str, Any]] = []
         raw_grasps: List[Dict[str, Any]] = []
         self._background = bool(background)
+        self._bg_committed = False
         centroid_msg = None          # kept in the result so a cache replay
         centroid_base_msg = None     # publishes exactly what a fresh pick does
         if not background:
@@ -282,6 +290,7 @@ class PickPipeline:
                     "[graspgen] model not warm yet — waiting for the in-flight "
                     "preload and reusing its instance (single load, no reload)."
                 )
+        self._bg_committed = True   # from here the job finishes even if a click arrives
         try:
             resp = send_points_to_graspgen(
                 pts_send,
