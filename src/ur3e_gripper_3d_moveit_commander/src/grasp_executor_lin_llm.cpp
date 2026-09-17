@@ -225,7 +225,7 @@ public:
     // whose control point lies cartesian_curve_lead_m behind the grasp
     // along the gripper's z, so the curve arrives along the fingers' axis
     // with no corner; the last stretch is straight by construction.
-    cartesian_curve_lead_m_ = get_or_declare_param<double>(node_, "cartesian_curve_lead_m", 0.12);
+    cartesian_curve_lead_m_ = get_or_declare_param<double>(node_, "cartesian_curve_lead_m", 0.18);   // tangent length of the bend
     // Close on the way in (2026-09-16, Majd: "it stops before it grasps"):
     // the close pulse is sent close_lead_s before the motion ends, so the
     // fingers meet the object as the arm stops instead of 1.1 s later. The
@@ -243,7 +243,7 @@ public:
     // selection_cycle_id ~2.4 s before the candidates arrive; sending the
     // open then removes the "waiting for the fingers" pause on a cache
     // miss. Only a selection triggers it, never a background check.
-    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 16);
+    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 40);   // over the bend; the slide at the same spacing
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.008);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
@@ -3128,10 +3128,17 @@ private:
     if (!robot_state_from_ear(start_state)) { start_state.setToDefaultValues(); }
     arm_group_.setStartState(start_state);
     arm_group_.setPoseReferenceFrame(target_pose.header.frame_id);
-    // P0 = current TCP, P2 = grasp, P1 = a point behind the grasp on its
-    // approach axis. The Bezier's final tangent is P2 - P1 = the gripper's
-    // z: the curve lands along the fingers. Orientation is slerped, so the
-    // wrist turns gradually over the whole path instead of at a corner.
+    // Shape (2026-09-17 evening, from the recorder: the quadratic arc
+    // dipped to 0.08 m/s where it turned into the straight run):
+    //   bend  = cubic Bezier from the current TCP to the pre-grasp point
+    //           (pregrasp_approach_distance_ behind the grasp), starting
+    //           along the chord and ending along the fingers' axis, with a
+    //           tangent length of cartesian_curve_lead_m_ so the turn is
+    //           spread over that length instead of concentrated;
+    //   slide = a genuinely straight last stretch into the grasp.
+    // The two join with a continuous tangent, so there is no corner. The
+    // wrist finishes its turn by half of the bend, so the joint that hits
+    // its limit at the turn has nothing left to do there.
     const std::string ee = arm_group_.getEndEffectorLink();
     Eigen::Isometry3d T0 = start_state.getGlobalLinkTransform(ee);
     if (target_pose.header.frame_id != arm_group_.getPlanningFrame()) {
@@ -3143,10 +3150,18 @@ private:
         return false;
       }
     }
-    const auto lead_pose = compute_pregrasp_pose(target_pose, cartesian_curve_lead_m_);
+    const auto pre_pose = compute_pregrasp_pose(target_pose, pregrasp_approach_distance_);
     const Eigen::Vector3d P0 = T0.translation();
-    const Eigen::Vector3d P1(lead_pose.pose.position.x, lead_pose.pose.position.y, lead_pose.pose.position.z);
+    const Eigen::Vector3d Ppre(pre_pose.pose.position.x, pre_pose.pose.position.y, pre_pose.pose.position.z);
     const Eigen::Vector3d P2(target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
+    const Eigen::Vector3d axis = (P2 - Ppre).norm() > 1e-6 ? (P2 - Ppre).normalized() : Eigen::Vector3d::UnitZ();
+    const Eigen::Vector3d chord = Ppre - P0;
+    const double chord_len = chord.norm();
+    if (chord_len < 1e-3) { if (reason) { *reason = "already at the pre-grasp point"; } return false; }
+    // Tangent length: the requested lead, but never more than half the chord.
+    const double tl = std::min(cartesian_curve_lead_m_, 0.5 * chord_len);
+    const Eigen::Vector3d C1 = P0 + chord.normalized() * tl;   // leave along the chord
+    const Eigen::Vector3d C2 = Ppre - axis * tl;               // arrive along the fingers' axis
     tf2::Quaternion q0, q2;
     {
       const Eigen::Quaterniond eq0(T0.rotation());
@@ -3155,17 +3170,25 @@ private:
       q2 = tf2::Quaternion(o.x, o.y, o.z, o.w);
     }
     std::vector<geometry_msgs::msg::Pose> waypoints;
-    const int n = std::max(4, cartesian_curve_samples_);
-    for (int i = 1; i <= n; ++i) {
-      const double u = static_cast<double>(i) / n;
-      const Eigen::Vector3d P = (1 - u) * (1 - u) * P0 + 2 * (1 - u) * u * P1 + u * u * P2;
-      // orientation: reach the grasp orientation by 60 % of the path, then hold it
-      const double w = std::min(1.0, u / 0.6);
-      const tf2::Quaternion q = q0.slerp(q2, w).normalized();
+    auto push = [&](const Eigen::Vector3d & P, const tf2::Quaternion & q) {
       geometry_msgs::msg::Pose wp;
       wp.position.x = P.x(); wp.position.y = P.y(); wp.position.z = P.z();
       wp.orientation.x = q.x(); wp.orientation.y = q.y(); wp.orientation.z = q.z(); wp.orientation.w = q.w();
       waypoints.push_back(wp);
+    };
+    // Samples: cartesian_curve_samples_ over the bend (its length is about
+    // the chord), the slide at the same spacing.
+    const int nb = std::max(8, cartesian_curve_samples_);
+    for (int i = 1; i <= nb; ++i) {
+      const double u = static_cast<double>(i) / nb, v = 1.0 - u;
+      const Eigen::Vector3d P = v * v * v * P0 + 3 * v * v * u * C1 + 3 * v * u * u * C2 + u * u * u * Ppre;
+      const double w = std::min(1.0, u / 0.5);   // wrist turn done by half of the bend
+      push(P, q0.slerp(q2, w).normalized());
+    }
+    const int ns = std::max(2, static_cast<int>(std::ceil((P2 - Ppre).norm() / (chord_len / nb))));
+    for (int i = 1; i <= ns; ++i) {
+      const double u = static_cast<double>(i) / ns;
+      push(Ppre + (P2 - Ppre) * u, q2);
     }
     moveit_msgs::msg::RobotTrajectory path_msg;
     const auto t0 = std::chrono::steady_clock::now();
@@ -3194,8 +3217,8 @@ private:
       const auto & pts = plan.trajectory_.joint_trajectory.points;
       const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
       RCLCPP_INFO(node_->get_logger(),
-        "one-motion approach OK: %zu points, %.2f s, one curve from the current TCP into the grasp along the fingers' axis, scaling x%.2f, planned in %.2f s.",
-        pts.size(), dur, f, wall);
+        "one-motion approach OK: %zu points, %.2f s, bend into a straight %.0f cm slide along the fingers' axis, scaling x%.2f, planned in %.2f s.",
+        pts.size(), dur, pregrasp_approach_distance_ * 100.0, f, wall);
       return true;
     }
     if (reason) { *reason = "time parameterisation failed"; }
