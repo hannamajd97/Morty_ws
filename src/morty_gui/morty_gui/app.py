@@ -1019,6 +1019,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             return
         detail = (f"approach {float(got['velocity_scaling']):.2f}/{float(got['acceleration_scaling']):.2f}, "
                   f"arc {float(got['blend_velocity_scaling']):.1f}, return {float(got['fast_replay_duration_s']):.1f} s, "
+                  f"approach duration {float(got.get('approach_duration_s', 0.0)):.1f} s, "
                   f"open {float(got['gripper_open_time_s']):.1f}+{float(got['open_before_arrival_margin_s']):.1f} s, "
                   f"drop hold {float(got['drop_hold_s']):.1f} s, after release {float(got['post_release_wait_s']):.1f} s, "
                   f"sensor {'on' if got.get('check_grasp_sensor') else 'off'}, slip {'on' if got.get('check_slip') else 'off'}")

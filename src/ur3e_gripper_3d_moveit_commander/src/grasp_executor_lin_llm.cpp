@@ -368,6 +368,13 @@ public:
     // the goal is sent (measured 741.43 -> 741.69), and the fingers need a
     // little settle. So the arm arrives no earlier than 1.2 s after the send.
     open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.1);
+    // One duration for every approach (Majd 2026-09-17 night: "make them all
+    // one speed, not mega fast, not very slow, 2.5 s"): whatever planner won
+    // and at whatever scaling, a plan shorter than this is stretched to it.
+    // Longer plans stay as planned (they cannot be compressed past limits).
+    // It also ends the fast-arrival grasps that hit the object: the fingers'
+    // 1.0 s is always inside it.
+    approach_duration_s_ = get_or_declare_param<double>(node_, "approach_duration_s", 2.5);
     gripper_adapter_node_name_ = get_or_declare_param<std::string>(
       node_, "gripper_adapter_node_name", "/gripper_controller/gripper_command_adapter");
     override_gripper_pulse_from_executor_ =
@@ -1211,6 +1218,7 @@ public:
         staged_lin_ok = true;
       } else {
         {
+          stretch_plan_to_min_duration(blended, approach_floor_s(), "Step 2 - one motion");
           const auto & pts = blended.trajectory_.joint_trajectory.points;
           const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
           send_open_with_motion("Step 2 - one motion");
@@ -1294,8 +1302,7 @@ public:
         RCLCPP_INFO(node_->get_logger(), "Step 2a/2b: execute:=false, skipping execution.");
         staged_lin_ok = true;
       } else {
-        stretch_plan_to_min_duration(
-          pre_plan, gripper_open_time_s_ + open_before_arrival_margin_s_, "Step 2a - LIN to pre-grasp");
+        stretch_plan_to_min_duration(pre_plan, approach_floor_s(), "Step 2a - LIN to pre-grasp");
         RCLCPP_INFO(node_->get_logger(), "Step 2a - LIN to the pre-grasp %.0f cm behind the grasp.",
           pregrasp_approach_distance_ * 100.0);
         send_open_with_motion("Step 2a - LIN to the pre-grasp");
@@ -1349,8 +1356,7 @@ public:
           "Step 2 - Grasp LIN: execute:=false, skipping execution.");
         step2_ok = true;
       } else {
-        stretch_plan_to_min_duration(
-          approach_plan, gripper_open_time_s_ + open_before_arrival_margin_s_, "Step 2 - Grasp LIN");
+        stretch_plan_to_min_duration(approach_plan, approach_floor_s(), "Step 2 - Grasp LIN");
         send_open_with_motion("Step 2 - Grasp LIN");
         auto exec_result = execute_with_deadline(approach_plan, __func__);
         step2_ok = (exec_result == moveit::core::MoveItErrorCode::SUCCESS);
@@ -1367,7 +1373,7 @@ public:
     } else {
       // Pregrasp-staging path: the LIN start pose only exists after the
       // stand-off PTP, so plan+execute here (3 attempts, flake guard).
-      min_exec_duration_s_ = gripper_open_time_s_ + open_before_arrival_margin_s_;
+      min_exec_duration_s_ = approach_floor_s();
       send_open_with_motion("Step 2 - Grasp LIN (fresh plan)");
       for (int s2 = 0; s2 < 3 && !step2_ok; ++s2) {
         if (s2 > 0) {
@@ -3720,9 +3726,8 @@ private:
       for (auto & a : pt.accelerations) { a /= (k * k); }
     }
     RCLCPP_INFO(node_->get_logger(),
-      "%s: approach %.2f s is shorter than open %.2f s + margin %.2f s — stretched to %.2f s (x%.2f slower) "
-      "so the fingers are apart before the arm arrives.",
-      step_name.c_str(), dur, gripper_open_time_s_, open_before_arrival_margin_s_, min_s, k);
+      "%s: planned %.2f s, stretched to %.2f s (x%.2f slower): approach duration %.2f s, fingers %.2f + %.2f s.",
+      step_name.c_str(), dur, min_s, k, approach_duration_s_, gripper_open_time_s_, open_before_arrival_margin_s_);
   }
 
   moveit::core::MoveItErrorCode execute_with_deadline(
@@ -5940,6 +5945,9 @@ private:
         prechecks_.clear();
       }
     }
+    if (node_->has_parameter("approach_duration_s")) {
+      approach_duration_s_ = node_->get_parameter("approach_duration_s").as_double();
+    }
     if (node_->has_parameter("gripper_open_time_s")) {
       gripper_open_time_s_ = node_->get_parameter("gripper_open_time_s").as_double();
     }
@@ -6184,6 +6192,8 @@ private:
   double cartesian_path_tolerance_rad_{0.05};
   double cartesian_curve_lead_m_{0.12};
   double close_lead_s_{0.4};
+  double approach_duration_s_{2.5};
+  double approach_floor_s() const { return std::max(approach_duration_s_, gripper_open_time_s_ + open_before_arrival_margin_s_); }
   bool check_grasp_sensor_{true};
   bool check_slip_{true};
   std::atomic<bool> early_close_fired_{false};   // the close went out on the way in (sensor said apart)
