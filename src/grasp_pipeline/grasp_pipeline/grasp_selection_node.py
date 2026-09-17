@@ -513,6 +513,11 @@ class YoloLiveSelectGrasp(Node):
         self._perf_infer_count: int = 0
         self._perf_infer_ms_acc: float = 0.0
         self._selection_in_progress: bool = False
+        # True while the click path waits for / runs the selected-object
+        # segmentation: the detector thread then starts no new inference
+        # (2026-09-17: the segmentation queued behind the detector's
+        # YOLO + identity + open-set chain for 1-3 s on every click).
+        self._seg_wait: bool = False
         self._selection_prompted: bool = False
         self._selection_prompt_sig: Optional[tuple] = None
         self._pointer_px = None
@@ -881,10 +886,19 @@ class YoloLiveSelectGrasp(Node):
                 f"[seg] starting selected-object segmentation bbox=({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]})"
             )
             t_seg0 = time.time()
-            with self._infer_lock:
-                selected_mask = segmenter.segment(self.fb.rgb_frame, bbox)
-            seg_ms = (time.time() - t_seg0) * 1000.0
-            self.get_logger().info(f"[seg] selected-object segmentation finished in {seg_ms:.1f} ms")
+            self._seg_wait = True
+            try:
+                with self._infer_lock:
+                    t_lock = time.time()
+                    selected_mask = segmenter.segment(self.fb.rgb_frame, bbox)
+            finally:
+                self._seg_wait = False
+            t_end = time.time()
+            seg_ms = (t_end - t_seg0) * 1000.0
+            self.get_logger().info(
+                f"[seg] selected-object segmentation finished in {seg_ms:.1f} ms "
+                f"(waited {(t_lock - t_seg0) * 1000.0:.0f} ms for the detector's lock, "
+                f"model {(t_end - t_lock) * 1000.0:.0f} ms)")
             if selected_mask is None:
                 if keep_state:
                     self.last_selected_mask_np = None
@@ -1678,6 +1692,10 @@ class YoloLiveSelectGrasp(Node):
             bool(self.get_parameter("suspend_inference_while_selecting").value)
             and self._selection_in_progress
         ):
+            return
+        if self._seg_wait:
+            # The click's segmentation is waiting for the lock: do not queue
+            # another 0.4-0.8 s detector chain in front of it.
             return
         rgb, depth, (fx, fy, cx, cy), depth_scale, header = self.fb.latest()
         if rgb is None:

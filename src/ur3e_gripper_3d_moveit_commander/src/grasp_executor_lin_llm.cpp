@@ -1171,7 +1171,7 @@ public:
     // never opens the gripper. Whether the fingers really parted is checked
     // by the finger sensor right before closing (ensure_fingers_open).
     if (open_already_sent()) {
-      RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: already sent at the click.");
+      RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: already sent when the candidates arrived.");
     } else {
       begin_gripper_open_async();
       RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: sent with the approach (opens while the arm travels).");
@@ -1657,13 +1657,13 @@ public:
     bool lifted_after_grasp = false;
     if (lift_height_m_ > 0.0) {
       rclcpp::sleep_for(std::chrono::milliseconds(150));
-      lifted_after_grasp = execute_fast_joint_lift(lift_height_m_);
+      lifted_after_grasp = lift_object(grasp_pose_world, "Post-grasp lift");
       if (lifted_after_grasp) {
         RCLCPP_INFO(node_->get_logger(),
-          "Post-grasp lift OK (planner-free) — holding clear of the table.");
+          "Post-grasp lift OK — holding clear of the table.");
       } else {
         RCLCPP_WARN(node_->get_logger(),
-          "Post-grasp fast lift failed; Step 3a will retry with the LIN fallback.");
+          "Post-grasp lift failed (jog and LIN); Step 3a will retry after the drop pause.");
       }
     }
 
@@ -1866,38 +1866,8 @@ public:
       RCLCPP_INFO(node_->get_logger(),
         "Step 3a - already lifted right after the grasp; skipping.");
     } else if (lift_height_m_ > 0.0) {
-      const auto dir = compute_lift_direction_in_target();
-      const double dx = dir[0] * lift_height_m_;
-      const double dy = dir[1] * lift_height_m_;
-      const double dz = dir[2] * lift_height_m_;
-      geometry_msgs::msg::PoseStamped lift_pose = grasp_pose_world;
-      lift_pose.pose.position.x += dx;
-      lift_pose.pose.position.y += dy;
-      lift_pose.pose.position.z += dz;
-      RCLCPP_INFO(node_->get_logger(),
-        "Step 3a - Lifting %.3f m along dir=[%.3f, %.3f, %.3f] in %s: "
-        "d=[%.3f, %.3f, %.3f] -> [%.3f, %.3f, %.3f]",
-        lift_height_m_, dir[0], dir[1], dir[2], target_frame_.c_str(),
-        dx, dy, dz,
-        lift_pose.pose.position.x, lift_pose.pose.position.y, lift_pose.pose.position.z);
-      // Use lower velocity/acceleration for the short lift to avoid joint limits.
-      arm_group_.setMaxVelocityScalingFactor(std::min(velocity_scaling_, 0.1));
-      arm_group_.setMaxAccelerationScalingFactor(std::min(acceleration_scaling_, 0.1));
-      // FAST LIFT FIRST (Majd 2026-08-26: planner-free like the fast
-      // observation — just go up 5 cm). LIN's diagonal lift only as a
-      // fallback for rigs where the jog is unavailable.
       rclcpp::sleep_for(std::chrono::milliseconds(150));
-      bool lift_ok = execute_fast_joint_lift(lift_height_m_);
-      if (lift_ok) {
-        RCLCPP_INFO(node_->get_logger(),
-          "Step 3a - fast joint lift OK (planner-free).");
-      } else {
-        rclcpp::sleep_for(std::chrono::milliseconds(200));
-        lift_ok = execute_arm_lin_pose(lift_pose, "Step 3a - Lift object (LIN fallback)");
-      }
-      arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
-      arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
-      if (!lift_ok) {
+      if (!lift_object(grasp_pose_world, "Step 3a - Lift object")) {
         RCLCPP_WARN(node_->get_logger(),
           "All lift variants failed — CONTINUING WITHOUT LIFT (object "
           "held; transport move will provide the clearance).");
@@ -3395,6 +3365,43 @@ private:
     }
     arm_group_.setStartStateToCurrentState();
     return ok;
+  }
+
+  // Lift the held object clear of the table: the planner-free joint jog
+  // first, the LIN fallback the moment it fails. One owner for both call
+  // sites (right after the grasp, and the retry after the drop pause).
+  // Before 2026-09-17 a refused jog ("IK jumped 0.41 rad") left the object
+  // standing on the table until the operator pressed Drop, and only then
+  // did the LIN fallback run — "the lift sometimes takes too long".
+  bool lift_object(const geometry_msgs::msg::PoseStamped & grasp_pose_world, const char * tag)
+  {
+    const auto dir = compute_lift_direction_in_target();
+    const double dx = dir[0] * lift_height_m_;
+    const double dy = dir[1] * lift_height_m_;
+    const double dz = dir[2] * lift_height_m_;
+    geometry_msgs::msg::PoseStamped lift_pose = grasp_pose_world;
+    lift_pose.pose.position.x += dx;
+    lift_pose.pose.position.y += dy;
+    lift_pose.pose.position.z += dz;
+    RCLCPP_INFO(node_->get_logger(),
+      "%s - lifting %.3f m along dir=[%.3f, %.3f, %.3f] in %s: "
+      "d=[%.3f, %.3f, %.3f] -> [%.3f, %.3f, %.3f]",
+      tag, lift_height_m_, dir[0], dir[1], dir[2], target_frame_.c_str(),
+      dx, dy, dz,
+      lift_pose.pose.position.x, lift_pose.pose.position.y, lift_pose.pose.position.z);
+    arm_group_.setMaxVelocityScalingFactor(std::min(velocity_scaling_, 0.1));
+    arm_group_.setMaxAccelerationScalingFactor(std::min(acceleration_scaling_, 0.1));
+    bool lift_ok = execute_fast_joint_lift(lift_height_m_);
+    if (lift_ok) {
+      RCLCPP_INFO(node_->get_logger(), "%s - fast joint lift OK (planner-free).", tag);
+    } else {
+      rclcpp::sleep_for(std::chrono::milliseconds(200));
+      const std::string label = std::string(tag) + " (LIN fallback)";
+      lift_ok = execute_arm_lin_pose(lift_pose, label);
+    }
+    arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
+    arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
+    return lift_ok;
   }
 
   // ── Instrumented plan() ───────────────────────────────────────────
@@ -6433,13 +6440,6 @@ int main(int argc, char ** argv)
         // Any trajectory kept from the previous cycle's probe is now for
         // the wrong grasp and must never be reachable.
         grasp_executor.invalidate_cached_lin_plan("a new selection cycle_id arrived");
-        // Open at the click (2026-09-17): the fingers get their 1.2 s while
-        // the pipeline segments and GraspGen runs, so the executor does not
-        // have to wait for them once the plan is ready. Never while an
-        // object is still held from a previous pick.
-        if (grasp_executor.open_on_selection() && !grasp_executor.holding_object()) {
-          grasp_executor.open_gripper_early();
-        }
         // A NEW pick supersedes any stale stop (2026-08-31, live repro:
         // "Stop, reset." produced MULTIPLE abort publishes — stop intent
         // + reset intent — and the stragglers arriving after clear_abort
@@ -6697,6 +6697,16 @@ int main(int argc, char ** argv)
         node->get_logger(),
         "Received %zu grasp candidates; evaluating LIN feasibility (cycle_id=%ld).",
         cands.size(), static_cast<long>(cycle_id));
+      // Open the fingers NOW, when the candidates arrive — not at the click
+      // (Majd 2026-09-17: "we open the gripper before we execute, that is
+      // wrong": the click ran 3-5 s ahead of the move, so the fingers stood
+      // open in front of a still arm). Candidates mean a pick is really
+      // coming; the probe (~1.3 s) and the approach (~1 s) cover the
+      // 1.2 s + 0.5 s the fingers need. Never while an object is held.
+      if (grasp_executor.open_on_selection() && !grasp_executor.holding_object()) {
+        grasp_executor.open_gripper_early();
+        RCLCPP_INFO(node->get_logger(), "Step 1 - Open gripper: sent as the candidates arrived.");
+      }
       grasp_executor.clear_abort();
       if (grasp_executor.holding_object()) {
         // The previous pick was stopped while holding (Reset during the
