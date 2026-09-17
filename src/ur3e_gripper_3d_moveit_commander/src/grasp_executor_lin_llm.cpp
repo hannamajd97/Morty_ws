@@ -3198,7 +3198,8 @@ private:
     arm_group_.setStartStateToCurrentState();
     if (fraction < 0.999) {
       if (reason) {
-        *reason = "cartesian path covers only " + std::to_string(static_cast<int>(fraction * 100.0)) + " % (collision or IK)";
+        *reason = "cartesian path covers only " + std::to_string(static_cast<int>(fraction * 100.0)) + " % — " +
+          curve_autopsy(start_state, path_msg, waypoints, fraction);
       }
       return false;
     }
@@ -3451,6 +3452,51 @@ private:
     arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
     arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
     return lift_ok;
+  }
+
+  // Why did the curve stop at `fraction`? computeCartesianPath logs nothing
+  // (2026-09-17 night: 73 of 88 curves refused, every one "collision or
+  // IK"). From the last joint state it did reach, solve the next waypoint
+  // with that state as the seed: no solution = reach or a wrist flip;
+  // a solution that /check_state_validity rejects = a named contact; a
+  // clean solution = the step itself was refused (joint jump). The
+  // validity call costs a service round trip, so it is made at the click
+  // only, not inside the background check.
+  std::string curve_autopsy(
+    const moveit::core::RobotState & start_state,
+    const moveit_msgs::msg::RobotTrajectory & partial,
+    const std::vector<geometry_msgs::msg::Pose> & waypoints,
+    double fraction)
+  {
+    if (waypoints.empty()) { return "no waypoints"; }
+    moveit::core::RobotState st = start_state;
+    const auto * jmg = st.getJointModelGroup(arm_group_.getName());
+    if (!jmg) { return "no joint model group"; }
+    const auto & pts = partial.joint_trajectory.points;
+    if (!pts.empty()) {
+      for (size_t i = 0; i < partial.joint_trajectory.joint_names.size() && i < pts.back().positions.size(); ++i) {
+        st.setVariablePosition(partial.joint_trajectory.joint_names[i], pts.back().positions[i]);
+      }
+      st.update();
+    }
+    const size_t k = std::min(waypoints.size() - 1, static_cast<size_t>(fraction * waypoints.size()));
+    const int pct = static_cast<int>(fraction * 100.0);
+    char buf[256];
+    if (!st.setFromIK(jmg, waypoints[k], arm_group_.getEndEffectorLink(), 0.05)) {
+      std::snprintf(buf, sizeof(buf), "no joint solution for the point at %d %% (reach edge or a wrist flip)", pct);
+      return buf;
+    }
+    st.update();
+    if (precheck_mode_) {
+      std::snprintf(buf, sizeof(buf), "a joint solution exists at %d %% (collision or joint jump; detail at the click)", pct);
+      return buf;
+    }
+    std::string why;
+    const int v = check_state_valid(st, &why);
+    if (v == 0) { std::snprintf(buf, sizeof(buf), "at %d %% the arm %s", pct, why.c_str()); return buf; }
+    if (v == 1) { std::snprintf(buf, sizeof(buf), "the point at %d %% is reachable and collision-free — the step to it was refused (joint jump)", pct); return buf; }
+    std::snprintf(buf, sizeof(buf), "a joint solution exists at %d %% (%s)", pct, why.c_str());
+    return buf;
   }
 
   // ── Instrumented plan() ───────────────────────────────────────────
