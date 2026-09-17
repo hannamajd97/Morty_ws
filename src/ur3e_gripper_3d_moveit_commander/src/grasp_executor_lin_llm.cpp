@@ -5786,6 +5786,26 @@ private:
     if (node_->has_parameter("fast_replay_duration_s")) {
       fast_replay_duration_s_ = node_->get_parameter("fast_replay_duration_s").as_double();
     }
+    // Approach speed / accel from the GUI's Pick-speeds Apply (2026-09-17:
+    // "the execution is way too fast" — Apply changed the node parameter,
+    // the GUI read it back, but the curve was still planned with the launch
+    // values). A cached plan or background verdict was timed at the old
+    // speed, so both are dropped when the value changes.
+    {
+      double v = velocity_scaling_, a = acceleration_scaling_;
+      if (node_->has_parameter("velocity_scaling")) { v = node_->get_parameter("velocity_scaling").as_double(); }
+      if (node_->has_parameter("acceleration_scaling")) { a = node_->get_parameter("acceleration_scaling").as_double(); }
+      if (v > 0.0 && a > 0.0 && (v != velocity_scaling_ || a != acceleration_scaling_)) {
+        RCLCPP_INFO(node_->get_logger(),
+          "Approach speed changed in the GUI: velocity %.2f -> %.2f, acceleration %.2f -> %.2f (cached plans dropped).",
+          velocity_scaling_, v, acceleration_scaling_, a);
+        velocity_scaling_ = v; acceleration_scaling_ = a;
+        arm_group_.setMaxVelocityScalingFactor(velocity_scaling_);
+        arm_group_.setMaxAccelerationScalingFactor(acceleration_scaling_);
+        invalidate_cached_lin_plan("approach speed changed in the GUI");
+        prechecks_.clear();
+      }
+    }
     if (node_->has_parameter("gripper_open_time_s")) {
       gripper_open_time_s_ = node_->get_parameter("gripper_open_time_s").as_double();
     }
