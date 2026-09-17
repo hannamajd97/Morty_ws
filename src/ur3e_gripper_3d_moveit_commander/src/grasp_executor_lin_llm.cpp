@@ -1198,6 +1198,7 @@ public:
         bool planned = (staging_mode_ == "cartesian") && plan_cartesian_two_lines(grasp_pose_world, &why);
         if (!planned && staging_mode_ == "swing") { planned = plan_blended_two_lines(grasp_pose_world, &why, "PTP"); }
         if (!planned) { planned = plan_blended_two_lines(grasp_pose_world, &why); }
+        if (!planned && staging_mode_ != "swing") { planned = plan_blended_two_lines(grasp_pose_world, &why, "PTP"); }
         if (!planned) {
           RCLCPP_ERROR(node_->get_logger(), "Step 2 - one-motion planning failed: %s", why.c_str());
           recover_to_reset_target("Step 2 (blended two lines) planning failed");
@@ -4080,16 +4081,23 @@ private:
           if (reason) { *reason = "background check interrupted by a selection"; }
           return true;
         };
-        if (!staged_ok && !yield_to_selection()) {
+        // The chain (Majd 2026-09-17 evening): curve, blended lines, then
+        // the swing (PTP into the slide) as the reach rescue, then reject.
+        // The two separate lines are out: they need the same straight line
+        // the blend just failed to draw (tonight: 1 rescue in 85, at a
+        // crawl), and "swing" mode simply starts at its own step.
+        if (!staged_ok && staging_mode_ != "blend" && staging_mode_ != "swing" && !yield_to_selection()) {
           staged_ok = plan_blended_two_lines(target_pose, &why);
-          if (!staged_ok && !yield_to_selection()) {
-            // Whatever the sequence planner disliked (service missing, timed
-            // out, blend impossible here), the two separate lines decide the
-            // candidate — a blend problem must never reject a reachable grasp.
-            RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the two separate lines.", why.c_str());
-            staged_ok = can_reach_via_pregrasp(target_pose, reason);
-          }
+          if (!staged_ok) { RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the swing.", why.c_str()); }
+        } else if (!staged_ok && staging_mode_ == "blend" && !yield_to_selection()) {
+          staged_ok = plan_blended_two_lines(target_pose, &why);
         }
+        if (!staged_ok && staging_mode_ != "swing" && !yield_to_selection()) {
+          staged_ok = plan_blended_two_lines(target_pose, &why, "PTP");
+        } else if (!staged_ok && staging_mode_ == "swing" && !yield_to_selection()) {
+          staged_ok = plan_blended_two_lines(target_pose, &why);
+        }
+        if (!staged_ok && reason && reason->empty()) { *reason = why; }
       } else {
         staged_ok = can_reach_via_pregrasp(target_pose, reason);
       }
