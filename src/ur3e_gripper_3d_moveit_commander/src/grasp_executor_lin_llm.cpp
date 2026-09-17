@@ -239,8 +239,13 @@ public:
     // check); check_slip = the slip pin is watched after the grasp.
     check_grasp_sensor_ = get_or_declare_param<bool>(node_, "check_grasp_sensor", true);
     check_slip_ = get_or_declare_param<bool>(node_, "check_slip", true);
-    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 24);
-    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.005);
+    // Open at the CLICK (2026-09-17): the pipeline announces a selection on
+    // selection_cycle_id ~2.4 s before the candidates arrive; sending the
+    // open then removes the "waiting for the fingers" pause on a cache
+    // miss. Only a selection triggers it, never a background check.
+    open_on_selection_ = get_or_declare_param<bool>(node_, "open_on_selection", true);
+    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 16);
+    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.008);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -891,6 +896,8 @@ public:
   }
 
   void open_gripper_early() { begin_gripper_open_async(); }
+  bool open_on_selection() const { return open_on_selection_; }
+  bool open_already_sent() const { return open_pending_ || open_done_; }
 
   // A background-verified pick skips the probe, so nothing reached the GUI's
   // console and its STOP button never armed (it arms on candidate_status).
@@ -1163,8 +1170,12 @@ public:
     // travel hide inside the 2-3 s motion, and a search that finds no line
     // never opens the gripper. Whether the fingers really parted is checked
     // by the finger sensor right before closing (ensure_fingers_open).
-    begin_gripper_open_async();
-    RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: sent with the approach (opens while the arm travels).");
+    if (open_already_sent()) {
+      RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: already sent at the click.");
+    } else {
+      begin_gripper_open_async();
+      RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: sent with the approach (opens while the arm travels).");
+    }
 
     // 2) LIN-only approach to grasp (no PTP retries in this stage).
     if (aborted_at("the approach")) {
@@ -5975,6 +5986,7 @@ private:
   double close_lead_s_{0.4};
   bool check_grasp_sensor_{true};
   bool check_slip_{true};
+  bool open_on_selection_{true};
   bool close_pending_{false};
   bool open_done_{false};      // the open of this pick has completed
   std::thread early_close_thread_;
@@ -6397,6 +6409,13 @@ int main(int argc, char ** argv)
         // Any trajectory kept from the previous cycle's probe is now for
         // the wrong grasp and must never be reachable.
         grasp_executor.invalidate_cached_lin_plan("a new selection cycle_id arrived");
+        // Open at the click (2026-09-17): the fingers get their 1.2 s while
+        // the pipeline segments and GraspGen runs, so the executor does not
+        // have to wait for them once the plan is ready. Never while an
+        // object is still held from a previous pick.
+        if (grasp_executor.open_on_selection() && !grasp_executor.holding_object()) {
+          grasp_executor.open_gripper_early();
+        }
         // A NEW pick supersedes any stale stop (2026-08-31, live repro:
         // "Stop, reset." produced MULTIPLE abort publishes — stop intent
         // + reset intent — and the stragglers arriving after clear_abort
