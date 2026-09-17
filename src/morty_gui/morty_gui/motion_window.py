@@ -222,6 +222,15 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.speed_after_spin.setValue(qs.value("pick_speed/post_release_wait_s", 2.0, type=float))
         self.speed_after_spin.setToolTip("AFTER the gripper opens: how long the arm stays at the drop pose before going home,\nso you can take the object without the arm swinging at you.")
         speed_form.addRow("Wait after release (s):", self.speed_after_spin)
+        self.cb_grasp_sensor = QtWidgets.QCheckBox("Verify the grasp with the finger sensor")
+        self.cb_grasp_sensor.setChecked(qs.value("pick_speed/check_grasp_sensor", True, type=bool))
+        self.cb_grasp_sensor.setToolTip("On: after the close, pin 16 must say 'object inside', otherwise no-grasp recovery.\n"
+                                        "Off: the object is assumed held; no recovery, no 'still holding' refusal, no fingers-apart check.")
+        speed_form.addRow("", self.cb_grasp_sensor)
+        self.cb_slip = QtWidgets.QCheckBox("Watch for slip after the grasp")
+        self.cb_slip.setChecked(qs.value("pick_speed/check_slip", True, type=bool))
+        self.cb_slip.setToolTip("On: the slip pin slows the arm while carrying. Off: the slip pin is ignored.")
+        speed_form.addRow("", self.cb_slip)
         self.speed_status = QtWidgets.QLabel("")
         self.speed_status.setWordWrap(True)
         self.speed_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
@@ -242,38 +251,10 @@ class MotionWindow(QtWidgets.QMainWindow):
             _w.valueChanged.connect(self._mark_speed_stale)
         for _c in (self.speed_transport_combo, self.speed_return_combo):
             _c.currentIndexChanged.connect(self._mark_speed_stale)
+        for _cb in (self.cb_grasp_sensor, self.cb_slip):
+            _cb.toggled.connect(self._mark_speed_stale)
         layout.addWidget(speed_box)
 
-        # Pick calibration (Majd 2026-09-16: "what is applied at the moment,
-        # +0.02 or -0.02, and how can we know?"). A `ros2 param set` dies
-        # with the pipeline process; this field is remembered, pushed onto
-        # every new pipeline, and shown back from the node after Apply.
-        cal_box = QtWidgets.QGroupBox("Pick calibration (grasp2tcp_offset_m)")
-        cal_form = self._compact_form(cal_box)
-        self.cal_spins = []
-        for axis, tip in (("x", "red axis of the executed TCP in RViz = the CLOSING direction of the fingers"),
-                          ("y", "green axis of the executed TCP"),
-                          ("z", "blue axis of the executed TCP = the approach direction (deeper / shallower)")):
-            sp = QtWidgets.QDoubleSpinBox()
-            sp.setDecimals(3); sp.setRange(-0.05, 0.05); sp.setSingleStep(0.005); sp.setSuffix(" m")
-            sp.setValue(qs.value(f"calib/offset_{axis}", 0.02 if axis == "x" else 0.0, type=float))
-            sp.setToolTip("Shift of the executed grasp pose, in metres, in the TCP frame RViz shows on "
-                          "/grasp_executor_lin_llm/selected_pose.\n" + tip +
-                          "\nMeasure with the calibration pause: ros2 param set /grasp_executor_lin_llm pause_before_close_s 10.0")
-            cal_form.addRow(f"Offset {axis}:", sp)
-            cal_form.labelForField(sp).setToolTip(sp.toolTip())
-            self.cal_spins.append(sp)
-        self.cal_status = QtWidgets.QLabel("")
-        self.cal_status.setWordWrap(True)
-        self.cal_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
-        self.cal_apply_btn = self._small_apply_button(
-            "Send the offset to the running pipeline and read it back.\n"
-            "Green = the pipeline confirmed it. Remembered and pushed again at every pipeline start."
-        )
-        cal_form.addRow("", self._apply_row(self.cal_apply_btn, self.cal_status))
-        for sp in self.cal_spins:
-            sp.valueChanged.connect(self._mark_cal_stale)
-        layout.addWidget(cal_box)
 
         joints_box = QtWidgets.QGroupBox("Group joints of goal state (like RViz Joints tab)")
         joints_lay = QtWidgets.QVBoxLayout(joints_box)
@@ -395,20 +376,6 @@ class MotionWindow(QtWidgets.QMainWindow):
     def show_speed_apply(self, kind: str, detail: str) -> None:
         self._set_status(self.speed_status, *self._apply_status_text(kind, detail))
 
-    def _mark_cal_stale(self, *_a) -> None:
-        self._set_status(self.cal_status, self.STALE_TEXT, GREY)
-
-    def show_cal_apply(self, kind: str, detail: str) -> None:
-        self._set_status(self.cal_status, *self._apply_status_text(kind, detail))
-
-    def calibration_offset(self) -> List[float]:
-        return [float(sp.value()) for sp in self.cal_spins]
-
-    def save_calibration(self) -> None:
-        qs = QtCore.QSettings("morty", "morty_gui")
-        for axis, v in zip("xyz", self.calibration_offset()):
-            qs.setValue(f"calib/offset_{axis}", float(v))
-
     def pick_speed_values(self) -> Dict[str, float]:
         """The six executor parameters as the tab shows them."""
         return {
@@ -420,10 +387,12 @@ class MotionWindow(QtWidgets.QMainWindow):
             "open_before_arrival_margin_s": float(self.speed_margin_spin.value()),
             "drop_hold_s": float(self.speed_hold_spin.value()),
             "post_release_wait_s": float(self.speed_after_spin.value()),
+            "check_grasp_sensor": bool(self.cb_grasp_sensor.isChecked()),
+            "check_slip": bool(self.cb_slip.isChecked()),
         }
 
     def pick_speed_launch_args(self) -> List[str]:
-        return [f"{k}:={v:.2f}" for k, v in self.pick_speed_values().items()]
+        return [f"{k}:={str(v).lower() if isinstance(v, bool) else f'{v:.2f}'}" for k, v in self.pick_speed_values().items()]
 
     def save_pick_speeds(self) -> None:
         qs = QtCore.QSettings("morty", "morty_gui")

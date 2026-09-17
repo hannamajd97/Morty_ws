@@ -107,6 +107,8 @@ class IdentityCheck:
                               for r in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE, cv2.ROTATE_180)]
                     self._refs[os.path.basename(cdir)] = self._embed(crops + turned)
             stats = [f"{k} ({len(e) // 4} refs x 4 orientations)" for k, e in self._refs.items()]
+            if self._device == "cuda":
+                torch.cuda.empty_cache()   # the reference batches' activations are not needed any more
             log.info(f"[identity] DINOv2 ready in {time.monotonic() - t:.1f} s; references: " + ", ".join(stats)
                      + f"; threshold {float(self._p('identity_threshold', 0.5)):.2f}")
         except Exception as e:  # noqa: BLE001

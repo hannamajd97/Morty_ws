@@ -233,6 +233,12 @@ public:
     // begins (+0.25 s adapter delay), so 0.4 s is safe. 0 = close after
     // arrival, as before.
     close_lead_s_ = get_or_declare_param<double>(node_, "close_lead_s", 0.4);
+    // Sensor switches (Majd 2026-09-17): check_grasp_sensor = the finger
+    // pin decides "object inside" after the close (off: assumed holding, no
+    // no-grasp recovery, no "still holding" refusal, no fingers-apart
+    // check); check_slip = the slip pin is watched after the grasp.
+    check_grasp_sensor_ = get_or_declare_param<bool>(node_, "check_grasp_sensor", true);
+    check_slip_ = get_or_declare_param<bool>(node_, "check_slip", true);
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 24);
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.005);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
@@ -913,6 +919,7 @@ public:
   // open the executor sends; a GUI open shows as an open gripper joint.
   bool holding_object()
   {
+    if (!check_grasp_sensor_) { return false; }   // without the sensor there is nothing to refuse on
     if (!held_object_.load()) { return false; }
     if (!grasp_detected_.load()) { return false; }
     sensor_msgs::msg::JointState js;
@@ -1457,6 +1464,10 @@ public:
       if (holding && stall_max > 0.0 && stall_s > stall_max) {
         holding = false;   // stalled late = fingers met each other, nothing between them
       }
+      if (!check_grasp_sensor_) {
+        RCLCPP_INFO(node_->get_logger(), "Grasp sensor check is OFF — the object is assumed to be held.");
+        holding = true;
+      }
       RCLCPP_INFO(node_->get_logger(),
         "Post-close DI check: grasp_pin(TI0)=%d=%s (stall after %.2f s%s), slip_pin(TI1)=%d=%s "
         "(TI1 is informational — gripper hardware self-compensates).",
@@ -1607,7 +1618,7 @@ public:
 
     // From this point on, the gripper is closed on the object.
     // If any step fails, we attempt a fallback recovery to initgrasp.
-    slip_monitor_armed_.store(true);
+    slip_monitor_armed_.store(check_slip_);
 
     if (stop_after_grasp_) {
       rclcpp::sleep_for(std::chrono::milliseconds(150));
@@ -5566,7 +5577,7 @@ private:
   // grasp nothing.
   bool ensure_fingers_open(const std::string & step_name)
   {
-    if (!execute_) { return true; }
+    if (!execute_ || !check_grasp_sensor_) { return true; }
     auto settled_low = [this](double window_s) {
       const auto t_end = std::chrono::steady_clock::now() +
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(window_s));
@@ -5705,6 +5716,12 @@ private:
         node_->get_parameter("blend_velocity_scaling").as_double();
     if (node_->has_parameter("drop_hold_s")) {
       drop_hold_s_ = node_->get_parameter("drop_hold_s").as_double();
+    }
+    if (node_->has_parameter("check_grasp_sensor")) {
+      check_grasp_sensor_ = node_->get_parameter("check_grasp_sensor").as_bool();
+    }
+    if (node_->has_parameter("check_slip")) {
+      check_slip_ = node_->get_parameter("check_slip").as_bool();
     }
     if (node_->has_parameter("post_release_wait_s")) {
       post_release_wait_s_ = node_->get_parameter("post_release_wait_s").as_double();
@@ -5956,6 +5973,8 @@ private:
   double cartesian_path_tolerance_rad_{0.05};
   double cartesian_curve_lead_m_{0.12};
   double close_lead_s_{0.4};
+  bool check_grasp_sensor_{true};
+  bool check_slip_{true};
   bool close_pending_{false};
   bool open_done_{false};      // the open of this pick has completed
   std::thread early_close_thread_;
