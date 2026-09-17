@@ -204,7 +204,7 @@ class MotionWindow(QtWidgets.QMainWindow):
         speed_form.addRow("Return home:", self.speed_return_combo)
         self.speed_open_spin = QtWidgets.QDoubleSpinBox()
         self.speed_open_spin.setRange(0.3, 2.0); self.speed_open_spin.setSingleStep(0.1)
-        self.speed_open_spin.setValue(qs.value("pick_speed/gripper_open_time_s", 0.7, type=float))
+        self.speed_open_spin.setValue(qs.value("pick_speed/gripper_open_time_s", 1.0, type=float))
         self.speed_open_spin.setToolTip('How long the fingers need to be fully apart after the open pulse is sent.\nMeasured 2026-09-16: still opening at 1.0 s, open at 1.3 s. The arm may not reach the object\nbefore open time + margin has passed, and the close waits for it as well.')
         speed_form.addRow("Gripper open time (s):", self.speed_open_spin)
         self.speed_margin_spin = QtWidgets.QDoubleSpinBox()

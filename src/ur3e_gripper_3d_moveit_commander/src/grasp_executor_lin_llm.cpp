@@ -363,7 +363,7 @@ public:
     // 1.2 s (measured 2026-09-16): with the close pulse 1.03 s after the open
     // pulse began the fingers were still opening (Majd saw them touch the
     // object); at 1.29 s the close stalled on the object after 0.73 s.
-    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.7);   // measured 2026-09-17: the adapter reports the open done 0.55-0.70 s after the send
+    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 1.0);   // 2026-09-17 evening, 8 picks: a close sent 0.80 s after the open grasped nothing twice, >= 0.93 s held six times; the adapter's 0.6 s "done" is not the fingers
     // Margin 0.5 s (2026-09-16): the adapter starts the pulse ~0.25 s after
     // the goal is sent (measured 741.43 -> 741.69), and the fingers need a
     // little settle. So the arm arrives no earlier than 1.2 s after the send.
