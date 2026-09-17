@@ -3251,6 +3251,23 @@ private:
     if (!robot_state_from_ear(start_state)) { start_state.setToDefaultValues(); }
     moveit_msgs::msg::RobotState start_msg;
     moveit::core::robotStateToRobotStateMsg(start_state, start_msg);
+    // Swing: the PTP goal is given as JOINTS, solved here with the current
+    // joints as the seed (nearest arm configuration). Given as a pose, Pilz
+    // picked its own solution — often the flipped configuration — and the
+    // joint path to it swept the upper arm through the wall (2026-09-17
+    // night: 605 wall contacts, 300 self-collisions, 1 swing planned in 71).
+    // The morning's plain PTP to the stand-off worked for the same reason:
+    // it was seeded from the current state.
+    const bool ptp_first = (std::string(first_planner) == "PTP");
+    moveit::core::RobotState pre_state = start_state;
+    const auto * jmg = pre_state.getJointModelGroup(arm_group_.getName());
+    const bool pre_joint_goal = ptp_first && jmg &&
+      pre_state.setFromIK(jmg, pre_pose.pose, ee, 0.05);
+    if (ptp_first && !pre_joint_goal) {
+      if (reason) { *reason = "no joint solution for the pre-grasp point (seeded from the current joints)"; }
+      return false;
+    }
+    if (pre_joint_goal) { pre_state.update(); }
 
     // Per-line factors (2026-09-16, Majd: "the first LIN is slow"): only the
     // short last stretch needs the slow-down for the joint acceleration
@@ -3279,8 +3296,12 @@ private:
         item.req.max_acceleration_scaling_factor = acceleration_scaling_ * pr[k == 0 ? 1 : 3];
         item.req.allowed_planning_time = std::max(2.0, lin_feasibility_planning_time_);
         if (k == 0) { item.req.start_state = start_msg; }
-        item.req.goal_constraints.push_back(
-          kinematic_constraints::constructGoalConstraints(ee, k == 0 ? pre_pose : target_pose));
+        if (k == 0 && pre_joint_goal) {
+          item.req.goal_constraints.push_back(kinematic_constraints::constructGoalConstraints(pre_state, jmg));
+        } else {
+          item.req.goal_constraints.push_back(
+            kinematic_constraints::constructGoalConstraints(ee, k == 0 ? pre_pose : target_pose));
+        }
         item.blend_radius = (k == 0) ? blend_radius_m_ : 0.0;
         req->request.items.push_back(item);
       }
