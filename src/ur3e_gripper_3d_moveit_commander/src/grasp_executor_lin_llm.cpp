@@ -3287,14 +3287,15 @@ private:
     arm_group_.clearPoseTargets();
     arm_group_.setStartStateToCurrentState();
     arm_group_.setPlanningPipelineId("pilz_industrial_motion_planner");
-    // "blend" and "cartesian" fall back here when the one-motion planners
-    // refuse: the two separate lines must then be planned AND cached exactly
-    // as in "lin". A fallback that used the PTP stand-off cached nothing, so
-    // a candidate the probe had verified was planned AGAIN at execution and
-    // failed there (2026-09-16 for "blend"; 2026-09-17 the same hole for
-    // "cartesian": four picks ended in "Step 2a/2b planning failed" and a
-    // recovery PTP home). Only the plain "ptp" mode keeps the PTP stand-off.
-    const bool lin_staging = (staging_mode_ != "ptp");
+    // Stage A is a straight line in "lin" and "blend"; in "cartesian" the
+    // curve was already refused, and a LIN from home to the stand-off fails
+    // almost everywhere (2026-09-17 afternoon: 10/10 candidates rejected,
+    // 21 s of background probing, nothing executed) — so the fallback there
+    // is "PTP stand-off + LIN last stretch", which the PTP reaches. Whatever
+    // stage A is, BOTH plans are cached below: a fallback that cached
+    // nothing made the probe's verified candidate get planned again at
+    // execution and fail there (2026-09-16 "blend", 2026-09-17 "cartesian").
+    const bool lin_staging = (staging_mode_ == "lin" || staging_mode_ == "blend");
     arm_group_.setPlannerId(lin_staging ? "LIN" : "PTP");
     if (!arm_group_.setPoseTarget(pre_pose, ee)) {
       if (reason) { *reason = "LIN planning failed: NO_IK_SOLUTION (-31)"; }
@@ -3350,13 +3351,13 @@ private:
       }
       if (lin_result == moveit::core::MoveItErrorCode::SUCCESS) {
         ok = true;
-        if (lin_staging) {
-          // Keyed by the GRASP pose so plan reuse and the background record
-          // match as before; the plan itself ends at the pre-grasp point.
-          cache_lin_plan(target_pose, pre_plan, wall_a + wall_b);
-          cached_final_plan_ = lin_plan;
-          cached_final_plan_valid_ = true;
-        }
+        // Keyed by the GRASP pose so plan reuse and the background record
+        // match as before; the plan itself ends at the pre-grasp point.
+        // Cached in every staged mode (PTP stand-off + LIN last stretch in
+        // "cartesian"), never left for execution to plan again.
+        cache_lin_plan(target_pose, pre_plan, wall_a + wall_b);
+        cached_final_plan_ = lin_plan;
+        cached_final_plan_valid_ = true;
       } else if (reason) {
         *reason = "LIN planning failed: " +
           moveit::core::error_code_to_string(lin_result) +

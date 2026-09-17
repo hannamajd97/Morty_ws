@@ -1934,6 +1934,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             cmd, env=pipeline_env, log_path=os.path.expanduser("~/morty_ws/logs/pipeline_gui.log")
         )
         if not self._executor.running():
+            self._retire_headless_executors()
             exec_cmd = self._executor_cmd()
             if self.mode_combo.currentIndex() == 1:
                 exec_cmd.append("use_fake_hardware:=true")
@@ -2678,6 +2679,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             # Same self-heal for the LLM grasp executor: a pipeline without
             # it selects grasps and then waits on cycle_done forever.
             if self._pipeline.running() and not self._executor.running():
+                self._retire_headless_executors()
                 exec_cmd = self._executor_cmd()
                 if self.mode_combo.currentIndex() == 1:
                     exec_cmd.append("use_fake_hardware:=true")
@@ -2940,6 +2942,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         relaunch left the old instance running.  Adopt the NEWEST wrapper
         (the one that carries the current binary and parameters) and
         SIGINT every older duplicate so ros2 launch tears it down cleanly."""
+        self._retire_headless_executors()
         pids = self._pgrep_all(r"ros2 launch .*grasp_executor_lin_ll[m]")
         if not pids:
             return
@@ -2953,6 +2956,31 @@ class OperatorWindow(QtWidgets.QMainWindow):
             except ProcessLookupError:
                 pass
         self._executor.adopt(newest)
+
+    def _retire_headless_executors(self) -> None:
+        """Kill executor NODES whose `ros2 launch` parent is gone.  Such a
+        node lives on under systemd and keeps racing for the candidate
+        topics (2026-09-17: one from a dead GUI executed every pick next to
+        the new one; the controller refused the second goal with
+        CONTROL_FAILED and the robot went home each time).  The launch
+        sweep in _adopt_newest_executor cannot see it: there is no wrapper
+        to SIGINT, so the binary itself is terminated."""
+        for pid in self._pgrep_all(r"grasp_executor_lin_llm --ros-arg[s]"):
+            try:
+                with open(f"/proc/{pid}/stat") as f:
+                    ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+                with open(f"/proc/{ppid}/cmdline", "rb") as f:
+                    parent = f.read().replace(b"\0", b" ").decode(errors="replace")
+            except (OSError, ValueError, IndexError):
+                continue
+            if "ros2 launch" in parent:
+                continue
+            try:
+                os.kill(pid, signal.SIGTERM)
+                print(f"[gui] killed headless executor node pid {pid} "
+                      f"(parent {ppid}: {parent[:50]!r})", flush=True)
+            except ProcessLookupError:
+                pass
 
     def _write_latest_html(self) -> None:
         """~/morty_ws/experiments/latest/view3d.html — refreshed on every
