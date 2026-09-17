@@ -2081,7 +2081,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
             return  # still starting up
         try:
             with open(self._voice_log, "r", errors="replace") as f:
-                lines = f.readlines()[-120:]
+                lines = f.readlines()
+            # The log is appended across sessions: look at this session only.
+            for i in range(len(lines) - 1, -1, -1):
+                if lines[i].startswith("===== session started"):
+                    lines = lines[i + 1:]
+                    break
+            lines = lines[-120:]
         except OSError:
             return
         picked: List[str] = []

@@ -66,14 +66,27 @@ class ManagedLaunch(QtCore.QObject):
                 # SIGPIPE-kill adopted children if the GUI ever dies); the
                 # GUI tails the file into its own terminal so Majd keeps
                 # his live console view (2026-08-12).
-                self._log_f = open(log_path, "wb")
+                # Appended across restarts (2026-09-17: every restart erased
+                # the previous session, so "which fallback ever rescued a
+                # pick" could not be counted over a day). A session header
+                # separates runs; above 20 MB the file rotates to <name>.1.
+                try:
+                    if os.path.exists(log_path) and os.path.getsize(log_path) > 20 * 1024 * 1024:
+                        os.replace(log_path, log_path + ".1")
+                except OSError:
+                    pass
+                self._log_f = open(log_path, "ab")
+                tail_from = self._log_f.tell()
+                self._log_f.write(
+                    f"\n===== session started {time.strftime('%Y-%m-%d %H:%M:%S')} =====\n".encode())
+                self._log_f.flush()
                 self.proc = subprocess.Popen(
                     cmd, start_new_session=True, env=env,
                     stdout=self._log_f, stderr=subprocess.STDOUT,
                 )
                 threading.Thread(
                     target=self._tail_to_console,
-                    args=(log_path, self.proc),
+                    args=(log_path, self.proc, tail_from),
                     daemon=True,
                 ).start()
             else:
@@ -84,10 +97,12 @@ class ManagedLaunch(QtCore.QObject):
             self._stop_stage = 0
 
     @staticmethod
-    def _tail_to_console(log_path, proc) -> None:
-        """Echo the growing log file to the GUI's stdout (like tail -f)."""
+    def _tail_to_console(log_path, proc, offset: int = 0) -> None:
+        """Echo the growing log file to the GUI's stdout (like tail -f),
+        from this session's start only."""
         try:
             with open(log_path, "rb") as f:
+                f.seek(offset)
                 while True:
                     line = f.readline()
                     if line:
