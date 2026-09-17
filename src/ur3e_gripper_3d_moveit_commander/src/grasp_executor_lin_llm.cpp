@@ -1266,7 +1266,10 @@ public:
         RCLCPP_INFO(node_->get_logger(), "Step 2a/2b - planning both lines now (%s).",
           reuse_reject.empty() ? "no final plan held" : reuse_reject.c_str());
         std::string why;
-        if (!can_reach_via_pregrasp(grasp_pose_world, &why) || !cached_final_plan_valid_) {
+        if (can_reach_via_pregrasp(grasp_pose_world, &why) && !cached_final_plan_valid_) {
+          why = "two-line planner kept no plans (staging_mode=" + staging_mode_ + ")";
+        }
+        if (!cached_lin_plan_valid_ || !cached_final_plan_valid_) {
           RCLCPP_ERROR(node_->get_logger(), "Step 2a/2b planning failed: %s", why.c_str());
           recover_to_reset_target("Step 2a/2b (two lines) planning failed");
           return false;
@@ -3314,11 +3317,14 @@ private:
     arm_group_.clearPoseTargets();
     arm_group_.setStartStateToCurrentState();
     arm_group_.setPlanningPipelineId("pilz_industrial_motion_planner");
-    // "blend" falls back here when the sequence planner refuses: the two
-    // separate lines must then be planned AND cached exactly as in "lin"
-    // (2026-09-16: a "blend" fallback used the PTP stand-off and cached
-    // nothing, so a candidate the probe verified failed at execution).
-    const bool lin_staging = (staging_mode_ == "lin" || staging_mode_ == "blend");
+    // "blend" and "cartesian" fall back here when the one-motion planners
+    // refuse: the two separate lines must then be planned AND cached exactly
+    // as in "lin". A fallback that used the PTP stand-off cached nothing, so
+    // a candidate the probe had verified was planned AGAIN at execution and
+    // failed there (2026-09-16 for "blend"; 2026-09-17 the same hole for
+    // "cartesian": four picks ended in "Step 2a/2b planning failed" and a
+    // recovery PTP home). Only the plain "ptp" mode keeps the PTP stand-off.
+    const bool lin_staging = (staging_mode_ != "ptp");
     arm_group_.setPlannerId(lin_staging ? "LIN" : "PTP");
     if (!arm_group_.setPoseTarget(pre_pose, ee)) {
       if (reason) { *reason = "LIN planning failed: NO_IK_SOLUTION (-31)"; }
@@ -3968,6 +3974,21 @@ private:
     return true;
   }
 
+  // The background check yields to a click between candidates AND between
+  // the stages of one candidate's chain (curve -> blend -> two lines): a
+  // chain can cost 2 s on a hard pose, and the click's candidates were
+  // waiting behind it (2026-09-17).
+  bool precheck_stop_requested()
+  {
+    if (!precheck_mode_) { return false; }
+    rclcpp::spin_some(node_);
+    if (precheck_interrupt_ && precheck_interrupt_()) {
+      precheck_interrupted_ = true;
+      return true;
+    }
+    return false;
+  }
+
   bool can_plan_lin_pose(const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason = nullptr)
   {
     // INVALIDATION: a new probe supersedes any earlier one. Candidate
@@ -3993,13 +4014,21 @@ private:
             RCLCPP_INFO(node_->get_logger(), "one-motion approach not planned (%s) — trying the blend.", why.c_str());
           }
         }
-        if (!staged_ok) { staged_ok = plan_blended_two_lines(target_pose, &why); }
-        if (!staged_ok) {
-          // Whatever the sequence planner disliked (service missing, timed
-          // out, blend impossible here), the two separate lines decide the
-          // candidate — a blend problem must never reject a reachable grasp.
-          RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the two separate lines.", why.c_str());
-          staged_ok = can_reach_via_pregrasp(target_pose, reason);
+        // A click outranks the rest of this chain (background check only).
+        auto yield_to_selection = [&]() {
+          if (!precheck_stop_requested()) { return false; }
+          if (reason) { *reason = "background check interrupted by a selection"; }
+          return true;
+        };
+        if (!staged_ok && !yield_to_selection()) {
+          staged_ok = plan_blended_two_lines(target_pose, &why);
+          if (!staged_ok && !yield_to_selection()) {
+            // Whatever the sequence planner disliked (service missing, timed
+            // out, blend impossible here), the two separate lines decide the
+            // candidate — a blend problem must never reject a reachable grasp.
+            RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the two separate lines.", why.c_str());
+            staged_ok = can_reach_via_pregrasp(target_pose, reason);
+          }
         }
       } else {
         staged_ok = can_reach_via_pregrasp(target_pose, reason);
@@ -4627,14 +4656,8 @@ private:
         "Evaluating candidate batch %zu/%zu (indices %zu..%zu).",
         batch_idx, batch_count, batch_start + 1, batch_end);
       for (size_t i = batch_start; i < batch_end; ++i) {
-        if (precheck_mode_) {
-          // Let a real selection in, and stop for it between candidates.
-          rclcpp::spin_some(node_);
-          if (precheck_interrupt_ && precheck_interrupt_()) {
-            precheck_interrupted_ = true;
-            return false;
-          }
-        }
+        // Let a real selection in, and stop for it between candidates.
+        if (precheck_stop_requested()) { return false; }
         if (abort_requested_.load()) {
           last_failure_reason_ = "stopped by your command";
           // INVALIDATION: abort mid-evaluation.
@@ -4675,6 +4698,7 @@ private:
           precheck_tried_ = n_tried + 1;
           return true;
         }
+        if (precheck_interrupted_) { return false; }
         ++n_tried;
         precheck_tried_ = n_tried;
         // MoveGroup returns only a broad error code. Its useful detail (for
