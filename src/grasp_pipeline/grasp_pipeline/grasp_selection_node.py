@@ -2546,7 +2546,10 @@ class YoloLiveSelectGrasp(Node):
                             )
                         self._awaiting_executor_cycle_done = False
                         self.get_logger().info("Resetting for next cycle...")
-                        time.sleep(3.0)
+                        # A hard 3.0 s sleep sat here (Majd 2026-09-17: "I have to
+                        # wait 1-2 s until it resets"); a short settle is enough for
+                        # the overlay and the cache to see the table without the arm.
+                        time.sleep(float(self.get_parameter("post_cycle_settle_s").value))
                         self.detections_cache = []
                         self.selection_made = False
                         self.selected_idx = None
