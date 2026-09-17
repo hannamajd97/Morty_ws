@@ -243,7 +243,6 @@ public:
     // selection_cycle_id ~2.4 s before the candidates arrive; sending the
     // open then removes the "waiting for the fingers" pause on a cache
     // miss. Only a selection triggers it, never a background check.
-    open_on_selection_ = get_or_declare_param<bool>(node_, "open_on_selection", true);
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 16);
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.008);
     pregrasp_approach_distance_ = get_or_declare_param<double>(
@@ -364,11 +363,11 @@ public:
     // 1.2 s (measured 2026-09-16): with the close pulse 1.03 s after the open
     // pulse began the fingers were still opening (Majd saw them touch the
     // object); at 1.29 s the close stalled on the object after 0.73 s.
-    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 1.2);
+    gripper_open_time_s_ = get_or_declare_param<double>(node_, "gripper_open_time_s", 0.7);   // measured 2026-09-17: the adapter reports the open done 0.55-0.70 s after the send
     // Margin 0.5 s (2026-09-16): the adapter starts the pulse ~0.25 s after
     // the goal is sent (measured 741.43 -> 741.69), and the fingers need a
     // little settle. So the arm arrives no earlier than 1.2 s after the send.
-    open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.5);
+    open_before_arrival_margin_s_ = get_or_declare_param<double>(node_, "open_before_arrival_margin_s", 0.1);
     gripper_adapter_node_name_ = get_or_declare_param<std::string>(
       node_, "gripper_adapter_node_name", "/gripper_controller/gripper_command_adapter");
     override_gripper_pulse_from_executor_ =
@@ -895,8 +894,18 @@ public:
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - rec.t_done).count();
   }
 
-  void open_gripper_early() { begin_gripper_open_async(); }
-  bool open_on_selection() const { return open_on_selection_; }
+  // The open goes out WITH the first arm motion of a pick and never before
+  // it (Majd 2026-09-17: "don't open the gripper if there is no real
+  // movement"). Every branch of the approach calls this right before its
+  // first execute, so a plan that fails never parts the fingers. The
+  // adapter reports the open done ~0.6 s after the send (0.25 s to the
+  // pulse, 0.20 s pulse, IO round trip) — gripper_open_time_s.
+  void send_open_with_motion(const char * where)
+  {
+    if (open_already_sent()) { return; }   // a retry inside the same pick
+    begin_gripper_open_async();
+    RCLCPP_INFO(node_->get_logger(), "%s: open sent with the motion.", where);
+  }
   bool open_already_sent() const { return open_pending_ || open_done_; }
 
   // A background-verified pick skips the probe, so nothing reached the GUI's
@@ -1102,6 +1111,7 @@ public:
     refresh_runtime_params();
     last_failure_reason_.clear();
     cycle_done_note_.clear();
+    open_pending_ = false; open_done_ = false; early_close_fired_.store(false);
 
     // Operator-stop check used between the irreversible-ish steps. Sets
     // the narration reason FIRST so recover_to_reset_target keeps it.
@@ -1165,17 +1175,10 @@ public:
       }
     }
 
-    // 1) Open gripper, sent WITH the approach (Majd 2026-09-16: "let the
-    // gripper open while it is moving"): the 0.2 s pulse and the finger
-    // travel hide inside the 2-3 s motion, and a search that finds no line
-    // never opens the gripper. Whether the fingers really parted is checked
-    // by the finger sensor right before closing (ensure_fingers_open).
-    if (open_already_sent()) {
-      RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: already sent when the candidates arrived.");
-    } else {
-      begin_gripper_open_async();
-      RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: sent with the approach (opens while the arm travels).");
-    }
+    // 1) The open goes out with the first arm motion, never before it
+    // (send_open_with_motion in every branch below). Whether the fingers
+    // really parted is checked by the finger sensor before the close.
+    RCLCPP_INFO(node_->get_logger(), "Step 1 - Open gripper: goes out with the approach, not before it.");
 
     // 2) LIN-only approach to grasp (no PTP retries in this stage).
     if (aborted_at("the approach")) {
@@ -1205,35 +1208,42 @@ public:
       if (!execute_) {
         staged_lin_ok = true;
       } else {
-        // Fingers apart BEFORE the motion (2026-09-16): a stretched plan
-        // crept into the object; the missing open time is waited out here
-        // at home instead, and the arm then moves at full speed.
         {
           const auto & pts = blended.trajectory_.joint_trajectory.points;
           const double dur = pts.empty() ? 0.0 : rclcpp::Duration(pts.back().time_from_start).seconds();
-          const double need = gripper_open_time_s_ + open_before_arrival_margin_s_ - dur;
-          if (need > 0.0) {
-            RCLCPP_INFO(node_->get_logger(), "Step 2 - waiting %.2f s for the fingers before moving (plan %.2f s).", need, dur);
-            const auto t_end = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
-              std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_ - dur));
-            while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
-              rclcpp::spin_some(node_);
-              std::this_thread::sleep_for(std::chrono::milliseconds(20));
-            }
-          }
-          if (!finish_gripper_open("Step 1 - Open gripper") || !ensure_fingers_open("Step 1b - Fingers apart?")) {
-            recover_to_reset_target("Step 1: the fingers did not open");
-            return false;
-          }
-          // Close on the way in: the pulse goes out close_lead_s before the end.
+          send_open_with_motion("Step 2 - one motion");
+          // Close on the way in: the pulse goes out close_lead_s before the
+          // end — but never before the open is done (gripper_open_time_s +
+          // margin after the send) and never while the finger sensor still
+          // reads "touching". Fingers not apart by the arrival: the close is
+          // left to Step 3, after the usual sensor check and second pulse.
           double pause_s = 0.0;
           try { pause_s = node_->get_parameter("pause_before_close_s").as_double(); } catch (...) {}
           if (close_lead_s_ > 0.0 && pause_s <= 0.0 && !vitamin_mode_active_ && dur > close_lead_s_ + 0.2) {
             if (early_close_thread_.joinable()) { early_close_thread_.join(); }
-            const double fire_after = dur - close_lead_s_;
-            early_close_thread_ = std::thread([this, fire_after]() {
-              std::this_thread::sleep_for(std::chrono::duration<double>(fire_after));
-              if (!abort_requested_.load()) { begin_gripper_close_async(); }
+            using ns = std::chrono::nanoseconds;
+            const auto t_start = std::chrono::steady_clock::now();
+            const auto open_ready = open_sent_t_ + std::chrono::duration_cast<ns>(
+              std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_));
+            const auto lead_at = t_start + std::chrono::duration_cast<ns>(std::chrono::duration<double>(dur - close_lead_s_));
+            const auto arrival = t_start + std::chrono::duration_cast<ns>(std::chrono::duration<double>(dur));
+            early_close_thread_ = std::thread([this, open_ready, lead_at, arrival]() {
+              const auto earliest = std::max(open_ready, lead_at);
+              while (std::chrono::steady_clock::now() < earliest && !abort_requested_.load()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+              }
+              while (!abort_requested_.load() && std::chrono::steady_clock::now() < arrival) {
+                if (!check_grasp_sensor_ || !grasp_detected_.load()) {
+                  early_close_fired_.store(true);
+                  begin_gripper_close_async();
+                  return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+              }
+              if (!abort_requested_.load()) {
+                RCLCPP_WARN(node_->get_logger(),
+                  "Close on the way in skipped: the finger sensor did not read 'apart' before the arrival — closing after the sensor check.");
+              }
             });
           }
         }
@@ -1286,6 +1296,7 @@ public:
           pre_plan, gripper_open_time_s_ + open_before_arrival_margin_s_, "Step 2a - LIN to pre-grasp");
         RCLCPP_INFO(node_->get_logger(), "Step 2a - LIN to the pre-grasp %.0f cm behind the grasp.",
           pregrasp_approach_distance_ * 100.0);
+        send_open_with_motion("Step 2a - LIN to the pre-grasp");
         auto r1 = execute_with_deadline(pre_plan, __func__);
         if (r1 != moveit::core::MoveItErrorCode::SUCCESS) {
           RCLCPP_ERROR(node_->get_logger(), "Step 2a - LIN to pre-grasp: execution failed: %s (%d)",
@@ -1313,6 +1324,7 @@ public:
       RCLCPP_INFO(node_->get_logger(),
         "Step 2a - PTP to stand-off %.0f cm behind the grasp.",
         pregrasp_approach_distance_ * 100.0);
+      send_open_with_motion("Step 2a - PTP to stand-off");
       if (!execute_arm_ptp_pose(pre_pose, "Step 2a - PTP to stand-off")) {
         if (aborted_at("the approach")) {
           return false;
@@ -1337,6 +1349,7 @@ public:
       } else {
         stretch_plan_to_min_duration(
           approach_plan, gripper_open_time_s_ + open_before_arrival_margin_s_, "Step 2 - Grasp LIN");
+        send_open_with_motion("Step 2 - Grasp LIN");
         auto exec_result = execute_with_deadline(approach_plan, __func__);
         step2_ok = (exec_result == moveit::core::MoveItErrorCode::SUCCESS);
         if (step2_ok) {
@@ -1353,6 +1366,7 @@ public:
       // Pregrasp-staging path: the LIN start pose only exists after the
       // stand-off PTP, so plan+execute here (3 attempts, flake guard).
       min_exec_duration_s_ = gripper_open_time_s_ + open_before_arrival_margin_s_;
+      send_open_with_motion("Step 2 - Grasp LIN (fresh plan)");
       for (int s2 = 0; s2 < 3 && !step2_ok; ++s2) {
         if (s2 > 0) {
           RCLCPP_WARN(node_->get_logger(),
@@ -1382,11 +1396,11 @@ public:
     if (aborted_at("before closing the gripper")) {
       return false;
     }
-    if (!staged_lin_done) {   // the one-plan branch verified the fingers before moving
-      if (!finish_gripper_open("Step 1 - Open gripper")) {
-        recover_to_reset_target("Step 1 (open gripper) failed");
-        return false;
-      }
+    if (!finish_gripper_open("Step 1 - Open gripper")) {
+      recover_to_reset_target("Step 1 (open gripper) failed");
+      return false;
+    }
+    if (!early_close_fired_.load()) {   // otherwise the sensor was read 'apart' before the close went out
       // The fingers get their full opening time whatever the approach did
       // (a stretched plan, a fallback plan, a cached one): wait out the rest.
       {
@@ -3287,15 +3301,15 @@ private:
     arm_group_.clearPoseTargets();
     arm_group_.setStartStateToCurrentState();
     arm_group_.setPlanningPipelineId("pilz_industrial_motion_planner");
-    // Stage A is a straight line in "lin" and "blend"; in "cartesian" the
-    // curve was already refused, and a LIN from home to the stand-off fails
-    // almost everywhere (2026-09-17 afternoon: 10/10 candidates rejected,
-    // 21 s of background probing, nothing executed) — so the fallback there
-    // is "PTP stand-off + LIN last stretch", which the PTP reaches. Whatever
-    // stage A is, BOTH plans are cached below: a fallback that cached
-    // nothing made the probe's verified candidate get planned again at
+    // Stage A is a straight line in every staged mode. Majd 2026-09-17:
+    // "we don't need that PTP fallback when the two lines don't work" — a
+    // candidate the curve and the two lines cannot reach is rejected and
+    // the next one is tried; the arm only ever approaches on a curve or
+    // on straight lines. Only the plain "ptp" mode keeps the PTP stand-off.
+    // BOTH plans are cached below whatever stage A is: a fallback that
+    // cached nothing made a verified candidate get planned again at
     // execution and fail there (2026-09-16 "blend", 2026-09-17 "cartesian").
-    const bool lin_staging = (staging_mode_ == "lin" || staging_mode_ == "blend");
+    const bool lin_staging = (staging_mode_ != "ptp");
     arm_group_.setPlannerId(lin_staging ? "LIN" : "PTP");
     if (!arm_group_.setPoseTarget(pre_pose, ee)) {
       if (reason) { *reason = "LIN planning failed: NO_IK_SOLUTION (-31)"; }
@@ -6018,7 +6032,7 @@ private:
   double close_lead_s_{0.4};
   bool check_grasp_sensor_{true};
   bool check_slip_{true};
-  bool open_on_selection_{true};
+  std::atomic<bool> early_close_fired_{false};   // the close went out on the way in (sensor said apart)
   bool close_pending_{false};
   bool open_done_{false};      // the open of this pick has completed
   std::thread early_close_thread_;
@@ -6704,10 +6718,6 @@ int main(int argc, char ** argv)
       // open in front of a still arm). Candidates mean a pick is really
       // coming; the probe (~1.3 s) and the approach (~1 s) cover the
       // 1.2 s + 0.5 s the fingers need. Never while an object is held.
-      if (grasp_executor.open_on_selection() && !grasp_executor.holding_object()) {
-        grasp_executor.open_gripper_early();
-        RCLCPP_INFO(node->get_logger(), "Step 1 - Open gripper: sent as the candidates arrived.");
-      }
       grasp_executor.clear_abort();
       if (grasp_executor.holding_object()) {
         // The previous pick was stopped while holding (Reset during the
