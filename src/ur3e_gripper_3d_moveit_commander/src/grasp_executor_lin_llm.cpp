@@ -4571,7 +4571,13 @@ private:
       // drivable the gripper had opened for nothing. It goes with the approach.
     }
     size_t ik_demoted = 0;
-    std::vector<std::pair<double, size_t>> demoted;
+    std::vector<std::pair<double, size_t>> demoted, untested;
+    // Only the first batch (max_candidate_tries_) is ever probed, so the
+    // 20 ms quick test stops once that many have passed (Majd 2026-09-17:
+    // "sort the first 10 because we only execute them"). 48 tests were
+    // 0.5 s of every click; 10-12 are 0.1 s. The untested rest keeps
+    // GraspGen's order behind the passers, ahead of the demoted ones.
+    const size_t want = static_cast<size_t>(std::max(1, max_candidate_tries_));
     for (size_t i = 0; i < total_in; ++i) {
       double cost = static_cast<double>(i);  // fall back to GraspGen order
       if (sort_by_reach && have_tcp) {
@@ -4580,6 +4586,10 @@ private:
         const double dy = p.y - tcp_pose.position.y;
         const double dz = p.z - tcp_pose.position.z;
         cost = std::sqrt(dx * dx + dy * dy + dz * dz);
+      }
+      if (!sort_by_reach && ranked.size() >= want) {
+        untested.emplace_back(cost, i);
+        continue;
       }
       if (has_ik_solution(candidates[i])) {
         ranked.emplace_back(cost, i);
@@ -4593,13 +4603,15 @@ private:
       std::sort(ranked.begin(), ranked.end());
       std::sort(demoted.begin(), demoted.end());
     }
+    const size_t ik_passed = ranked.size();
+    ranked.insert(ranked.end(), untested.begin(), untested.end());
     ranked.insert(ranked.end(), demoted.begin(), demoted.end());
 
     RCLCPP_INFO(
       node_->get_logger(),
       "Pre-filter: %zu/%zu candidates have a quick IK solution; %zu demoted to "
-      "the end of the probe order (none dropped). Sort by reachability: %s.",
-      ranked.size() - ik_demoted, total_in, ik_demoted,
+      "the end of the probe order (none dropped; %zu untested: enough passed for the first batch). Sort by reachability: %s.",
+      ik_passed, ik_passed + ik_demoted, ik_demoted, untested.size(),
       sort_by_reach ? "enabled" : "disabled");
 
     if (ranked.empty()) {
