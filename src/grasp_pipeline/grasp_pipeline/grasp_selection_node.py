@@ -1716,10 +1716,17 @@ class YoloLiveSelectGrasp(Node):
                         dets = [d for d in dets if d["label"].lower() in self._allowed_classes]
                     for d in dets:
                         d["source"] = "ys"          # trained YOLO ("yolo standard")
-                    dets, rejected = self._identity.check(rgb, dets)
-                    dets = dets + self._open_set.detect(
-                        rgb, depth, header, dets,
-                        [list(r["bbox"]) + [float(r.get("score", 0.5))] for r in rejected])
+                    if self._seg_wait:
+                        # A click is waiting for this lock: stop after the
+                        # fast half (YOLO) and skip the identity + open-set
+                        # stages for this one round (2026-09-17: the click's
+                        # 50 ms segmentation waited up to 0.8 s here).
+                        pass
+                    else:
+                        dets, rejected = self._identity.check(rgb, dets)
+                        dets = dets + self._open_set.detect(
+                            rgb, depth, header, dets,
+                            [list(r["bbox"]) + [float(r.get("score", 0.5))] for r in rejected])
                     self._perf_infer_count += 1
                     self._perf_infer_ms_acc += infer_ms
                     # Annotate every detection with its simplified label.
