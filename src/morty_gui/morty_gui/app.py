@@ -1680,9 +1680,19 @@ class OperatorWindow(QtWidgets.QMainWindow):
         parts = {}
         parts["graspgen"] = False
         if self._graspgen.running():
+            # The log is appended across restarts (2026-09-17): look only at
+            # THIS session's part, else a "Service ready" from a previous run
+            # lit the LED orange while the model was still loading
+            # (Majd 2026-09-18: "it still makes orange when it isn't ready").
             try:
                 with open(GRASPGEN_LOG, "rb") as f:
-                    parts["graspgen"] = b"Service ready" in f.read(65536)
+                    f.seek(0, 2); size = f.tell()
+                    f.seek(max(0, size - 4 * 1024 * 1024))
+                    data = f.read()
+                cut = data.rfind(b"===== session started")
+                if cut >= 0:
+                    data = data[cut:]
+                parts["graspgen"] = b"Service ready" in data
             except Exception:
                 parts["graspgen"] = False
         parts["executor"] = self.bridge.executor_alive()
