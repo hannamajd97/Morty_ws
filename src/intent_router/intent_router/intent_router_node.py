@@ -404,6 +404,14 @@ class IntentRouterNode(Node):
             String, "/robot/held_object", held_qos
         )
         self._held_object_label: str = ""
+        # 2026-09-18: ONE owner for "can the robot move": this node's
+        # _check_robot_ready verdict (latched program flag + the live
+        # witnesses that outrank it) is broadcast every watchdog tick so
+        # chat_node's spoken 'press Play' reminder and its status block
+        # for the LLM say the same thing as the router instead of reading
+        # the raw flag themselves.
+        self._robot_status_pub = self.create_publisher(
+            String, "/intent_router/robot_status", 1)
         # Last named pose successfully reached. chat_node feeds this to
         # the LLM as a developer message so it knows where the arm is.
         self._current_pose_pub = self.create_publisher(
@@ -2662,11 +2670,27 @@ class IntentRouterNode(Node):
         manually run `ros2 control set_controller_state`."""
         if self._robot_program_running is False:
             self._poll_dashboard_program_state()
+        self._publish_robot_status()
         if not self._list_controllers_cli.service_is_ready():
             return  # controller manager not up yet; quiet poll
         req = ListControllers.Request()
         future = self._list_controllers_cli.call_async(req)
         future.add_done_callback(self._on_list_controllers_done)
+
+    def _publish_robot_status(self) -> None:
+        """program_running: null while the flag was never heard, else the
+        flag OR a live witness (see _check_robot_ready)."""
+        now = self.get_clock().now().nanoseconds / 1e9
+        flag = self._robot_program_running
+        witness = self._program_running_witness(now)
+        running = None if flag is None else bool(flag or witness)
+        self._robot_status_pub.publish(String(data=json.dumps({
+            "program_running": running,
+            "flag": flag,
+            "witness": witness,
+            "controller": self._last_controller_state,
+            "dashboard": self._dashboard_state,
+        })))
 
     def _on_list_controllers_done(self, fut) -> None:
         try:

@@ -1104,7 +1104,17 @@ class ChatIntentNode(Node):
         # play on the teach pendant"): once per not-running episode, when
         # the driver is up but the pendant program isn't playing.
         self._pendant_reminded = False
+        self._program_stopped_since = 0.0
         self.create_timer(3.0, self._pendant_reminder_tick)
+        # 2026-09-18: the router owns the "program running" verdict (the
+        # latched flag can stay False after the External Control link
+        # flapped; an active trajectory controller or a PLAYING dashboard
+        # outrank it). Its verdict arrives every ~2 s; the raw flag above
+        # is only the fallback while no router is running.
+        self._router_status: dict = {}
+        self._router_status_at = 0.0
+        self.create_subscription(
+            String, "/intent_router/robot_status", self._on_router_status, 1)
         # /tf freshness — half-dead driver detection (2026-08-20).
         from tf2_msgs.msg import TFMessage
         self._tf_msg_type = TFMessage
@@ -3186,6 +3196,20 @@ class ChatIntentNode(Node):
     def _on_program_running(self, msg: Bool) -> None:
         self._program_running = bool(msg.data)
 
+    def _on_router_status(self, msg: String) -> None:
+        try:
+            self._router_status = json.loads(msg.data)
+        except Exception:
+            return
+        self._router_status_at = self.get_clock().now().nanoseconds / 1e9
+
+    def _program_running_view(self) -> bool | None:
+        """The router's verdict when fresh, else this node's raw flag."""
+        now = self.get_clock().now().nanoseconds / 1e9
+        if now - self._router_status_at < 6.0 and "program_running" in self._router_status:
+            return self._router_status["program_running"]
+        return self._program_running
+
     def _on_tf_msg(self, msg) -> None:
         self._last_tf_at = self.get_clock().now().nanoseconds / 1e9
 
@@ -3283,12 +3307,23 @@ class ChatIntentNode(Node):
             # Driver down: next bring-up should remind again.
             self._pendant_reminded = False
             return
+        running = self._program_running_view()
         if (self.count_publishers(
                 "/io_and_status_controller/robot_program_running") == 0
-                or self._program_running is None):
+                or running is None):
             return
-        if self._program_running:
+        if running:
             self._pendant_reminded = False
+            self._program_stopped_since = 0.0
+            return
+        # Start-up grace (2026-09-18): the GUI restarts the driver and
+        # auto-Plays the pendant within ~12 s; a reminder spoken 3 s after
+        # the driver came up ("press Play") was true for one moment and
+        # wrong by the time it was heard. Remind only when the program has
+        # stayed stopped for a while.
+        if not self._program_stopped_since:
+            self._program_stopped_since = now
+        if now - self._program_stopped_since < 20.0:
             return
         if not self._pendant_reminded:
             self._pendant_reminded = True
@@ -3319,11 +3354,12 @@ class ChatIntentNode(Node):
                 "the operator must press 'Start driver' (or 'Start ALL') "
                 "in the Morty GUI"
             )
+        running = self._program_running_view()
         if (self.count_publishers(
                 "/io_and_status_controller/robot_program_running") > 0
-                and self._program_running is not None):
+                and running is not None):
             parts.append(
-                "pendant program: PLAYING" if self._program_running
+                "pendant program: PLAYING" if running
                 else "pendant program: STOPPED — motion commands will be "
                      "ignored until the operator presses Play on the "
                      "robot's teach pendant"
