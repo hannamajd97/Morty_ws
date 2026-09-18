@@ -247,7 +247,7 @@ _FAST_COMMAND_PATTERNS: list[tuple[str, str]] = [
     # Bare "zu" (German "close") as a single-word command.
     (r"^\s*zu\s*[!\.\?]*\s*$", "close_gripper"),
     # Go home
-    (r"^\s*(?:(?:yes|yeah|yep|sure|ok(?:ay)?|now|and(?:\s+now)?|then|so|also|alright|all right),?\s+)?(?:please\s+)?(?:can you\s+)?(?:let'?s\s+)?(?:now\s+)?go(?: back)?(?: to)?(?: the)? home(?: position)?,?\s*(?:please)?\s*(very slow(?:ly)?|slow(?:ly)?|normal|very fast|fast)?\s*[!\.\?]*\s*$", "go_home"),
+    (r"^\s*(?:(?:yes|yeah|yep|sure|ok(?:ay)?|now|and(?:\s+now)?|then|so|also|alright|all right),?\s+)?(?:please\s+)?(?:can you\s+)?(?:let'?s\s+)?(?:now\s+)?go(?: back)?(?: to)?(?: the)? home(?: position)?(?:,?\s*now)?,?\s*(?:please)?(?:,?\s*now)?\s*(very slow(?:ly)?|slow(?:ly)?|normal|very fast|fast)?\s*[!\.\?]*\s*$", "go_home"),
     (r"^\s*(?:please\s+)?(?:can you\s+)?return(?: to)? home\s*[!\.\?]*\s*$", "go_home"),
     # Bare "home" / "now home" / "home please" (2026-09-02: "Now home."
     # fell to the LLM, which — with the live pose unknown mid-move —
@@ -1005,6 +1005,13 @@ class ChatIntentNode(Node):
         self._said_loading = False
         self._said_ready = False
         self.create_subscription(String, "/graspgen/readiness", self._on_readiness, 10)
+        # The executor's open question (2026-09-18: "Should I go back home?"
+        # + "Yes, go back home now." went to the LLM, which answered "you're
+        # already home" while the arm stood at the drop). While a question
+        # is open, an affirmative IS the answer and skips the LLM.
+        self._open_question = ""     # "awaiting_home_confirm" | "awaiting_release" | ""
+        self.create_subscription(String, "/grasp_executor_lin_llm/interactive_status",
+                                 self._on_interactive_status_question, 10)
 
         # Proactive scene narration: when new objects appear and the user
         # has been idle, Morty volunteers what he sees and asks if the
@@ -2162,7 +2169,7 @@ class ChatIntentNode(Node):
         # publish the intent ourselves and skip the LLM entirely. Cuts
         # latency from ~1-3s down to ~10ms and avoids piling up calls in
         # the chat lock when the user gives several commands in a row.
-        fast = _match_fast_command(text)
+        fast = _match_fast_command(text) or self._answer_open_question(text)
         if fast is not None:
             action, speed = fast
             self._fire_fast_command(action, speed, text)
@@ -2977,6 +2984,25 @@ class ChatIntentNode(Node):
 
     def _tts_ready(self) -> bool:
         return self._speak_client is not None and self._speak_client.server_is_ready()
+
+    def _on_interactive_status_question(self, msg: String) -> None:
+        d = str(msg.data or "").strip()
+        self._open_question = d if d in ("awaiting_home_confirm", "awaiting_release") else ""
+
+    _AFFIRMATIVE = re.compile(
+        r"^\s*(?:yes|yeah|yep|yup|sure|ok(?:ay)?|please|go ahead|do it|alright|all right|of course|ja|klar)"
+        r"(?:[\s,!.]+(?:please|now|go ahead|do it|sure|ok(?:ay)?))*\s*[!.?]*\s*$", re.I)
+
+    def _answer_open_question(self, text: str):
+        """(action, speed) when `text` answers the executor's open question."""
+        q = getattr(self, "_open_question", "")
+        if not q or not self._AFFIRMATIVE.match(text or ""):
+            return None
+        if q == "awaiting_home_confirm":
+            return ("go_home", "")
+        if q == "awaiting_release":
+            return ("open_gripper", "")
+        return None
 
     def _on_readiness(self, msg: String) -> None:
         """Majd 2026-09-18: at start 'please wait until the system is ready,
