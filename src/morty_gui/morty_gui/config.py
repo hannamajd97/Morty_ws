@@ -48,7 +48,7 @@ __all__ = [
     "PLANNER_LIBS",
     "PROFILE_HELP",
     "RED",
-    "REPLAY_CMD", "NAMED_POSE_SERVER_CMD",
+    "REPLAY_CMD", "REPLAY_LOG", "NAMED_POSE_SERVER_CMD",
     "ROBOT_IP",
     "SHUTTLE_IP",
     "RVIZ_STANDALONE",
@@ -365,6 +365,7 @@ NAMED_POSE_SERVER_CMD = [
     "ros2", "run", "ur3e_fast_observation", "move_to_named_pose_server", "--ros-args",
     "-p", "collision_check:=true",
 ]
+REPLAY_LOG = os.path.expanduser("~/morty_ws/logs/replay_gui.log")   # 2026-09-18: was /dev/pts — two hangs left no trace
 REPLAY_CMD = [
     "ros2", "run", "ur3e_fast_observation", "replay_node", "--ros-args",
     "-p", "poses_file:=" + os.path.expanduser("~/morty_ws/observation_poses.yaml"),

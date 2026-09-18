@@ -1962,7 +1962,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # Fast-replay node rides with the driver (works in fake mode too);
         # skip if one already exists (e.g. a terminal-started pipeline).
         if not self.bridge.fast_replay_available():
-            self._replay_extra.start(list(REPLAY_CMD))
+            self._replay_extra.start(list(REPLAY_CMD), log_path=REPLAY_LOG)
         if not self.bridge.named_pose_server_available():
             self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD), log_path=NAMED_POSE_LOG)
         self.driver_btn.setText("Stop driver")
@@ -2784,7 +2784,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             # replay node exists anywhere, start ours.
             if (self._driver.running() and not self._replay_extra.running()
                     and not self.bridge.fast_replay_available()):
-                self._replay_extra.start(list(REPLAY_CMD))
+                self._replay_extra.start(list(REPLAY_CMD), log_path=REPLAY_LOG)
             if (self._driver.running() and not self._named_pose_extra.running()
                     and not self.bridge.named_pose_server_available()):
                 self._named_pose_extra.start(list(NAMED_POSE_SERVER_CMD), log_path=NAMED_POSE_LOG)

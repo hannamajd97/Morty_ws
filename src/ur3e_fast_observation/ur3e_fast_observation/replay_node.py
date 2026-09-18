@@ -58,6 +58,7 @@ Topics & actions
 
 from __future__ import annotations
 
+import faulthandler
 import json
 import os
 import threading
@@ -152,6 +153,16 @@ class ReplayNode(Node):
         # Group for the momentary /joint_states subscription used to
         # anchor a smoothed path (see _capture_current_joints).
         self._js_cb_group = ReentrantCallbackGroup()
+        # 2026-09-18 watchdog: two moves today produced no controller goal
+        # for 30-40 s and nothing was logged (stderr went to a terminal).
+        # A request is 'pending' from arrival until the controller answers
+        # the goal; if that takes longer than _stuck_after_s the node logs
+        # it and dumps every thread's stack, once per request.
+        self._max_request_age_s = 5.0
+        self._stuck_after_s = 8.0
+        self._pending: Optional[tuple] = None      # (label, monotonic arrival)
+        self._pending_reported = False
+        self.create_timer(1.0, self._watchdog_tick)
         self._load_poses()
 
         self._action_client = ActionClient(
@@ -326,6 +337,16 @@ class ReplayNode(Node):
             if not label:
                 self.get_logger().warn('replay JSON missing "label"; ignoring.')
                 return
+            sent_at = payload.get('sent_at')
+            age = (time.time() - float(sent_at)) if sent_at is not None else 0.0
+            self.get_logger().info(f"request '{label}' received (sent {age:.2f}s ago)")
+            if age > self._max_request_age_s:
+                self.get_logger().error(
+                    f"request '{label}' is {age:.1f}s old — this node was blocked; "
+                    "dropping it instead of moving the arm late.")
+                self._publish_status(f'failed:{label}:stale_request')
+                return
+            self._pending = (label, time.monotonic()); self._pending_reported = False
             positions = payload.get('positions')
             if positions is not None:
                 try:
@@ -382,6 +403,21 @@ class ReplayNode(Node):
             handle.cancel_goal_async()
         except Exception as exc:
             self.get_logger().warn(f'cancel_goal_async failed: {exc}')
+
+    def _watchdog_tick(self) -> None:
+        p = self._pending
+        if not p or self._pending_reported:
+            return
+        waited = time.monotonic() - p[1]
+        if waited > self._stuck_after_s:
+            self._pending_reported = True
+            self.get_logger().error(
+                f"request '{p[0]}' has produced no controller goal response for "
+                f"{waited:.0f}s — all thread stacks follow:")
+            try:
+                faulthandler.dump_traceback(all_threads=True)
+            except Exception:
+                pass
 
     def _maybe_run_default(self) -> None:
         if getattr(self, '_default_done', False):
@@ -527,6 +563,7 @@ class ReplayNode(Node):
         goal = FollowJointTrajectory.Goal()
         goal.trajectory = traj
 
+        self.get_logger().info(f"sending goal '{label}' to the controller")
         send_future = self._action_client.send_goal_async(goal)
         send_future.add_done_callback(
             lambda fut: self._on_goal_response(fut, label)
@@ -534,6 +571,8 @@ class ReplayNode(Node):
         return True
 
     def _on_goal_response(self, future, label: str) -> None:
+        if self._pending and self._pending[0] == label:
+            self._pending = None
         try:
             handle = future.result()
         except Exception as exc:
@@ -575,6 +614,10 @@ class ReplayNode(Node):
 
 
 def main(args=None) -> None:
+    try:
+        faulthandler.enable(all_threads=True)
+    except Exception:
+        pass
     rclpy.init(args=args)
     node = ReplayNode()
     executor = MultiThreadedExecutor()

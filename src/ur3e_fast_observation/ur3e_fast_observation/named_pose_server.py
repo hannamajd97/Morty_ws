@@ -429,6 +429,12 @@ class MoveToNamedPoseServer(Node):
         self._replay_pub = self.create_publisher(
             String, str(self.get_parameter("replay_topic").value), 10
         )
+        # 2026-09-18: a move this server gave up on must not run later.
+        # Twice today a request sat 40 s inside a blocked replay node and
+        # was executed after the operator had been told it failed.
+        self._cancel_pub = self.create_publisher(
+            String, "/ur3e_fast_observation_replay/cancel", 10
+        )
 
         self._status_event = threading.Event()
         self._latest_status: str = ""
@@ -1095,6 +1101,7 @@ class MoveToNamedPoseServer(Node):
                             f"'{pose_name}' ({exc}); falling back to the "
                             "classic single-waypoint request."
                         )
+            req_payload["sent_at"] = time.time()   # replay_node drops stale requests
             req_msg = String()
             req_msg.data = json.dumps(req_payload, separators=(",", ":"))
             self._replay_pub.publish(req_msg)
@@ -1120,6 +1127,7 @@ class MoveToNamedPoseServer(Node):
                         return self._fail(
                             goal_handle, "the replay node is not running"
                         )
+                    self._cancel_pub.publish(String(data=pose_name))
                     return self._fail(
                         goal_handle,
                         f"the robot didn't reach pose {pose_name!r} in time "
