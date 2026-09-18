@@ -49,6 +49,7 @@ def _pgrep_oldest(pattern: str) -> Optional[int]:
 
 class VlaLink(QtCore.QObject):
     def __init__(self, bridge, parent=None) -> None:
+        self.last_episode: Optional[int] = None   # index of the episode end() closed
         super().__init__(parent)
         self._bridge = bridge          # may be None (window opened standalone)
         self._proc = ManagedLaunch(self)
@@ -81,10 +82,15 @@ class VlaLink(QtCore.QObject):
             self._proc.stop()
 
     # ── episode lifecycle (mirrors the trial's ⏺ / ⏹ / ✖) ────────────
-    def begin(self, fallback_task: str) -> bool:
-        """Open a provisional episode. False = no recorder to talk to."""
+    def begin(self, fallback_task: str, trial_hint: str = "") -> bool:
+        """Open a provisional episode. False = no recorder to talk to.
+        ``trial_hint`` is the trial folder (relative to the experiments
+        root) the episode's meta.json will name."""
         if self._bridge is None or not self.node_up():
             return False
+        self.last_episode = None
+        if trial_hint:
+            self._bridge.vla_cmd(f"hint {trial_hint}")
         self._bridge.vla_cmd(f"trial {fallback_task}")
         return True
 
@@ -93,6 +99,11 @@ class VlaLink(QtCore.QObject):
         cycle_done decide (the recorder discards it anyway if the arm
         never moved)."""
         if self._bridge is not None:
+            # Read the index BEFORE the stop lands: the recorder's status
+            # says "episode: None" once it is no longer recording. The
+            # trial's trial.json names this episode (2026-09-18).
+            st = self._bridge.vla_status() or {}
+            self.last_episode = st.get("episode") if st.get("recording") else None
             self._bridge.vla_cmd(
                 "stop " + {True: "ok", False: "fail", None: "auto"}[success])
 

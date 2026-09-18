@@ -171,6 +171,7 @@ class EpisodeRecorder(Node):
         self.ep_dir: Path | None = None; self.ep_index = -1
         self.rows: dict[str, list] = {}; self.t0 = 0.0; self.dropped = 0; self.drop_reasons: dict[str, int] = {}
         self.mmhri_hint = ""
+        self.mmhri_hint_next = ""   # "hint <trial folder>" from the GUI, consumed by the next episode
         self.create_timer(1.0 / self.fps, self._tick)
         self.create_timer(1.0, self._housekeeping)
         self.get_logger().info(f"VLA recorder ready. dataset={self.dataset_dir} fps={self.fps} auto_mode={self.auto_mode} "
@@ -309,6 +310,8 @@ class EpisodeRecorder(Node):
             self.discard_episode()
         elif head == "task":
             self.task = rest.strip()
+        elif head == "hint":
+            self.mmhri_hint_next = rest.strip()
         elif text:
             self.get_logger().warn(f"unknown command '{text}'")
         self._publish_status()
@@ -353,7 +356,12 @@ class EpisodeRecorder(Node):
         self.provisional = provisional; self.recording = True
         self.bound_to_trial = False; self.confirmed_by = ""; self.q_start = None
         self.task_fallback = ""; self.transcripts = []
-        self.mmhri_hint = self._newest_trial()
+        # 2026-09-18: the GUI names the trial folder ("hint ..." before
+        # "trial ..."); the newest-folder guess stays as the fallback for
+        # episodes started outside a trial. (The guess was empty all day:
+        # recorder.yaml still pointed at the old experiments/mmhri root.)
+        self.mmhri_hint = self.mmhri_hint_next or self._newest_trial()
+        self.mmhri_hint_next = ""
         self.get_logger().info(f"episode {self.ep_index} started{' (provisional)' if provisional else ''}: '{task}'")
 
     def start_trial_episode(self, fallback_task: str):

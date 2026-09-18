@@ -642,7 +642,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._vla_ended = False
         vla_note = ""
         if want_vla:
-            vla_note = (" + VLA episode" if self._vla.begin(self._fallback_task())
+            hint = os.path.relpath(self._trial_dir, EXPERIMENTS_DIR) if self._trial_dir else ""
+            vla_note = (" + VLA episode" if self._vla.begin(self._fallback_task(), hint)
                         else " — VLA recorder NOT up, MMHRI only")
         # One ROS bag per trial, inside the trial folder when there is one.
         self._bag_ended = True
@@ -995,7 +996,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self._reset_buttons()
             return
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as f:
-            json.dump({**meta, **row, "bag": self._bag.last_dir}, f, indent=2)
+            json.dump({**meta, **row, "bag": self._bag.last_dir,
+                       "vla_episode": self._vla.last_episode}, f, indent=2)
         self._append_csv(os.path.join(MMHRI_DIR, "mmhri_experiments.csv"),
                          CSV_COLUMNS, [row.get(c, "") for c in CSV_COLUMNS])
         # Stage times as CSV columns too (Majd 2026-08-25: "I need

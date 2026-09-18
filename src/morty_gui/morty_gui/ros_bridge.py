@@ -619,6 +619,11 @@ class MortyGuiBridge(Node):
         """One line of the recorder's /vla_recorder/cmd protocol."""
         self._pub_vla_cmd.publish(String(data=text))
 
+    def vla_status(self) -> Optional[Dict[str, Any]]:
+        """The recorder's latched status (episode index, recording flag…)."""
+        with self._lock:
+            return dict(self._vla_status) if self._vla_status else None
+
     def vla_node_up(self) -> bool:
         try:
             return "vla_episode_recorder" in self.get_node_names()
