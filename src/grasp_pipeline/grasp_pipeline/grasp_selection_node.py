@@ -594,6 +594,20 @@ class YoloLiveSelectGrasp(Node):
             on_hand=_on_hand,
             on_hover=_on_hover,
         )
+        # Live switch for the hand pointing (2026-09-18: while Majd rearranged
+        # objects with the GUI, MediaPipe read his hand as pointing and picked
+        # the same object twice with no click). The GUI's Detection tab sets
+        # use_mediapipe_selection; the tracker keeps running, its verdict is
+        # simply not used while off.
+        def _on_params(params):
+            from rcl_interfaces.msg import SetParametersResult
+            for prm in params:
+                if prm.name == "use_mediapipe_selection":
+                    on = bool(prm.value) and getattr(self.point_or_voice, "tracker", None) is not None
+                    self.point_or_voice.use_mediapipe = on
+                    self.get_logger().info(f"Hand pointing selection {'ON' if on else 'OFF'} (use_mediapipe_selection).")
+            return SetParametersResult(successful=True)
+        self.add_on_set_parameters_callback(_on_params)
         self.get_logger().info(
             f"Selection input: mediapipe_enabled={self.point_or_voice.use_mediapipe}, "
             f"pointing_mode={self.point_or_voice.pointing_mode}, "

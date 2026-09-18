@@ -999,6 +999,12 @@ class ChatIntentNode(Node):
             self._on_candidates,
             latched,
         )
+        # Readiness (2026-09-18, Majd: "tell me when it is ready to grasp,
+        # only for the first run, and while it loads say please wait"):
+        # the pipeline's precompute publishes /graspgen/readiness every second.
+        self._said_loading = False
+        self._said_ready = False
+        self.create_subscription(String, "/graspgen/readiness", self._on_readiness, 10)
 
         # Proactive scene narration: when new objects appear and the user
         # has been idle, Morty volunteers what he sees and asks if the
@@ -2923,6 +2929,23 @@ class ChatIntentNode(Node):
         with self._grasp_lock:
             self._latest_pose = msg
             self._latest_pose_received_at = self.get_clock().now().nanoseconds / 1e9
+
+    def _on_readiness(self, msg: String) -> None:
+        try:
+            r = json.loads(msg.data)
+        except Exception:
+            return
+        if self._said_ready:
+            return
+        model_ready = bool(r.get("model_ready"))
+        verified = [o for o in (r.get("objects") or []) if o.get("state") == "verified"]
+        if model_ready and verified:
+            self._said_ready = True
+            names = ", ".join(str(o.get("label", "")).replace("_", " ") for o in verified[:4])
+            self._speak(f"I'm ready to grasp. {names} {'is' if len(verified) == 1 else 'are'} ready.")
+        elif not model_ready and not self._said_loading:
+            self._said_loading = True
+            self._speak("Please wait, I'm still loading. I'll tell you when I'm ready.")
 
     def _on_candidates(self, msg: PoseArray) -> None:
         with self._grasp_lock:

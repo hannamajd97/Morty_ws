@@ -237,6 +237,14 @@ class OperatorWindow(QtWidgets.QMainWindow):
             "is renamed to the known object it does look like, or handed to the unknown-object path. "
             "References: grasp_pipeline/models/identity_refs (74-80 photos per object).")
         df.addWidget(self.cb_identity)
+        self.cb_pointing = QtWidgets.QCheckBox(
+            "Hand pointing selects objects  (MediaPipe finger ray)")
+        self.cb_pointing.setChecked(_qs.value("use_mediapipe_selection", False, type=bool))
+        self.cb_pointing.setToolTip(
+            "On: pointing at an object with your hand in the camera view selects it, as in the voice demos.\n"
+            "Off (default with the GUI): only clicks and voice select. With it on, a hand rearranging the\n"
+            "objects on the table is read as pointing and starts picks by itself (2026-09-18).")
+        df.addWidget(self.cb_pointing)
         det_note = QtWidgets.QLabel(
             "Apply sends both switches to the running pipeline and reads them back; they are "
             "also used when the pipeline next starts. Turning unknown-object detection off "
@@ -1603,7 +1611,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         """Apply button of the Detection tab: save, push both switches onto
         the running pipeline, read them back, start/stop the naming service."""
         want = {"open_set_enabled": bool(self.cb_open_set.isChecked()),
-                "identity_check_enabled": bool(self.cb_identity.isChecked())}
+                "identity_check_enabled": bool(self.cb_identity.isChecked()),
+                "use_mediapipe_selection": bool(self.cb_pointing.isChecked())}
         qs = QtCore.QSettings("morty", "morty_gui")
         for k, v in want.items():
             qs.setValue(k, v)
@@ -1623,7 +1632,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.det_apply_status.setText(
                 f"✓ applied {time.strftime('%H:%M:%S')} — unknown objects "
                 f"{'ON' if want['open_set_enabled'] else 'OFF'}, name check "
-                f"{'ON' if want['identity_check_enabled'] else 'OFF'}")
+                f"{'ON' if want['identity_check_enabled'] else 'OFF'}, hand pointing "
+                f"{'ON' if want['use_mediapipe_selection'] else 'OFF'}")
         else:
             self.det_apply_status.setText("✓ sent, but the pipeline's read-back did not match")
 
@@ -1983,6 +1993,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if self.cb_multiview.isChecked():
             cmd.append("registration_enabled:=true")
         cmd.append(f"open_set_enabled:={'true' if self.cb_open_set.isChecked() else 'false'}")
+        cmd.append(f"use_mediapipe_selection:={'true' if self.cb_pointing.isChecked() else 'false'}")
         cmd.append(f"identity_check_enabled:={'true' if self.cb_identity.isChecked() else 'false'}")
         # GraspGen service first (it preloads the model in ~6 s; ZMQ queues
         # the pipeline's first request until the service is bound).
