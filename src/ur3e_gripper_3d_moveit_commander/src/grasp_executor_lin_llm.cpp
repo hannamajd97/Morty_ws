@@ -4648,12 +4648,29 @@ private:
     return b;
   }
 
+  // One line per search with the arm's joints in degrees (2026-09-18: a
+  // whole session refused every candidate and the logs held no joint
+  // angles — a joint wrapped by a full turn at "home" looks identical in
+  // TCP space and kills every straight-line plan).
+  void log_start_joints(const char * where)
+  {
+    std::vector<double> q;
+    if (!arm_joints_now(&q) || q.size() < 6) {
+      RCLCPP_WARN(node_->get_logger(), "%s: no fresh arm joints from /joint_states.", where);
+      return;
+    }
+    RCLCPP_INFO(node_->get_logger(), "%s: arm joints [%.0f %.0f %.0f %.0f %.0f %.0f] deg",
+      where, q[0] * 180.0 / M_PI, q[1] * 180.0 / M_PI, q[2] * 180.0 / M_PI,
+      q[3] * 180.0 / M_PI, q[4] * 180.0 / M_PI, q[5] * 180.0 / M_PI);
+  }
+
   bool choose_first_lin_feasible(
     const std::vector<geometry_msgs::msg::PoseStamped> & candidates_in,
     geometry_msgs::msg::PoseStamped * selected,
     const std::vector<size_t> * skip = nullptr)
   {
     precheck_rejected_.clear();
+    log_start_joints(precheck_mode_ ? "[precheck] start" : "search start");
     // Mutable copy: the wrist-twin pass below may replace orientations.
     std::vector<geometry_msgs::msg::PoseStamped> candidates = candidates_in;
     if (!selected) {
