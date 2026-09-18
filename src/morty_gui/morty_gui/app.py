@@ -1723,7 +1723,12 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if self._software_stop_latched:
             self.statusBar().showMessage("Software stop is latched — re-arm before sending a drop side.")
             return
-        self.bridge.publish_resume(token)            # the one-time answer to the executor's wait
+        # The BUTTON is one shot: go there, open, come home — the compound
+        # token the executor already understands. A spoken "drop right"
+        # sends the bare token and the executor then waits at the drop for
+        # "release", and after that asks about home (Majd 2026-09-18:
+        # "Morty must not behave as the button").
+        self.bridge.publish_resume(token + "+release_home")
         self.bridge.set_executor_params({"drop_target_name": token})   # default side for voice picks
         self.statusBar().showMessage(
             f"Drop {label.upper()}: sent — the robot drops there once it holds an object."

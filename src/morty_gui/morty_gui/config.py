@@ -354,7 +354,7 @@ EXECUTOR_CMD = ["ros2", "launch", "ur3e_gripper_3d_moveit_commander",
                 # for Left / Right from the GUI, then goes home and drops
                 # there. Nothing is asked by voice; Release stays automatic.
                 "wait_for_destination:=true",
-                "wait_for_release:=false"]
+                "wait_for_release:=true"]   # voice "drop right" waits at the drop for "release"; the GUI buttons send the +release_home compound (2026-09-18)
 
 # The named-pose action server rides with the driver too (2026-09-16): the
 # grasp executor moves home / to the drop through /move_to_named_pose with a
