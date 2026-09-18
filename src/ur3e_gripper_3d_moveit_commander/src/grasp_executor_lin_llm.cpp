@@ -4904,7 +4904,11 @@ private:
           precheck_tried_ = n_tried + 1;
           return true;
         }
-        if (precheck_interrupted_) { return false; }
+        // Only the BACKGROUND check stops here: the flag can still be set
+        // from an interrupted background run, and at the click it made the
+        // search give up after one refused candidate (2026-09-18, cycles
+        // 3/6/7: one candidate tried, "no feasible", nothing moved).
+        if (precheck_mode_ && precheck_interrupted_) { return false; }
         ++n_tried;
         precheck_tried_ = n_tried;
         // MoveGroup returns only a broad error code. Its useful detail (for
