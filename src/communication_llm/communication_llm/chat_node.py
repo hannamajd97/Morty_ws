@@ -3027,6 +3027,13 @@ class ChatIntentNode(Node):
             return
         if self._said_ready or not self._tts_ready():
             return
+        # Majd 2026-09-18: always "Hi! I'm Morty" first, then "please
+        # wait". The greeting timer and this 1 Hz report both wait for the
+        # speech server; whichever ticked first used to speak first. While
+        # the greeting is still pending (timer alive) this handler stays
+        # silent — _fire_startup_greeting speaks the wait line itself.
+        if self._greeting_timer is not None:
+            return
         objs = r.get("objects") or []
         verified = [o for o in objs if o.get("state") == "verified"]
         # Majd 2026-09-18 (evening): "it should be waiting until all of
