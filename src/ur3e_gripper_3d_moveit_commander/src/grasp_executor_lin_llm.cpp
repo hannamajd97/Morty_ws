@@ -7095,6 +7095,13 @@ int main(int argc, char ** argv)
           RCLCPP_INFO(node->get_logger(),
             "[precheck] set %ld stopped after %zu candidates (%.2f s): a selection or a stop came first.",
             static_cast<long>(job->first), rec.n_tried, dt);
+          // Answer anyway (2026-09-18): without a verdict the pipeline waited
+          // 15 s before sending its next set, twice in a row. -2 = not judged,
+          // the pipeline re-sends the set once the executor is idle again.
+          std_msgs::msg::String r;
+          r.data = "key=" + std::to_string(job->first) + " feasible=-2 tried=" + std::to_string(rec.n_tried) +
+            " reason=interrupted by a selection";
+          pub_precheck_result->publish(r);
         } else {
           std_msgs::msg::String r;
           r.data = "key=" + std::to_string(job->first) + " feasible=" + std::to_string(rec.feasible_idx) +

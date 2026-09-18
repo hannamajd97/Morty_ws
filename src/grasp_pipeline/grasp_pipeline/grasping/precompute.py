@@ -162,6 +162,10 @@ class GraspPrecomputer:
         # done with GraspGen, which is verified for execution, which failed"):
         # one JSON line, published on every state change and every detection round.
         self._pub_readiness = node.create_publisher(String, "/graspgen/readiness", 10)
+        # Published every second as well: the detector thread (the other
+        # publisher) pauses during a pick and the drop wait, and the GUI
+        # showed "no readiness report" meanwhile (2026-09-18).
+        self._readiness_timer = node.create_timer(1.0, self._publish_readiness_periodic)
         self._running_key: Optional[str] = None
         self._last_readiness: str = ""
         self._sub_precheck = node.create_subscription(
@@ -260,6 +264,10 @@ class GraspPrecomputer:
                     if t.blocked_by:
                         t.blocked_by = ""; t.attempts = 0; t.gave_up = False
         self._wake.set()
+        self._publish_readiness()
+
+    def _publish_readiness_periodic(self) -> None:
+        self._last_readiness = ""          # force a publish even if unchanged
         self._publish_readiness()
 
     def _publish_readiness(self) -> None:
@@ -506,6 +514,19 @@ class GraspPrecomputer:
             try:
                 if not self._may_run():
                     continue
+                # A stored result whose background check never got a verdict
+                # (interrupted by a click, or the executor was busy): re-send
+                # it before computing anything new — the grasps exist, only
+                # the execution check is missing (2026-09-18: "stops after
+                # GraspGen and never computes the execution").
+                if self._precheck_free.is_set():
+                    with self._state:
+                        pending = [e for e in self._entries.values()
+                                   if e.lin_idx == -2 and e.precheck_key != self._precheck_inflight
+                                   and time.monotonic() - e.t_done > 1.0]
+                    if pending:
+                        self._send_for_precheck(pending[0])
+                        continue
                 job = self._next_job()
                 if job is None:
                     continue
@@ -657,6 +678,12 @@ class GraspPrecomputer:
             return
         if key == self._precheck_inflight:
             self._precheck_free.set()
+        if feasible == -2:
+            # Interrupted by a click: not judged. The entry stays "unchecked"
+            # and the worker re-sends it once the executor is idle again.
+            self._node.get_logger().info(f"[precompute] set {key} was interrupted at the executor — will re-send")
+            self._wake.set()
+            return
         with self._state:
             hit = next((e for e in self._entries.values() if e.precheck_key == key), None)
             if hit is not None:

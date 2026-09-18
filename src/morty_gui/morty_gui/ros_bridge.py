@@ -1414,7 +1414,7 @@ class MortyGuiBridge(Node):
             now = time.monotonic()
             out["hw_alive"] = (now - self._joint_state_t) < 1.5
             out["pipeline_alive"] = (now - self._dets_t) < 2.5
-            out["readiness"] = self._readiness if (now - self._readiness_t) < 10.0 else None
+            out["readiness"] = self._readiness if (now - self._readiness_t) < 30.0 else None
             out["camera_alive"] = (now - self._camera_t) < 1.5
             # 3 s, not 1.5: 10 Hz over the shuttle network link.
             out["astra_alive"] = (now - self._astra_t) < 3.0
