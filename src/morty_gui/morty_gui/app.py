@@ -239,11 +239,11 @@ class OperatorWindow(QtWidgets.QMainWindow):
         df.addWidget(self.cb_identity)
         self.cb_pointing = QtWidgets.QCheckBox(
             "Hand pointing selects objects  (MediaPipe finger ray)")
-        self.cb_pointing.setChecked(_qs.value("use_mediapipe_selection", False, type=bool))
+        self.cb_pointing.setChecked(_qs.value("use_mediapipe_selection", True, type=bool))
         self.cb_pointing.setToolTip(
             "On: pointing at an object with your hand in the camera view selects it, as in the voice demos.\n"
-            "Off (default with the GUI): only clicks and voice select. With it on, a hand rearranging the\n"
-            "objects on the table is read as pointing and starts picks by itself (2026-09-18).")
+            "Off: only clicks and voice select. Switch it off while you rearrange objects on the table:\n"
+            "a hand over the table can be read as pointing and start a pick by itself (2026-09-18).")
         df.addWidget(self.cb_pointing)
         det_note = QtWidgets.QLabel(
             "Apply sends both switches to the running pipeline and reads them back; they are "

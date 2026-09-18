@@ -2582,8 +2582,16 @@ class YoloLiveSelectGrasp(Node):
                                             mark = getattr(self, "_auto_retry_mark", None)
                                             was_retry = bool(mark) and self._same_object(mark, sel)
                                             self._auto_retry_mark = None
+                                            # Only when NOTHING moved: no candidate could be
+                                            # planned. A pick that moved and failed (empty
+                                            # gripper, object pushed) is not retried by itself
+                                            # (Majd 2026-09-18: "it grasps the same object twice").
+                                            planning_only = ("tried " in reason or "reachable" in reason
+                                                             or "no LIN-feasible" in reason.lower()
+                                                             or "candidate" in reason.lower())
                                             if (bool(self.get_parameter("auto_retry_once").value)
-                                                    and not was_retry and "stopped" not in reason):
+                                                    and not was_retry and "stopped" not in reason
+                                                    and planning_only):
                                                 self._auto_retry_sel = {"label": sel.get("label"),
                                                                         "bbox": list(sel.get("bbox", []))}
                                         # SELF-clear the auto-pick label on failure.
