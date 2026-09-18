@@ -2949,9 +2949,10 @@ class ChatIntentNode(Node):
             return
         if self._said_ready or not self._tts_ready():
             return
-        model_ready = bool(r.get("model_ready"))
         verified = [o for o in (r.get("objects") or []) if o.get("state") == "verified"]
-        if model_ready and verified:
+        # A verified object implies GraspGen answered and the executor
+        # planned it: that IS ready, whatever the model flag says.
+        if verified:
             self._said_ready = True
             names = ", ".join(str(o.get("label", "")).replace("_", " ") for o in verified[:4])
             self._speak(f"I'm ready to grasp now. {names} {'is' if len(verified) == 1 else 'are'} ready.")

@@ -132,11 +132,15 @@ def _get_sampler(config_path: str):
         _SAMPLER_LOCK.release()
 
 
+_SERVICE_ANSWERED = False   # the ZMQ GraspGen service returned grasps at least once (2026-09-18)
+
+
 def sampler_is_warm() -> bool:
-    """True once the in-process GraspGen sampler is built and cached — the
-    module-level singleton shared by the startup preload and the pick path.
-    Cheap and lock-free; used by the node to report warmup state honestly."""
-    return _SAMPLER is not None
+    """True once GraspGen has answered: the in-process sampler is built, or
+    the ZMQ service returned a result at least once. The pipeline runs the
+    service backend, so the in-process flag alone stayed False forever and
+    the readiness report said 'model loading' with three verified objects."""
+    return _SAMPLER is not None or _SERVICE_ANSWERED
 
 
 def _send_inprocess(points_xyz, threshold, num_grasps, topk_num_grasps,
@@ -263,7 +267,7 @@ def _send_zmq(points_xyz, endpoint, threshold, colors, num_grasps,
         return {"ok": False, "error": "timeout or recv error"}
 
 
-def send_points_to_graspgen(points_xyz: Iterable[Any], endpoint: str = "tcp://127.0.0.1:5555",
+def _send_points_to_graspgen_impl(points_xyz: Iterable[Any], endpoint: str = "tcp://127.0.0.1:5555",
                             threshold: float = 0.4,
                             colors: Optional[Iterable[Any]] = None,
                             num_grasps: int = 200, topk_num_grasps: int = -1,
@@ -309,3 +313,15 @@ def send_points_to_graspgen(points_xyz: Iterable[Any], endpoint: str = "tcp://12
     except Exception as e:
         # Surface the error in the same shape callers already handle.
         return {"ok": False, "error": f"in-process GraspGen failed: {e}"}
+
+def send_points_to_graspgen(*args, **kwargs):
+    """See _send_points_to_graspgen_impl; records that GraspGen answered."""
+    global _SERVICE_ANSWERED
+    resp = _send_points_to_graspgen_impl(*args, **kwargs)
+    try:
+        if resp is not None and (resp.get("grasps") is not None or resp.get("poses") is not None or len(resp) > 0):
+            _SERVICE_ANSWERED = True
+    except Exception:
+        pass
+    return resp
+
