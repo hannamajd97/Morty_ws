@@ -794,6 +794,7 @@ public:
   // executes without probing.
   struct PrecheckRecord {
     int64_t key = 0;
+    std::string planner;        // approach the background check verified
     std::vector<geometry_msgs::msg::PoseStamped> poses;
     int feasible_idx = -1;      // index into poses, -1 = none of the batch
     size_t n_tried = 0;
@@ -826,6 +827,7 @@ public:
     try { ok = choose_first_lin_feasible(cands, &sel); } catch (...) { ok = false; }
     precheck_mode_ = false; precheck_interrupt_ = nullptr;
     rec->reason = ok ? "" : last_failure_reason_;
+    rec->planner = ok ? last_planner_ : "";
     last_failure_reason_ = saved_reason;
     skip_next_precheck_ = false;
     rec->n_tried = precheck_tried_;
@@ -919,12 +921,14 @@ public:
 
   // A background-verified pick skips the probe, so nothing reached the GUI's
   // console and its STOP button never armed (it arms on candidate_status).
-  void announce_precheck_hit(int idx, size_t n, const geometry_msgs::msg::PoseStamped & pose)
+  void announce_precheck_hit(int idx, size_t n, const geometry_msgs::msg::PoseStamped & pose,
+                             const std::string & planner = "")
   {
     try {
       std_msgs::msg::String cs;
       cs.data = "grasp " + std::to_string(idx + 1) + "/" + std::to_string(n) +
-        ": FEASIBLE (verified in the background) — executing this one";
+        ": FEASIBLE (verified in the background via the " + (planner.empty() ? std::string("curve") : planner) +
+        ") — executing this one";
       candidate_status_pub_->publish(cs);
     } catch (...) {}
     (void)pose;
@@ -4149,6 +4153,7 @@ private:
     // plans from the STAND-OFF state and so is never cacheable for
     // Step 2 (Step 2 executes from wherever the arm is now).
     invalidate_cached_lin_plan("a new LIN probe started");
+    last_planner_.clear();
     // Apply a tight planning budget for the per-candidate feasibility
     // probe so a single hard pose can't burn 20-30s. Restore the normal
     // budget afterwards so the actual execution plan still has full time.
@@ -4163,6 +4168,8 @@ private:
           staged_ok = plan_cartesian_two_lines(target_pose, &why);
           if (!staged_ok) {
             RCLCPP_INFO(node_->get_logger(), "one-motion approach not planned (%s) — trying the blend.", why.c_str());
+          } else {
+            last_planner_ = "curve";
           }
         }
         // A click outranks the rest of this chain (background check only).
@@ -4178,10 +4185,12 @@ private:
         if (!staged_ok && !yield_to_selection()) {
           staged_ok = plan_blended_two_lines(target_pose, &why);
           if (!staged_ok) { RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — candidate rejected.", why.c_str()); }
+          else { last_planner_ = "blended lines"; }
         }
         if (!staged_ok && reason && reason->empty()) { *reason = why; }
       } else {
         staged_ok = can_reach_via_pregrasp(target_pose, reason);
+        if (staged_ok) { last_planner_ = "two lines"; }
       }
       arm_group_.setPlanningTime(planning_time_);
       arm_group_.setNumPlanningAttempts(num_attempts_);
@@ -4853,7 +4862,8 @@ private:
           try {
             std_msgs::msg::String cs;
             cs.data = "grasp " + std::to_string(i + 1) + "/" +
-              std::to_string(total) + ": FEASIBLE — executing this one (" +
+              std::to_string(total) + ": FEASIBLE — executing this one via the " +
+              (last_planner_.empty() ? std::string("line") : last_planner_) + " (" +
               describe_candidate(candidates[orig_idx]) + ")";
             if (!precheck_mode_) { candidate_status_pub_->publish(cs); }
           } catch (...) {}
@@ -6203,6 +6213,7 @@ private:
   double cartesian_curve_lead_m_{0.12};
   double close_lead_s_{0.4};
   double approach_duration_s_{2.5};
+  std::string last_planner_;   // which approach the last probe planned ("curve", "blended lines", "two lines")
   double cartesian_max_joint_step_rad_{0.8};
   double cartesian_max_joint_travel_rad_{2.6};
   double approach_floor_s() const { return std::max(approach_duration_s_, gripper_open_time_s_ + open_before_arrival_margin_s_); }
@@ -6929,7 +6940,7 @@ int main(int argc, char ** argv)
         } else {
           selected = cands[static_cast<size_t>(rec->feasible_idx)];
           grasp_executor.apply_precheck(*rec);
-          grasp_executor.announce_precheck_hit(rec->feasible_idx, cands.size(), selected);
+          grasp_executor.announce_precheck_hit(rec->feasible_idx, cands.size(), selected, rec->planner);
           feasible = true;
           used_precheck = true;
           RCLCPP_INFO(node->get_logger(),
@@ -7049,6 +7060,11 @@ int main(int argc, char ** argv)
           std_msgs::msg::String r;
           r.data = "key=" + std::to_string(job->first) + " feasible=" + std::to_string(rec.feasible_idx) +
             " tried=" + std::to_string(rec.n_tried);
+          if (rec.feasible_idx >= 0 && !rec.planner.empty()) {
+            std::string tok = rec.planner;
+            std::replace(tok.begin(), tok.end(), ' ', '_');
+            r.data += " planner=" + tok;     // parsed by the pipeline's precompute (no spaces)
+          }
           if (rec.feasible_idx < 0 && !rec.reason.empty()) { r.data += " reason=" + rec.reason; }
           pub_precheck_result->publish(r);
           if (rec.feasible_idx >= 0) {

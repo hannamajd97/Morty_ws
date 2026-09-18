@@ -69,6 +69,14 @@ class ExperimentsWindow(QtWidgets.QMainWindow):
         )
         self.cand_log.setMaximumBlockCount(300)
         split.addWidget(self.cand_log)
+        # Readiness per object (Majd 2026-09-18): GraspGen done, verified for
+        # execution in the background (and by which approach), or why not.
+        self.ready_log = QtWidgets.QPlainTextEdit()
+        self.ready_log.setReadOnly(True)
+        self.ready_log.setPlaceholderText(
+            "object readiness — GraspGen and background execution check per object"
+        )
+        split.addWidget(self.ready_log)
         self.u_plot = pg.PlotWidget(title="grasp utility U(v) per cycle")
         self.u_plot.showGrid(x=True, y=True, alpha=0.3)
         self.u_curve = self.u_plot.plot(pen=pg.mkPen((255, 170, 40), width=2),

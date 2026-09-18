@@ -42,6 +42,7 @@ Scheduling
 from __future__ import annotations
 
 import copy
+import json
 import hashlib
 import re
 import threading
@@ -113,6 +114,7 @@ class CacheEntry:
     mask: Optional[np.ndarray] = field(default=None, repr=False)
     precheck_key: int = 0          # id sent with the candidate set to the executor
     lin_idx: int = -2              # -2 unchecked, -1 none feasible, >=0 verified candidate
+    planner: str = ""              # which approach the background check verified ("curve", "blended lines")
 
 
 class GraspPrecomputer:
@@ -156,6 +158,12 @@ class GraspPrecomputer:
         # candidate set while the arm is idle and answers with the first
         # feasible index (-1 = none, which counts as a failed attempt here).
         self._pub_precheck = node.create_publisher(PoseArray, "/graspgen/precheck_candidates", 10)
+        # Readiness per object for the GUI (2026-09-18, Majd: "which object is
+        # done with GraspGen, which is verified for execution, which failed"):
+        # one JSON line, published on every state change and every detection round.
+        self._pub_readiness = node.create_publisher(String, "/graspgen/readiness", 10)
+        self._running_key: Optional[str] = None
+        self._last_readiness: str = ""
         self._sub_precheck = node.create_subscription(
             String, "/grasp_executor_lin_llm/precheck_result", self._on_precheck_result, 10)
         self._worker = threading.Thread(target=self._loop, name="grasp-precompute", daemon=True)
@@ -252,6 +260,49 @@ class GraspPrecomputer:
                     if t.blocked_by:
                         t.blocked_by = ""; t.attempts = 0; t.gave_up = False
         self._wake.set()
+        self._publish_readiness()
+
+    def _publish_readiness(self) -> None:
+        """One JSON line: is the GraspGen model loaded, and per visible object
+        whether GraspGen ran, whether the executor verified an approach in the
+        background (and which one), or why not."""
+        try:
+            from ..grasp_client import sampler_is_warm
+            warm = bool(sampler_is_warm())
+        except Exception:
+            warm = False
+        objs = []
+        with self._state:
+            running = self._running_key
+            for k, t in self._tracks.items():
+                e = self._entries.get(k)
+                planner = e.planner if e is not None else ""
+                if e is not None and e.lin_idx >= 0:
+                    state = "verified"
+                elif e is not None and e.lin_idx == -2:
+                    state = "grasps"            # GraspGen done, background check pending
+                elif t.blocked_by:
+                    state = "blocked"
+                elif t.gave_up:
+                    state = "unreachable"
+                elif k == running:
+                    state = "computing"
+                elif t.attempts:
+                    state = "failed"
+                else:
+                    state = "waiting"
+                objs.append({"name": k, "label": t.label, "state": state, "planner": planner,
+                             "attempts": int(t.attempts), "blocked_by": t.blocked_by,
+                             "reach": t.reach_state})
+        text = json.dumps({"model_ready": warm, "enabled": bool(self.enabled), "objects": objs})
+        if text == self._last_readiness:
+            return
+        self._last_readiness = text
+        try:
+            m = String(); m.data = text
+            self._pub_readiness.publish(m)
+        except Exception:
+            pass
 
     def bump(self, idx: Optional[int]) -> None:
         """Hovered / pointed-at object goes first in the queue."""
@@ -480,6 +531,7 @@ class GraspPrecomputer:
         self._node.get_logger().info(f"[precompute] '{key}' {why} — attempt {n}/{mx}"
                                      + ("; retry queued behind new objects" if n < mx else ""))
 
+        self._publish_readiness()
     def note_pick_failed(self, sel: Dict[str, Any]) -> None:
         """The executor could not carry out the pick of this object: its
         stored grasps are wrong, the others stay (the arm is back home)."""
@@ -512,10 +564,13 @@ class GraspPrecomputer:
         try:
             if not self._may_run():
                 return
+            self._running_key = tr.key
+            self._publish_readiness()
             res = self._pick._compute(sel, background=True)
         finally:
             self._pick._background = False
             self.model_lock.release()
+            self._running_key = None
         dt_job = time.monotonic() - t0
         if not res:
             if getattr(node, "selection_made", False):
@@ -551,6 +606,7 @@ class GraspPrecomputer:
         node.get_logger().info(
             f"[precompute] '{tr.key}' ready in {dt_job:.2f} s: {entry.n_grasps} grasps kept "
             f"of {len(res.get('raw_grasps') or [])} (stored {len(self._entries)})")
+        self._publish_readiness()
         self._send_for_precheck(entry)
 
     def _send_for_precheck(self, entry: CacheEntry) -> None:
@@ -596,6 +652,7 @@ class GraspPrecomputer:
             head, _, reason = text.partition(" reason=")
             kv = dict(part.split("=", 1) for part in head.split())
             key, feasible, tried = int(kv["key"]), int(kv["feasible"]), int(kv.get("tried", 0))
+            planner = str(kv.get("planner", "")).replace("_", " ")
         except Exception:
             return
         if key == self._precheck_inflight:
@@ -604,8 +661,10 @@ class GraspPrecomputer:
             hit = next((e for e in self._entries.values() if e.precheck_key == key), None)
             if hit is not None:
                 hit.lin_idx = feasible
+                hit.planner = planner if feasible >= 0 else ""
         if hit is None:
             return                     # entry already replaced or dropped
+        self._publish_readiness()
         if feasible >= 0:
             self._node.get_logger().info(
                 f"[precompute] '{hit.key}' LIN-verified: candidate {feasible + 1} (set {key}, {tried} probed)")

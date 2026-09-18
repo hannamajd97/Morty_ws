@@ -1624,6 +1624,40 @@ class OperatorWindow(QtWidgets.QMainWindow):
         else:
             self.statusBar().showMessage(f"naming service not started: {NAMING_SERVICE_CMD[0]} missing")
 
+    def _render_readiness(self, r) -> None:
+        """The readiness panel next to the grasp probing log: one line per
+        object — GraspGen done, verified in the background (and via which
+        approach), computing, failed/retrying, blocked, or given up."""
+        if not hasattr(self, "exp_win") or not hasattr(self.exp_win, "ready_log"):
+            return
+        if not r:
+            text = "no readiness report from the pipeline yet"
+        elif not r.get("enabled", True):
+            text = "precompute is off — every click computes GraspGen and the plan"
+        else:
+            lines = ["GraspGen model: " + ("loaded" if r.get("model_ready") else "loading…")]
+            for o in r.get("objects") or []:
+                st = o.get("state"); nm = o.get("name"); pl = o.get("planner") or "curve"
+                if st == "verified":
+                    d = f"READY — verified in the background via the {pl}"
+                elif st == "grasps":
+                    d = "grasps ready — execution check pending"
+                elif st == "computing":
+                    d = "GraspGen running…"
+                elif st == "failed":
+                    d = f"no reachable grasp yet (attempt {o.get('attempts', 0)}/5) — retrying"
+                elif st == "blocked":
+                    d = f"blocked by {o.get('blocked_by')} — move that object"
+                elif st == "unreachable":
+                    d = "gave up — move the object or click it for a fresh try"
+                else:
+                    d = "waiting for GraspGen"
+                lines.append(f"{nm}: {d}")
+            text = "\n".join(lines)
+        if text != getattr(self, "_last_ready_text", None):
+            self._last_ready_text = text
+            self.exp_win.ready_log.setPlainText(text)
+
     def _refresh_ready_parts(self) -> None:
         """Every 5 s: the slow checks behind the ready LED."""
         parts = {}
@@ -2891,6 +2925,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.chat_state_label.setText(f"state: {state or '—'}")
         for action in upd.get("system_intents", []):
             self._handle_system_intent(action)
+        self._render_readiness(upd.get("readiness"))
         if "cand_status" in upd:
             for line in upd["cand_status"]:
                 self.exp_win.cand_log.appendPlainText(line)
@@ -3114,18 +3149,32 @@ class OperatorWindow(QtWidgets.QMainWindow):
             paint(self.led_rviz, GREEN, "rviz2 process running")
         else:
             paint(self.led_rviz, GREY, "rviz2 not running")
-        parts = dict(self._ready_parts)
-        parts["pipeline"] = bool(upd.get("pipeline_alive"))
-        missing = [k for k, v in parts.items() if not v]
+        # Ready LED, three states (Majd 2026-09-18): RED = nothing ready yet,
+        # ORANGE = the GraspGen model is loaded (picks are possible, they will
+        # compute at the click), GREEN = every object on the table has a
+        # verified approach, the click moves the arm at once.
+        r = upd.get("readiness") or {}
+        model_ready = bool(r.get("model_ready")) or bool(self._ready_parts.get("graspgen"))
+        exec_up = bool(self._ready_parts.get("executor"))
+        objs = list(r.get("objects") or [])
         if not self._pipeline.running():
             paint(self.led_ready, GREY, "pipeline not running")
-        elif not missing:
-            paint(self.led_ready, GREEN, "ready to execute: pipeline detecting, GraspGen warmed up, executor up"
-                  + (", naming service answering" if "naming" in parts else ""))
+        elif not upd.get("pipeline_alive") or not model_ready or not exec_up:
+            missing = []
+            if not upd.get("pipeline_alive"): missing.append("pipeline not detecting yet")
+            if not model_ready: missing.append("GraspGen model still loading (~80 s)")
+            if not exec_up: missing.append("executor not up")
+            paint(self.led_ready, RED, "not ready: " + "; ".join(missing))
         else:
-            names = {"pipeline": "pipeline not detecting yet", "graspgen": "GraspGen still warming up (~80 s)",
-                     "executor": "executor not up", "naming": "naming service still loading"}
-            paint(self.led_ready, RED, "not ready: " + "; ".join(names.get(m, m) for m in missing))
+            verified = [o for o in objs if o.get("state") == "verified"]
+            if objs and len(verified) == len(objs):
+                paint(self.led_ready, GREEN, f"ready: all {len(objs)} object(s) verified for execution — a click moves the arm at once")
+            else:
+                rest = [f"{o.get('name')}: {o.get('state')}" for o in objs if o.get("state") != "verified"]
+                paint(self.led_ready, "#e6a100",
+                      "GraspGen loaded — picks compute at the click. "
+                      + (f"verified {len(verified)}/{len(objs)}; " if objs else "no object seen yet; ")
+                      + "; ".join(rest[:6]))
         if upd.get("voice_alive"):
             paint(self.led_voice, GREEN, "voice stack up (/chat/state publishing)")
         elif self._voice.running():

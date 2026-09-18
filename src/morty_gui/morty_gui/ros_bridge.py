@@ -233,6 +233,12 @@ class MortyGuiBridge(Node):
             String, "/grasp_executor_lin_llm/candidate_status",
             self._on_cand_status, 20
         )
+        # Per-object readiness from the pipeline's precompute (GraspGen done /
+        # verified in the background / failed): the ready LED and the
+        # readiness panel (2026-09-18).
+        self._readiness = None
+        self._readiness_t = 0.0
+        self.create_subscription(String, "/graspgen/readiness", self._on_readiness, 10)
         # Voice system-control: chat_node publishes start_driver /
         # start_pipeline / start_all / stop_* intents; the GUI owns the
         # launches, so it executes them (Majd, 2026-08-12).
@@ -903,6 +909,13 @@ class MortyGuiBridge(Node):
         self._pub_pipeline_abort.publish(String(data="abort"))
         self.llm_cycle_active = False
 
+    def _on_readiness(self, msg) -> None:
+        try:
+            self._readiness = json.loads(msg.data)
+            self._readiness_t = time.monotonic()
+        except Exception:
+            pass
+
     def _on_cand_status(self, msg: String) -> None:
         self.trial_mark("cand_status", str(msg.data))
         self.llm_cycle_active = True
@@ -1401,6 +1414,7 @@ class MortyGuiBridge(Node):
             now = time.monotonic()
             out["hw_alive"] = (now - self._joint_state_t) < 1.5
             out["pipeline_alive"] = (now - self._dets_t) < 2.5
+            out["readiness"] = self._readiness if (now - self._readiness_t) < 10.0 else None
             out["camera_alive"] = (now - self._camera_t) < 1.5
             # 3 s, not 1.5: 10 Hz over the shuttle network link.
             out["astra_alive"] = (now - self._astra_t) < 3.0
