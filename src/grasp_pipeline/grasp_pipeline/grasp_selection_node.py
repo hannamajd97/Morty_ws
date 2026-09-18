@@ -2005,6 +2005,18 @@ class YoloLiveSelectGrasp(Node):
         self._selection_wake.set()
         self.get_logger().info(f"Queued window-click selection index: {self._pending_manual_choice}")
 
+    @staticmethod
+    def _same_object(a, b, tol_px: float = 40.0) -> bool:
+        """Same label and bbox centre within tol_px: the retried object."""
+        try:
+            if str(a.get("label", "")).strip().lower() != str(b.get("label", "")).strip().lower():
+                return False
+            ax1, ay1, ax2, ay2 = [float(v) for v in a.get("bbox", [0, 0, 0, 0])]
+            bx1, by1, bx2, by2 = [float(v) for v in b.get("bbox", [0, 0, 0, 0])]
+            return abs(0.5 * (ax1 + ax2) - 0.5 * (bx1 + bx2)) < tol_px and abs(0.5 * (ay1 + ay2) - 0.5 * (by1 + by2)) < tol_px
+        except Exception:
+            return False
+
     def _resolve_clicked_choice(self, dets, queued_idx: int) -> int:
         """Map a queued click onto the CURRENT detection list.
 
@@ -2527,6 +2539,20 @@ class YoloLiveSelectGrasp(Node):
                                                 "drop it (Drop left / Drop right / Release) before the next pick.")
                                         else:
                                             self._precompute.note_pick_failed(sel)
+                                            # One automatic second try (Majd 2026-09-18:
+                                            # "it should keep trying to execute, not
+                                            # reset"): when no candidate could be planned,
+                                            # the same object is queued again after the
+                                            # reset with a fresh grasp set. Once per click:
+                                            # a cycle that already was the retry ends here.
+                                            reason = str(getattr(self, "_executor_cycle_reason", ""))
+                                            mark = getattr(self, "_auto_retry_mark", None)
+                                            was_retry = bool(mark) and self._same_object(mark, sel)
+                                            self._auto_retry_mark = None
+                                            if (bool(self.get_parameter("auto_retry_once").value)
+                                                    and not was_retry and "stopped" not in reason):
+                                                self._auto_retry_sel = {"label": sel.get("label"),
+                                                                        "bbox": list(sel.get("bbox", []))}
                                         # SELF-clear the auto-pick label on failure.
                                         # intent_router normally clears it at
                                         # cycle end, but when the voice stack is
@@ -2589,6 +2615,17 @@ class YoloLiveSelectGrasp(Node):
                         self._selection_prompted = False
                         self._selection_prompt_sig = None
                         self._pending_manual_choice = None
+                        retry = getattr(self, "_auto_retry_sel", None)
+                        self._auto_retry_sel = None
+                        if retry:
+                            self._pending_manual_choice_det = dict(retry)
+                            self._pending_manual_choice = 0
+                            self._pending_manual_choice_stamp = max(time.time(), float(self._last_cycle_end_t) + 0.01)
+                            self._auto_retry_mark = dict(retry)
+                            self._selection_wake.set()
+                            self.get_logger().info(
+                                f"[retry] '{retry.get('label')}' is queued once more with a fresh grasp set "
+                                "(no candidate could be planned).")
                     self._selection_in_progress = False
                 else:
                     time.sleep(0.1)

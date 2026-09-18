@@ -331,7 +331,9 @@ def declare_all_parameters(node: "Node") -> None:
     # Robot self-filter (2026-09-15): the gripper's own collision hulls,
     # projected through TF into the image, are removed from detections and
     # zeroed in every depth frame. See perception/self_filter.py.
-    node.declare_parameter("post_cycle_settle_s", 0.3)   # was a hard 3.0 s sleep after every cycle (until 2026-09-17)
+    node.declare_parameter("post_cycle_settle_s", 0.3)
+    # One automatic second try of the clicked object with a fresh grasp set when no candidate could be planned (2026-09-18).
+    node.declare_parameter("auto_retry_once", True)   # was a hard 3.0 s sleep after every cycle (until 2026-09-17)
     node.declare_parameter("self_filter_enabled", True)
     node.declare_parameter("self_filter_links",
                            ["gripper_base", "gripper_finger_left", "gripper_finger_right"])
