@@ -1731,7 +1731,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             gpu = f"graphics card memory {u} of {t} MB" + ("  ⚠ nearly full" if t - u < 600 else "")
         except Exception:
             gpu = "graphics card memory: n/a"
-        self.det_status.setText(f"naming service: {naming}   ·   {gpu}")
+        self._det_status_text = f"naming service: {naming}   ·   {gpu}"   # applied on the UI thread in _poll
 
     def _on_drop_side(self, token: str, label: str) -> None:
         if self._software_stop_latched:
@@ -2643,12 +2643,28 @@ class OperatorWindow(QtWidgets.QMainWindow):
 
     def _poll(self) -> None:
         self._poll_count += 1
+        txt = getattr(self, "_det_status_text", None)
+        if txt is not None and hasattr(self, "det_status") and self.det_status.text() != txt:
+            self.det_status.setText(txt)
         self._reap_system()
         self._refresh_start_all_btn()
         if self._poll_count % 50 == 0:
             self._tune_priorities()
-            self._refresh_detection_status()
-            self._refresh_ready_parts()
+            # nvidia-smi (up to 2 s) and the naming-service health probe
+            # (0.5 s) used to run HERE, on the UI thread, every 5 s — the
+            # microphone waveform and the whole window froze for that long
+            # (Majd 2026-09-18: "the waveform keeps stucking"). A worker
+            # thread does them now; the UI only reads what it left behind.
+            import threading
+            if not getattr(self, "_slow_refresh_busy", False):
+                self._slow_refresh_busy = True
+                def _work():
+                    try:
+                        self._refresh_detection_status()
+                        self._refresh_ready_parts()
+                    finally:
+                        self._slow_refresh_busy = False
+                threading.Thread(target=_work, name="gui-slow-refresh", daemon=True).start()
         # Driver start watchdog (2026-09-16): the control node dies within a
         # second when the robot does not answer at that moment; nothing in the
         # launch restarts it. 25 s without joint states after a start = stop
@@ -3206,6 +3222,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         objs = list(r.get("objects") or [])
         if not self._pipeline.running():
             paint(self.led_ready, GREY, "pipeline not running")
+        elif upd.get("traj_ctrl_active") is False:
+            paint(self.led_ready, RED, "the robot's trajectory controller is NOT active — the arm will refuse every motion. "
+                  "Press Play on the pendant; the GUI re-arms the controller within 5 s while the program runs.")
         elif not upd.get("pipeline_alive") or not model_ready or not exec_up:
             missing = []
             if not upd.get("pipeline_alive"): missing.append("pipeline not detecting yet")

@@ -826,6 +826,8 @@ class MortyGuiBridge(Node):
                 return
             for c in ctrls:
                 if c.name == "scaled_joint_trajectory_controller":
+                    self._traj_ctrl_active = (c.state == "active")
+                    self._traj_ctrl_t = time.monotonic()
                     if c.state != "active":
                         req = SwitchController.Request()
                         req.activate_controllers = ["scaled_joint_trajectory_controller"]
@@ -1423,6 +1425,9 @@ class MortyGuiBridge(Node):
             out["hw_alive"] = (now - self._joint_state_t) < 1.5
             out["pipeline_alive"] = (now - self._dets_t) < 2.5
             out["readiness"] = self._readiness if (now - self._readiness_t) < 30.0 else None
+            # None = unknown (no listing yet / driver down); False = seen inactive within 15 s
+            out["traj_ctrl_active"] = (getattr(self, "_traj_ctrl_active", None)
+                                       if now - getattr(self, "_traj_ctrl_t", 0.0) < 15.0 else None)
             out["camera_alive"] = (now - self._camera_t) < 1.5
             # 3 s, not 1.5: 10 Hz over the shuttle network link.
             out["astra_alive"] = (now - self._astra_t) < 3.0

@@ -1283,6 +1283,13 @@ public:
           if (close_pending_) { finish_gripper_close("Step 3 - Close gripper (after a failed approach)"); }
           RCLCPP_ERROR(node_->get_logger(), "Step 2 - blended two lines: execution failed: %s (%d)",
             moveit::core::error_code_to_string(r).c_str(), r.val);
+          // Name the real cause for the narration (Majd 2026-09-18: Morty
+          // said "Step 2 failed" while the controller had simply been left
+          // inactive after a program stop).
+          if (last_failure_reason_.empty() && r == moveit::core::MoveItErrorCode::CONTROL_FAILED) {
+            last_failure_reason_ = "the robot refused the motion — its trajectory controller is not active. "
+                                   "Press Play on the pendant; the GUI re-arms the controller within a few seconds";
+          }
         } else {
           RCLCPP_INFO(node_->get_logger(), "Step 2 - blended two lines: execution OK (%.2f s, no stop at the corner).", dt);
           log_arrival_error(grasp_pose_world, "Step 2 - blended two lines");
