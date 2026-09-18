@@ -2614,9 +2614,20 @@ class YoloLiveSelectGrasp(Node):
                         self.last_selected_debug_stamp_mono = 0.0
                         self._selection_prompted = False
                         self._selection_prompt_sig = None
-                        self._pending_manual_choice = None
                         retry = getattr(self, "_auto_retry_sel", None)
                         self._auto_retry_sel = None
+                        # A click made AFTER the cycle ended wins over the
+                        # automatic retry (2026-09-18 12:25: the retry overwrote
+                        # his click); a click made during the cycle is stale and
+                        # is cleared as before.
+                        click_fresh = (self._pending_manual_choice is not None
+                                       and float(getattr(self, "_pending_manual_choice_stamp", 0.0))
+                                       >= float(self._last_cycle_end_t))
+                        if not click_fresh:
+                            self._pending_manual_choice = None
+                        if retry and click_fresh:
+                            self.get_logger().info("[retry] dropped: the operator clicked something else")
+                            retry = None
                         if retry:
                             self._pending_manual_choice_det = dict(retry)
                             self._pending_manual_choice = 0

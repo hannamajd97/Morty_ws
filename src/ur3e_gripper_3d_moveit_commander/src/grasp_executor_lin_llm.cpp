@@ -246,7 +246,12 @@ public:
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 40);   // over the bend; the slide at the same spacing
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.015);
     cartesian_max_joint_step_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_step_rad", 0.8);
-    cartesian_max_joint_travel_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_travel_rad", 2.6);   // ~150 deg per joint over the whole curve   // 2026-09-18: 0.35 refused 12 curves for 0.36-0.43 rad steps in the bend (the wrist turning, not a flip); a real flip is >= 1 rad   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
+    // 2026-09-18 12:30: 150 deg refused the far objects — legitimate curves
+    // there turn the elbow 180-240 deg and the base 165-170 deg — while the
+    // real flips read 368-478 deg. 250 deg separates the two in every case
+    // seen; the motion-time cap below is the second net.
+    cartesian_max_joint_travel_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_travel_rad", 4.36);   // 250 deg per joint over the whole curve
+    cartesian_max_motion_s_ = get_or_declare_param<double>(node_, "cartesian_max_motion_s", 4.0);   // a curve timed longer than this at full scaling is a wrong configuration, not an approach   // 2026-09-18: 0.35 refused 12 curves for 0.36-0.43 rad steps in the bend (the wrist turning, not a flip); a real flip is >= 1 rad   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -3267,6 +3272,15 @@ private:
     const double factors[3] = {1.0, 0.5, 0.25};
     for (double f : factors) {
       if (!totg.computeTimeStamps(rt, velocity_scaling_ * f, acceleration_scaling_ * f)) { continue; }
+      if (f >= 1.0 && rt.getDuration() > cartesian_max_motion_s_) {
+        if (reason) {
+          char buf[160];
+          std::snprintf(buf, sizeof(buf), "the curve would take %.1f s at full speed (limit %.1f s): a wrong arm configuration, not an approach",
+                        rt.getDuration(), cartesian_max_motion_s_);
+          *reason = buf;
+        }
+        return false;
+      }
       moveit::planning_interface::MoveGroupInterface::Plan plan;
       rt.getRobotTrajectoryMsg(plan.trajectory_);
       moveit::core::robotStateToRobotStateMsg(start_state, plan.start_state_);
@@ -6215,7 +6229,8 @@ private:
   double approach_duration_s_{2.5};
   std::string last_planner_;   // which approach the last probe planned ("curve", "blended lines", "two lines")
   double cartesian_max_joint_step_rad_{0.8};
-  double cartesian_max_joint_travel_rad_{2.6};
+  double cartesian_max_joint_travel_rad_{4.36};
+  double cartesian_max_motion_s_{4.0};
   double approach_floor_s() const { return std::max(approach_duration_s_, gripper_open_time_s_ + open_before_arrival_margin_s_); }
   bool check_grasp_sensor_{true};
   bool check_slip_{true};

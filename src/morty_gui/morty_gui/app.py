@@ -682,7 +682,21 @@ class OperatorWindow(QtWidgets.QMainWindow):
             "font-family:monospace;font-size:11px;}"
         )
         self.probe_hist.setVisible(False)
-        v.addWidget(self.probe_hist)
+        # Readiness pane beside it (Majd 2026-09-18): per object, GraspGen
+        # done / verified for execution (and via which approach) / failed.
+        self.ready_pane = QtWidgets.QPlainTextEdit()
+        self.ready_pane.setReadOnly(True)
+        self.ready_pane.setFixedHeight(96)
+        self.ready_pane.setStyleSheet(
+            "QPlainTextEdit{background:#101010;color:#9fd;"
+            "font-family:monospace;font-size:11px;}"
+        )
+        self.ready_pane.setPlaceholderText("object readiness — waiting for the pipeline")
+        panes = QtWidgets.QHBoxLayout()
+        panes.setContentsMargins(0, 0, 0, 0)
+        panes.addWidget(self.probe_hist, stretch=3)
+        panes.addWidget(self.ready_pane, stretch=2)
+        v.addLayout(panes)
         v.addWidget(bar)
         self.setCentralWidget(central)
         self.statusBar().showMessage("Morty GUI up — waiting for pipeline topics.")
@@ -1635,7 +1649,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         elif not r.get("enabled", True):
             text = "precompute is off — every click computes GraspGen and the plan"
         else:
-            lines = ["GraspGen model: " + ("loaded" if r.get("model_ready") else "loading…")]
+            model_ready = bool(r.get("model_ready")) or bool(self._ready_parts.get("graspgen"))
+            lines = ["GraspGen model: " + ("loaded" if model_ready else "loading…")]
             for o in r.get("objects") or []:
                 st = o.get("state"); nm = o.get("name"); pl = o.get("planner") or "curve"
                 if st == "verified":
@@ -1657,6 +1672,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if text != getattr(self, "_last_ready_text", None):
             self._last_ready_text = text
             self.exp_win.ready_log.setPlainText(text)
+            if hasattr(self, "ready_pane"):
+                self.ready_pane.setPlainText(text)
 
     def _refresh_ready_parts(self) -> None:
         """Every 5 s: the slow checks behind the ready LED."""
