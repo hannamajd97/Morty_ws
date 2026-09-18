@@ -113,7 +113,7 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.neighbour_pad_spin.setRange(0.000, 0.100)
         self.neighbour_pad_spin.setDecimals(3)
         self.neighbour_pad_spin.setSingleStep(0.005)
-        self.neighbour_pad_spin.setValue(0.005)
+        self.neighbour_pad_spin.setValue(0.001)
         self.neighbour_pad_spin.setToolTip(
             "Safety cushion added around each neighbour box, per side (m).\n"
             "Bigger = safer, but harder to find a plan in a crowded scene."

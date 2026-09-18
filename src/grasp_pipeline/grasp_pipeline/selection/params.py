@@ -209,7 +209,7 @@ def declare_all_parameters(node: "Node") -> None:
     # detected object EXCEPT the grasp target, so MoveIt stops routing the
     # gripper through the other items standing on the table.
     node.declare_parameter("neighbour_obstacles_enabled", True)
-    node.declare_parameter("neighbour_obstacle_padding_m", 0.005)
+    node.declare_parameter("neighbour_obstacle_padding_m", 0.001)
     node.declare_parameter("neighbour_obstacle_min_px", 60)
     node.declare_parameter("neighbour_obstacle_frame", "base_link")
     # 2026-08-28 over-sized-box fix (measured: a 7 cm bottle got a
