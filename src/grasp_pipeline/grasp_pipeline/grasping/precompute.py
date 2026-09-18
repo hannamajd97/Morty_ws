@@ -115,6 +115,11 @@ class CacheEntry:
     precheck_key: int = 0          # id sent with the candidate set to the executor
     lin_idx: int = -2              # -2 unchecked, -1 none feasible, >=0 verified candidate
     planner: str = ""              # which approach the background check verified ("curve", "blended lines")
+    t_start_wall: float = 0.0      # timeline (2026-09-18): wall-clock job start / done, job length,
+    t_done_wall: float = 0.0       # when the executor verified it and how long its probe took
+    job_s: float = 0.0
+    verified_wall: float = 0.0
+    probe_s: float = 0.0
 
 
 class GraspPrecomputer:
@@ -265,6 +270,17 @@ class GraspPrecomputer:
                         t.blocked_by = ""; t.attempts = 0; t.gave_up = False
         self._wake.set()
         self._publish_readiness()
+
+    def _publish_timing(self, rec: Dict[str, Any]) -> None:
+        """Background job / verdict records on /graspgen/timing (the same
+        topic the click path uses), for the trial timeline."""
+        try:
+            pub = getattr(self._node, "pub_timing", None)
+            if pub is None:
+                pub = self._node.pub_timing = self._node.create_publisher(String, "/graspgen/timing", 10)
+            pub.publish(String(data=json.dumps(rec)))
+        except Exception:
+            pass
 
     def _publish_readiness_periodic(self) -> None:
         self._last_readiness = ""          # force a publish even if unchanged
@@ -580,6 +596,7 @@ class GraspPrecomputer:
         sel = {"label": tr.label, "simplified_label": tr.label, "display": tr.key,
                "score": tr.score, "bbox": list(tr.box), "header": copy.deepcopy(header)}
         t0 = time.monotonic()
+        t0_wall = time.time()
         if not self.model_lock.acquire(timeout=0.05):
             return
         try:
@@ -614,7 +631,8 @@ class GraspPrecomputer:
         entry = CacheEntry(key=tr.key, label=tr.label, box=list(tr.box), depth_m=d_before, tool0=t_before,
                            params_hash=params_hash, params_snapshot=params_snapshot,
                            result=res, t_done=time.monotonic(),
-                           n_grasps=len(res.get("grasps") or []), mask=mask)
+                           n_grasps=len(res.get("grasps") or []), mask=mask,
+                           t_start_wall=t0_wall, t_done_wall=time.time(), job_s=dt_job)
         with self._state:
             live = self._tracks.get(tr.key)
             if live is None or not _boxes_agree(live.box, tr.box, float(self._p("precompute_box_shift_px", 15.0)),
@@ -628,6 +646,9 @@ class GraspPrecomputer:
             f"[precompute] '{tr.key}' ready in {dt_job:.2f} s: {entry.n_grasps} grasps kept "
             f"of {len(res.get('raw_grasps') or [])} (stored {len(self._entries)})")
         self._publish_readiness()
+        self._publish_timing({"kind": "background_job", "label": entry.label, "key": entry.key,
+                              "job_start": entry.t_start_wall, "job_done": entry.t_done_wall,
+                              "job_s": entry.job_s, "n_grasps": entry.n_grasps})
         self._send_for_precheck(entry)
 
     def _send_for_precheck(self, entry: CacheEntry) -> None:
@@ -674,6 +695,7 @@ class GraspPrecomputer:
             kv = dict(part.split("=", 1) for part in head.split())
             key, feasible, tried = int(kv["key"]), int(kv["feasible"]), int(kv.get("tried", 0))
             planner = str(kv.get("planner", "")).replace("_", " ")
+            probe_s = float(kv.get("probe_s", 0.0) or 0.0)
         except Exception:
             return
         if key == self._precheck_inflight:
@@ -689,9 +711,14 @@ class GraspPrecomputer:
             if hit is not None:
                 hit.lin_idx = feasible
                 hit.planner = planner if feasible >= 0 else ""
+                hit.verified_wall = time.time()
+                hit.probe_s = probe_s
         if hit is None:
             return                     # entry already replaced or dropped
         self._publish_readiness()
+        self._publish_timing({"kind": "background_verdict", "label": hit.label, "key": hit.key,
+                              "verified_at": hit.verified_wall, "probe_s": probe_s,
+                              "feasible": feasible, "tried": tried, "planner": hit.planner})
         if feasible >= 0:
             self._node.get_logger().info(
                 f"[precompute] '{hit.key}' LIN-verified: candidate {feasible + 1} (set {key}, {tried} probed)")

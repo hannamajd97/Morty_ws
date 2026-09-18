@@ -25,6 +25,8 @@ preserved exactly.
 from __future__ import annotations
 
 import copy
+import json
+from std_msgs.msg import String
 from typing import Any, Dict, List, TYPE_CHECKING, Optional, Tuple
 
 import numpy as np
@@ -117,6 +119,13 @@ class PickPipeline:
             entry, why = pre.lookup(sel)
             if entry is not None:
                 t0 = _time.monotonic()
+                self._tm = {"path": "precomputed",
+                            "select": getattr(self._node, "_selection_cycle_start_t", None),
+                            "hit": _time.time(),
+                            "precompute": {"label": entry.label, "key": entry.key,
+                                           "job_start": entry.t_start_wall, "job_done": entry.t_done_wall,
+                                           "job_s": entry.job_s, "verified_at": entry.verified_wall,
+                                           "probe_s": entry.probe_s, "planner": entry.planner}}
                 try:
                     if pre.replay_capture(entry, sel):
                         ok = self._publish(entry.result, sel)
@@ -198,14 +207,22 @@ class PickPipeline:
 
         # ── Phase 2: capture first cloud + multi-view registration ────
         import time as _time
+        # Wall-clock phase record for the trial timeline (2026-09-18):
+        # published on /graspgen/timing by _publish (fresh path) or kept
+        # for the precompute's own record (background job).
+        self._tm = {"path": "background" if background else "fresh",
+                    "select": (None if background else getattr(self._node, "_selection_cycle_start_t", None)),
+                    "compute_start": _time.time()}
         _t_phase = _time.monotonic()
         sel_capture = self._node._refresh_selection_for_capture(sel)
         self._node.get_logger().info(
             f"[timing] refresh-detection {_time.monotonic() - _t_phase:.2f}s")
+        self._tm["detect_done"] = _time.time()
         _t_phase = _time.monotonic()
         obs0 = self._node._extract_filtered_object_cloud(sel_capture, publish_outputs=not background, background=background)
         self._node.get_logger().info(
             f"[timing] capture+segment+cloud {_time.monotonic() - _t_phase:.2f}s")
+        self._tm["cloud_done"] = _time.time()
         _t_phase = _time.monotonic()
         if obs0 is None:
             self._node.get_logger().warn(
@@ -291,6 +308,7 @@ class PickPipeline:
                     "preload and reusing its instance (single load, no reload)."
                 )
         self._bg_committed = True   # from here the job finishes even if a click arrives
+        self._tm["graspgen_start"] = _time.time()
         try:
             resp = send_points_to_graspgen(
                 pts_send,
@@ -317,6 +335,7 @@ class PickPipeline:
                 f"Failed contacting GraspGen at {self._node.get_parameter('graspgen_endpoint').value}: {e}"
             )
             return None
+        self._tm["graspgen_done"] = _time.time()
         if not resp or not resp.get("ok", False):
             self._node.get_logger().error(f"GraspGen error: {None if resp is None else resp.get('error')}")
             return None
@@ -809,6 +828,27 @@ class PickPipeline:
                 self._node.get_logger().warn(f"[cand-floor] skipped ({e})")
         return pose_array, scores_msg
 
+    def _publish_timing(self, sel: Dict[str, Any], n_candidates: int) -> None:
+        """One JSON record per selection cycle on /graspgen/timing: how the
+        click became candidates (fresh: detect, cloud, GraspGen, publish;
+        precomputed: when the background computed and verified it)."""
+        import time as _time
+        try:
+            tm = dict(getattr(self, "_tm", {}) or {})
+            tm["published"] = _time.time()
+            rec = {"kind": "selection_cycle",
+                   "cycle_id": int(getattr(self._node, "_waiting_cycle_id", -1) or -1),
+                   "label": str(sel.get("label", "")),
+                   "source": str(getattr(self._node, "_last_selection_source", "") or ""),
+                   "n_candidates": int(n_candidates),
+                   **tm}
+            pub = getattr(self._node, "pub_timing", None)
+            if pub is None:
+                pub = self._node.pub_timing = self._node.create_publisher(String, "/graspgen/timing", 10)
+            pub.publish(String(data=json.dumps(rec)))
+        except Exception as exc:  # never let bookkeeping break a pick
+            self._node.get_logger().debug(f"timing record failed: {exc}")
+
     def _publish(self, res: Dict[str, Any], sel: Dict[str, Any]) -> bool:
         """Phases 8-10 on a compute result: candidates to the executor first,
         then the viewer poses, then the single best pose."""
@@ -828,6 +868,7 @@ class PickPipeline:
                     return False
                 self._node.pub_candidates_base.publish(pose_array)
                 self._node.pub_candidate_scores.publish(scores_msg)
+                self._publish_timing(sel, len(pose_array.poses))
                 self._node.last_candidates_base = copy.deepcopy(pose_array)
                 self._node.last_candidate_scores = copy.deepcopy(scores_msg)
                 # Tag the keep-alive cache with the cycle these belong to —

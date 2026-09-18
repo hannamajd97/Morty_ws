@@ -928,6 +928,7 @@ public:
     if (open_already_sent()) { return; }   // a retry inside the same pick
     begin_gripper_open_async();
     RCLCPP_INFO(node_->get_logger(), "%s: open sent with the motion.", where);
+    phase_mark("open_sent");
   }
   bool open_already_sent() const { return open_pending_ || open_done_; }
 
@@ -1220,6 +1221,7 @@ public:
       std::string reuse_reject;
       if (!try_reuse_cached_lin_plan(grasp_pose_world, blended, &reuse_reject)) {
         RCLCPP_INFO(node_->get_logger(), "Step 2 - blended two-line plan not reusable (%s); planning now.", reuse_reject.c_str());
+        phase_mark("plan_fresh_start");
         std::string why;
         bool planned = (staging_mode_ == "cartesian") && plan_cartesian_two_lines(grasp_pose_world, &why);
         if (!planned) { planned = plan_blended_two_lines(grasp_pose_world, &why); }
@@ -1230,6 +1232,7 @@ public:
           return false;
         }
         blended = cached_lin_plan_;
+        phase_mark("plan_fresh_done");
       }
       staged_lin_done = true;
       if (!execute_) {
@@ -1276,7 +1279,9 @@ public:
           }
         }
         const auto t2 = std::chrono::steady_clock::now();
+        phase_mark("motion_start");
         auto r = execute_with_deadline(blended, __func__);
+        phase_mark("arrival");
         if (early_close_thread_.joinable()) { early_close_thread_.join(); }
         const double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t2).count();
         if (r != moveit::core::MoveItErrorCode::SUCCESS) {
@@ -1535,6 +1540,7 @@ public:
         grasp_pin_, holding ? "HIGH(holding)" : (grasp_detected_.load() ? "HIGH but LATE(empty)" : "low(empty)"),
         stall_s, stall_max > 0.0 ? (std::string(", limit ") + std::to_string(stall_max).substr(0, 4) + " s").c_str() : "",
         slip_pin_, slip_active_.load() ? "HIGH(slip→hw retighten)" : "low");
+        phase_mark("grasp_verdict");
       held_object_.store(holding);
       grasp_verdict_holding_ = holding;
       if (!holding) {
@@ -1708,6 +1714,7 @@ public:
       if (lifted_after_grasp) {
         RCLCPP_INFO(node_->get_logger(),
           "Post-grasp lift OK — holding clear of the table.");
+          phase_mark("lift_done");
       } else {
         RCLCPP_WARN(node_->get_logger(),
           "Post-grasp lift failed (jog and LIN); Step 3a will retry after the drop pause.");
@@ -1769,6 +1776,7 @@ public:
         "Interactive drop: object grasped, pausing at grasp pose. "
         "Waiting for destination on '%s' (timeout %.1fs).",
         resume_topic_.c_str(), resume_timeout_s_);
+        phase_mark("wait_destination_start");
       // Reset the wait state BEFORE publishing 'paused' (and before
       // anyone else can publish a resume) so we don't miss a fast
       // reply that lands between publish and wait setup.
@@ -1897,6 +1905,7 @@ public:
       RCLCPP_INFO(node_->get_logger(),
         "Interactive drop: destination set to '%s'. Continuing with "
         "lift + drop sequence.", drop_target_name_.c_str());
+        phase_mark("destination_received");
       try {
         std_msgs::msg::String s;
         s.data = "resumed:" + drop_target_name_;
@@ -2540,6 +2549,7 @@ public:
         if (execute_ && post_release_wait_s_ > 0.0 && !ask_home_before_reset) {
           RCLCPP_INFO(node_->get_logger(),
             "Step 5c - Released; staying %.1f s at the drop pose before going home.", post_release_wait_s_);
+            phase_mark("released");
           const auto t_end = std::chrono::steady_clock::now() +
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(post_release_wait_s_));
           while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
@@ -2636,6 +2646,7 @@ public:
     // Step 7 closes the gripper at home as a "ready for next pick"
     // posture. Skip if we kept the object held — gripper is already
     // closed.
+    phase_mark("home_done");
     if (sequence_ok && !skip_release && !stay_in_place && !execute_gripper_named_target(gripper_close_name_, "Step 7 - Close gripper at reset")) {
       sequence_ok = false;
     }
@@ -4714,6 +4725,31 @@ private:
     return b;
   }
 
+  // ── Phase clock (2026-09-18, Majd: "logs of how fast the system is from
+  // top to bottom, every tiny thing, background and non-background") ──
+  // Every step of a pick stamps a wall-clock second; publish_timing()
+  // hands the whole record to /grasp_executor_lin_llm/timing as JSON at
+  // the end of the cycle. The GUI's trial recorder writes it into the
+  // trial folder next to the pipeline's and the precompute's records.
+  std::vector<std::pair<std::string, double>> phase_;
+public:
+  void phase_reset() { phase_.clear(); }
+  void phase_mark(const char * name)
+  {
+    phase_.emplace_back(name, node_->now().seconds());
+  }
+  std::string timing_json(int64_t cycle_id, bool ok) const
+  {
+    std::string out = "{\"kind\":\"executor_cycle\",\"cycle_id\":" + std::to_string(cycle_id) +
+      ",\"ok\":" + (ok ? "true" : "false") + ",\"planner\":\"" + last_planner_ + "\",\"phases\":[";
+    for (size_t i = 0; i < phase_.size(); ++i) {
+      char buf[96];
+      std::snprintf(buf, sizeof(buf), "%s{\"name\":\"%s\",\"t\":%.3f}", i ? "," : "", phase_[i].first.c_str(), phase_[i].second);
+      out += buf;
+    }
+    return out + "]}";
+  }
+
   // One line per search with the arm's joints in degrees (2026-09-18: a
   // whole session refused every candidate and the logs held no joint
   // angles — a joint wrapped by a full turn at "home" looks identical in
@@ -5031,6 +5067,7 @@ private:
             node_->get_logger(),
             "Candidate %zu/%zu (orig=%zu, cost=%.3f) is LIN-feasible; selecting it.",
             i + 1, total, orig_idx + 1, ranked[i].first);
+            phase_mark("probe_feasible");
           try {
             std_msgs::msg::String cs;
             cs.data = "grasp " + std::to_string(i + 1) + "/" +
@@ -5887,6 +5924,7 @@ private:
     close_goal_future_ = gripper_action_client_->async_send_goal(goal);
     close_pending_ = true;
     RCLCPP_INFO(node_->get_logger(), "Gripper close sent on the way in (%.2f s before the arm stops).", close_lead_s_);
+    phase_mark("close_sent");
   }
 
   bool finish_gripper_close(const std::string & step_name)
@@ -6844,7 +6882,15 @@ int main(int argc, char ** argv)
       }
     });
 
+  auto pub_timing = node->create_publisher<std_msgs::msg::String>(
+    "/grasp_executor_lin_llm/timing", rclcpp::QoS(rclcpp::KeepLast(20)).reliable());
   auto publish_completion = [&](bool ok, int64_t cycle_id) {
+    grasp_executor.phase_mark(ok ? "cycle_done" : "cycle_failed");
+    try {
+      std_msgs::msg::String tm;
+      tm.data = grasp_executor.timing_json(cycle_id, ok);
+      pub_timing->publish(tm);
+    } catch (...) {}
     std_msgs::msg::String msg;
     msg.data = std::string(ok ? "done" : "failed") + "|" + std::to_string(cycle_id);
     if (!ok && !grasp_executor.last_failure_reason().empty()) {
@@ -7079,6 +7125,7 @@ int main(int argc, char ** argv)
         node->get_logger(),
         "Received %zu grasp candidates; evaluating LIN feasibility (cycle_id=%ld).",
         cands.size(), static_cast<long>(cycle_id));
+        grasp_executor.phase_reset(); grasp_executor.phase_mark("candidates_received");
       // Open the fingers NOW, when the candidates arrive — not at the click
       // (Majd 2026-09-17: "we open the gripper before we execute, that is
       // wrong": the click ran 3-5 s ahead of the move, so the fingers stood
@@ -7112,6 +7159,7 @@ int main(int argc, char ** argv)
         if (rec == nullptr) {
           RCLCPP_INFO(node->get_logger(),
             "[precheck] MISS: no background check for this candidate set — probing now.");
+            grasp_executor.phase_mark("precheck_miss");
         } else if (!grasp_executor.precheck_usable(*rec, &why)) {
           RCLCPP_INFO(node->get_logger(), "[precheck] MISS: %s — probing now.", why.c_str());
         } else if (rec->feasible_idx < 0) {
@@ -7129,6 +7177,7 @@ int main(int argc, char ** argv)
             "[precheck] HIT: candidate %d of %zu was LIN-verified %.0f s ago — executing without probing (%s).",
             rec->feasible_idx + 1, cands.size(), grasp_executor.precheck_age_s(*rec),
             rec->has_plan ? "plan reused" : "plan recomputed");
+            grasp_executor.phase_mark("precheck_hit");
         }
       }
       if (!used_precheck) {
@@ -7250,7 +7299,7 @@ int main(int argc, char ** argv)
         } else {
           std_msgs::msg::String r;
           r.data = "key=" + std::to_string(job->first) + " feasible=" + std::to_string(rec.feasible_idx) +
-            " tried=" + std::to_string(rec.n_tried);
+            " tried=" + std::to_string(rec.n_tried) + " probe_s=" + std::to_string(dt);
           if (rec.feasible_idx >= 0 && !rec.planner.empty()) {
             std::string tok = rec.planner;
             std::replace(tok.begin(), tok.end(), ' ', '_');
