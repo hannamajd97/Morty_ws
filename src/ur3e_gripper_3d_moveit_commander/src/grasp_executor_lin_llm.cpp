@@ -245,7 +245,8 @@ public:
     // miss. Only a selection triggers it, never a background check.
     cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 40);   // over the bend; the slide at the same spacing
     cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.015);
-    cartesian_max_joint_step_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_step_rad", 0.8);   // 2026-09-18: 0.35 refused 12 curves for 0.36-0.43 rad steps in the bend (the wrist turning, not a flip); a real flip is >= 1 rad   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
+    cartesian_max_joint_step_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_step_rad", 0.8);
+    cartesian_max_joint_travel_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_travel_rad", 2.6);   // ~150 deg per joint over the whole curve   // 2026-09-18: 0.35 refused 12 curves for 0.36-0.43 rad steps in the bend (the wrist turning, not a flip); a real flip is >= 1 rad   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -3216,17 +3217,40 @@ private:
       return false;
     }
     {
+      // Two tests (2026-09-18: a flip spread over several 15 mm steps, each
+      // under the per-step limit, slipped through and the arm went upside
+      // down into the bottle — 8 s of motion, upper_arm <-> camera_mount):
+      //  (1) per step: one joint moving more than cartesian_max_joint_step_rad;
+      //  (2) whole path: one joint travelling more than
+      //      cartesian_max_joint_travel_rad in total. An approach from home
+      //      never needs a joint to turn more than ~150 deg; a flipped
+      //      configuration needs 300 deg or more.
       const auto & jp = path_msg.joint_trajectory.points;
+      std::vector<double> travel(jp.empty() ? 0 : jp.front().positions.size(), 0.0);
       for (size_t i = 1; i < jp.size(); ++i) {
         double dmax = 0.0;
         for (size_t k = 0; k < jp[i].positions.size() && k < jp[i - 1].positions.size(); ++k) {
-          dmax = std::max(dmax, std::fabs(jp[i].positions[k] - jp[i - 1].positions[k]));
+          const double d = std::fabs(jp[i].positions[k] - jp[i - 1].positions[k]);
+          dmax = std::max(dmax, d);
+          if (k < travel.size()) { travel[k] += d; }
         }
         if (dmax > cartesian_max_joint_step_rad_) {
           if (reason) {
             char buf[160];
             std::snprintf(buf, sizeof(buf), "joint flip of %.2f rad in one step at %d %% of the curve", dmax,
                           static_cast<int>(100.0 * i / std::max<size_t>(1, jp.size() - 1)));
+            *reason = buf;
+          }
+          return false;
+        }
+      }
+      for (size_t k = 0; k < travel.size(); ++k) {
+        if (travel[k] > cartesian_max_joint_travel_rad_) {
+          if (reason) {
+            char buf[200];
+            std::snprintf(buf, sizeof(buf), "configuration flip along the curve: %s would turn %.0f deg in total (limit %.0f)",
+                          k < path_msg.joint_trajectory.joint_names.size() ? path_msg.joint_trajectory.joint_names[k].c_str() : "a joint",
+                          travel[k] * 180.0 / M_PI, cartesian_max_joint_travel_rad_ * 180.0 / M_PI);
             *reason = buf;
           }
           return false;
@@ -6179,7 +6203,8 @@ private:
   double cartesian_curve_lead_m_{0.12};
   double close_lead_s_{0.4};
   double approach_duration_s_{2.5};
-  double cartesian_max_joint_step_rad_{0.35};
+  double cartesian_max_joint_step_rad_{0.8};
+  double cartesian_max_joint_travel_rad_{2.6};
   double approach_floor_s() const { return std::max(approach_duration_s_, gripper_open_time_s_ + open_before_arrival_margin_s_); }
   bool check_grasp_sensor_{true};
   bool check_slip_{true};
