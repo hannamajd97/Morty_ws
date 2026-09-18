@@ -1238,6 +1238,9 @@ class ChatIntentNode(Node):
         try:
             self._speak(self._startup_greeting)
             self.get_logger().info("Startup greeting sent.")
+            if not self._said_ready and not self._said_loading:
+                self._said_loading = True
+                self._speak("Please wait until the system is ready. You can chat with me until we start.")
         except Exception as exc:
             self.get_logger().warn(f"Startup greeting failed: {exc}")
 
@@ -2930,22 +2933,31 @@ class ChatIntentNode(Node):
             self._latest_pose = msg
             self._latest_pose_received_at = self.get_clock().now().nanoseconds / 1e9
 
+    def _tts_ready(self) -> bool:
+        return self._speak_client is not None and self._speak_client.server_is_ready()
+
     def _on_readiness(self, msg: String) -> None:
+        """Majd 2026-09-18: at start 'please wait until the system is ready,
+        you can chat until then'; once the first object is verified for
+        execution, 'I'm ready to grasp now' — each once. The report comes
+        every second, so a sentence is only marked as said once the speech
+        server could take it (it loads ~8 s after this node; the first
+        version lost the sentence to that gap)."""
         try:
             r = json.loads(msg.data)
         except Exception:
             return
-        if self._said_ready:
+        if self._said_ready or not self._tts_ready():
             return
         model_ready = bool(r.get("model_ready"))
         verified = [o for o in (r.get("objects") or []) if o.get("state") == "verified"]
         if model_ready and verified:
             self._said_ready = True
             names = ", ".join(str(o.get("label", "")).replace("_", " ") for o in verified[:4])
-            self._speak(f"I'm ready to grasp. {names} {'is' if len(verified) == 1 else 'are'} ready.")
-        elif not model_ready and not self._said_loading:
+            self._speak(f"I'm ready to grasp now. {names} {'is' if len(verified) == 1 else 'are'} ready.")
+        elif not self._said_loading:
             self._said_loading = True
-            self._speak("Please wait, I'm still loading. I'll tell you when I'm ready.")
+            self._speak("Please wait until the system is ready. You can chat with me until we start.")
 
     def _on_candidates(self, msg: PoseArray) -> None:
         with self._grasp_lock:
