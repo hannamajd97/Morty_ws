@@ -251,7 +251,8 @@ public:
     // real flips read 368-478 deg. 250 deg separates the two in every case
     // seen; the motion-time cap below is the second net.
     cartesian_max_joint_travel_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_travel_rad", 4.36);   // 250 deg per joint over the whole curve
-    cartesian_max_motion_s_ = get_or_declare_param<double>(node_, "cartesian_max_motion_s", 4.0);   // a curve timed longer than this at full scaling is a wrong configuration, not an approach   // 2026-09-18: 0.35 refused 12 curves for 0.36-0.43 rad steps in the bend (the wrist turning, not a flip); a real flip is >= 1 rad   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
+    cartesian_max_motion_s_ = get_or_declare_param<double>(node_, "cartesian_max_motion_s", 3.0);   // 2026-09-18 13:00: good curves 1.2-2.0 s, wrong configurations 3.75-8 s
+    cartesian_end_config_tol_rad_ = get_or_declare_param<double>(node_, "cartesian_end_config_tol_rad", 1.2);   // the curve must end in the configuration the solver finds from the start   // 2026-09-18: 0.35 refused 12 curves for 0.36-0.43 rad steps in the bend (the wrist turning, not a flip); a real flip is >= 1 rad   // 2026-09-17: halves the joint solves + collision checks; the robot interpolates between points anyway
     pregrasp_approach_distance_ = get_or_declare_param<double>(
       node_, "pregrasp_approach_distance", 0.10);
     target_frame_ = get_or_declare_param<std::string>(node_, "target_frame", "world");
@@ -3254,6 +3255,35 @@ private:
           return false;
         }
       }
+      // (3) the path must END in the natural configuration for this grasp:
+      //     the joint solution the solver finds for the grasp pose seeded
+      //     from the start state. A path that arrives in another branch
+      //     (elbow or shoulder flipped) is a wide swing even when every
+      //     step and every joint's total travel passed (2026-09-18 13:00:
+      //     a 3.75 s curve swung wide and closed on nothing).
+      if (!jp.empty()) {
+        moveit::core::RobotState want = start_state;
+        const auto * jmg = want.getJointModelGroup(arm_group_.getName());
+        if (jmg && want.setFromIK(jmg, target_pose.pose, arm_group_.getEndEffectorLink(), 0.05)) {
+          std::vector<double> qw; want.copyJointGroupPositions(jmg, qw);
+          const auto & names = path_msg.joint_trajectory.joint_names;
+          const auto & jn = jmg->getVariableNames();
+          for (size_t k = 0; k < names.size() && k < jp.back().positions.size(); ++k) {
+            auto it = std::find(jn.begin(), jn.end(), names[k]);
+            if (it == jn.end()) { continue; }
+            const double d = std::fabs(jp.back().positions[k] - qw[static_cast<size_t>(it - jn.begin())]);
+            if (d > cartesian_end_config_tol_rad_) {
+              if (reason) {
+                char buf[200];
+                std::snprintf(buf, sizeof(buf), "the curve ends in another arm configuration: %s is %.0f deg away from the natural solution",
+                              names[k].c_str(), d * 180.0 / M_PI);
+                *reason = buf;
+              }
+              return false;
+            }
+          }
+        }
+      }
       for (size_t k = 0; k < travel.size(); ++k) {
         if (travel[k] > cartesian_max_joint_travel_rad_) {
           if (reason) {
@@ -6254,7 +6284,8 @@ private:
   std::string last_planner_;   // which approach the last probe planned ("curve", "blended lines", "two lines")
   double cartesian_max_joint_step_rad_{0.8};
   double cartesian_max_joint_travel_rad_{4.36};
-  double cartesian_max_motion_s_{4.0};
+  double cartesian_max_motion_s_{3.0};
+  double cartesian_end_config_tol_rad_{1.2};
   double approach_floor_s() const { return std::max(approach_duration_s_, gripper_open_time_s_ + open_before_arrival_margin_s_); }
   bool check_grasp_sensor_{true};
   bool check_slip_{true};
