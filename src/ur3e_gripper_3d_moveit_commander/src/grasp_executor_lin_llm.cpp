@@ -1215,6 +1215,7 @@ public:
         std::string why;
         bool planned = (staging_mode_ == "cartesian") && plan_cartesian_two_lines(grasp_pose_world, &why);
         if (!planned) { planned = plan_blended_two_lines(grasp_pose_world, &why); }
+        if (!planned) { planned = plan_direct_lin(grasp_pose_world, &why); }
         if (!planned) {
           RCLCPP_ERROR(node_->get_logger(), "Step 2 - one-motion planning failed: %s", why.c_str());
           recover_to_reset_target("Step 2 (blended two lines) planning failed");
@@ -4158,59 +4159,14 @@ private:
     return false;
   }
 
-  bool can_plan_lin_pose(const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason = nullptr)
+  // A straight line from wherever the arm is straight into the grasp — the
+  // original approach. Last step of the chain (Majd 2026-09-18: "for the
+  // far objects we need only LIN, it won't fail there"): the curve and the
+  // blended lines refuse near the reach edge, a single line often still
+  // plans. The plan is cached like the others and runs as one motion,
+  // stretched to the approach duration.
+  bool plan_direct_lin(const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason)
   {
-    // INVALIDATION: a new probe supersedes any earlier one. Candidate
-    // N-1's trajectory must never survive into candidate N — the poses
-    // differ and the guards would then be comparing against the wrong
-    // plan. Dropping it here also covers the staging branch below, which
-    // plans from the STAND-OFF state and so is never cacheable for
-    // Step 2 (Step 2 executes from wherever the arm is now).
-    invalidate_cached_lin_plan("a new LIN probe started");
-    last_planner_.clear();
-    // Apply a tight planning budget for the per-candidate feasibility
-    // probe so a single hard pose can't burn 20-30s. Restore the normal
-    // budget afterwards so the actual execution plan still has full time.
-    arm_group_.setPlanningTime(lin_feasibility_planning_time_);
-    arm_group_.setNumPlanningAttempts(lin_feasibility_attempts_);
-    if (use_pregrasp_staging_) {
-      bool staged_ok = false;
-      if (staging_mode_ == "cartesian" || staging_mode_ == "blend") {
-        std::string why;
-        staged_ok = false;
-        if (staging_mode_ == "cartesian") {
-          staged_ok = plan_cartesian_two_lines(target_pose, &why);
-          if (!staged_ok) {
-            RCLCPP_INFO(node_->get_logger(), "one-motion approach not planned (%s) — trying the blend.", why.c_str());
-          } else {
-            last_planner_ = "curve";
-          }
-        }
-        // A click outranks the rest of this chain (background check only).
-        auto yield_to_selection = [&]() {
-          if (!precheck_stop_requested()) { return false; }
-          if (reason) { *reason = "background check interrupted by a selection"; }
-          return true;
-        };
-        // The chain (Majd 2026-09-17): curve, blended lines, reject. The two
-        // separate lines are out (they need the same straight line the blend
-        // just failed to draw: 1 rescue in 85, at a crawl); the swing was
-        // deleted (0 of 28, 1.7 s per candidate); no PTP anywhere.
-        if (!staged_ok && !yield_to_selection()) {
-          staged_ok = plan_blended_two_lines(target_pose, &why);
-          if (!staged_ok) { RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — candidate rejected.", why.c_str()); }
-          else { last_planner_ = "blended lines"; }
-        }
-        if (!staged_ok && reason && reason->empty()) { *reason = why; }
-      } else {
-        staged_ok = can_reach_via_pregrasp(target_pose, reason);
-        if (staged_ok) { last_planner_ = "two lines"; }
-      }
-      arm_group_.setPlanningTime(planning_time_);
-      arm_group_.setNumPlanningAttempts(num_attempts_);
-      arm_group_.setStartStateToCurrentState();
-      return staged_ok;
-    }
     arm_group_.clearPoseTargets();
     arm_group_.setStartStateToCurrentState();
     arm_group_.setPlanningPipelineId("pilz_industrial_motion_planner");
@@ -4266,6 +4222,70 @@ private:
     arm_group_.setPlanningTime(planning_time_);
     arm_group_.setNumPlanningAttempts(num_attempts_);
     return ok;
+  }
+
+  bool can_plan_lin_pose(const geometry_msgs::msg::PoseStamped & target_pose, std::string * reason = nullptr)
+  {
+    // INVALIDATION: a new probe supersedes any earlier one. Candidate
+    // N-1's trajectory must never survive into candidate N — the poses
+    // differ and the guards would then be comparing against the wrong
+    // plan. Dropping it here also covers the staging branch below, which
+    // plans from the STAND-OFF state and so is never cacheable for
+    // Step 2 (Step 2 executes from wherever the arm is now).
+    invalidate_cached_lin_plan("a new LIN probe started");
+    last_planner_.clear();
+    // Apply a tight planning budget for the per-candidate feasibility
+    // probe so a single hard pose can't burn 20-30s. Restore the normal
+    // budget afterwards so the actual execution plan still has full time.
+    arm_group_.setPlanningTime(lin_feasibility_planning_time_);
+    arm_group_.setNumPlanningAttempts(lin_feasibility_attempts_);
+    if (use_pregrasp_staging_) {
+      bool staged_ok = false;
+      if (staging_mode_ == "cartesian" || staging_mode_ == "blend") {
+        std::string why;
+        staged_ok = false;
+        if (staging_mode_ == "cartesian") {
+          staged_ok = plan_cartesian_two_lines(target_pose, &why);
+          if (!staged_ok) {
+            RCLCPP_INFO(node_->get_logger(), "one-motion approach not planned (%s) — trying the blend.", why.c_str());
+          } else {
+            last_planner_ = "curve";
+          }
+        }
+        // A click outranks the rest of this chain (background check only).
+        auto yield_to_selection = [&]() {
+          if (!precheck_stop_requested()) { return false; }
+          if (reason) { *reason = "background check interrupted by a selection"; }
+          return true;
+        };
+        // The chain (Majd 2026-09-17): curve, blended lines, reject. The two
+        // separate lines are out (they need the same straight line the blend
+        // just failed to draw: 1 rescue in 85, at a crawl); the swing was
+        // deleted (0 of 28, 1.7 s per candidate); no PTP anywhere.
+        if (!staged_ok && !yield_to_selection()) {
+          staged_ok = plan_blended_two_lines(target_pose, &why);
+          if (!staged_ok) { RCLCPP_INFO(node_->get_logger(), "blend not planned (%s) — trying the direct line.", why.c_str()); }
+          else { last_planner_ = "blended lines"; }
+        }
+        if (!staged_ok && !yield_to_selection()) {
+          std::string why_lin;
+          staged_ok = plan_direct_lin(target_pose, &why_lin);
+          if (!staged_ok) {
+            RCLCPP_INFO(node_->get_logger(), "direct line not planned (%s) — candidate rejected.", why_lin.c_str());
+            why += "; direct line: " + why_lin;
+          } else { last_planner_ = "direct line"; }
+        }
+        if (!staged_ok && reason && reason->empty()) { *reason = why; }
+      } else {
+        staged_ok = can_reach_via_pregrasp(target_pose, reason);
+        if (staged_ok) { last_planner_ = "two lines"; }
+      }
+      arm_group_.setPlanningTime(planning_time_);
+      arm_group_.setNumPlanningAttempts(num_attempts_);
+      arm_group_.setStartStateToCurrentState();
+      return staged_ok;
+    }
+    return plan_direct_lin(target_pose, reason);
   }
 
   // ── Collision autopsy ─────────────────────────────────────────────
