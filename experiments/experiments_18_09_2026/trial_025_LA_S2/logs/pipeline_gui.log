@@ -1,0 +1,39 @@
+[run_grasp_pipeline_venv-1] [INFO] [1789743333.749437452] [yolo_live_select_grasp]: [identity] small_bottle 0.10 rejected (looks 0.27 like it)  (rejected so far 57)
+[run_grasp_pipeline_venv-1] [INFO] [1789743334.246673430] [yolo_live_select_grasp]: [perf] infer_fps=0.45, infer_ms_avg=1112.3, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789743336.585008259] [yolo_live_select_grasp]: [self-filter] dropped 2 detection(s) on the gripper: small_bottle 0.19 (99% gripper); small_bottle 0.12 (99% gripper)  (total 223)
+[run_grasp_pipeline_venv-1] [INFO] [1789743337.503446626] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-3).
+[run_grasp_pipeline_venv-1] [INFO] [1789743338.087732669] [yolo_live_select_grasp]: [perf] infer_fps=0.25, infer_ms_avg=2266.2, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789743340.437985544] [yolo_live_select_grasp]: [identity] small_bottle 0.13 rejected (looks 0.19 like it)  (rejected so far 59)
+[run_grasp_pipeline_venv-1] [INFO] [1789743340.618196889] [yolo_live_select_grasp]: [perf] infer_fps=0.40, infer_ms_avg=1473.3, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789743341.999056124] [yolo_live_select_grasp]: [self-filter] dropped 2 detection(s) on the gripper: small_bottle 0.20 (99% gripper); small_bottle 0.12 (99% gripper)  (total 227)
+[run_grasp_pipeline_venv-1] [INFO] [1789743342.700513661] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1789743343.057562939] [yolo_live_select_grasp]: [perf] infer_fps=0.42, infer_ms_avg=1348.9, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789743343.262048440] [yolo_live_select_grasp]: [prompt] You chose small_bottle.
+[run_grasp_pipeline_venv-1] [INFO] [1789743343.334949040] [yolo_live_select_grasp]: Selected index 0: small_bottle (by pointing)
+[run_grasp_pipeline_venv-1] [INFO] [1789743343.363412727] [yolo_live_select_grasp]: Published selection cycle_id=2 on '/graspgen/selection_cycle_id'.
+[run_grasp_pipeline_venv-1] [INFO] [1789743343.397581805] [yolo_live_select_grasp]: Published selected 'small_bottle' bbox=(172,274,242,414) | depth=yes (cached)
+[run_grasp_pipeline_venv-1] [INFO] [1789743344.321691649] [yolo_live_select_grasp]: Published 39 grasp candidates on '/graspgen/candidate_poses_base_link'.
+[run_grasp_pipeline_venv-1] [INFO] [1789743344.353516074] [yolo_live_select_grasp]: [viz] executor's ACTUAL pick bridged to viz frame 'camera_color_optical_frame' (ORANGE).
+[run_grasp_pipeline_venv-1] [INFO] [1789743346.342861777] [yolo_live_select_grasp]: [identity] small_bottle 0.14 rejected (looks 0.29 like it)  (rejected so far 61)
+[run_grasp_pipeline_venv-1] [INFO] [1789743346.477874386] [yolo_live_select_grasp]: [perf] infer_fps=0.29, infer_ms_avg=2049.8, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.222100322] [yolo_live_select_grasp]: [viz] best grasp approach·view = +0.96 -> FRONT approach (correct)
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.257876634] [yolo_live_select_grasp]: [viz] published grasp poses for viewer: 39 kept, 200 rejected (frame=camera_color_optical_frame)
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.295177954] [yolo_live_select_grasp]: [calib] executed pose = GraspGen pose × flipY × offset [+0.000, +0.000, +0.000] m (TCP frame), matrix_normalized=True
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.309467202] [yolo_live_select_grasp]: [fixed] grasp→tcp rotation: flipY
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.358699380] [yolo_live_select_grasp]: Published TCP grasp pose transformed to base_link
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.372861522] [yolo_live_select_grasp]: Source frame pose: t=(-0.079,0.071,0.388)
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.405387021] [yolo_live_select_grasp]: base_link pose: t=(0.192,-0.244,0.688)
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.406669923] [yolo_live_select_grasp]: Published TCP-aligned grasp pose (will republish continuously)
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.407947895] [yolo_live_select_grasp]: Best grasp score=0.306 @ t=(-0.079,0.071,0.388) frame=camera_color_optical_frame
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.414029045] [yolo_live_select_grasp]: [debug] Cloud centroid=(-0.074,0.066,0.381), Best grasp=(-0.079,0.071,0.388)
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.422553258] [yolo_live_select_grasp]: [precompute] HIT 'small_bottle' (age 165 s) -> published in 4.03 s
+[run_grasp_pipeline_venv-1] [INFO] [1789743347.441589270] [yolo_live_select_grasp]: Waiting for executor completion on '/grasp_executor_lin_llm/cycle_done' (cycle_id=2)...
+[run_grasp_pipeline_venv-1] [INFO] [1789743389.704172472] [yolo_live_select_grasp]: Received executor cycle status: done (cycle_id=2)
+[run_grasp_pipeline_venv-1] [INFO] [1789743389.757374988] [yolo_live_select_grasp]: Executor cycle complete: done.
+[run_grasp_pipeline_venv-1] [INFO] [1789743389.790451292] [yolo_live_select_grasp]: Resetting for next cycle...
+[run_grasp_pipeline_venv-1] [INFO] [1789743390.918497614] [yolo_live_select_grasp]: [self-filter] dropped 2 detection(s) on the gripper: small_bottle 0.19 (99% gripper); small_bottle 0.08 (99% gripper)  (total 231)
+[run_grasp_pipeline_venv-1] [INFO] [1789743391.830932811] [yolo_live_select_grasp]: [identity] small_bottle 0.06 rejected (looks 0.29 like it)  (rejected so far 62)
+[run_grasp_pipeline_venv-1] [INFO] [1789743391.911787717] [yolo_live_select_grasp]: [prompt] I see 4 objects: a vitamin_tube, a small_bottle, a vitamin_tube 2, a tape_dispenser. Point at one, click it in the window, or tell me which to pick.
+[run_grasp_pipeline_venv-1] [INFO] [1789743391.938693355] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1789743391.947408972] [yolo_live_select_grasp]: [perf] infer_fps=0.02, infer_ms_avg=776.1, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789743394.441753173] [yolo_live_select_grasp]: [perf] infer_fps=0.40, infer_ms_avg=1410.0, last_dets=4, detector_device=cuda

@@ -1,0 +1,14 @@
+# trial 021 started 2026-09-18T16:47:19.360298
+[  12.63s] You: Class for me, the vitamin tube.
+[  12.69s] Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+[  21.16s] Morty (status): Starting grasp on the vitamin tube.
+[  27.32s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  38.44s] You: Please drop it on the left side.
+[  38.53s] Morty (status): Going to drop left.
+[  44.23s] Morty (status): I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?
+[  53.93s] You: Yes, open the gripper.
+[  53.93s] Morty (status): Opening the gripper.
+[  57.54s] Morty (status): Should I go back home?
+[  63.44s] You: Go back home.
+[  63.53s] Morty (status): Going home.
+[  67.94s] Morty (status): Done — I'm back at the home position. What's next?

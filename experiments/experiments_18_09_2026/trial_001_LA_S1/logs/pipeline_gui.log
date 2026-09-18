@@ -1,0 +1,15 @@
+[run_grasp_pipeline_venv-1] [INFO] [1789741082.415727497] [yolo_live_select_grasp]: [perf] infer_fps=1.57, infer_ms_avg=369.5, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789741082.646186127] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1789741083.154370829] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1789741084.685168559] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: small_bottle 0.44 (99% gripper)  (total 167)
+[run_grasp_pipeline_venv-1] [INFO] [1789741085.364136718] [yolo_live_select_grasp]: [perf] infer_fps=0.34, infer_ms_avg=2237.3, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789741088.163460605] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-3).
+[run_grasp_pipeline_venv-1] [INFO] [1789741088.507721279] [yolo_live_select_grasp]: [perf] infer_fps=0.65, infer_ms_avg=774.4, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789741090.775410349] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: small_bottle 0.46 (99% gripper)  (total 171)
+[run_grasp_pipeline_venv-1] [INFO] [1789741091.290896430] [yolo_live_select_grasp]: [perf] infer_fps=0.70, infer_ms_avg=713.1, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789741093.347680152] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1789741093.870792390] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1789741094.335575960] [yolo_live_select_grasp]: [perf] infer_fps=0.67, infer_ms_avg=833.0, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789741096.408617077] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: small_bottle 0.48 (99% gripper)  (total 175)
+[run_grasp_pipeline_venv-1] [INFO] [1789741096.864987848] [yolo_live_select_grasp]: [perf] infer_fps=0.78, infer_ms_avg=709.6, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1789741098.923107693] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-3).

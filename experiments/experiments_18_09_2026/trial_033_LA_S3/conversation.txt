@@ -1,0 +1,6 @@
+# trial 033 started 2026-09-18T17:13:59.990170
+[   9.47s] You: Look at the left and the right side, then go back home.
+[  11.47s] Morty: Looking left, then right, then going home.
+[  46.14s] Morty (status): Could not reach the pose. the robot didn't reach pose 'detect_right' in time (30s)
+[  46.99s] Morty: I didn't catch that, could you repeat?
+[  49.10s] You: Now look right, Zainhol.

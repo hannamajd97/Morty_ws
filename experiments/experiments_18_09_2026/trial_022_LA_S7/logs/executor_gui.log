@@ -1,0 +1,10 @@
+[grasp_executor_lin_llm-1] [INFO] [1789742948.511716270] [grasp_executor_lin_llm]: [precheck] start: arm joints [130 -205 73 44 88 5] deg
+[grasp_executor_lin_llm-1] [INFO] [1789742948.513100356] [grasp_executor_lin_llm]: Wrist-twin rewrite disabled; preserving all pipeline TCP orientations.
+[grasp_executor_lin_llm-1] [INFO] [1789742948.601559020] [grasp_executor_lin_llm]: Pre-filter: 10/11 candidates have a quick IK solution; 1 demoted to the end of the probe order (none dropped; 39 untested: enough passed for the first batch). Sort by reachability: disabled.
+[grasp_executor_lin_llm-1] [INFO] [1789742948.601730292] [grasp_executor_lin_llm]: Evaluating candidate batch 1/5 (indices 1..10).
+[grasp_executor_lin_llm-1] [INFO] [1789742948.602112826] [grasp_executor_lin_llm]: Candidate 1/50 (orig=2) skipped: rejected by the background check already.
+[grasp_executor_lin_llm-1] [INFO] [1789742949.344094295] [grasp_executor_lin_llm]: Kept the probe's verified LIN plan (123 points, cost 0.74 s) so Step 2 does not have to recompute it.
+[grasp_executor_lin_llm-1] [INFO] [1789742949.344231074] [grasp_executor_lin_llm]: one-motion approach OK: 123 points, 1.22 s, bend into a straight 5 cm slide along the fingers' axis, scaling x1.00, planned in 0.74 s.
+[grasp_executor_lin_llm-1] [INFO] [1789742949.344382326] [grasp_executor_lin_llm]: Candidate 2/50 (orig=3, cost=2.000) is LIN-feasible; selecting it.
+[grasp_executor_lin_llm-1] [INFO] [1789742949.344568626] [grasp_executor_lin_llm]: Probe-plan cache dropped: kept in the background-check record instead.
+[grasp_executor_lin_llm-1] [INFO] [1789742949.344681520] [grasp_executor_lin_llm]: [precheck] set 7: candidate 3 of 50 is LIN-feasible (1 probed, 0.84 s) — verdict kept.

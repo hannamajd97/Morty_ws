@@ -1,0 +1,56 @@
+1
+00:00:05,970 --> 00:00:09,970
+You: Now grasp for me is a small bottle.
+
+2
+00:00:17,349 --> 00:00:21,349
+Morty (status): Starting grasp on the small bottle.
+
+3
+00:00:23,265 --> 00:00:27,265
+Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+
+4
+00:00:32,069 --> 00:00:36,069
+You: Objects, please drop it on the right side.
+
+5
+00:00:32,168 --> 00:00:36,168
+Morty (status): Going to drop right.
+
+6
+00:00:37,763 --> 00:00:41,763
+Morty (status): I'm at the drop right position, still holding the small bottle. Should I open the gripper?
+
+7
+00:00:47,465 --> 00:00:51,465
+You: open the gripper, give me the object.
+
+8
+00:00:47,666 --> 00:00:51,666
+Morty (status): Opening the gripper.
+
+9
+00:00:51,166 --> 00:00:55,166
+Morty (status): Should I go back home?
+
+10
+00:00:57,162 --> 00:01:01,162
+You: Yes, go back home now.
+
+11
+00:00:58,167 --> 00:01:02,167
+Morty: You're already home — the arm just returned there.
+
+12
+00:01:07,369 --> 00:01:11,369
+You: Go back home.
+
+13
+00:01:07,373 --> 00:01:11,373
+Morty (status): Going home.
+
+14
+00:01:11,894 --> 00:01:15,894
+Morty (status): Done — I'm back at the home position. What's next?
+

@@ -1,0 +1,15 @@
+[speech_input_node-4] [INFO] [1789741081.555766718] [speech_input_node]: Skipping low-energy buffer (rms=0.0054 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741083.087611550] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789741085.079574810] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'active' -> 'inactive'
+[intent_router_node-6] [INFO] [1789741085.130865105] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789741087.064867568] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'inactive' -> 'active'
+[speech_input_node-4] [INFO] [1789741089.401699968] [speech_input_node]: [timing] whisper 1.46s for 4.2s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789741089.404581628] [speech_input_node]: Heard: 'Hello Morty, what kind of object are you seeing right now?'
+[chat_node-7] User: User (voice): Hello Morty, what kind of object are you seeing right now?
+[speech_input_node-4] [INFO] [1789741090.639872813] [speech_input_node]: Skipping low-energy buffer (rms=0.0005 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789741091.450853040] [communication_llm_chat_node]: [timing] LLM main call 1.99s[0m
+[chat_node-7] Assistant: I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin on the table.
+[speak_action_server-3] [INFO] [1789741091.466187595] [speak_action_server]: Speak: 'I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin on the table.'
+[speech_input_node-4] [INFO] [1789741093.642749848] [speech_input_node]: Skipping low-energy buffer (rms=0.0055 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741095.809355312] [speech_input_node]: Skipping low-energy buffer (rms=0.0013 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741097.414796919] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.

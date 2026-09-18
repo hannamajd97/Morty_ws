@@ -1,0 +1,3 @@
+# trial 041 started 2026-09-18T17:18:36.623943
+[   6.07s] You: Please look at the right side and go back home.
+[   8.17s] Morty: Looking right, then going home.

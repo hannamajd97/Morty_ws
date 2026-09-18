@@ -1,0 +1,4 @@
+# trial 034 started 2026-09-18T17:15:32.244259
+[  13.55s] Morty (status): Looking left.
+[  15.64s] Morty (status): Going home.
+[  17.35s] You: Look at the lift, then go back home.

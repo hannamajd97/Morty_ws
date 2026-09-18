@@ -1,0 +1,28 @@
+[ur_ros2_control_node-7] [INFO] [1789744718.380210251] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [WARN] [1789744718.382383204] [UR_Client_Library:]: Connection attempt on port 50003 while maximum number of clients (1) is already connected. Closing connection.
+[ur_ros2_control_node-7] [INFO] [1789744718.383033919] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[ur_ros2_control_node-7] [INFO] [1789744718.517666393] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [INFO] [1789744718.525772739] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[ur_ros2_control_node-7] [INFO] [1789744719.144913564] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [WARN] [1789744719.145141061] [UR_Client_Library:]: Connection attempt on port 50003 while maximum number of clients (1) is already connected. Closing connection.
+[ur_ros2_control_node-7] [INFO] [1789744719.147169622] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[ur_ros2_control_node-7] [INFO] [1789744719.913736445] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [INFO] [1789744719.915269833] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[gripper_command_adapter-3] [WARN] [1789744719.989413685] [gripper_controller.gripper_command_adapter]: New subscription discovered on topic '/joint_states', requesting incompatible QoS. No messages will be sent to it. Last incompatible policy: DURABILITY
+[gripper_command_adapter-3] [INFO] [1789744721.153729128] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789744721.165580167] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [WARN] [1789744723.645393506] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1789744723.645540184] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1789744723.645825002] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[ur_ros2_control_node-7] [INFO] [1789744724.127005148] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1789744724.127187821] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1789744726.256594927] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789744726.266290166] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1789744728.139200241] [scaled_joint_trajectory_controller]: Goal reached, success!
+[ur_ros2_control_node-7] [INFO] [1789744728.820059524] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1789744728.820207720] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1789744731.360266857] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789744731.368237974] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1789744732.823593581] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1789744736.569553725] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789744736.578675589] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']

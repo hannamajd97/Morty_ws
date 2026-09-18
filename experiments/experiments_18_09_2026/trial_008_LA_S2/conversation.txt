@@ -1,0 +1,3 @@
+# trial 008 started 2026-09-18T16:18:25.105795
+[   5.17s] You: Crasp for me is a book.
+[   5.96s] Morty: I didn't catch that — could you repeat?

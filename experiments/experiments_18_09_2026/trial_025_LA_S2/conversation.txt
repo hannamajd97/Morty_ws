@@ -1,0 +1,7 @@
+# trial 025 started 2026-09-18T16:55:32.630186
+[   4.66s] You: Crust from me is a bottle.
+[  11.54s] Morty (status): Starting grasp on the small bottle.
+[  17.06s] Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+[  44.46s] You: Drop it on the right side and give me the object and go back home.
+[  53.15s] Morty (status): Opening the gripper.
+[  57.35s] Morty (status): Done — I'm back at the home position. What's next?

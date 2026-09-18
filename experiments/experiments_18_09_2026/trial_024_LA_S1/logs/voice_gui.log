@@ -1,0 +1,12 @@
+[intent_router_node-6] [INFO] [1789743312.606913160] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'active' -> 'inactive'
+[intent_router_node-6] [INFO] [1789743312.788084739] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789743314.654888716] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'inactive' -> 'active'
+[speech_input_node-4] [INFO] [1789743316.437430877] [speech_input_node]: [timing] whisper 0.91s for 6.3s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789743316.446757200] [speech_input_node]: Heard: 'Hello Morty, what kind of object are you seeing right now?'
+[chat_node-7] User (voice): Hello Morty, what kind of object are you seeing right now?
+[chat_node-7] [0m[INFO] [1789743318.841392244] [communication_llm_chat_node]: [timing] LLM main call 2.30s[0m
+[chat_node-7] Assistant: I can see a Vitamin C, a Multivitamin, a small bottle, and a tape dispenser on the table.
+[speak_action_server-3] [INFO] [1789743318.854764901] [speak_action_server]: Speak: 'I can see a Vitamin C, a Multivitamin, a small bottle, and a tape dispenser on the table.'
+[speech_input_node-4] [INFO] [1789743321.272342946] [speech_input_node]: Skipping low-energy buffer (rms=0.0039 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743322.144301630] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743326.342746776] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.

@@ -1,0 +1,75 @@
+{
+ "start_wall": 1789744716.6215649,
+ "stop_wall": 1789744737.1119492,
+ "stage_times": {
+  "intent_s": 0.991,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "planning_s": null,
+  "approach_s": null,
+  "grasp_s": null,
+  "wait_destination_s": null,
+  "transport_s": null,
+  "execution_s": null,
+  "click_to_motion_s": null,
+  "background_lead_s": null,
+  "total_s": null,
+  "planner": null,
+  "path": null
+ },
+ "selection_cycles": [],
+ "executor_cycles": [],
+ "background": [],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 2.315,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9550750851631165, \"bbox\": [31.279739379882812, 273.4547119140625, 108.85763549804688, 413.80096435546875], \"reach_pct\": 86.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.4, \"reach_closer_cm\": 1.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9452853798866272, "
+  },
+  {
+   "t": 6.049,
+   "source": "transcript",
+   "text": "Please look at the right side and go back home."
+  },
+  {
+   "t": 7.04,
+   "source": "intent",
+   "text": "{\"action_intent\":\"look_right\",\"object_intent\":null,\"object_attributes\":null}"
+  },
+  {
+   "t": 8.116,
+   "source": "morty_said",
+   "text": "Looking right, then going home."
+  },
+  {
+   "t": 9.294,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9533571004867554, \"bbox\": [31.212486267089844, 273.4876403808594, 108.862060546875, 413.69085693359375], \"reach_pct\": 86.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.4, \"reach_closer_cm\": 1.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9452164769172668, \"b"
+  },
+  {
+   "t": 13.069,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.945637047290802, \"bbox\": [197.8091583251953, 191.3958740234375, 258.458740234375, 413.07275390625], \"reach_pct\": 83.3, \"reach_state\": \"green\", \"reach_angle_deg\": 18.8, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.929581880569458,"
+  },
+  {
+   "t": 15.142,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9253411293029785, \"bbox\": [211.37155151367188, 261.28863525390625, 280.2820739746094, 460.4824523925781], \"reach_pct\": 88.1, \"reach_state\": \"orange\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 2.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"blue\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.73759144544"
+  },
+  {
+   "t": 19.297,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9520002007484436, \"bbox\": [405.55126953125, 177.42282104492188, 459.2424621582031, 405.9066162109375], \"reach_pct\": 87.9, \"reach_state\": \"orange\", \"reach_angle_deg\": 26.0, \"reach_closer_cm\": 2.4, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"purple\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.94686388969421"
+  },
+  {
+   "t": 20.49,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+[intent_router_node-6] [INFO] [1789744170.886937346] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'active' -> 'inactive'
+[intent_router_node-6] [INFO] [1789744170.914133802] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789744172.659403206] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'inactive' -> 'active'
+[speech_input_node-4] [INFO] [1789744175.741117757] [speech_input_node]: Skipping low-energy buffer (rms=0.0011 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789744177.170962902] [communication_llm_chat_node]: Pointed-object update: 'small bottle'[0m
+[chat_node-7] [0m[INFO] [1789744177.700783142] [communication_llm_chat_node]: Pointed-object update: '<none>'[0m
+[chat_node-7] [0m[INFO] [1789744178.214566323] [communication_llm_chat_node]: Pointed-object update: 'small bottle'[0m
+[chat_node-7] [0m[INFO] [1789744178.267125004] [communication_llm_chat_node]: Pointed-object update: '<none>'[0m
+[chat_node-7] [0m[INFO] [1789744178.389846091] [communication_llm_chat_node]: Pointed-object update: 'small bottle'[0m
+[speech_input_node-4] [INFO] [1789744179.314850690] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789744181.057350425] [intent_router_node]: Selected detection: label='small_bottle' (updating _last_target_label for narration).
+[intent_router_node-6] [INFO] [1789744181.668273203] [intent_router_node]: cycle_id=6 (target='small bottle') — narrating start
+[speak_action_server-3] [INFO] [1789744181.678542196] [speak_action_server]: Speak: 'Starting grasp on the small bottle.'
+[speech_input_node-4] [INFO] [1789744184.132818379] [speech_input_node]: Skipping low-energy buffer (rms=0.0030 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744184.862999929] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789744187.060647379] [intent_router_node]: Held-object memory: 'small_bottle'
+[speak_action_server-3] [INFO] [1789744187.068984102] [speak_action_server]: Speak: 'Got the small bottle. Where should I drop it? Left, right, or home?'
+[chat_node-7] [0m[INFO] [1789744187.170728771] [communication_llm_chat_node]: Held-object update: '' -> 'small_bottle'[0m
+[speech_input_node-4] [INFO] [1789744188.976043605] [speech_input_node]: Skipping low-energy buffer (rms=0.0042 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744191.376400376] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744198.231552735] [speech_input_node]: [timing] whisper 0.85s for 3.4s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744198.234530526] [speech_input_node]: Heard: 'Objects. Drop it on home position.'
+[chat_node-7] User (voice): Objects. Drop it on home position.
+[chat_node-7] [0m[INFO] [1789744198.240128681] [communication_llm_chat_node]: FAST: matched 'Objects. Drop it on home position.' -> go_home (speed=default); published {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1789744198.245296373] [communication_llm_chat_node]: [timing] handled in 0.01s (route=PAUSE-ANSWER go_home)[0m
+[intent_router_node-6] [INFO] [1789744198.246119209] [intent_router_node]: Resume 'home' published (bypass queue (pick paused): plain 'go_home').
+[speak_action_server-3] [INFO] [1789744198.264166960] [speak_action_server]: Speak: 'Going home.'
+[speech_input_node-4] [INFO] [1789744201.655389631] [speech_input_node]: Skipping low-energy buffer (rms=0.0081 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744202.987930803] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789744204.831609085] [intent_router_node]: Held-object memory: 'small_bottle'
+[speak_action_server-3] [INFO] [1789744204.840047345] [speak_action_server]: Speak: "I'm at the home position, still holding the small bottle. Should I open the gripper?"
+[speech_input_node-4] [INFO] [1789744208.026514042] [speech_input_node]: Skipping low-energy buffer (rms=0.0030 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744209.495443497] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744213.417126015] [speech_input_node]: [timing] whisper 0.80s for 2.6s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744213.418779848] [speech_input_node]: Word-time echo cut: removed 1 word(s) spoken while Morty's speaker was sounding ('Yes,'); kept 'open the gripper.'
+[speech_input_node-4] [INFO] [1789744213.420372193] [speech_input_node]: Heard: 'open the gripper.'
+[chat_node-7] User (voice): open the gripper.
+[chat_node-7] [0m[INFO] [1789744213.422747099] [communication_llm_chat_node]: FAST: matched 'open the gripper.' -> open_gripper (speed=default); published {"action_intent":"open_gripper","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1789744213.423631350] [communication_llm_chat_node]: Withholding pre-emptive narration 'Opening the gripper.' for 'open_gripper' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[intent_router_node-6] [INFO] [1789744213.423961584] [intent_router_node]: Resume 'release' published (bypass queue (release paused): open_gripper).
+[chat_node-7] [0m[INFO] [1789744213.424513004] [communication_llm_chat_node]: [timing] handled in 0.00s (route=FAST open_gripper)[0m
+[speak_action_server-3] [INFO] [1789744213.442980646] [speak_action_server]: Speak: 'Opening the gripper.'
+[chat_node-7] [0m[INFO] [1789744214.192431129] [communication_llm_chat_node]: Held-object update: 'small_bottle' -> ''[0m
+[intent_router_node-6] [INFO] [1789744214.192675755] [intent_router_node]: Held-object memory: ''
+[intent_router_node-6] [INFO] [1789744215.602148656] [intent_router_node]: cycle_done received: 'done|6' (outcome=done)
+[intent_router_node-6] [INFO] [1789744215.604218636] [intent_router_node]: Grasp cycle completed successfully.
+[intent_router_node-6] [INFO] [1789744215.607720022] [intent_router_node]: Held-object memory: ''
+[speak_action_server-3] [INFO] [1789744215.608990148] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[intent_router_node-6] [INFO] [1789744215.626211644] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[speak_action_server-3] [INFO] [1789744215.824765579] [speak_action_server]: Speak: "I'm at the home position. What's next?"
+[speech_input_node-4] [INFO] [1789744216.672669736] [speech_input_node]: Skipping low-energy buffer (rms=0.0005 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744217.855623578] [speech_input_node]: Skipping low-energy buffer (rms=0.0020 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789744218.217183674] [communication_llm_chat_node]: Pointed-object update: '<none>'[0m
+[speech_input_node-4] [INFO] [1789744221.542299149] [speech_input_node]: Skipping low-energy buffer (rms=0.0013 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744224.052080412] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744233.330503263] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.

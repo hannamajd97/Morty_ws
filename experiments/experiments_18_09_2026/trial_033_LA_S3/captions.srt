@@ -1,0 +1,20 @@
+1
+00:00:09,471 --> 00:00:13,471
+You: Look at the left and the right side, then go back home.
+
+2
+00:00:11,471 --> 00:00:15,471
+Morty: Looking left, then right, then going home.
+
+3
+00:00:46,141 --> 00:00:50,141
+Morty (status): Could not reach the pose. the robot didn't reach pose 'detect_right' in time (30s)
+
+4
+00:00:46,994 --> 00:00:50,994
+Morty: I didn't catch that, could you repeat?
+
+5
+00:00:49,104 --> 00:00:53,104
+You: Now look right, Zainhol.
+

@@ -1,0 +1,13 @@
+[speech_input_node-4] [INFO] [1789741195.071940223] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741195.883889758] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741200.227266672] [speech_input_node]: [timing] whisper 0.86s for 2.6s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789741200.230605543] [speech_input_node]: Heard: 'Pick up for me the book.'
+[chat_node-7] User (voice): Pick up for me the book.
+[chat_node-7] [0m[INFO] [1789741200.234892366] [communication_llm_chat_node]: [timing] pruned 8 stale message(s) from the LLM context (17 -> 9)[0m
+[speech_input_node-4] [INFO] [1789741200.576018342] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789741201.141901590] [communication_llm_chat_node]: [timing] LLM main call 0.90s[0m
+[chat_node-7] Assistant: I don't see a book on the table. I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin. Would you like me to pick up one of those instead?
+[speak_action_server-3] [INFO] [1789741201.158747931] [speak_action_server]: Speak: "I don't see a book on the table. I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin. Would you like me to pick up one of those instead?"
+[speech_input_node-4] [INFO] [1789741203.594895430] [speech_input_node]: Skipping low-energy buffer (rms=0.0041 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741205.617526259] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789741207.442313198] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.

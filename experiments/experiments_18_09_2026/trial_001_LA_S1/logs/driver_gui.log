@@ -1,0 +1,16 @@
+[ur_ros2_control_node-7] [INFO] [1789741082.623608602] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [WARN] [1789741082.624026615] [UR_Client_Library:]: Connection attempt on port 50003 while maximum number of clients (1) is already connected. Closing connection.
+[ur_ros2_control_node-7] [INFO] [1789741082.627239007] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[ur_ros2_control_node-7] [INFO] [1789741083.179633753] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [INFO] [1789741083.183216382] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[ur_ros2_control_node-7] [INFO] [1789741083.329038302] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [INFO] [1789741083.333162528] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[ur_ros2_control_node-7] [WARN] [1789741083.611789894] [UR_Client_Library:]: Connection attempt on port 50003 while maximum number of clients (1) is already connected. Closing connection.
+[ur_ros2_control_node-7] [INFO] [1789741083.612617591] [UR_Client_Library:]: Connection to reverse interface dropped.
+[ur_ros2_control_node-7] [INFO] [1789741083.618633679] [UR_Client_Library:]: Robot connected to reverse interface. Ready to receive control commands.
+[gripper_command_adapter-3] [INFO] [1789741086.223524204] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789741086.229462002] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1789741091.424716884] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789741091.428197453] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1789741096.429237418] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1789741096.434020159] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']

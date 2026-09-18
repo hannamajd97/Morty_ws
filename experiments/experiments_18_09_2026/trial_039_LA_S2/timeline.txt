@@ -1,0 +1,9 @@
+TRIAL TIMELINE  start 2026-09-18 17:17:46  stop 17:18:06  (20.2 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +8.74  you said: "Can you give me the screwdriver?"
+t=   +9.57  Morty said: "I don't see a screwdriver on the table — only a small bottle, two vitamin tubes,"
+t=  +20.17  trial stop
+
+SUMMARY

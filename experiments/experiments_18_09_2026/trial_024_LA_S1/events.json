@@ -1,0 +1,66 @@
+{
+ "timings": {
+  "intent_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "execution_s": null,
+  "total_s": null
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.347,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.944227933883667, \"bbox\": [172.40582275390625, 274.3670959472656, 243.23509216308594, 413.8416748046875], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.5, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9442192316055298, \"b"
+  },
+  {
+   "t": 3.802,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9445088505744934, \"bbox\": [172.3035888671875, 274.3499755859375, 243.23915100097656, 413.7469177246094], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.5, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9445077776908875, \"b"
+  },
+  {
+   "t": 6.363,
+   "source": "transcript",
+   "text": "Hello Morty, what kind of object are you seeing right now?"
+  },
+  {
+   "t": 6.647,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9446215629577637, \"bbox\": [2.2292041778564453, 181.23922729492188, 70.05340576171875, 409.0061340332031], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.3, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9444936513900"
+  },
+  {
+   "t": 8.766,
+   "source": "morty_said",
+   "text": "I can see a Vitamin C, a Multivitamin, a small bottle, and a tape dispenser on the table."
+  },
+  {
+   "t": 8.788,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9443888068199158, \"bbox\": [172.40049743652344, 274.2906799316406, 243.28988647460938, 413.73736572265625], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.5, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9441759586334229, "
+  },
+  {
+   "t": 11.553,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9446337223052979, \"bbox\": [2.2373695373535156, 181.235107421875, 70.01578521728516, 408.9718322753906], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.3, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.944483816623687"
+  },
+  {
+   "t": 13.959,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9454723596572876, \"bbox\": [172.32534790039062, 274.24365234375, 243.43719482421875, 413.6894836425781], \"reach_pct\": 85.6, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.5, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9443272352218628, \"bb"
+  },
+  {
+   "t": 16.891,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9450705647468567, \"bbox\": [172.3185577392578, 274.2087707519531, 243.24880981445312, 413.6584167480469], \"reach_pct\": 85.5, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.4, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9444818496704102, \"b"
+  },
+  {
+   "t": 18.287,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

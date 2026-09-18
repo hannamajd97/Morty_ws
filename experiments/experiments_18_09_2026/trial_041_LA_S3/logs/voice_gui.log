@@ -1,0 +1,31 @@
+[intent_router_node-6] [INFO] [1789744720.690455595] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'active' -> 'inactive'
+[intent_router_node-6] [INFO] [1789744720.783220533] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[speech_input_node-4] [INFO] [1789744722.461800593] [speech_input_node]: [timing] whisper 0.86s for 4.0s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744722.467554899] [speech_input_node]: Heard: 'Please look at the right side and go back home.'
+[chat_node-7] User (voice): Please look at the right side and go back home.
+[chat_node-7] [0m[INFO] [1789744722.475237336] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (48 -> 39)[0m
+[intent_router_node-6] [INFO] [1789744722.812374342] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'inactive' -> 'active'
+[speech_input_node-4] [INFO] [1789744723.449106324] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789744723.577474419] [intent_router_node]: Queued intent 'look_right'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1789744723.580193499] [intent_router_node]: dispatching: action='look_right', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1789744723.589258678] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[chat_node-7] [0m[INFO] [1789744723.593502338] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_right","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1789744723.604142158] [intent_router_node]: Sending MoveToNamedPose -> 'detect_right' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1789744723.613156909] [communication_llm_chat_node]: [timing] intent dispatched 1.11s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1789744723.674056850] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1789744723.685263173] [communication_llm_chat_node]: [timing] intent dispatched 1.19s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1789744723.709934534] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[chat_node-7] [0m[INFO] [1789744723.711860575] [communication_llm_chat_node]: [timing] LLM main call 1.21s[0m
+[intent_router_node-6] [INFO] [1789744723.762586516] [intent_router_node]: Queued intent 'go_home'; queue size now 1, busy=True
+[chat_node-7] [0m[INFO] [1789744724.622200524] [communication_llm_chat_node]: [timing] LLM follow-up call 0.91s[0m
+[chat_node-7] Assistant: Looking right, then going home.
+[speak_action_server-3] [INFO] [1789744724.634877493] [speak_action_server]: Speak: 'Looking right, then going home.'
+[speech_input_node-4] [INFO] [1789744726.825683750] [speech_input_node]: Skipping low-energy buffer (rms=0.0021 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789744728.211089567] [communication_llm_chat_node]: Current pose update: '' -> 'detect_right'[0m
+[intent_router_node-6] [INFO] [1789744728.220598834] [intent_router_node]: MoveToNamedPose completed.
+[intent_router_node-6] [INFO] [1789744728.224257228] [intent_router_node]: dispatching: action='go_home', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1789744728.230929831] [intent_router_node]: Sending MoveToNamedPose -> 'home' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1789744728.236043131] [communication_llm_chat_node]: Current pose update: 'detect_right' -> ''[0m
+[speech_input_node-4] [INFO] [1789744732.637172991] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789744732.890723978] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[intent_router_node-6] [INFO] [1789744732.898578802] [intent_router_node]: MoveToNamedPose completed.

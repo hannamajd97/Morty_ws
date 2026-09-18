@@ -1,0 +1,48 @@
+TRIAL TIMELINE  start 2026-09-18 16:55:32  stop 16:56:34  (61.8 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -149.92  background: GraspGen for 'small_bottle' done (job 4.11 s, 39 grasps)
+t= -147.79  background: 'small_bottle' verified for execution via the curve (executor probe 0.74 s, 1 tried)
+t=   +0.00  trial start
+t=   +4.60  you said: "Crust from me is a bottle."
+t=   +5.88  intent: pick small_bottle
+t=  +10.76  pipeline: 'small_bottle' precomputed — GraspGen ran 160.5 s before the click (job 4.11 s), executor verified it via the curve (probe 0.74 s)
+t=  +10.86  selection cycle 2 started
+t=  +11.43  Morty said: "Starting grasp on the small bottle."
+t=  +11.59  pipeline: 39 candidates published (0.99 s after the click, precomputed)
+t=  +11.60  executor: candidates received
+t=  +11.60  executor: precheck hit (+0.00 s)
+t=  +11.73  probe: grasp 2/39: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +11.81  executor: open sent (+0.21 s)
+t=  +11.81  executor: motion start (+0.00 s)
+t=  +13.91  executor: close sent (+2.10 s)
+t=  +14.44  executor: arrival (+0.52 s)
+t=  +15.44  executor: grasp verdict (+1.01 s)
+t=  +16.62  executor: lift done (+1.18 s)
+t=  +16.89  executor: wait destination start (+0.26 s)
+t=  +17.02  Morty said: "Got the small bottle. Where should I drop it? Left, right, or home?"
+t=  +44.26  executor: destination received (+27.38 s)
+t=  +44.37  intent: drop_right_release_home
+t=  +44.38  you said: "Drop it on the right side and give me the object and go back home."
+t=  +50.68  executor: released (+6.41 s)
+t=  +53.04  Morty said: "Opening the gripper."
+t=  +55.66  executor: home done (+4.99 s)
+t=  +57.04  executor: cycle done (+1.38 s)
+t=  +57.04  executor: cycle 2 done via the curve
+t=  +57.26  Morty said: "Done — I'm back at the home position. What's next?"
+t=  +57.28  executor reported: done|2
+t=  +61.84  trial stop
+
+SUMMARY
+  speech -> intent                              1.28 s
+  click -> perception done                      0.99 s
+  GraspGen at the click (0 = precomputed)       0.00 s
+  precomputed this long before the click      160.51 s
+  executor: candidates -> motion start          0.21 s
+  click -> motion start                         1.22 s
+  approach                                      2.63 s
+  arrival -> grasp verdict                      1.01 s
+  waiting for the drop side                    27.38 s
+  motion start -> home                         45.23 s
+  total                                        52.44 s
+  approach planned by                        curve (precomputed)

@@ -1,0 +1,4 @@
+# trial 039 started 2026-09-18T17:17:46.664784
+[   8.82s] You: Can you give me the screwdriver?
+[   9.63s] Morty (status): I don't see a screwdriver on the table — only a small bottle, two vitamin tubes, and a tape dispenser.
+[  12.66s] Morty: I don't see a screwdriver on the table — only a small bottle, two vitamin tubes, and a tape dispenser.

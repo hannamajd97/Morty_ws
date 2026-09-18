@@ -1,0 +1,22 @@
+[intent_router_node-6] [INFO] [1789744604.683866672] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789744606.989512476] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789744609.013166843] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789744610.847140320] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'inactive' -> 'active'
+[speech_input_node-4] [INFO] [1789744610.958750765] [speech_input_node]: [timing] whisper 1.01s for 4.2s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744610.965396806] [speech_input_node]: Heard: 'Pick up for me the smartphone.'
+[chat_node-7] User (voice): Pick up for me the smartphone.
+[chat_node-7] [0m[INFO] [1789744610.979479571] [communication_llm_chat_node]: [timing] pruned 11 stale message(s) from the LLM context (52 -> 41)[0m
+[chat_node-7] [0m[INFO] [1789744611.753260173] [communication_llm_chat_node]: [timing] LLM main call 0.77s[0m
+[chat_node-7] Assistant: I didn't catch that, could you repeat?
+[speak_action_server-3] [INFO] [1789744611.764012908] [speak_action_server]: Speak: "I didn't catch that, could you repeat?"
+[speech_input_node-4] [INFO] [1789744614.321604928] [speech_input_node]: Skipping low-energy buffer (rms=0.0076 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744616.779517776] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744622.173415029] [speech_input_node]: [timing] whisper 0.94s for 3.8s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744622.180911562] [speech_input_node]: Heard: 'Can you pick up for me the smartphone?'
+[chat_node-7] User (voice): Can you pick up for me the smartphone?
+[chat_node-7] [0m[INFO] [1789744622.233483684] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (50 -> 40)[0m
+[chat_node-7] [0m[INFO] [1789744623.392096419] [communication_llm_chat_node]: [timing] LLM main call 1.15s[0m
+[chat_node-7] Assistant: I don't see a smartphone on the table — only a small bottle, two vitamin tubes, and a tape dispenser.
+[speak_action_server-3] [INFO] [1789744623.401523302] [speak_action_server]: Speak: "I don't see a smartphone on the table — only a small bottle, two vitamin tubes, and a tape dispenser."
+[speech_input_node-4] [INFO] [1789744626.709551915] [speech_input_node]: Skipping low-energy buffer (rms=0.0047 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744628.782298020] [speech_input_node]: Skipping low-energy buffer (rms=0.0017 < min=0.0250); likely background noise / distant speech.

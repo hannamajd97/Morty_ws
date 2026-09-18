@@ -1,0 +1,5 @@
+# trial 037 started 2026-09-18T17:16:44.646431
+[   6.65s] You: Pick up for me the smartphone.
+[   7.25s] Morty: I didn't catch that, could you repeat?
+[  17.76s] You: Can you pick up for me the smartphone?
+[  18.95s] Morty: I don't see a smartphone on the table — only a small bottle, two vitamin tubes, and a tape dispenser.

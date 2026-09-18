@@ -1,0 +1,60 @@
+TRIAL TIMELINE  start 2026-09-18 17:05:02  stop 17:06:32  (90.3 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -712.56  background: GraspGen for 'vitamin_tube' done (job 2.59 s, 39 grasps)
+t= -708.59  background: 'vitamin_tube' verified for execution via the curve (executor probe 3.32 s, 2 tried)
+t= -708.04  background: GraspGen for 'vitamin_tube' done (job 4.00 s, 40 grasps)
+t= -706.34  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.75 s, 1 tried)
+t= -449.54  background: GraspGen for 'vitamin_tube' done (job 3.42 s, 39 grasps)
+t= -447.81  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.02 s, 1 tried)
+t=   +0.00  trial start
+t=   +9.42  you said: "Crasp for me is a vitamin tube."
+t=  +10.40  Morty said: "I see two vitamin tubes. Could you say leftmost or rightmost, or point at the on"
+t=  +10.41  intent: pick vitamin_tube
+t=  +22.59  you said: "The rightmost vitamin tube."
+t=  +23.50  Morty said: "Picking the rightmost Multivitamin."
+t=  +23.52  intent: pick vitamin_tube
+t=  +24.11  pipeline: 'vitamin_tube' precomputed — GraspGen ran 472.5 s before the click (job 3.42 s), executor verified it via the curve (probe 1.02 s)
+t=  +24.21  selection cycle 4 started
+t=  +24.82  pipeline: 39 candidates published (1.89 s after the click, precomputed)
+t=  +24.83  executor: candidates received
+t=  +24.83  executor: precheck hit (+0.00 s)
+t=  +24.99  probe: grasp 1/39: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +25.04  executor: open sent (+0.21 s)
+t=  +25.04  executor: motion start (+0.00 s)
+t=  +26.96  Morty said: "Starting grasp on the vitamin tube."
+t=  +27.14  executor: close sent (+2.11 s)
+t=  +27.69  executor: arrival (+0.55 s)
+t=  +28.76  executor: grasp verdict (+1.08 s)
+t=  +30.01  executor: lift done (+1.25 s)
+t=  +30.30  executor: wait destination start (+0.29 s)
+t=  +30.47  Morty said: "Got the vitamin tube. Where should I drop it? Left, right, or home?"
+t=  +39.86  executor: destination received (+9.56 s)
+t=  +39.92  intent: drop_left
+t=  +39.94  you said: "Drop it on the left side."
+t=  +43.02  Morty said: "Going to drop left."
+t=  +45.81  Morty said: "I'm at the drop left position, still holding the vitamin tube. Should I open the"
+t=  +56.85  Morty said: "Opening the gripper."
+t=  +56.86  intent: release_home
+t=  +56.87  you said: "gripper, give me the object, then go back home."
+t=  +57.27  executor: released (+17.41 s)
+t=  +62.35  executor: home done (+5.08 s)
+t=  +63.73  executor: cycle done (+1.38 s)
+t=  +63.73  executor: cycle 4 done via the curve
+t=  +63.88  Morty said: "Done — I'm back at the home position. What's next?"
+t=  +63.90  executor reported: done|4
+t=  +90.32  trial stop
+
+SUMMARY
+  speech -> intent                              0.99 s
+  click -> perception done                      1.89 s
+  GraspGen at the click (0 = precomputed)       0.00 s
+  precomputed this long before the click      472.47 s
+  executor: candidates -> motion start          0.21 s
+  click -> motion start                         2.11 s
+  approach                                      2.65 s
+  arrival -> grasp verdict                      1.08 s
+  waiting for the drop side                     9.56 s
+  motion start -> home                         38.69 s
+  total                                        54.31 s
+  approach planned by                        curve (precomputed)

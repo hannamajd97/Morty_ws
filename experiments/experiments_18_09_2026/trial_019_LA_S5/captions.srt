@@ -1,0 +1,36 @@
+1
+00:00:05,852 --> 00:00:09,852
+You: Class for me is a vitamin tube.
+
+2
+00:00:06,033 --> 00:00:10,033
+Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+
+3
+00:00:16,682 --> 00:00:20,682
+You: The rightmost vitamin tube.
+
+4
+00:00:20,895 --> 00:00:24,895
+Morty (status): Picking the rightmost Multivitamin.
+
+5
+00:00:21,186 --> 00:00:25,186
+Morty (status): Starting grasp on the vitamin tube.
+
+6
+00:00:24,694 --> 00:00:28,694
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+7
+00:00:37,725 --> 00:00:41,725
+You: drop it on the right side, then open the gripper, then go back home.
+
+8
+00:00:43,592 --> 00:00:47,592
+Morty (status): Opening the gripper.
+
+9
+00:00:50,596 --> 00:00:54,596
+Morty (status): Done — I'm back at the home position. What's next?
+

@@ -1,0 +1,13 @@
+# trial 028 started 2026-09-18T17:05:02.496390
+[   9.48s] You: Crasp for me is a vitamin tube.
+[  10.50s] Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+[  22.69s] You: The rightmost vitamin tube.
+[  23.65s] Morty (status): Picking the rightmost Multivitamin.
+[  26.98s] Morty (status): Starting grasp on the vitamin tube.
+[  30.59s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  39.99s] You: Drop it on the left side.
+[  43.19s] Morty (status): Going to drop left.
+[  45.89s] Morty (status): I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?
+[  56.88s] You: gripper, give me the object, then go back home.
+[  56.89s] Morty (status): Opening the gripper.
+[  63.99s] Morty (status): Done — I'm back at the home position. What's next?

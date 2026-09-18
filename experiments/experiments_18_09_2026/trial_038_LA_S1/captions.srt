@@ -1,0 +1,8 @@
+1
+00:00:08,939 --> 00:00:12,939
+Morty: I see a small bottle, two vitamin tubes, and a tape dispenser.
+
+2
+00:00:10,433 --> 00:00:14,433
+You: Objects, what kind of object are you seeing right now? Objects, what kind of object are you seeing right now?
+

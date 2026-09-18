@@ -1,0 +1,10 @@
+[chat_node-7] [0m[INFO] [1789744646.487867532] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1789744651.738669224] [speech_input_node]: [timing] whisper 1.02s for 4.4s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744651.743152456] [speech_input_node]: Heard: 'Objects, what kind of object are you seeing right now? Objects, what kind of object are you seeing right now?'
+[chat_node-7] User (voice): Objects, what kind of object are you seeing right now? Objects, what kind of object are you seeing right now?
+[chat_node-7] [0m[INFO] [1789744651.746207525] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (49 -> 39)[0m
+[chat_node-7] [0m[INFO] [1789744653.063078145] [communication_llm_chat_node]: [timing] LLM main call 1.31s[0m
+[chat_node-7] Assistant: I see a small bottle, two vitamin tubes, and a tape dispenser.
+[speak_action_server-3] [INFO] [1789744653.076956795] [speak_action_server]: Speak: 'I see a small bottle, two vitamin tubes, and a tape dispenser.'
+[speech_input_node-4] [INFO] [1789744654.991644873] [speech_input_node]: Skipping low-energy buffer (rms=0.0060 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744656.279695758] [speech_input_node]: Skipping low-energy buffer (rms=0.0006 < min=0.0250); likely background noise / distant speech.

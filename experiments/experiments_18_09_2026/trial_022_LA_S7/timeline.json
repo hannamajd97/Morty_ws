@@ -1,0 +1,45 @@
+{
+ "start_wall": 1789742947.617458,
+ "stop_wall": 1789742951.4554935,
+ "stage_times": {
+  "intent_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "planning_s": null,
+  "approach_s": null,
+  "grasp_s": null,
+  "wait_destination_s": null,
+  "transport_s": null,
+  "execution_s": null,
+  "click_to_motion_s": null,
+  "background_lead_s": null,
+  "total_s": null,
+  "planner": null,
+  "path": null
+ },
+ "selection_cycles": [],
+ "executor_cycles": [],
+ "background": [],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.057,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9425112009048462, \"bbox\": [2.189441680908203, 181.1968994140625, 69.72097778320312, 409.0024108886719], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.3, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9248939752578"
+  },
+  {
+   "t": 2.276,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.942460298538208, \"bbox\": [2.2341842651367188, 181.1393585205078, 69.75067138671875, 408.8825378417969], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.3, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9242725372314"
+  },
+  {
+   "t": 3.838,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

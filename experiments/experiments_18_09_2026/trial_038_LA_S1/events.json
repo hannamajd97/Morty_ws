@@ -1,0 +1,36 @@
+{
+ "timings": {
+  "intent_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "execution_s": null,
+  "total_s": null
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 2.424,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9535057544708252, \"bbox\": [31.188472747802734, 273.4547424316406, 108.83902740478516, 413.73651123046875], \"reach_pct\": 86.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 23.4, \"reach_closer_cm\": 1.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9451507329940796, "
+  },
+  {
+   "t": 8.79,
+   "source": "morty_said",
+   "text": "I see a small bottle, two vitamin tubes, and a tape dispenser."
+  },
+  {
+   "t": 10.437,
+   "source": "transcript",
+   "text": "Objects, what kind of object are you seeing right now? Objects, what kind of object are you seeing right now?"
+  },
+  {
+   "t": 15.612,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

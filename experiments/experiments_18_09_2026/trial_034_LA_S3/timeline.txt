@@ -1,0 +1,12 @@
+TRIAL TIMELINE  start 2026-09-18 17:15:32  stop 17:15:58  (26.1 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=  +12.57  intent: look_left
+t=  +12.69  intent: go_home
+t=  +13.48  Morty said: "Looking left."
+t=  +15.55  Morty said: "Going home."
+t=  +17.30  you said: "Look at the lift, then go back home."
+t=  +26.15  trial stop
+
+SUMMARY

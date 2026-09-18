@@ -1,0 +1,29 @@
+{
+  "Trial ID": "033",
+  "Date": "2026-09-18",
+  "Scenario": "S3: Moving without grasping",
+  "Modifiers": "M1",
+  "Level": "L1 single-step, explicit",
+  "Stage Times": {
+    "intent_s": 1.104,
+    "yolo_s": null,
+    "graspgen_s": null,
+    "execution_s": null,
+    "total_s": null
+  },
+  "Task ID": "",
+  "Scene Layout": "Layout A",
+  "Command Used": "Look at the left and the right side, then go back home.",
+  "Intended Target": "\u2014",
+  "Intended Destination": "\u2014",
+  "User Intent understood correctly?": "yes",
+  "Object Detected?": "",
+  "Correct Object Selected?": "",
+  "Grasp Success?": "",
+  "Action Executed Correctly?": "",
+  "Full Task Success?": "",
+  "Interaction Time (s)": "1.104",
+  "Total Time (s)": "",
+  "Failure Category / Notes": "",
+  "bag": "/home/deep/morty_ws/experiments/experiments_18_09_2026/trial_033_LA_S3/bag"
+}

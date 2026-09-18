@@ -1,0 +1,52 @@
+TRIAL TIMELINE  start 2026-09-18 17:09:28  stop 17:10:40  (71.4 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -985.90  background: GraspGen for 'small_bottle' done (job 4.11 s, 39 grasps)
+t= -983.77  background: 'small_bottle' verified for execution via the curve (executor probe 0.74 s, 1 tried)
+t= -154.21  background: GraspGen for 'small_bottle' done (job 4.97 s, 41 grasps)
+t= -152.22  background: 'small_bottle' verified for execution via the curve (executor probe 1.06 s, 1 tried)
+t=   +0.00  trial start
+t=  +12.48  pipeline: 'small_bottle' precomputed — GraspGen ran 164.8 s before the click (job 4.97 s), executor verified it via the curve (probe 1.06 s)
+t=  +12.58  selection cycle 6 started
+t=  +13.09  pipeline: 41 candidates published (2.48 s after the click, precomputed)
+t=  +13.10  executor: candidates received
+t=  +13.10  executor: precheck hit (+0.00 s)
+t=  +13.17  probe: grasp 1/41: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +13.29  executor: open sent (+0.19 s)
+t=  +13.29  executor: motion start (+0.00 s)
+t=  +15.40  executor: close sent (+2.11 s)
+t=  +15.90  executor: arrival (+0.50 s)
+t=  +16.21  Morty said: "Starting grasp on the small bottle."
+t=  +16.97  executor: grasp verdict (+1.07 s)
+t=  +18.20  executor: lift done (+1.23 s)
+t=  +18.45  executor: wait destination start (+0.25 s)
+t=  +18.60  Morty said: "Got the small bottle. Where should I drop it? Left, right, or home?"
+t=  +29.69  executor: destination received (+11.24 s)
+t=  +29.76  Morty said: "Going home."
+t=  +29.78  intent: go_home
+t=  +29.80  you said: "Objects. Drop it on home position."
+t=  +39.36  Morty said: "I'm at the home position, still holding the small bottle. Should I open the grip"
+t=  +44.98  intent: open_gripper
+t=  +44.99  you said: "open the gripper."
+t=  +45.58  executor: home done (+15.89 s)
+t=  +46.98  executor: cycle done (+1.40 s)
+t=  +46.98  executor: cycle 6 done via the curve
+t=  +47.12  executor reported: done|6
+t=  +47.96  Morty said: "Opening the gripper."
+t=  +48.05  Morty said: "I'm at the home position. What's next?"
+t=  +54.89  background: GraspGen for 'small_bottle' done (job 5.12 s, 43 grasps)
+t=  +71.44  trial stop
+
+SUMMARY
+  speech -> intent                             15.18 s
+  click -> perception done                      2.48 s
+  GraspGen at the click (0 = precomputed)       0.00 s
+  precomputed this long before the click      164.82 s
+  executor: candidates -> motion start          0.20 s
+  click -> motion start                         2.67 s
+  approach                                      2.61 s
+  arrival -> grasp verdict                      1.07 s
+  waiting for the drop side                    11.24 s
+  motion start -> home                         33.69 s
+  total                                        17.18 s
+  approach planned by                        curve (precomputed)

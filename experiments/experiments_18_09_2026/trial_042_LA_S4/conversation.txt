@@ -1,0 +1,4 @@
+# trial 042 started 2026-09-18T17:19:05.540159
+[   8.47s] You: Now grasp for me the tape dispenser.
+[  13.15s] Morty (status): The grasp failed: tried 0 grasps:. Resetting.
+[  14.26s] Morty (status): Starting grasp on the tape dispenser.

@@ -1,0 +1,48 @@
+1
+00:00:09,482 --> 00:00:13,482
+You: Crasp for me is a vitamin tube.
+
+2
+00:00:10,498 --> 00:00:14,498
+Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+
+3
+00:00:22,693 --> 00:00:26,693
+You: The rightmost vitamin tube.
+
+4
+00:00:23,654 --> 00:00:27,654
+Morty (status): Picking the rightmost Multivitamin.
+
+5
+00:00:26,984 --> 00:00:30,984
+Morty (status): Starting grasp on the vitamin tube.
+
+6
+00:00:30,594 --> 00:00:34,594
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+7
+00:00:39,994 --> 00:00:43,994
+You: Drop it on the left side.
+
+8
+00:00:43,189 --> 00:00:47,189
+Morty (status): Going to drop left.
+
+9
+00:00:45,885 --> 00:00:49,885
+Morty (status): I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?
+
+10
+00:00:56,884 --> 00:01:00,884
+You: gripper, give me the object, then go back home.
+
+11
+00:00:56,885 --> 00:01:00,885
+Morty (status): Opening the gripper.
+
+12
+00:01:03,986 --> 00:01:07,986
+Morty (status): Done — I'm back at the home position. What's next?
+

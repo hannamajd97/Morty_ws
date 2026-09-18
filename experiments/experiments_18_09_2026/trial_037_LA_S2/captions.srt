@@ -1,0 +1,16 @@
+1
+00:00:06,649 --> 00:00:10,649
+You: Pick up for me the smartphone.
+
+2
+00:00:07,246 --> 00:00:11,246
+Morty: I didn't catch that, could you repeat?
+
+3
+00:00:17,760 --> 00:00:21,760
+You: Can you pick up for me the smartphone?
+
+4
+00:00:18,946 --> 00:00:22,946
+Morty: I don't see a smartphone on the table — only a small bottle, two vitamin tubes, and a tape dispenser.
+

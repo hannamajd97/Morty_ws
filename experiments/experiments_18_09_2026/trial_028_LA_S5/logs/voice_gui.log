@@ -1,0 +1,90 @@
+[speech_input_node-4] [INFO] [1789743911.666698794] [speech_input_node]: [timing] whisper 1.89s for 6.0s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789743911.668331349] [speech_input_node]: Heard: 'Crasp for me is a vitamin tube.'
+[speech_input_node-4] [INFO] [1789743911.673547537] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] User (voice): Crasp for me is a vitamin tube.
+[chat_node-7] [0m[INFO] [1789743911.729033463] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (24 -> 17)[0m
+[intent_router_node-6] [INFO] [1789743912.779166857] [intent_router_node]: Queued intent 'pick'; queue size now 1, busy=False
+[chat_node-7] [0m[INFO] [1789743912.780209056] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"pick","object_intent":"vitamin_tube","object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1789743912.780676000] [intent_router_node]: dispatching: action='pick', object='vitamin_tube', colour='', shape='', position='', speed='slow'
+[chat_node-7] [0m[INFO] [1789743912.782012223] [communication_llm_chat_node]: [timing] intent dispatched 1.05s into the LLM call (before the reply finished)[0m
+[intent_router_node-6] [INFO] [1789743912.782817145] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[chat_node-7] [0m[INFO] [1789743912.785367803] [communication_llm_chat_node]: [timing] LLM main call 1.05s[0m
+[intent_router_node-6] [INFO] [1789743912.788521887] [intent_router_node]: Vitamin-tube pick check: position='', visible_count=2, scene_age_s=1.10
+[intent_router_node-6] [INFO] [1789743912.790047355] [intent_router_node]: Refusing plain-pick of vitamin_c: 2+ visible and no position/ordinal/colour qualifier. Asking user to clarify.
+[speak_action_server-3] [INFO] [1789743912.800794698] [speak_action_server]: Speak: 'I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?'
+[speech_input_node-4] [INFO] [1789743913.099777514] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789743913.491572277] [communication_llm_chat_node]: [timing] LLM follow-up call 0.70s[0m
+[speech_input_node-4] [INFO] [1789743915.281651904] [speech_input_node]: Skipping low-energy buffer (rms=0.0029 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743920.062219416] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743924.952518796] [speech_input_node]: [timing] whisper 0.88s for 3.4s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789743924.958552839] [speech_input_node]: Heard: 'The rightmost vitamin tube.'
+[chat_node-7] User (voice): The rightmost vitamin tube.
+[chat_node-7] [0m[INFO] [1789743924.977008959] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (28 -> 21)[0m
+[chat_node-7] [0m[INFO] [1789743925.796369025] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"pick","object_intent":"vitamin_tube","object_attributes":{"colour":null,"shape":null,"position":"rightmost","ordinal":null,"ordinal_from":null,"speed":null,"destination":null}}[0m
+[intent_router_node-6] [INFO] [1789743925.794835176] [intent_router_node]: Queued intent 'pick'; queue size now 1, busy=False
+[chat_node-7] [0m[INFO] [1789743925.797794794] [communication_llm_chat_node]: [timing] intent dispatched 0.82s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1789743925.800214118] [communication_llm_chat_node]: [timing] LLM main call 0.82s[0m
+[intent_router_node-6] [INFO] [1789743925.801520041] [intent_router_node]: dispatching: action='pick', object='vitamin_tube', colour='', shape='', position='rightmost', speed='slow'
+[intent_router_node-6] [INFO] [1789743925.804800858] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1789743925.810198033] [intent_router_node]: Vitamin-tube pick check: position='rightmost', visible_count=2, scene_age_s=2.24
+[chat_node-7] [0m[INFO] [1789743925.856148538] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[intent_router_node-6] [INFO] [1789743925.862311519] [intent_router_node]: Voice pick: execution gate OPENED (auto-execute checkbox applies to GUI clicks only).
+[intent_router_node-6] [INFO] [1789743925.868854260] [intent_router_node]: Published spatial pick det (index=2, label='vitamin_tube') to /yolo/select_detection for live re-resolution.
+[speak_action_server-3] [INFO] [1789743925.869051089] [speak_action_server]: Speak: 'Picking the rightmost Multivitamin.'
+[intent_router_node-6] [INFO] [1789743925.889444328] [intent_router_node]: Set wait_for_destination=True on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1789743925.897742190] [intent_router_node]: Set vitamin_mode_active=False on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1789743926.549326224] [intent_router_node]: Selected detection: label='vitamin_tube' (updating _last_target_label for narration).
+[chat_node-7] [0m[INFO] [1789743926.625011695] [communication_llm_chat_node]: [timing] LLM follow-up call 0.82s[0m
+[intent_router_node-6] [INFO] [1789743927.178740246] [intent_router_node]: cycle_id=4 (target='vitamin tube') — narrating start
+[speak_action_server-3] [INFO] [1789743927.194507690] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speech_input_node-4] [INFO] [1789743928.471015070] [speech_input_node]: Skipping low-energy buffer (rms=0.0030 < min=0.0250); likely background noise / distant speech.
+[speak_action_server-3] [INFO] [1789743929.340937971] [speak_action_server]: Speak: 'Starting grasp on the vitamin tube.'
+[speech_input_node-4] [INFO] [1789743930.167910198] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743931.584018744] [speech_input_node]: Skipping low-energy buffer (rms=0.0015 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743932.415824021] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789743932.799706557] [intent_router_node]: Held-object memory: 'vitamin_tube'
+[chat_node-7] [0m[INFO] [1789743932.800904942] [communication_llm_chat_node]: Held-object update: '' -> 'vitamin_tube'[0m
+[speak_action_server-3] [INFO] [1789743932.808095781] [speak_action_server]: Speak: 'Got the vitamin tube. Where should I drop it? Left, right, or home?'
+[speech_input_node-4] [INFO] [1789743935.058563458] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743936.037911366] [speech_input_node]: Skipping low-energy buffer (rms=0.0007 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743942.305600240] [speech_input_node]: [timing] whisper 0.86s for 3.3s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789743942.309257944] [speech_input_node]: Heard: 'Drop it on the left side.'
+[chat_node-7] User (voice): Drop it on the left side.
+[chat_node-7] [0m[INFO] [1789743942.317869024] [communication_llm_chat_node]: FAST: matched 'Drop it on the left side.' -> drop_left (speed=default); published {"action_intent":"drop_left","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1789743942.317847654] [intent_router_node]: Resume 'drop_left' published (bypass queue (pick paused): plain 'drop_left').
+[chat_node-7] [0m[INFO] [1789743942.322208594] [communication_llm_chat_node]: [timing] handled in 0.01s (route=FAST drop_left)[0m
+[speak_action_server-3] [INFO] [1789743942.333603337] [speak_action_server]: Speak: 'Going to drop left.'
+[speech_input_node-4] [INFO] [1789743944.602650724] [speech_input_node]: Skipping low-energy buffer (rms=0.0008 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743948.103341384] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789743948.166967854] [communication_llm_chat_node]: Current pose update: '' -> 'drop_left_side'[0m
+[intent_router_node-6] [INFO] [1789743948.169760015] [intent_router_node]: Held-object memory: 'vitamin_tube'
+[speak_action_server-3] [INFO] [1789743948.181846373] [speak_action_server]: Speak: "I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?"
+[speech_input_node-4] [INFO] [1789743950.306455472] [speech_input_node]: Skipping low-energy buffer (rms=0.0023 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743951.488887496] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743959.052016479] [speech_input_node]: [timing] whisper 0.87s for 4.3s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789743959.053012706] [speech_input_node]: Word-time echo cut: removed 2 word(s) spoken while Morty's speaker was sounding ('Open the'); kept 'gripper, give me the object, then go back home.'
+[speech_input_node-4] [INFO] [1789743959.055601313] [speech_input_node]: Heard: 'gripper, give me the object, then go back home.'
+[chat_node-7] User (voice): gripper, give me the object, then go back home.
+[chat_node-7] [0m[INFO] [1789743959.151569915] [communication_llm_chat_node]: FAST: matched 'gripper, give me the object, then go back home.' -> release_home (speed=default); published {"action_intent":"release_home","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1789743959.153278527] [intent_router_node]: Resume 'release_home' published (release pause: compound release_home).
+[chat_node-7] [0m[INFO] [1789743959.152863098] [communication_llm_chat_node]: Withholding pre-emptive narration None for 'release_home' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1789743959.159369030] [communication_llm_chat_node]: [timing] handled in 0.01s (route=FAST release_home)[0m
+[speak_action_server-3] [INFO] [1789743959.192214245] [speak_action_server]: Speak: 'Opening the gripper.'
+[intent_router_node-6] [INFO] [1789743959.766640511] [intent_router_node]: Held-object memory: ''
+[chat_node-7] [0m[INFO] [1789743959.772377537] [communication_llm_chat_node]: Held-object update: 'vitamin_tube' -> ''[0m
+[speech_input_node-4] [INFO] [1789743961.304541064] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789743964.839799546] [communication_llm_chat_node]: Current pose update: 'drop_left_side' -> 'home'[0m
+[speech_input_node-4] [INFO] [1789743964.948509563] [speech_input_node]: Skipping low-energy buffer (rms=0.0018 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789743966.226143648] [intent_router_node]: cycle_done received: 'done|4' (outcome=done)
+[intent_router_node-6] [INFO] [1789743966.227592971] [intent_router_node]: Grasp cycle completed successfully.
+[intent_router_node-6] [INFO] [1789743966.229926348] [intent_router_node]: Held-object memory: ''
+[speak_action_server-3] [INFO] [1789743966.236312606] [speak_action_server]: Speak: "Done — I'm back at the home position. What's next?"
+[intent_router_node-6] [INFO] [1789743966.244156740] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[speech_input_node-4] [INFO] [1789743968.548132569] [speech_input_node]: Skipping low-energy buffer (rms=0.0019 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743973.408948983] [speech_input_node]: Skipping low-energy buffer (rms=0.0015 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743975.198485341] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743976.591965361] [speech_input_node]: Skipping low-energy buffer (rms=0.0017 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743986.627744394] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743989.240178652] [speech_input_node]: Skipping low-energy buffer (rms=0.0019 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743990.848656216] [speech_input_node]: Skipping low-energy buffer (rms=0.0002 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789743991.746742029] [speech_input_node]: Skipping low-energy buffer (rms=0.0009 < min=0.0250); likely background noise / distant speech.

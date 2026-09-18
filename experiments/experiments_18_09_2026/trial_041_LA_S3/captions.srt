@@ -1,0 +1,8 @@
+1
+00:00:06,066 --> 00:00:10,066
+You: Please look at the right side and go back home.
+
+2
+00:00:08,172 --> 00:00:12,172
+Morty: Looking right, then going home.
+

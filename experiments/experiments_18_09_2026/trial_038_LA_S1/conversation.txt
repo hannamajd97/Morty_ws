@@ -1,0 +1,3 @@
+# trial 038 started 2026-09-18T17:17:24.456392
+[   8.94s] Morty: I see a small bottle, two vitamin tubes, and a tape dispenser.
+[  10.43s] You: Objects, what kind of object are you seeing right now? Objects, what kind of object are you seeing right now?

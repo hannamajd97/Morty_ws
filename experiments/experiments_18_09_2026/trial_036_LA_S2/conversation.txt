@@ -1,0 +1,3 @@
+# trial 036 started 2026-09-18T17:16:30.110155
+[   5.78s] You: Trust for me is a smartphone.
+[   6.78s] Morty: I didn't catch that, could you repeat?

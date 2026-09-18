@@ -1,0 +1,86 @@
+{
+ "timings": {
+  "intent_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "execution_s": null,
+  "total_s": null
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.417,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9519248008728027, \"bbox\": [2.269895553588867, 181.14535522460938, 74.48282623291016, 409.6767578125], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.925665438175201"
+  },
+  {
+   "t": 2.907,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9523230195045471, \"bbox\": [2.4603500366210938, 181.11973571777344, 74.55770111083984, 409.6147155761719], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.92452406883"
+  },
+  {
+   "t": 5.447,
+   "source": "transcript",
+   "text": "Pick up for me the book."
+  },
+  {
+   "t": 5.457,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9516195058822632, \"bbox\": [2.1897850036621094, 181.17727661132812, 74.44375610351562, 409.5762023925781], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.92483389377"
+  },
+  {
+   "t": 6.396,
+   "source": "morty_said",
+   "text": "I don't see a book on the table. I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin. Would you like me to pick up one of those instead?"
+  },
+  {
+   "t": 6.678,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9520158767700195, \"bbox\": [2.2125244140625, 181.14401245117188, 74.34367370605469, 409.5961608886719], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.92553776502609"
+  },
+  {
+   "t": 8.036,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9526185989379883, \"bbox\": [2.36407470703125, 181.10543823242188, 74.60081481933594, 409.5531921386719], \"reach_pct\": 85.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.1, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9255532026290"
+  },
+  {
+   "t": 9.554,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9522468447685242, \"bbox\": [2.3146896362304688, 181.17129516601562, 74.4834976196289, 409.5087890625], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.925156354904174"
+  },
+  {
+   "t": 10.998,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9517236351966858, \"bbox\": [2.4179229736328125, 181.16197204589844, 74.54530334472656, 409.53594970703125], \"reach_pct\": 85.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.1, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9255858063"
+  },
+  {
+   "t": 12.324,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9511904120445251, \"bbox\": [2.3411712646484375, 181.14825439453125, 74.52497100830078, 409.5469665527344], \"reach_pct\": 85.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.1, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.92485493421"
+  },
+  {
+   "t": 13.651,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9519196152687073, \"bbox\": [2.3445281982421875, 181.14596557617188, 74.55504608154297, 409.6050720214844], \"reach_pct\": 85.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.1, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.92478466033"
+  },
+  {
+   "t": 14.947,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9512737989425659, \"bbox\": [2.491800308227539, 181.1398468017578, 74.58047485351562, 409.51861572265625], \"reach_pct\": 85.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.924285709857"
+  },
+  {
+   "t": 16.169,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9512953758239746, \"bbox\": [2.40606689453125, 181.15696716308594, 74.59528350830078, 409.5278015136719], \"reach_pct\": 85.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.3, \"reach_closer_cm\": 0.1, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9253127574920"
+  },
+  {
+   "t": 16.723,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

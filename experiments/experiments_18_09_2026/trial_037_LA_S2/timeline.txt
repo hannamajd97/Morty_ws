@@ -1,0 +1,11 @@
+TRIAL TIMELINE  start 2026-09-18 17:16:44  stop 17:17:15  (31.0 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +6.52  you said: "Pick up for me the smartphone."
+t=   +7.29  Morty said: "I didn't catch that, could you repeat?"
+t=  +17.72  you said: "Can you pick up for me the smartphone?"
+t=  +18.91  Morty said: "I don't see a smartphone on the table — only a small bottle, two vitamin tubes, "
+t=  +30.99  trial stop
+
+SUMMARY

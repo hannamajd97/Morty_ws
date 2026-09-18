@@ -1,0 +1,12 @@
+1
+00:00:06,456 --> 00:00:10,456
+You: Hello Morty, what kind of object are you seeing right now?
+
+2
+00:00:08,805 --> 00:00:12,805
+Morty (status): I can see a Vitamin C, a Multivitamin, a small bottle, and a tape dispenser on the table.
+
+3
+00:00:11,753 --> 00:00:15,753
+Morty: I can see a Vitamin C, a Multivitamin, a small bottle, and a tape dispenser on the table.
+

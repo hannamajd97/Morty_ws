@@ -1,0 +1,9 @@
+# trial 031 started 2026-09-18T17:09:28.611129
+[  16.28s] Morty (status): Starting grasp on the small bottle.
+[  18.86s] Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+[  29.77s] You: Objects. Drop it on home position.
+[  29.89s] Morty (status): Going home.
+[  39.39s] Morty (status): I'm at the home position, still holding the small bottle. Should I open the gripper?
+[  45.06s] You: open the gripper.
+[  48.07s] Morty (status): Opening the gripper.
+[  48.07s] Morty (status): I'm at the home position. What's next?

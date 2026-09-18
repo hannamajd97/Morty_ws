@@ -1,0 +1,3 @@
+# trial 002 started 2026-09-18T16:19:54.906131
+[   5.48s] You: Pick up for me the book.
+[   6.44s] Morty: I don't see a book on the table. I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin. Would you like me to pick up one of those instead?

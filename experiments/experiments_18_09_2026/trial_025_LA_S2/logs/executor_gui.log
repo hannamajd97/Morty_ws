@@ -1,0 +1,40 @@
+[grasp_executor_lin_llm-1] [INFO] [1789743343.366788341] [grasp_executor_lin_llm]: New selection cycle_id=2 — discarding buffered candidates/grasp from the previous cycle.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.224639197] [grasp_executor_lin_llm]: Buffered 39 candidates for active cycle_id=2; ready for evaluation.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.224831633] [grasp_executor_lin_llm]: Received 39 grasp candidates; evaluating LIN feasibility (cycle_id=2).
+[grasp_executor_lin_llm-1] [INFO] [1789743344.226424552] [grasp_executor_lin_llm]: Kept the probe's verified LIN plan (168 points, cost 0.66 s) so Step 2 does not have to recompute it.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.226616401] [grasp_executor_lin_llm]: [precheck] HIT: candidate 2 of 39 was LIN-verified 159 s ago — executing without probing (plan reused).
+[grasp_executor_lin_llm-1] [INFO] [1789743344.226827438] [grasp_executor_lin_llm]: Published selected pose on '/grasp_executor_lin_llm/selected_pose': [0.165, -0.246, 0.664]
+[grasp_executor_lin_llm-1] [INFO] [1789743344.226925387] [grasp_executor_lin_llm]: Received grasp pose in frame 'base_link'
+[grasp_executor_lin_llm-1] [INFO] [1789743344.227034227] [grasp_executor_lin_llm]: Grasp pose in 'base_link': [0.165, -0.246, 0.664]
+[grasp_executor_lin_llm-1] [INFO] [1789743344.227127428] [grasp_executor_lin_llm]: Pre-check skipped — pose already LIN-verified by the candidate probe.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.227227101] [grasp_executor_lin_llm]: refresh_runtime_params: vitamin_mode_active=false, wait_for_destination=true, wait_for_release=true, drop_target_name='drop_right_side', blend_via_home=true (velocity_scaling=0.30).
+[grasp_executor_lin_llm-1] [INFO] [1789743344.227315424] [grasp_executor_lin_llm]: Step 1 - Open gripper: goes out with the approach, not before it.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.434188141] [grasp_executor_lin_llm]: Step 2 - reusing the probe's verified plan (saved ~0.7 s) [pose match 0.047 mm / 0.0054 deg; start state within 0.0000 rad of the cached first point (tol 0.010); 5 of 168 waypoints re-validated; plan age 0.0 s].
+[grasp_executor_lin_llm-1] [INFO] [1789743344.434424462] [grasp_executor_lin_llm]: Step 2 - one motion: planned 1.67 s, stretched to 2.50 s (x1.50 slower): approach duration 2.50 s, fingers 1.00 + 0.10 s.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.435219065] [grasp_executor_lin_llm]: Gripper open sent (target=0.500) — it opens while the arm travels.
+[grasp_executor_lin_llm-1] [INFO] [1789743344.435357788] [grasp_executor_lin_llm]: Step 2 - one motion: open sent with the motion.
+[grasp_executor_lin_llm-1] [INFO] [1789743346.538661905] [grasp_executor_lin_llm]: Gripper close sent on the way in (0.40 s before the arm stops).
+[grasp_executor_lin_llm-1] [INFO] [1789743347.063897683] [grasp_executor_lin_llm]: Step 2 - blended two lines: execution OK (2.63 s, no stop at the corner).
+[grasp_executor_lin_llm-1] [INFO] [1789743347.064388837] [grasp_executor_lin_llm]: [arrival] Step 2 - blended two lines: commanded TCP [0.165, -0.246, 0.664], reached [0.165, -0.246, 0.664] (base_link) — error 0.0 mm (dx +0.0, dy +0.0, dz +0.0)
+[grasp_executor_lin_llm-1] [INFO] [1789743347.866404905] [grasp_executor_lin_llm]: Step 1 - Open gripper: already open (reached=0.230, opened during the probing).
+[grasp_executor_lin_llm-1] [INFO] [1789743347.918626769] [grasp_executor_lin_llm]: Step 3 - Close gripper: closed on the way in (reached=0.000).
+[grasp_executor_lin_llm-1] [INFO] [1789743348.069967766] [grasp_executor_lin_llm]: Post-close DI check: grasp_pin(TI0)=16=HIGH(holding) (stall after 0.75 s), slip_pin(TI1)=17=low (TI1 is informational — gripper hardware self-compensates).
+[grasp_executor_lin_llm-1] [INFO] [1789743348.220225400] [grasp_executor_lin_llm]: Post-grasp lift - lifting 0.070 m along dir=[-0.707, 0.707, 0.000] in base_link: d=[-0.049, 0.049, 0.000] -> [0.115, -0.196, 0.664]
+[grasp_executor_lin_llm-1] [INFO] [1789743348.220863198] [grasp_executor_lin_llm]: fast-lift: 0.070 m along up=[-0.707, 0.707, 0.000]: TCP [0.165, -0.246, 0.664] -> [0.115, -0.196, 0.664]
+[grasp_executor_lin_llm-1] [INFO] [1789743349.182118035] [grasp_executor_lin_llm]: fast-lift: DONE — TCP now [0.118, -0.199, 0.664], moved d=[-0.047, +0.047, +0.000].
+[grasp_executor_lin_llm-1] [INFO] [1789743349.249001080] [grasp_executor_lin_llm]: Post-grasp lift - fast joint lift OK (planner-free).
+[grasp_executor_lin_llm-1] [INFO] [1789743349.249369484] [grasp_executor_lin_llm]: Post-grasp lift OK — holding clear of the table.
+[grasp_executor_lin_llm-1] [INFO] [1789743349.512078227] [grasp_executor_lin_llm]: Interactive drop: object grasped, pausing at grasp pose. Waiting for destination on '/grasp_executor_lin_llm/resume' (timeout 1800.0s).
+[grasp_executor_lin_llm-1] [INFO] [1789743376.892007044] [grasp_executor_lin_llm]: Interactive drop: destination set to 'drop_right_side'. Continuing with lift + drop sequence.
+[grasp_executor_lin_llm-1] [INFO] [1789743376.892257124] [grasp_executor_lin_llm]: Step 3a - already lifted right after the grasp; skipping.
+[grasp_executor_lin_llm-1] [INFO] [1789743376.892908110] [grasp_executor_lin_llm]: [blend] Step 3b+4 - Blended transport: ONE goal for lift->home->drop_right_side (velocity_scaling=0.30, 2 segments).
+[grasp_executor_lin_llm-1] [INFO] [1789743382.557498574] [grasp_executor_lin_llm]: [blend] lift->home->drop_right_side completed in 5.66 s (2 segments, 41 waypoints).
+[grasp_executor_lin_llm-1] [INFO] [1789743382.557660727] [grasp_executor_lin_llm]: Interactive release: PRE-AUTHORIZED by the compound command — opening on arrival, then straight home.
+[grasp_executor_lin_llm-1] [INFO] [1789743382.557880989] [grasp_executor_lin_llm]: Step 5 - Open gripper at drop: target=0.500 via action '/gripper_controller/gripper_cmd'.
+[grasp_executor_lin_llm-1] [INFO] [1789743383.153939284] [grasp_executor_lin_llm]: Step 5 - Open gripper at drop: execution OK (reached=0.230).
+[grasp_executor_lin_llm-1] [INFO] [1789743383.306438914] [grasp_executor_lin_llm]: Step 5c - Released; staying 2.0 s at the drop pose before going home.
+[grasp_executor_lin_llm-1] [INFO] [1789743388.291402711] [grasp_executor_lin_llm]: Step 6 - Move to reset target: action-fast-replay completed (collision-checked) for 'home'.
+[grasp_executor_lin_llm-1] [INFO] [1789743388.291547211] [grasp_executor_lin_llm]: Step 7 - Close gripper at reset: target=0.000 via action '/gripper_controller/gripper_cmd'.
+[grasp_executor_lin_llm-1] [INFO] [1789743389.669547678] [grasp_executor_lin_llm]: Step 7 - Close gripper at reset: execution OK (reached=0.000).
+[grasp_executor_lin_llm-1] [INFO] [1789743389.669743966] [grasp_executor_lin_llm]: Pick-place sequence complete.
+[grasp_executor_lin_llm-1] [INFO] [1789743389.670059102] [grasp_executor_lin_llm]: Grasp sequence finished.

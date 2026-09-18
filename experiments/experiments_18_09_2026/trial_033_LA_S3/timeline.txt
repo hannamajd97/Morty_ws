@@ -1,0 +1,16 @@
+TRIAL TIMELINE  start 2026-09-18 17:13:59  stop 17:15:28  (88.9 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +9.47  you said: "Look at the left and the right side, then go back home."
+t=  +10.58  intent: look_left
+t=  +10.72  intent: look_right
+t=  +10.84  intent: go_home
+t=  +11.43  Morty said: "Looking left, then right, then going home."
+t=  +45.93  Morty said: "Could not reach the pose. the robot didn't reach pose 'detect_right' in time (30"
+t=  +49.04  you said: "Now look right, Zainhol."
+t=  +51.66  Morty said: "I didn't catch that, could you repeat?"
+t=  +88.88  trial stop
+
+SUMMARY
+  speech -> intent                              1.10 s

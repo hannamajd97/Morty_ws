@@ -1,0 +1,54 @@
+[intent_router_node-6] [INFO] [1789744442.822620986] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'active' -> 'inactive'
+[intent_router_node-6] [INFO] [1789744442.835514761] [intent_router_node]: Auto-recovery: activated 'scaled_joint_trajectory_controller'.
+[intent_router_node-6] [INFO] [1789744444.574389040] [intent_router_node]: Controller 'scaled_joint_trajectory_controller' state: 'inactive' -> 'active'
+[speech_input_node-4] [INFO] [1789744449.303782081] [speech_input_node]: [timing] whisper 0.99s for 7.4s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744449.306923581] [speech_input_node]: Heard: 'Look at the left and the right side, then go back home.'
+[chat_node-7] User (voice): Look at the left and the right side, then go back home.
+[chat_node-7] [0m[INFO] [1789744449.313612761] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (34 -> 27)[0m
+[chat_node-7] [0m[INFO] [1789744450.475113812] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_left","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1789744450.479872402] [communication_llm_chat_node]: [timing] intent dispatched 1.15s into the LLM call (before the reply finished)[0m
+[intent_router_node-6] [INFO] [1789744450.478198501] [intent_router_node]: Queued intent 'look_left'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1789744450.479968158] [intent_router_node]: dispatching: action='look_left', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1789744450.484656659] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1789744450.487690962] [intent_router_node]: Sending MoveToNamedPose -> 'detect_left' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1789744450.568047944] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_right","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1789744450.574925512] [intent_router_node]: Queued intent 'look_right'; queue size now 1, busy=True
+[chat_node-7] [0m[INFO] [1789744450.575133317] [communication_llm_chat_node]: [timing] intent dispatched 1.25s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1789744450.584862647] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1789744450.586723180] [communication_llm_chat_node]: [timing] intent dispatched 1.26s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1789744450.589300844] [communication_llm_chat_node]: [timing] LLM main call 1.26s[0m
+[intent_router_node-6] [INFO] [1789744450.672982833] [intent_router_node]: Queued intent 'go_home'; queue size now 2, busy=True
+[chat_node-7] [0m[INFO] [1789744451.296692304] [communication_llm_chat_node]: [timing] LLM follow-up call 0.71s[0m
+[chat_node-7] Assistant: Looking left, then right, then going home.
+[speak_action_server-3] [INFO] [1789744451.318940226] [speak_action_server]: Speak: 'Looking left, then right, then going home.'
+[speech_input_node-4] [INFO] [1789744451.321557521] [speech_input_node]: Skipping low-energy buffer (rms=0.0029 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744453.647491286] [speech_input_node]: Skipping low-energy buffer (rms=0.0033 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744454.753022593] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [INFO] [1789744455.190143667] [intent_router_node]: MoveToNamedPose completed.
+[intent_router_node-6] [INFO] [1789744455.195614662] [intent_router_node]: dispatching: action='look_right', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1789744455.198874428] [intent_router_node]: Sending MoveToNamedPose -> 'detect_right' (velocity_scaling=0.20)
+[speech_input_node-4] [INFO] [1789744464.245989827] [speech_input_node]: Skipping low-energy buffer (rms=0.0005 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744476.329287152] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[intent_router_node-6] [WARN] [1789744485.780799430] [intent_router_node]: MoveToNamedPose failed: the robot didn't reach pose 'detect_right' in time (30s)
+[intent_router_node-6] [INFO] [1789744485.788679599] [intent_router_node]: dispatching: action='go_home', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1789744485.801338112] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[speak_action_server-3] [INFO] [1789744485.802570948] [speak_action_server]: Speak: "Could not reach the pose. the robot didn't reach pose 'detect_right' in time (30s)"
+[intent_router_node-6] [INFO] [1789744485.815790481] [intent_router_node]: Sending MoveToNamedPose -> 'home' (velocity_scaling=0.20)
+[speech_input_node-4] [INFO] [1789744485.835110304] [speech_input_node]: [timing] whisper 0.99s for 8.3s audio (word_timestamps=on)
+[speech_input_node-4] [INFO] [1789744485.837934136] [speech_input_node]: Heard: 'Now look right, Zainhol.'
+[chat_node-7] User (voice): Now look right, Zainhol.
+[chat_node-7] [0m[INFO] [1789744485.844914016] [communication_llm_chat_node]: [timing] pruned 8 stale message(s) from the LLM context (43 -> 35)[0m
+[chat_node-7] [0m[INFO] [1789744486.772552901] [communication_llm_chat_node]: [timing] LLM main call 0.92s[0m
+[chat_node-7] Assistant: I didn't catch that, could you repeat?
+[speak_action_server-3] [INFO] [1789744486.782432229] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speech_input_node-4] [INFO] [1789744489.945762518] [speech_input_node]: Skipping low-energy buffer (rms=0.0012 < min=0.0250); likely background noise / distant speech.
+[speak_action_server-3] [INFO] [1789744491.554201248] [speak_action_server]: Speak: "I didn't catch that, could you repeat?"
+[speech_input_node-4] [INFO] [1789744494.617174567] [speech_input_node]: Skipping low-energy buffer (rms=0.0007 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744498.693929484] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744501.046773081] [speech_input_node]: Skipping low-energy buffer (rms=0.0004 < min=0.0250); likely background noise / distant speech.
+[chat_node-7] [0m[INFO] [1789744502.259806222] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[intent_router_node-6] [INFO] [1789744502.261809184] [intent_router_node]: MoveToNamedPose completed.
+[speech_input_node-4] [INFO] [1789744504.930426291] [speech_input_node]: Skipping low-energy buffer (rms=0.0021 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744510.210726215] [speech_input_node]: Skipping low-energy buffer (rms=0.0022 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744517.185744543] [speech_input_node]: Skipping low-energy buffer (rms=0.0006 < min=0.0250); likely background noise / distant speech.
+[speech_input_node-4] [INFO] [1789744520.915287938] [speech_input_node]: Skipping low-energy buffer (rms=0.0003 < min=0.0250); likely background noise / distant speech.

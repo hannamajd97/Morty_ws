@@ -1,0 +1,9 @@
+TRIAL TIMELINE  start 2026-09-18 16:18:01  stop 16:18:19  (17.6 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +8.09  you said: "Hello Morty, what kind of object are you seeing right now?"
+t=  +10.21  Morty said: "I can see a Vitamin C, a small bottle, a tape dispenser, and a Multivitamin on t"
+t=  +17.55  trial stop
+
+SUMMARY

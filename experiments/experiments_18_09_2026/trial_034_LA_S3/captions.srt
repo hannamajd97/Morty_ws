@@ -1,0 +1,12 @@
+1
+00:00:13,545 --> 00:00:17,545
+Morty (status): Looking left.
+
+2
+00:00:15,635 --> 00:00:19,635
+Morty (status): Going home.
+
+3
+00:00:17,352 --> 00:00:21,352
+You: Look at the lift, then go back home.
+
