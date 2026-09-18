@@ -47,34 +47,37 @@ from .vla_link import VlaLink
 from .bag_link import BagLink
 from .config import BAG_DIR_VLA_ONLY
 
-MMHRI_DIR = os.path.expanduser("~/morty_ws/experiments/mmhri")
+MMHRI_DIR = os.path.expanduser("~/morty_ws/experiments/mmhri")      # campaign CSVs + the trials before 2026-09-18
+EXPERIMENTS_DIR = os.path.expanduser("~/morty_ws/experiments")      # day folders live directly here
+VLA_DATASET_DIR = os.path.expanduser("~/morty_ws/vla_experiments/datasets/morty_ur3e")   # every VLA episode, one dataset
 
 
 def day_dir(now: Optional[datetime.date] = None) -> str:
-    """Today's folder: experiments/mmhri/experiments_18_09_2026 (Majd
-    2026-09-18: 'make it always depend on the day')."""
+    """Today's folder: ~/morty_ws/experiments/experiments_18_09_2026 (Majd
+    2026-09-18: directly in the experiments folder, named by the day)."""
     d = now or datetime.date.today()
-    return os.path.join(MMHRI_DIR, d.strftime("experiments_%d_%m_%Y"))
+    return os.path.join(EXPERIMENTS_DIR, d.strftime("experiments_%d_%m_%Y"))
 
 
 def all_trial_dirs() -> List[str]:
-    """Every trial folder: the day folders' and the old ones at the root."""
+    """Every trial folder: experiments/<session>/trial_*, plus the layouts
+    before 2026-09-18 (experiments/mmhri/trial_* and mmhri/<session>/trial_*)."""
     out: List[str] = []
-    try:
-        for d in sorted(os.listdir(MMHRI_DIR)):
-            p = os.path.join(MMHRI_DIR, d)
-            if not os.path.isdir(p):
-                continue
-            if d.startswith("trial_"):
-                out.append(p)
-            else:
-                for t in sorted(os.listdir(p)):
-                    q = os.path.join(p, t)
-                    if t.startswith("trial_") and os.path.isdir(q):
-                        out.append(q)
-    except OSError:
-        pass
-    return out
+
+    def _scan(base: str, depth: int) -> None:
+        try:
+            for d in sorted(os.listdir(base)):
+                p = os.path.join(base, d)
+                if not os.path.isdir(p):
+                    continue
+                if d.startswith("trial_"):
+                    out.append(p)
+                elif depth > 0 and not d.startswith("."):
+                    _scan(p, depth - 1)
+        except OSError:
+            pass
+    _scan(EXPERIMENTS_DIR, 2)
+    return sorted(set(out))
 
 # The 7 experiment scenarios (Majd's MMHRI Paper Experiments PDF +
 # chat spec, 2026-08-20). 3 layouts x 5 reps each = 105 trials.
@@ -229,8 +232,11 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         folder_row = QtWidgets.QHBoxLayout()
         folder_row.addWidget(QtWidgets.QLabel("Session folder:"))
         self.folder_edit = QtWidgets.QLineEdit()
-        self.folder_edit.setToolTip("Sub-folder of ~/morty_ws/experiments/mmhri that receives this session's trials.\n"
-                                    "Proposed from today's date; type another name to change it.")
+        self.folder_edit.setToolTip("Sub-folder of ~/morty_ws/experiments that receives this session's trials\n"
+                                    "(video, audio, clouds, grasps, events, timeline, bag/). Proposed from today's\n"
+                                    "date; type another name to change it. The campaign CSVs stay in experiments/mmhri/.\n"
+                                    f"VLA episodes are one training dataset and always go to\n{VLA_DATASET_DIR}/episode_NNN;\n"
+                                    "each trial's trial.json names its episode, each episode's meta.json names its trial.")
         self.folder_edit.textEdited.connect(lambda _t: setattr(self, "_folder_edited", True))
         folder_row.addWidget(self.folder_edit, stretch=1)
         self.folder_hint = QtWidgets.QLabel()
@@ -511,12 +517,12 @@ class MMHRIWindow(QtWidgets.QMainWindow):
     def _refresh_folder_label(self) -> None:
         if not getattr(self, "_folder_edited", False):
             self.folder_edit.setText(os.path.basename(day_dir()))
-        self.folder_hint.setText("/ trial_NNN_LX_SN/")
+        self.folder_hint.setText("/ trial_NNN_LX_SN/      VLA → vla_experiments/datasets/morty_ur3e/")
 
     def session_dir(self) -> str:
-        """~/morty_ws/experiments/mmhri/<name typed or today's>."""
+        """~/morty_ws/experiments/<name typed or today's>."""
         name = (self.folder_edit.text().strip() or os.path.basename(day_dir())).replace("/", "_")
-        return os.path.join(MMHRI_DIR, name)
+        return os.path.join(EXPERIMENTS_DIR, name)
 
     def _next_trial_id(self) -> str:
         """Trial IDs keep counting across days (the tally is campaign-wide)."""
@@ -715,7 +721,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             try:
                 with open(meta) as f:
                     hint = str(json.load(f).get("mmhri_trial_hint") or "")
-                    if hint and any(hint == os.path.basename(p) or hint == os.path.relpath(p, MMHRI_DIR) for p in folders):
+                    if hint and any(hint == os.path.basename(p) or hint == os.path.relpath(p, EXPERIMENTS_DIR) for p in folders):
                         episodes.append(os.path.dirname(meta))
             except (OSError, ValueError):
                 continue
@@ -731,7 +737,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText(f"nothing recorded for trial {tid} — nothing to delete.")
             return
         lines = [f"Trial {tid} will be erased from the records:"]
-        lines += [f"  • folder {os.path.relpath(d, MMHRI_DIR)}/" for d in rec["folders"]]
+        lines += [f"  • folder {os.path.relpath(d, EXPERIMENTS_DIR)}/" for d in rec["folders"]]
         lines += [f"  • {n} row(s) in {name}" for name, n in rec["rows"].items() if n]
         if rec["episodes"]:
             lines.append("VLA episodes referencing it (kept, delete by hand if wanted):")
@@ -746,7 +752,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText("delete cancelled.")
             return
         for d in rec["folders"]:
-            shutil.rmtree(d if os.path.isabs(d) else os.path.join(MMHRI_DIR, d), ignore_errors=True)
+            shutil.rmtree(d if os.path.isabs(d) else os.path.join(EXPERIMENTS_DIR, d), ignore_errors=True)
         bdir = os.path.expanduser("~/morty_ws/backups")
         os.makedirs(bdir, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

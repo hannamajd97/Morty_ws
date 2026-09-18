@@ -93,7 +93,7 @@ class EpisodeRecorder(Node):
             ("cycle_done_topic", "/grasp_executor_lin_llm/cycle_done"),
             ("intent_wait_s", 25.0),
             ("max_episode_s", 240.0),
-            ("mmhri_dir", str(Path.home() / "morty_ws" / "experiments" / "mmhri")),
+            ("mmhri_dir", str(Path.home() / "morty_ws" / "experiments")),   # day folders since 2026-09-18
             ("base_frame", "base_link"),
             ("ee_frame", "gripper_tcp"),
             ("tool_frame", "tool0"),
@@ -319,7 +319,7 @@ class EpisodeRecorder(Node):
     def _newest_trial(self) -> str:
         try:
             # Day folders since 2026-09-18 (experiments_DD_MM_YYYY/trial_*), the old root layout kept.
-            dirs = sorted((p for p in list(self.mmhri_dir.glob("trial_*")) + list(self.mmhri_dir.glob("*/trial_*"))
+            dirs = sorted((p for p in list(self.mmhri_dir.glob("*/trial_*")) + list(self.mmhri_dir.glob("*/*/trial_*"))
                            if p.is_dir()), key=lambda p: p.stat().st_mtime)
             return str(dirs[-1].relative_to(self.mmhri_dir)) if dirs else ""
         except Exception:
