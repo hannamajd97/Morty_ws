@@ -801,6 +801,8 @@ public:
   struct PrecheckRecord {
     int64_t key = 0;
     std::string planner;        // approach the background check verified
+    std::vector<size_t> rejected;   // candidate indices already refused (kept even when interrupted)
+    bool partial = false;           // interrupted before a verdict: the rejected ones are still worth skipping
     std::vector<geometry_msgs::msg::PoseStamped> poses;
     int feasible_idx = -1;      // index into poses, -1 = none of the batch
     size_t n_tried = 0;
@@ -830,15 +832,19 @@ public:
     precheck_interrupt_ = std::move(interrupt); precheck_tried_ = 0;
     geometry_msgs::msg::PoseStamped sel;
     bool ok = false;
-    try { ok = choose_first_lin_feasible(cands, &sel); } catch (...) { ok = false; }
+    std::vector<size_t> skip;
+    if (const auto * prev = match_precheck(cands)) { skip = prev->rejected; }   // a re-sent set: continue, do not restart
+    try { ok = choose_first_lin_feasible(cands, &sel, skip.empty() ? nullptr : &skip); } catch (...) { ok = false; }
     precheck_mode_ = false; precheck_interrupt_ = nullptr;
     rec->reason = ok ? "" : last_failure_reason_;
     rec->planner = ok ? last_planner_ : "";
     last_failure_reason_ = saved_reason;
     skip_next_precheck_ = false;
     rec->n_tried = precheck_tried_;
+    rec->rejected = precheck_rejected_;
     if (precheck_interrupted_ || abort_requested_.load()) {
       invalidate_cached_lin_plan("the background check was interrupted");
+      rec->partial = true;
       return false;
     }
     if (ok) {
@@ -1022,9 +1028,10 @@ public:
 
   bool select_first_lin_feasible(
     const std::vector<geometry_msgs::msg::PoseStamped> & candidates,
-    geometry_msgs::msg::PoseStamped * selected)
+    geometry_msgs::msg::PoseStamped * selected,
+    const std::vector<size_t> * skip = nullptr)
   {
-    const bool ok = choose_first_lin_feasible(candidates, selected);
+    const bool ok = choose_first_lin_feasible(candidates, selected, skip);
     // The winner just passed a FULL Pilz LIN plan from the current start
     // state — execute_grasp's pre-check of the same pose milliseconds
     // later is a duplicate ~7 s plan (measured 2026-08-26). Skip it once.
@@ -3255,32 +3262,38 @@ private:
           return false;
         }
       }
-      // (3) the path must END in the natural configuration for this grasp:
-      //     the joint solution the solver finds for the grasp pose seeded
-      //     from the start state. A path that arrives in another branch
-      //     (elbow or shoulder flipped) is a wide swing even when every
-      //     step and every joint's total travel passed (2026-09-18 13:00:
-      //     a 3.75 s curve swung wide and closed on nothing).
+      // (3) the path must not end much FARTHER from the start than the
+      //     solver's own solution for the grasp (seeded from the start):
+      //     that is the wide swing into another branch (2026-09-18 13:00, a
+      //     3.75 s curve that closed on nothing). Two valid branches at a
+      //     similar distance are both fine (the earlier "match the solver's
+      //     branch" test refused good first candidates for a 130 deg base
+      //     difference).
       if (!jp.empty()) {
         moveit::core::RobotState want = start_state;
         const auto * jmg = want.getJointModelGroup(arm_group_.getName());
         if (jmg && want.setFromIK(jmg, target_pose.pose, arm_group_.getEndEffectorLink(), 0.05)) {
-          std::vector<double> qw; want.copyJointGroupPositions(jmg, qw);
+          std::vector<double> qw, q0; want.copyJointGroupPositions(jmg, qw); start_state.copyJointGroupPositions(jmg, q0);
           const auto & names = path_msg.joint_trajectory.joint_names;
           const auto & jn = jmg->getVariableNames();
+          double d_path = 0.0, d_seed = 0.0; std::string worst;
           for (size_t k = 0; k < names.size() && k < jp.back().positions.size(); ++k) {
             auto it = std::find(jn.begin(), jn.end(), names[k]);
             if (it == jn.end()) { continue; }
-            const double d = std::fabs(jp.back().positions[k] - qw[static_cast<size_t>(it - jn.begin())]);
-            if (d > cartesian_end_config_tol_rad_) {
-              if (reason) {
-                char buf[200];
-                std::snprintf(buf, sizeof(buf), "the curve ends in another arm configuration: %s is %.0f deg away from the natural solution",
-                              names[k].c_str(), d * 180.0 / M_PI);
-                *reason = buf;
-              }
-              return false;
+            const size_t j = static_cast<size_t>(it - jn.begin());
+            const double dp = std::fabs(jp.back().positions[k] - q0[j]);
+            const double ds = std::fabs(qw[j] - q0[j]);
+            if (dp - ds > d_path - d_seed) { worst = names[k]; }
+            d_path = std::max(d_path, dp); d_seed = std::max(d_seed, ds);
+          }
+          if (d_path > d_seed + cartesian_end_config_tol_rad_) {
+            if (reason) {
+              char buf[220];
+              std::snprintf(buf, sizeof(buf), "the curve ends %.0f deg from the start where the solver's solution is %.0f deg away (%s): a wide swing into another branch",
+                            d_path * 180.0 / M_PI, d_seed * 180.0 / M_PI, worst.c_str());
+              *reason = buf;
             }
+            return false;
           }
         }
       }
@@ -3363,9 +3376,10 @@ private:
     // Both lines share one acceleration setting first (Majd 2026-09-16:
     // "get them both synced"): the same ramps on both sides of the corner
     // read as one motion. Mixed settings only when the shared ones fail.
-    const double pairs[7][4] = {{1.0, 1.0, 1.0, 1.0}, {1.0, 0.5, 1.0, 0.5}, {1.0, 0.25, 1.0, 0.25},
-                                {1.0, 0.25, 0.5, 0.25}, {0.5, 0.25, 0.5, 0.25}, {0.5, 0.5, 0.25, 0.25},
-                                {0.25, 0.25, 0.25, 0.25}};
+    // Three pairs (2026-09-18: seven pairs at ~0.35 s each cost 2.4 s per
+    // candidate the blend could not plan anyway — the blend rescues ~2 %
+    // of candidates, and those planned at acc x0.5 or x0.25).
+    const double pairs[3][4] = {{1.0, 1.0, 1.0, 1.0}, {1.0, 0.5, 1.0, 0.5}, {1.0, 0.25, 1.0, 0.25}};
     const auto t0 = std::chrono::steady_clock::now();
     std::string last_err;
     for (const auto & pr : pairs) {
@@ -4636,8 +4650,10 @@ private:
 
   bool choose_first_lin_feasible(
     const std::vector<geometry_msgs::msg::PoseStamped> & candidates_in,
-    geometry_msgs::msg::PoseStamped * selected)
+    geometry_msgs::msg::PoseStamped * selected,
+    const std::vector<size_t> * skip = nullptr)
   {
+    precheck_rejected_.clear();
     // Mutable copy: the wrist-twin pass below may replace orientations.
     std::vector<geometry_msgs::msg::PoseStamped> candidates = candidates_in;
     if (!selected) {
@@ -4912,6 +4928,15 @@ private:
           return false;
         }
         const size_t orig_idx = ranked[i].second;
+        if (skip && std::find(skip->begin(), skip->end(), orig_idx) != skip->end()) {
+          // Refused by the background check for this same set (2026-09-18:
+          // the click restarted from candidate 1 after the background had
+          // already spent up to 10 s rejecting 1-5) — not again.
+          RCLCPP_INFO(node_->get_logger(), "Candidate %zu/%zu (orig=%zu) skipped: rejected by the background check already.",
+            i + 1, total, orig_idx + 1);
+          precheck_rejected_.push_back(orig_idx);
+          continue;
+        }
         // A hint belongs to exactly one planning request. Clearing it here
         // prevents a velocity/collision diagnosis from candidate N being
         // accidentally printed for candidate N+1.
@@ -4939,6 +4964,7 @@ private:
         // search give up after one refused candidate (2026-09-18, cycles
         // 3/6/7: one candidate tried, "no feasible", nothing moved).
         if (precheck_mode_ && precheck_interrupted_) { return false; }
+        precheck_rejected_.push_back(orig_idx);
         ++n_tried;
         precheck_tried_ = n_tried;
         // MoveGroup returns only a broad error code. Its useful detail (for
@@ -6470,6 +6496,7 @@ private:
   bool precheck_interrupted_ = false;
   std::function<bool()> precheck_interrupt_;
   size_t precheck_tried_ = 0;
+  std::vector<size_t> precheck_rejected_;   // orig indices refused by the current search
   std::deque<PrecheckRecord> prechecks_;
   size_t precheck_max_sets_ = 8;
 
@@ -6995,6 +7022,7 @@ int main(int argc, char ** argv)
       }
       bool feasible = false;
       bool used_precheck = false;
+      std::vector<size_t> skip_from_record;   // candidates a background check of this set already refused
       if (precheck_enabled) {
         const auto * rec = grasp_executor.match_precheck(cands);
         std::string why;
@@ -7005,8 +7033,9 @@ int main(int argc, char ** argv)
           RCLCPP_INFO(node->get_logger(), "[precheck] MISS: %s — probing now.", why.c_str());
         } else if (rec->feasible_idx < 0) {
           RCLCPP_INFO(node->get_logger(),
-            "[precheck] HIT but none of the first %zu candidates was feasible %.0f s ago — probing again.",
-            rec->n_tried, grasp_executor.precheck_age_s(*rec));
+            "[precheck] %s: %zu candidate(s) of this set were refused %.0f s ago — probing the others.",
+            rec->partial ? "PARTIAL" : "HIT but none feasible", rec->rejected.size(), grasp_executor.precheck_age_s(*rec));
+          skip_from_record = rec->rejected;
         } else {
           selected = cands[static_cast<size_t>(rec->feasible_idx)];
           grasp_executor.apply_precheck(*rec);
@@ -7020,7 +7049,8 @@ int main(int argc, char ** argv)
         }
       }
       if (!used_precheck) {
-        feasible = grasp_executor.select_first_lin_feasible(cands, &selected);
+        feasible = grasp_executor.select_first_lin_feasible(cands, &selected,
+          skip_from_record.empty() ? nullptr : &skip_from_record);
       }
       bool ok = false;
       if (!feasible) {
@@ -7133,6 +7163,7 @@ int main(int argc, char ** argv)
           r.data = "key=" + std::to_string(job->first) + " feasible=-2 tried=" + std::to_string(rec.n_tried) +
             " reason=interrupted by a selection";
           pub_precheck_result->publish(r);
+          if (!rec.rejected.empty()) { grasp_executor.remember_precheck(rec); }   // the refusals are still worth skipping
         } else {
           std_msgs::msg::String r;
           r.data = "key=" + std::to_string(job->first) + " feasible=" + std::to_string(rec.feasible_idx) +

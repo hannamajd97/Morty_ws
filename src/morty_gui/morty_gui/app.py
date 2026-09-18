@@ -1669,6 +1669,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
                     d = "waiting for GraspGen"
                 lines.append(f"{nm}: {d}")
             text = "\n".join(lines)
+        if getattr(self, "_exec_holding", False):
+            text = "ROBOT IS HOLDING AN OBJECT — choose Drop left / Drop right (or say it); no new pick until then\n" + text
         if text != getattr(self, "_last_ready_text", None):
             self._last_ready_text = text
             self.exp_win.ready_log.setPlainText(text)
