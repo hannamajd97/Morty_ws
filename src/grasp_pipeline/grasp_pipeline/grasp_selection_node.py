@@ -1965,6 +1965,7 @@ class YoloLiveSelectGrasp(Node):
         """Queue a manual selection index published from another ROS process."""
         self._pending_manual_choice = int(msg.data)
         self._pending_manual_choice_stamp = time.time()
+        self._pending_choice_source = "voice"
         self._selection_wake.set()
         # CLI selection is an explicit index — make sure no stale clicked-det
         # from an earlier window click hijacks the resolution.
@@ -1995,6 +1996,7 @@ class YoloLiveSelectGrasp(Node):
             return
         self._pending_manual_choice = index
         self._pending_manual_choice_stamp = time.time()
+        self._pending_choice_source = "voice"
         self._pending_manual_choice_det = (
             {"label": label, "bbox": bbox} if label and len(bbox) == 4 else None
         )
@@ -2014,6 +2016,7 @@ class YoloLiveSelectGrasp(Node):
             return
         self._pending_manual_choice = int(idx)
         self._pending_manual_choice_stamp = time.time()
+        self._pending_choice_source = "click"
         # Also keep the clicked detection itself (label + bbox): the index is
         # re-resolved at consumption time because YOLO reorders detections
         # between frames (2026-08-07 wrong-object bug).
@@ -2268,6 +2271,7 @@ class YoloLiveSelectGrasp(Node):
                             queued_idx = self._resolve_clicked_choice(dets, queued_idx)
                             if 0 <= queued_idx < len(names):
                                 choice = queued_idx
+                                self._choice_source_this = getattr(self, "_pending_choice_source", None) or "voice"
                                 self.get_logger().info(
                                     f"Using manual topic selection index {choice}: {names[choice]}"
                                 )
@@ -2327,6 +2331,7 @@ class YoloLiveSelectGrasp(Node):
 
                     if choice is None and auto_idx >= 0 and auto_idx < len(names):
                         choice = auto_idx
+                        self._choice_source_this = "voice"
 
                     if choice is None and noninteractive and not sys.stdin.isatty():
                         choice = 0
@@ -2396,6 +2401,7 @@ class YoloLiveSelectGrasp(Node):
                                     queued_idx = self._resolve_clicked_choice(dets, queued_idx)
                                     if 0 <= queued_idx < len(names):
                                         choice = queued_idx
+                                        self._choice_source_this = getattr(self, "_pending_choice_source", None) or "voice"
                                         self.get_logger().info(
                                             f"Using manual topic selection index {choice}: {names[choice]}"
                                         )
@@ -2443,7 +2449,9 @@ class YoloLiveSelectGrasp(Node):
                     self._selection_prompted = False
                     self._selection_prompt_sig = None
                     self._speak_if_enabled(f"You chose {names[self.selected_idx]}.")
-                    self.get_logger().info(f"Selected index {self.selected_idx}: {names[self.selected_idx]}")
+                    self._last_selection_source = getattr(self, "_choice_source_this", None) or "pointing"
+                    self._choice_source_this = None
+                    self.get_logger().info(f"Selected index {self.selected_idx}: {names[self.selected_idx]} (by {self._last_selection_source})")
                     if bool(self.get_parameter("publish_debug_image").value) and self.fb.rgb_frame is not None:
                         self.debug_pub.publish(
                             header,
@@ -2589,9 +2597,12 @@ class YoloLiveSelectGrasp(Node):
                                             planning_only = ("tried " in reason or "reachable" in reason
                                                              or "no LIN-feasible" in reason.lower()
                                                              or "candidate" in reason.lower())
+                                            # GUI clicks only (Majd 2026-09-18: a pointed or
+                                            # spoken pick must not try twice by itself).
                                             if (bool(self.get_parameter("auto_retry_once").value)
                                                     and not was_retry and "stopped" not in reason
-                                                    and planning_only):
+                                                    and planning_only
+                                                    and getattr(self, "_last_selection_source", "") == "click"):
                                                 self._auto_retry_sel = {"label": sel.get("label"),
                                                                         "bbox": list(sel.get("bbox", []))}
                                         # SELF-clear the auto-pick label on failure.
@@ -2671,6 +2682,7 @@ class YoloLiveSelectGrasp(Node):
                             retry = None
                         if retry:
                             self._pending_manual_choice_det = dict(retry)
+                            self._pending_choice_source = "click"
                             self._pending_manual_choice = 0
                             self._pending_manual_choice_stamp = max(time.time(), float(self._last_cycle_end_t) + 0.01)
                             self._auto_retry_mark = dict(retry)

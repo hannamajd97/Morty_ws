@@ -2323,6 +2323,19 @@ class ChatIntentNode(Node):
     def _fire_fast_command(self, action: str, speed: str, text: str) -> None:
         """Publish an intent for a recognized direct command, bypass the LLM,
         and trigger the matching QUICK_NARRATION TTS line."""
+        if action == "go_home_open" and self._held_object_label:
+            # Holding an object: "go home and open" is ONE order to the
+            # executor (destination home, release on arrival). Split into
+            # two intents, the open fired standalone mid-carry and the
+            # executor still asked at home (2026-09-18).
+            intent_payload = {"action_intent": "go_home", "object_intent": None,
+                              "object_attributes": {"then": "release", **({"speed": speed} if speed else {})}}
+            intent_json = json.dumps(intent_payload, separators=(",", ":"))
+            self.intent_pub.publish(String(data=intent_json))
+            self.get_logger().info(f"FAST: matched {text!r} -> go_home then release (holding); published {intent_json}")
+            self._last_intent_json = intent_json
+            self._speak("Going home and opening the gripper there.")
+            return
         if action in self._FAST_MULTI:
             for sub in self._FAST_MULTI[action]:
                 self._fire_fast_command(sub, speed, text)

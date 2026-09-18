@@ -753,9 +753,21 @@ class IntentRouterNode(Node):
                 redirect = {"drop_right": "drop_right",
                             "drop_left": "drop_left",
                             "go_home": "home"}[action]
+                # "Drop it home, open the gripper" (2026-09-18): the chat
+                # node sends ONE go_home with then=release instead of a
+                # second open_gripper — the second intent used to fire the
+                # gripper standalone, mid-carry, and the executor still
+                # asked at home. The suffix makes the executor open on
+                # arrival, no question.
+                then_s = str((attrs or {}).get("then") or "").strip().lower() if isinstance(attrs, dict) else ""
+                if then_s == "release_home":
+                    redirect += "+release_home"
+                elif then_s == "release":
+                    redirect += "+release"
                 if not self._claim_executor_resume(
                     redirect,
-                    f"bypass queue (pick paused): plain {action!r}",
+                    f"bypass queue (pick paused): plain {action!r}"
+                    + (f" then {then_s}" if then_s else ""),
                 ):
                     self._narrate_ignored_resume(action, redirect)
                 return
