@@ -3234,6 +3234,18 @@ private:
       }
       return false;
     }
+    // UNWIND (2026-09-18 14:40, the actual root of the "flips"): the KDL
+    // plugin restarts from RANDOM seeds when the local solve from the
+    // previous point does not converge, and then returns the joints in an
+    // arbitrary winding. Home has shoulder_lift at -205 deg; a solution
+    // at +165 deg is the same arm pose written a full turn away, and a
+    // trajectory between the two spins the joint 360 deg — the arm went
+    // "upside down" into the small bottle yesterday, and today 10 of 10
+    // candidates read "370 deg away" for grasps 10 cm from the object.
+    // Every path point is brought into the winding of the point before it
+    // (the first one into the winding of the live start state), inside
+    // the joint limits; the tests below then measure real motion.
+    unwind_toward_start(path_msg, start_state);
     {
       // Two tests (2026-09-18: a flip spread over several 15 mm steps, each
       // under the per-step limit, slipped through and the arm went upside
@@ -3274,6 +3286,7 @@ private:
         const auto * jmg = want.getJointModelGroup(arm_group_.getName());
         if (jmg && want.setFromIK(jmg, target_pose.pose, arm_group_.getEndEffectorLink(), 0.05)) {
           std::vector<double> qw, q0; want.copyJointGroupPositions(jmg, qw); start_state.copyJointGroupPositions(jmg, q0);
+          for (size_t j = 0; j < qw.size() && j < q0.size(); ++j) { qw[j] = unwind_value(qw[j], q0[j], jmg, j); }
           const auto & names = path_msg.joint_trajectory.joint_names;
           const auto & jn = jmg->getVariableNames();
           double d_path = 0.0, d_seed = 0.0; std::string worst;
@@ -3610,6 +3623,52 @@ private:
     if (v == 1) { std::snprintf(buf, sizeof(buf), "the point at %d %% is reachable and collision-free — the step to it was refused (joint jump)", pct); return buf; }
     std::snprintf(buf, sizeof(buf), "a joint solution exists at %d %% (%s)", pct, why.c_str());
     return buf;
+  }
+
+  // Bring `q` into the winding of `ref` (|q - ref| <= pi) when the joint's
+  // limits allow it; otherwise leave it. UR joints allow +-2 pi.
+  double unwind_value(double q, double ref, const moveit::core::JointModelGroup * jmg, size_t j) const
+  {
+    double lo = -1e9, hi = 1e9;
+    try {
+      const auto & names = jmg->getVariableNames();
+      if (j < names.size()) {
+        const auto & b = jmg->getParentModel().getVariableBounds(names[j]);
+        if (b.position_bounded_) { lo = b.min_position_; hi = b.max_position_; }
+      }
+    } catch (...) {}
+    double out = q;
+    while (out - ref > M_PI && out - 2.0 * M_PI >= lo) { out -= 2.0 * M_PI; }
+    while (out - ref < -M_PI && out + 2.0 * M_PI <= hi) { out += 2.0 * M_PI; }
+    return out;
+  }
+
+  void unwind_toward_start(moveit_msgs::msg::RobotTrajectory & traj, const moveit::core::RobotState & start_state)
+  {
+    const auto * jmg = start_state.getJointModelGroup(arm_group_.getName());
+    if (!jmg) { return; }
+    const auto & jn = jmg->getVariableNames();
+    const auto & names = traj.joint_trajectory.joint_names;
+    std::vector<double> q0; start_state.copyJointGroupPositions(jmg, q0);
+    std::vector<double> ref(names.size(), 0.0);
+    std::vector<int> jidx(names.size(), -1);
+    for (size_t k = 0; k < names.size(); ++k) {
+      auto it = std::find(jn.begin(), jn.end(), names[k]);
+      if (it != jn.end()) { jidx[k] = static_cast<int>(it - jn.begin()); ref[k] = q0[static_cast<size_t>(jidx[k])]; }
+    }
+    size_t changed = 0;
+    for (auto & pt : traj.joint_trajectory.points) {
+      for (size_t k = 0; k < pt.positions.size() && k < names.size(); ++k) {
+        if (jidx[k] < 0) { continue; }
+        const double before = pt.positions[k];
+        pt.positions[k] = unwind_value(before, ref[k], jmg, static_cast<size_t>(jidx[k]));
+        if (std::fabs(pt.positions[k] - before) > 1e-9) { ++changed; }
+        ref[k] = pt.positions[k];
+      }
+    }
+    if (changed > 0) {
+      RCLCPP_INFO(node_->get_logger(), "curve: %zu joint values re-wound into the arm's current winding (KDL random-restart artefact).", changed);
+    }
   }
 
   // ── Instrumented plan() ───────────────────────────────────────────
