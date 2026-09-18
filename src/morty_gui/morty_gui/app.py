@@ -2536,6 +2536,14 @@ class OperatorWindow(QtWidgets.QMainWindow):
     _NICE_TARGETS = (
         ("grasp_pipeline.run_grasp_pipeline", 8),
         ("pointcloud_downsampler", 8),
+        # 2026-09-18: load average 30+ with the VLA recorder and the Astra
+        # cloud builder each holding a full core made the UR driver's
+        # real-time loop miss deadlines ("Connection to reverse interface
+        # dropped" bursts, program flag latched False, picks refused).
+        # Recording and cloud building are throughput work: same nice
+        # level as the pipeline, so the driver (nice 0) always wins.
+        ("episode_recorder", 8),
+        ("astra_cloud_local", 8),
     )
     # ── CPU ISOLATION (2026-09-02, SYSTEM_STATE_LOG #302) ────────────
     # The Alienware is 6 physical cores x 2 hyperthreads: sibling pairs
@@ -2564,7 +2572,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         "realsense2_camera_node", "move_group", "speech_input_node",
         "speak_action_server", "chat_node", "intent_router_node",
         "grasp_executor_lin_llm", "move_to_named_pose_server",
-        "replay_node", "yolo",
+        "replay_node", "yolo", "episode_recorder", "astra_cloud_local",
     )
 
     @staticmethod

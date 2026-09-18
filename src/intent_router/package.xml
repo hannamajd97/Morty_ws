@@ -20,6 +20,7 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>rcl_interfaces</exec_depend>
   <exec_depend>controller_manager_msgs</exec_depend>
+  <exec_depend>ur_dashboard_msgs</exec_depend>
   <exec_depend>vision_msgs</exec_depend>
   <exec_depend>morty_interfaces</exec_depend>
 

@@ -46,7 +46,8 @@ class _Jpeg:
         self.data = data
 from geometry_msgs.msg import PoseStamped
 from control_msgs.msg import JointTrajectoryControllerState
-from tf2_ros import Buffer, TransformListener, TransformException
+from tf2_ros import Buffer, TransformException
+from grasp_pipeline.tf_listener_lite import DecimatedTransformListener
 
 from .raw_dataset import ARM_JOINTS, STEP_KEYS
 
@@ -135,7 +136,14 @@ class EpisodeRecorder(Node):
         self.transcript = None
 
         self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
+        # 2026-09-18: the stock TransformListener deserialised the driver's
+        # ~830 /tf messages per second on this node's executor and kept the
+        # idle recorder at a full core (main thread 85 %) — one of the CPU
+        # hogs that starved the UR driver's real-time loop into "Connection
+        # to reverse interface dropped" bursts. The pipeline's decimating
+        # listener (grasp_pipeline/tf_listener_lite.py) feeds the same
+        # buffer at 50 Hz; the tick samples the TCP pose at `fps` (10 Hz).
+        self.tf_listener = DecimatedTransformListener(self.tf_buffer, self, max_hz=50.0)
 
         for cam in ("exterior", "wrist"):
             ctopic = g(f"{cam}_compressed_topic"); rtopic = g(f"{cam}_image_topic")

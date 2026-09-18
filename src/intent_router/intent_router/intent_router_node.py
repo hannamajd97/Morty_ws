@@ -34,6 +34,7 @@ from vision_msgs.msg import Detection2D
 from rcl_interfaces.msg import Parameter as ParameterMsg, ParameterValue, ParameterType
 from rcl_interfaces.srv import SetParameters
 from controller_manager_msgs.srv import ListControllers, SwitchController
+from ur_dashboard_msgs.srv import GetProgramState
 
 from morty_interfaces.action import MoveToNamedPose, OperateGripper, Speak
 
@@ -417,6 +418,12 @@ class IntentRouterNode(Node):
         self._js_max_age_s = float(self.get_parameter("joint_states_max_age_s").value)
         self._joint_states_at: float = 0.0
         self._robot_program_running: bool | None = None  # None = unknown
+        # Live witnesses that outrank a stale False on that latched topic
+        # (see _check_robot_ready): dashboard program state, polled by the
+        # controller watchdog only while the flag says False.
+        self._dashboard_state: str = ""
+        self._dashboard_at: float = 0.0
+        self._stale_flag_warned_at: float = 0.0
         # /joint_states publishes at ~494 Hz and this node reads NOTHING
         # from it but "did a message arrive recently". A standing
         # subscription cost ~0.9 of a CPU core (2026-08-28) even though
@@ -1364,11 +1371,61 @@ class IntentRouterNode(Node):
             # exists). If we've never heard the topic at all
             # (_robot_program_running is None) we don't know, so we let
             # motion proceed.
+            #
+            # 2026-09-18 (Majd: "the robot is running, why does he give
+            # such an error?"): the topic is latched and the driver only
+            # re-sends it on a change it noticed. When the External
+            # Control link flaps under machine load ("Connection to
+            # reverse interface dropped" bursts) and the GUI's auto-Play
+            # brings the program back, the flag can stay False for the
+            # rest of the session while the robot moves fine. Two live
+            # witnesses outrank it: the trajectory controller is active
+            # (controller_stopper deactivates it the moment the program
+            # stops, so 'active' means the program runs), or the
+            # dashboard reported PLAYING at the last poll.
+            witness = self._program_running_witness(now)
+            if witness:
+                if now - self._stale_flag_warned_at > 30.0:
+                    self._stale_flag_warned_at = now
+                    self.get_logger().warn(
+                        "robot_program_running says False but "
+                        f"{witness}; trusting the live evidence.")
+                return None
             return (
                 "The robot program isn't running. Press play on the teach "
                 "pendant or remote control."
             )
         return None
+
+    def _program_running_witness(self, now: float) -> str:
+        """Name the live evidence that the robot program runs, or ''."""
+        if self._last_controller_state == "active":
+            return "scaled_joint_trajectory_controller is active"
+        if self._dashboard_state == "PLAYING" and now - self._dashboard_at < 10.0:
+            return "the dashboard reports PLAYING"
+        return ""
+
+    def _poll_dashboard_program_state(self) -> None:
+        """Ask the UR dashboard for the program state (async; result lands
+        in _dashboard_state/_dashboard_at). Called by the controller
+        watchdog only while the latched program flag says False."""
+        if not hasattr(self, "_dashboard_cli"):
+            self._dashboard_cli = self.create_client(
+                GetProgramState, "/dashboard_client/program_state")
+        if not self._dashboard_cli.service_is_ready():
+            return
+
+        def _done(fut) -> None:
+            try:
+                resp = fut.result()
+            except Exception as exc:
+                self.get_logger().debug(f"dashboard program_state failed: {exc}")
+                return
+            if resp is not None and resp.success:
+                self._dashboard_state = str(resp.state.state)
+                self._dashboard_at = self.get_clock().now().nanoseconds / 1e9
+
+        self._dashboard_cli.call_async(GetProgramState.Request()).add_done_callback(_done)
 
     def _spoken_name_for_index(self, index: int, fallback_label: str) -> str:
         """Human name for a detection: the cap-colour product for vitamin
@@ -2603,6 +2660,8 @@ class IntentRouterNode(Node):
         on reverse-interface drop and never restores it, leaving the
         operator with 'Controller is not running' errors until they
         manually run `ros2 control set_controller_state`."""
+        if self._robot_program_running is False:
+            self._poll_dashboard_program_state()
         if not self._list_controllers_cli.service_is_ready():
             return  # controller manager not up yet; quiet poll
         req = ListControllers.Request()
