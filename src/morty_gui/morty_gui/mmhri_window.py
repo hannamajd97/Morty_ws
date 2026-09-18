@@ -49,6 +49,33 @@ from .config import BAG_DIR_VLA_ONLY
 
 MMHRI_DIR = os.path.expanduser("~/morty_ws/experiments/mmhri")
 
+
+def day_dir(now: Optional[datetime.date] = None) -> str:
+    """Today's folder: experiments/mmhri/experiments_18_09_2026 (Majd
+    2026-09-18: 'make it always depend on the day')."""
+    d = now or datetime.date.today()
+    return os.path.join(MMHRI_DIR, d.strftime("experiments_%d_%m_%Y"))
+
+
+def all_trial_dirs() -> List[str]:
+    """Every trial folder: the day folders' and the old ones at the root."""
+    out: List[str] = []
+    try:
+        for d in sorted(os.listdir(MMHRI_DIR)):
+            p = os.path.join(MMHRI_DIR, d)
+            if not os.path.isdir(p):
+                continue
+            if d.startswith("trial_"):
+                out.append(p)
+            elif d.startswith("experiments_"):
+                for t in sorted(os.listdir(p)):
+                    q = os.path.join(p, t)
+                    if t.startswith("trial_") and os.path.isdir(q):
+                        out.append(q)
+    except OSError:
+        pass
+    return out
+
 # The 7 experiment scenarios (Majd's MMHRI Paper Experiments PDF +
 # chat spec, 2026-08-20). 3 layouts x 5 reps each = 105 trials.
 # SINGLE SOURCE for scenarios: scenario_experiments.SCENARIOS.
@@ -195,6 +222,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
 
         central = QtWidgets.QWidget()
         lay = QtWidgets.QVBoxLayout(central)
+
+        # Where today's trials go — one folder per day, shown on top.
+        self.folder_label = QtWidgets.QLabel()
+        self.folder_label.setStyleSheet("color:#9fd; font-family:monospace;")
+        self.folder_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self._refresh_folder_label()
+        lay.addWidget(self.folder_label)
 
         form_box = QtWidgets.QGroupBox("Trial")
         form = QtWidgets.QFormLayout(form_box)
@@ -465,12 +499,19 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.destination.setCurrentText("—")
 
     # ── trial lifecycle ──────────────────────────────────────────────
+    def _refresh_folder_label(self) -> None:
+        home = os.path.expanduser("~")
+        shown = day_dir().replace(home, "~", 1)
+        self.folder_label.setText(f"saving to  {shown}/trial_NNN_LX_SN/")
+        self.folder_label.setToolTip(day_dir())
+
     def _next_trial_id(self) -> str:
+        """Trial IDs keep counting across days (the tally is campaign-wide)."""
         n = 1
         try:
-            existing = [d for d in os.listdir(MMHRI_DIR) if d.startswith("trial_")]
-            if existing:
-                n = max(int(d.split("_")[1]) for d in existing) + 1
+            ids = [int(os.path.basename(d).split("_")[1]) for d in all_trial_dirs()]
+            if ids:
+                n = max(ids) + 1
         except (OSError, ValueError):
             pass
         return f"{n:03d}"
@@ -519,7 +560,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         sid = self.scenario.currentText().split(":")[0]
         # MMHRI off = no folder at all; every feed_* checks _trial_dir,
         # so the evidence writers fall silent by themselves.
-        self._trial_dir = (os.path.join(MMHRI_DIR, f"trial_{tid}_L{la}_{sid}")
+        self._refresh_folder_label()
+        self._trial_dir = (os.path.join(day_dir(), f"trial_{tid}_L{la}_{sid}")
                            if want_mmhri else "")
         if self._trial_dir:
             os.makedirs(self._trial_dir, exist_ok=True)
@@ -646,9 +688,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
     # ── delete a trial from the records ──────────────────────────────
     def _trial_records(self, tid: str) -> dict:
         """Everything on disk that belongs to trial `tid`."""
-        folders = [d for d in sorted(os.listdir(MMHRI_DIR))
-                   if (d == f"trial_{tid}" or d.startswith(f"trial_{tid}_"))
-                   and os.path.isdir(os.path.join(MMHRI_DIR, d))]
+        folders = [p for p in all_trial_dirs()
+                   if os.path.basename(p) == f"trial_{tid}" or os.path.basename(p).startswith(f"trial_{tid}_")]
         rows = {}
         for name in ("mmhri_experiments.csv", "mmhri_meta.csv"):
             path = os.path.join(MMHRI_DIR, name)
@@ -660,7 +701,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         for meta in glob.glob(os.path.expanduser("~/morty_ws/vla_experiments/datasets/*/episode_*/meta.json")):
             try:
                 with open(meta) as f:
-                    if json.load(f).get("mmhri_trial_hint") in folders:
+                    hint = str(json.load(f).get("mmhri_trial_hint") or "")
+                    if hint and any(hint == os.path.basename(p) or hint == os.path.relpath(p, MMHRI_DIR) for p in folders):
                         episodes.append(os.path.dirname(meta))
             except (OSError, ValueError):
                 continue
@@ -676,7 +718,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText(f"nothing recorded for trial {tid} — nothing to delete.")
             return
         lines = [f"Trial {tid} will be erased from the records:"]
-        lines += [f"  • folder {d}/" for d in rec["folders"]]
+        lines += [f"  • folder {os.path.relpath(d, MMHRI_DIR)}/" for d in rec["folders"]]
         lines += [f"  • {n} row(s) in {name}" for name, n in rec["rows"].items() if n]
         if rec["episodes"]:
             lines.append("VLA episodes referencing it (kept, delete by hand if wanted):")
@@ -691,7 +733,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText("delete cancelled.")
             return
         for d in rec["folders"]:
-            shutil.rmtree(os.path.join(MMHRI_DIR, d), ignore_errors=True)
+            shutil.rmtree(d if os.path.isabs(d) else os.path.join(MMHRI_DIR, d), ignore_errors=True)
         bdir = os.path.expanduser("~/morty_ws/backups")
         os.makedirs(bdir, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -944,9 +986,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         """Count saved trials per scenario × layout from trial.json files."""
         counts: Dict[tuple, int] = {}
         try:
-            for d in os.listdir(MMHRI_DIR):
-                p = os.path.join(MMHRI_DIR, d, "trial.json")
-                if not (d.startswith("trial_") and os.path.isfile(p)):
+            for tdir in all_trial_dirs():
+                p = os.path.join(tdir, "trial.json")
+                if not os.path.isfile(p):
                     continue
                 try:
                     with open(p) as f:
