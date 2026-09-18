@@ -1005,6 +1005,14 @@ class MortyGuiBridge(Node):
                     break
 
     # ── GUI-thread API ───────────────────────────────────────────────
+    def publish_hover(self, x_px: float, y_px: float) -> None:
+        """Mouse over the camera image: the pipeline computes that object first."""
+        if not hasattr(self, "_pub_hover"):
+            self._pub_hover = self.create_publisher(Point, "/yolo/hover_pixel", 10)
+        p = Point()
+        p.x, p.y, p.z = float(x_px), float(y_px), 0.0
+        self._pub_hover.publish(p)
+
     def publish_click(self, x_px: float, y_px: float) -> None:
         p = Point()
         p.x, p.y, p.z = float(x_px), float(y_px), 0.0

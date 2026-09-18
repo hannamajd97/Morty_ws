@@ -243,8 +243,8 @@ public:
     // selection_cycle_id ~2.4 s before the candidates arrive; sending the
     // open then removes the "waiting for the fingers" pause on a cache
     // miss. Only a selection triggers it, never a background check.
-    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 40);   // over the bend; the slide at the same spacing
-    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.015);
+    cartesian_curve_samples_ = get_or_declare_param<int>(node_, "cartesian_curve_samples", 24);   // over the bend (2026-09-18: 40 → 24, the shape holds and the plan is ~40 % cheaper); the slide at the same spacing
+    cartesian_eef_step_m_ = get_or_declare_param<double>(node_, "cartesian_eef_step_m", 0.02);
     cartesian_max_joint_step_rad_ = get_or_declare_param<double>(node_, "cartesian_max_joint_step_rad", 0.8);
     // 2026-09-18 12:30: 150 deg refused the far objects — legitimate curves
     // there turn the elbow 180-240 deg and the base 165-170 deg — while the

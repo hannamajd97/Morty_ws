@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+import time as _time
 import numpy as np
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import CollisionObject, PlanningScene
@@ -378,8 +379,25 @@ def publish_neighbour_obstacles(node, capture_sel: Dict[str, Any],
             # object instead of its neighbour.
             others = [b for j, b in enumerate(all_bboxes)
                       if j != idx and b is not None and _iou(bbox, b) <= 0.5]
-            box = _box_from_bbox(node, depth_m, bbox, T_base_cam, min_px, up,
-                                 other_bboxes=others, depth_band=depth_band)
+            # BOX CACHE (2026-09-18): the boxes cost ~0.1 s each on every
+            # click, hit or miss, for objects that have not moved. Keyed by
+            # label + bbox rounded to 8 px, kept 30 s: an object that moved
+            # gets a new key, a still one gets its box back for free.
+            cache = getattr(node, "_obstacle_box_cache", None)
+            if cache is None:
+                cache = node._obstacle_box_cache = {}
+            ckey = (str(det.get("label", "obj")), tuple(int(round(v / 8.0)) for v in bbox))
+            hit = cache.get(ckey)
+            now_t = _time.monotonic()
+            if hit is not None and now_t - hit[0] < 30.0:
+                box = hit[1]
+            else:
+                box = _box_from_bbox(node, depth_m, bbox, T_base_cam, min_px, up,
+                                     other_bboxes=others, depth_band=depth_band)
+                cache[ckey] = (now_t, box)
+                if len(cache) > 64:
+                    for k in sorted(cache, key=lambda k: cache[k][0])[:32]:
+                        cache.pop(k, None)
             if box is None:
                 continue
             if target_box is not None and _boxes_overlap(

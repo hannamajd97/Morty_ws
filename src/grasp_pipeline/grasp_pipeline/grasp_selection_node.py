@@ -459,6 +459,10 @@ class YoloLiveSelectGrasp(Node):
             self._on_image_view_click,
             10,
         )
+        # Mouse hover from the GUI (2026-09-18): the object under the mouse
+        # goes first in the precompute queue, so it is verified by the time
+        # it is clicked. Hover only steers the queue; it selects nothing.
+        self._hover_sub = self.create_subscription(Point, "/yolo/hover_pixel", self._on_hover_pixel, 10)
         self.last_published_pose: Optional[PoseStamped] = None
         self.last_published_pose_base: Optional[PoseStamped] = None
         self.last_centroid: Optional[PoseStamped] = None
@@ -2079,6 +2083,21 @@ class YoloLiveSelectGrasp(Node):
         except Exception:
             pass
         return queued_idx
+
+    def _on_hover_pixel(self, msg: Point) -> None:
+        try:
+            dets = list(getattr(self.debug_pub, "_last_dets", []) or [])
+            idx = None
+            for i, d in enumerate(dets):
+                x1, y1, x2, y2 = [int(v) for v in d["bbox"]]
+                if min(x1, x2) <= int(msg.x) <= max(x1, x2) and min(y1, y2) <= int(msg.y) <= max(y1, y2):
+                    idx = i
+                    break
+            if idx is not None and idx != getattr(self, "_last_hover_idx", None):
+                self._last_hover_idx = idx
+                self._precompute.bump(idx)
+        except Exception:
+            pass
 
     def _on_image_view_click(self, msg: Point) -> None:
         """Left-click from rqt_image_view ("publish click location" checkbox).

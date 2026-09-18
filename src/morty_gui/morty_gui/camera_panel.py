@@ -22,9 +22,11 @@ class CameraPanel(QtWidgets.QLabel):
     """Aspect-fit video panel; clicks are mapped back to image pixels."""
 
     clicked_px = QtCore.pyqtSignal(float, float)
+    hovered_px = QtCore.pyqtSignal(float, float)   # mouse over the image, throttled (2026-09-18)
 
     def __init__(self) -> None:
         super().__init__("waiting for the camera (start the driver with realsense) ...")
+        self.setMouseTracking(True)
         self.setAlignment(QtCore.Qt.AlignCenter)
         self.setMinimumSize(400, 300)
         self.setStyleSheet("background:#141418; color:#888;")
@@ -45,6 +47,19 @@ class CameraPanel(QtWidgets.QLabel):
             pm.width(), pm.height(),
         )
         self.setPixmap(pm)
+
+    def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
+        # The object under the mouse is the one about to be clicked: the
+        # pipeline's precompute puts it first in its queue (hover priority).
+        if self._img_w and self._draw_rect.width() and self._draw_rect.contains(ev.pos()):
+            import time as _t
+            now = _t.monotonic()
+            if now - getattr(self, "_last_hover_t", 0.0) >= 0.15:
+                self._last_hover_t = now
+                fx = (ev.x() - self._draw_rect.x()) / self._draw_rect.width()
+                fy = (ev.y() - self._draw_rect.y()) / self._draw_rect.height()
+                self.hovered_px.emit(fx * self._img_w, fy * self._img_h)
+        super().mouseMoveEvent(ev)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.LeftButton and self._img_w and self._draw_rect.width():

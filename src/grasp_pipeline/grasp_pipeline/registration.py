@@ -143,12 +143,17 @@ def lookup_transform_matrix(
     else:
         t = rclpy.time.Time.from_msg(stamp)
     timeout = rclpy.duration.Duration(seconds=float(timeout_s))
+    # The exact-stamp lookup waits the full timeout when the buffer does not
+    # reach that stamp yet (decimated /tf listener), then falls back to the
+    # latest anyway: 0.5 s lost on the click path (2026-09-18). Wait 0.1 s
+    # at most for the exact stamp; the fallback keeps the full timeout.
+    exact_timeout = rclpy.duration.Duration(seconds=min(float(timeout_s), 0.1))
     try:
         tf_msg = tf_buffer.lookup_transform(
             target_frame,
             source_frame,
             t,
-            timeout=timeout,
+            timeout=exact_timeout,
         )
     except TransformException as exc:
         # Registration is often requested a few seconds after the first object was selected.

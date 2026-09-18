@@ -518,6 +518,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.camera = CameraPanel()
         self.camera.clicked_px.connect(self._on_camera_click)
+        self.camera.hovered_px.connect(
+            lambda x, y: self.bridge.publish_hover(x, y) if self.view_combo.currentIndex() != 1 else None)
         split.addWidget(self.camera)
         self.view3d = CloudGLView()
         split.addWidget(self.view3d)
