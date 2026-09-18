@@ -319,7 +319,7 @@ class EpisodeRecorder(Node):
     def _newest_trial(self) -> str:
         try:
             # Day folders since 2026-09-18 (experiments_DD_MM_YYYY/trial_*), the old root layout kept.
-            dirs = sorted((p for p in list(self.mmhri_dir.glob("trial_*")) + list(self.mmhri_dir.glob("experiments_*/trial_*"))
+            dirs = sorted((p for p in list(self.mmhri_dir.glob("trial_*")) + list(self.mmhri_dir.glob("*/trial_*"))
                            if p.is_dir()), key=lambda p: p.stat().st_mtime)
             return str(dirs[-1].relative_to(self.mmhri_dir)) if dirs else ""
         except Exception:

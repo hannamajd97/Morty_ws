@@ -67,7 +67,7 @@ def all_trial_dirs() -> List[str]:
                 continue
             if d.startswith("trial_"):
                 out.append(p)
-            elif d.startswith("experiments_"):
+            else:
                 for t in sorted(os.listdir(p)):
                     q = os.path.join(p, t)
                     if t.startswith("trial_") and os.path.isdir(q):
@@ -223,12 +223,21 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         central = QtWidgets.QWidget()
         lay = QtWidgets.QVBoxLayout(central)
 
-        # Where today's trials go — one folder per day, shown on top.
-        self.folder_label = QtWidgets.QLabel()
-        self.folder_label.setStyleSheet("color:#9fd; font-family:monospace;")
-        self.folder_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # Where today's trials go — one folder per day, editable (Majd
+        # 2026-09-18: "I have to be allowed to change it"). The name is
+        # proposed from the date; once edited it is kept for this window.
+        folder_row = QtWidgets.QHBoxLayout()
+        folder_row.addWidget(QtWidgets.QLabel("Session folder:"))
+        self.folder_edit = QtWidgets.QLineEdit()
+        self.folder_edit.setToolTip("Sub-folder of ~/morty_ws/experiments/mmhri that receives this session's trials.\n"
+                                    "Proposed from today's date; type another name to change it.")
+        self.folder_edit.textEdited.connect(lambda _t: setattr(self, "_folder_edited", True))
+        folder_row.addWidget(self.folder_edit, stretch=1)
+        self.folder_hint = QtWidgets.QLabel()
+        folder_row.addWidget(self.folder_hint)
+        self._folder_edited = False
         self._refresh_folder_label()
-        lay.addWidget(self.folder_label)
+        lay.addLayout(folder_row)
 
         form_box = QtWidgets.QGroupBox("Trial")
         form = QtWidgets.QFormLayout(form_box)
@@ -500,10 +509,14 @@ class MMHRIWindow(QtWidgets.QMainWindow):
 
     # ── trial lifecycle ──────────────────────────────────────────────
     def _refresh_folder_label(self) -> None:
-        home = os.path.expanduser("~")
-        shown = day_dir().replace(home, "~", 1)
-        self.folder_label.setText(f"saving to  {shown}/trial_NNN_LX_SN/")
-        self.folder_label.setToolTip(day_dir())
+        if not getattr(self, "_folder_edited", False):
+            self.folder_edit.setText(os.path.basename(day_dir()))
+        self.folder_hint.setText("/ trial_NNN_LX_SN/")
+
+    def session_dir(self) -> str:
+        """~/morty_ws/experiments/mmhri/<name typed or today's>."""
+        name = (self.folder_edit.text().strip() or os.path.basename(day_dir())).replace("/", "_")
+        return os.path.join(MMHRI_DIR, name)
 
     def _next_trial_id(self) -> str:
         """Trial IDs keep counting across days (the tally is campaign-wide)."""
@@ -561,7 +574,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # MMHRI off = no folder at all; every feed_* checks _trial_dir,
         # so the evidence writers fall silent by themselves.
         self._refresh_folder_label()
-        self._trial_dir = (os.path.join(day_dir(), f"trial_{tid}_L{la}_{sid}")
+        self._trial_dir = (os.path.join(self.session_dir(), f"trial_{tid}_L{la}_{sid}")
                            if want_mmhri else "")
         if self._trial_dir:
             os.makedirs(self._trial_dir, exist_ok=True)
