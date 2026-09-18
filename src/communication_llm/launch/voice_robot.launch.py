@@ -407,7 +407,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "whisper_silence_ms",
-                default_value="500",
+                default_value="300",
                 description="Silence (ms) that finalises an utterance.",
             ),
             DeclareLaunchArgument(

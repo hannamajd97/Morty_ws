@@ -82,9 +82,11 @@ class SpeechInputNode(Node):
         self.declare_parameter("whisper_device", "auto")
         self.declare_parameter("whisper_compute_type", "auto")
         # End-of-utterance silence threshold. Lower = faster response,
-        # higher = safer if you pause mid-sentence to think. 500ms is the
-        # sweet spot; 700ms felt slow. Override with whisper_silence_ms.
-        self.declare_parameter("whisper_silence_ms", 500)
+        # higher = safer if you pause mid-sentence to think. 500 ms was the
+        # old default; 300 ms since 2026-09-18 (Majd: commands are short,
+        # the wait was the longest piece after the language model).
+        # Override with whisper_silence_ms.
+        self.declare_parameter("whisper_silence_ms", 300)
         self.declare_parameter("whisper_max_utterance_s", 12.0)
         # ---- word-time echo cut (2026-08-28) -----------------------
         # Cut Morty's own words out of a mixed transcript by WHEN they
