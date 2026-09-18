@@ -2646,9 +2646,13 @@ class ChatIntentNode(Node):
         self.chat_agent.add_user_message(user_text)
         try:
             _t_llm0 = time.monotonic()
-            response = self.chat_agent.chat(model=self.model)
+            self._t_llm0 = _t_llm0
+            self._early_dispatched = {}
+            response = self.chat_agent.chat(model=self.model, on_tool_call=self._early_intent_call)
+            cached = getattr(response, "cache_read_tokens", None)
             self.get_logger().info(
-                f"[timing] LLM main call {time.monotonic() - _t_llm0:.2f}s")
+                f"[timing] LLM main call {time.monotonic() - _t_llm0:.2f}s"
+                + (f" (prompt cache: {cached} tokens read)" if cached else ""))
         except Exception as exc:
             # OpenAI hiccup (timeout, network, rate limit). Don't deadlock
             # the rclpy executor — apologize and bail out of this turn.
@@ -2680,6 +2684,12 @@ class ChatIntentNode(Node):
             if not calls:
                 break
             for call in calls:
+                early = self._early_dispatched.pop(call.call_id, None) if getattr(self, "_early_dispatched", None) else None
+                if early is not None:
+                    # Dispatched while the reply streamed; only the tool
+                    # output still has to go into the history, in order.
+                    self.chat_agent.add_function_call_output(call, early)
+                    continue
                 self._handle_intent_tool_call(call)
             try:
                 _t_llm1 = time.monotonic()
@@ -2838,7 +2848,24 @@ class ChatIntentNode(Node):
 
         send_future.add_done_callback(_on_goal_response)
 
-    def _handle_intent_tool_call(self, item: Any) -> None:
+    def _early_intent_call(self, item: Any) -> None:
+        """Streaming callback: the intent tool call is complete before the
+        model has finished its reply — dispatch it now (2026-09-18). The
+        tool output is kept aside and written into the history by the
+        drain loop, after the assistant message, so the order stays right."""
+        if getattr(item, "name", "") != "intent_extractor":
+            return
+        try:
+            self._last_tool_output = None
+            self._handle_intent_tool_call(item, record_output=False)
+            self._early_dispatched[item.call_id] = self._last_tool_output or "{}"
+            self.get_logger().info(
+                f"[timing] intent dispatched {time.monotonic() - getattr(self, '_t_llm0', time.monotonic()):.2f}s "
+                "into the LLM call (before the reply finished)")
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(f"early intent dispatch failed: {exc}")
+
+    def _handle_intent_tool_call(self, item: Any, record_output: bool = True) -> None:
         # Single-call path: the LLM now returns the structured fields
         # directly via the tool call. No second extract_intent() round-trip.
         try:
@@ -2850,9 +2877,9 @@ class ChatIntentNode(Node):
         action = str(args.get("action_intent") or "").strip()
         if not action:
             self.get_logger().warn("intent_extractor returned empty action_intent")
-            self.chat_agent.add_function_call_output(
-                item, '{"error": "empty action_intent"}'
-            )
+            self._last_tool_output = '{"error": "empty action_intent"}'
+            if record_output:
+                self.chat_agent.add_function_call_output(item, self._last_tool_output)
             return
 
         # Stop narrations are time-critical — speak immediately,
@@ -2914,7 +2941,9 @@ class ChatIntentNode(Node):
         if action and action not in {"stop", "cancel", "abort", "redo", "again", "repeat"}:
             self._last_intent_json = intent_json
 
-        self.chat_agent.add_function_call_output(item, intent_json)
+        self._last_tool_output = intent_json
+        if record_output:
+            self.chat_agent.add_function_call_output(item, intent_json)
 
         # If auto-execute is on and the action looks like a pick, fire ExecuteGrasp.
         # We do this after publishing /robot/intent so any other subscribers still see it.

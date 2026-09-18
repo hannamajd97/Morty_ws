@@ -517,27 +517,132 @@ def _bedrock_runtime_client():
     return _BEDROCK_CLIENT
 
 
+_CACHE_POINTS_OK = True   # cleared when the model/region rejects cache points
+
+
+def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call) -> dict[str, Any]:
+    """converse_stream, rebuilt into the non-streaming response shape.
+
+    Why streaming (2026-09-18, Majd: "make the model reply faster"): a
+    tool-use block (the intent) is complete long before the model has
+    finished its prose; ``on_tool_call`` fires the moment the block closes,
+    so the pick is dispatched while the rest of the reply still streams."""
+    resp = client.converse_stream(**kwargs)
+    blocks: dict[int, dict[str, Any]] = {}
+    order: list[int] = []
+    usage: dict[str, Any] = {}
+
+    def _block(idx: int, kind: str) -> dict[str, Any]:
+        if idx not in blocks:
+            blocks[idx] = {"text": ""} if kind == "text" else {"toolUse": {"toolUseId": "", "name": "", "input_str": ""}}
+            order.append(idx)
+        return blocks[idx]
+
+    for ev in resp["stream"]:
+        if "contentBlockStart" in ev:
+            cs = ev["contentBlockStart"]
+            start = cs.get("start", {}) or {}
+            if "toolUse" in start:
+                b = _block(cs["contentBlockIndex"], "toolUse")
+                b["toolUse"]["toolUseId"] = start["toolUse"].get("toolUseId", "")
+                b["toolUse"]["name"] = start["toolUse"].get("name", "")
+            else:
+                _block(cs["contentBlockIndex"], "text")
+        elif "contentBlockDelta" in ev:
+            d = ev["contentBlockDelta"]
+            delta = d.get("delta", {}) or {}
+            if "text" in delta:
+                b = _block(d["contentBlockIndex"], "text")
+                b["text"] = b.get("text", "") + (delta["text"] or "")
+            elif "toolUse" in delta:
+                b = _block(d["contentBlockIndex"], "toolUse")
+                b["toolUse"]["input_str"] += delta["toolUse"].get("input", "") or ""
+        elif "contentBlockStop" in ev:
+            b = blocks.get(ev["contentBlockStop"]["contentBlockIndex"])
+            if b and "toolUse" in b and "input" not in b["toolUse"]:
+                raw_in = b["toolUse"].pop("input_str", "")
+                try:
+                    b["toolUse"]["input"] = json.loads(raw_in) if raw_in else {}
+                except Exception:
+                    b["toolUse"]["input"] = {"_raw": raw_in}
+                if on_tool_call is not None:
+                    try:
+                        on_tool_call(_AdaptedFunctionCall(
+                            name=b["toolUse"]["name"],
+                            arguments=json.dumps(b["toolUse"]["input"]),
+                            call_id=b["toolUse"]["toolUseId"],
+                        ))
+                    except Exception:
+                        pass
+        elif "metadata" in ev:
+            usage = ev["metadata"].get("usage", {}) or {}
+    content = []
+    for idx in order:
+        b = blocks[idx]
+        if "toolUse" in b and "input" not in b["toolUse"]:
+            raw_in = b["toolUse"].pop("input_str", "")
+            try:
+                b["toolUse"]["input"] = json.loads(raw_in) if raw_in else {}
+            except Exception:
+                b["toolUse"]["input"] = {"_raw": raw_in}
+        content.append(b)
+    return {"output": {"message": {"role": "assistant", "content": content}}, "usage": usage}
+
+
 def _bedrock_converse_call(
     model: str,
     messages: list[Any],
     tools: list[dict[str, Any]],
     timeout: float,
+    on_tool_call=None,
 ) -> _BedrockConverseResponse:
+    """Bedrock Converse with prompt caching and streaming (2026-09-18).
+
+    Caching: the 12 k-character system prompt and the tool list are the
+    same on every call; a cache point after each lets Bedrock skip
+    re-reading them (measured elsewhere as 0.3-0.5 s per call). If the
+    model or region rejects cache points, the call is retried without
+    them and caching stays off for the process."""
+    global _CACHE_POINTS_OK
     msgs, system = _messages_for_converse(messages)
-    kwargs: dict[str, Any] = {
-        "modelId": model,
-        "messages": msgs,
-        "inferenceConfig": {"maxTokens": 1024},
-    }
-    if system:
-        kwargs["system"] = system
-    tool_config = _tools_for_converse(tools)
-    if tool_config is not None:
-        kwargs["toolConfig"] = tool_config
-    # boto3 doesn't take a per-call timeout, but the cached client uses the
-    # default 60s connect / 60s read which is fine for short LLM calls.
-    raw = _bedrock_runtime_client().converse(**kwargs)
-    return _BedrockConverseResponse(raw)
+
+    def _build(cache: bool) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "modelId": model,
+            "messages": msgs,
+            "inferenceConfig": {"maxTokens": 1024},
+        }
+        sys_blocks = list(system)
+        if sys_blocks and cache:
+            sys_blocks.append({"cachePoint": {"type": "default"}})
+        if sys_blocks:
+            kwargs["system"] = sys_blocks
+        tool_config = _tools_for_converse(tools)
+        if tool_config is not None:
+            if cache:
+                tool_config = {"tools": list(tool_config["tools"]) + [{"cachePoint": {"type": "default"}}]}
+            kwargs["toolConfig"] = tool_config
+        return kwargs
+
+    client = _bedrock_runtime_client()
+    last_exc: Exception | None = None
+    for attempt in (0, 1):
+        cache = _CACHE_POINTS_OK and attempt == 0
+        try:
+            raw = _bedrock_converse_stream(client, _build(cache), on_tool_call)
+            out = _BedrockConverseResponse(raw)
+            u = raw.get("usage", {}) or {}
+            out.cache_read_tokens = int(u.get("cacheReadInputTokens", 0) or 0)
+            out.cache_write_tokens = int(u.get("cacheWriteInputTokens", 0) or 0)
+            return out
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            text = str(exc)
+            if cache and ("cachePoint" in text or "cache" in text.lower() or "ValidationException" in text):
+                _CACHE_POINTS_OK = False
+                continue
+            raise
+    raise last_exc  # type: ignore[misc]
 
 
 class LLMService:
@@ -570,12 +675,14 @@ class LLMService:
         self.tools = tools or []
         self.messages = messages if messages is not None else []
 
-    def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0) -> Any:
+    def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0, on_tool_call=None) -> Any:
         # 20s ceiling — without this the openai client's default is 600s, so
         # a single slow turn would hang the whole rclpy executor thread for
         # 10 minutes and the user sees an unresponsive Morty.
+        # on_tool_call: called with each completed tool call WHILE the reply
+        # streams (Bedrock path only) — the intent is dispatched early.
         if _use_bedrock_converse(model):
-            return _bedrock_converse_call(model, self.messages, self.tools, timeout)
+            return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call)
         extra_body = _extra_body_for_model(model)
         if USE_CHAT_COMPLETIONS:
             raw = self.client.with_options(timeout=timeout).chat.completions.create(
