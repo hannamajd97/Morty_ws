@@ -3027,13 +3027,24 @@ class ChatIntentNode(Node):
             return
         if self._said_ready or not self._tts_ready():
             return
-        verified = [o for o in (r.get("objects") or []) if o.get("state") == "verified"]
-        # A verified object implies GraspGen answered and the executor
-        # planned it: that IS ready, whatever the model flag says.
-        if verified:
+        objs = r.get("objects") or []
+        verified = [o for o in objs if o.get("state") == "verified"]
+        # Majd 2026-09-18 (evening): "it should be waiting until all of
+        # them are done, not the first object" — the first scene is ready
+        # when NO object is still waiting, computing or awaiting its
+        # background check. A verified object implies GraspGen answered
+        # and the executor planned it, whatever the model flag says; the
+        # ones that ended failed / blocked / unreachable are named so the
+        # operator knows not to ask for them.
+        pending = [o for o in objs if o.get("state") in ("waiting", "computing", "grasps")]
+        if verified and not pending:
             self._said_ready = True
             names = ", ".join(str(o.get("label", "")).replace("_", " ") for o in verified[:4])
-            self._speak(f"I'm ready to grasp now. {names} {'is' if len(verified) == 1 else 'are'} ready.")
+            line = f"I'm ready to grasp now. {names} {'is' if len(verified) == 1 else 'are'} ready."
+            rest = [str(o.get("label", "")).replace("_", " ") for o in objs if o not in verified]
+            if rest:
+                line += f" I can't reach {', '.join(rest[:3])} from here."
+            self._speak(line)
         elif not self._said_loading:
             self._said_loading = True
             self._speak("Please wait until the system is ready. You can chat with me until we start.")
