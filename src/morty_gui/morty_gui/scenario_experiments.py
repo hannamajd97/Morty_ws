@@ -74,6 +74,163 @@ def _first(events, source, after=None):
     return None
 
 
+def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
+    """The trial's timeline (2026-09-18, Majd: "how fast the system is from
+    top to bottom, every tiny thing, background and non-background").
+
+    events:  the bridge's trial events, (monotonic, source, text)
+    records: (wall, dict) timing records from /graspgen/timing and
+             /grasp_executor_lin_llm/timing, incl. background jobs done
+             BEFORE the trial for the object that was then picked.
+    Returns (text, data, stage_times)."""
+    import datetime as _dt
+
+    def rel(t):
+        return t - t_start_wall
+
+    ev = [(mono_to_wall + t, src, txt) for t, src, txt in events]
+    recs = [r for _w, r in records]
+    lo, hi = t_start_wall - 2.0, t_stop_wall + 2.0
+
+    def first_phase_t(r):
+        ph = r.get("phases") or []
+        return ph[0]["t"] if ph else None
+
+    exec_cycles = [r for r in recs if r.get("kind") == "executor_cycle"
+                   and first_phase_t(r) is not None and lo <= first_phase_t(r) <= hi]
+    sel_cycles = [r for r in recs if r.get("kind") == "selection_cycle"
+                  and lo <= float(r.get("select") or r.get("published") or 0.0) <= hi]
+    labels = {r.get("label") for r in sel_cycles}
+    bg = [r for r in recs if r.get("kind") in ("background_job", "background_verdict")
+          and r.get("label") in labels
+          and float(r.get("job_done") or r.get("verified_at") or 0.0) <= hi]
+
+    items = []  # (wall_t, text)
+    for t, src, txt in ev:
+        if src == "transcript":
+            items.append((t, f'you said: "{txt[:90]}"'))
+        elif src == "intent":
+            try:
+                j = json.loads(txt)
+                items.append((t, f"intent: {j.get('action_intent')} {j.get('object_intent') or ''}".strip()))
+            except Exception:
+                items.append((t, f"intent: {txt[:80]}"))
+        elif src == "morty_said":
+            items.append((t, f'Morty said: "{txt[:80]}"'))
+        elif src == "selection_cycle_id":
+            items.append((t, f"selection cycle {txt} started"))
+        elif src == "cand_status":
+            items.append((t, f"probe: {txt[:100]}"))
+        elif src == "cycle_done":
+            items.append((t, f"executor reported: {txt[:60]}"))
+        elif src == "trial":
+            items.append((t, f"trial {txt}"))
+    for r in bg:
+        if r["kind"] == "background_job":
+            items.append((float(r.get("job_done") or 0.0),
+                          f"background: GraspGen for '{r.get('label')}' done "
+                          f"(job {float(r.get('job_s') or 0):.2f} s, {r.get('n_grasps')} grasps)"))
+        else:
+            ok = int(r.get("feasible", -1)) >= 0
+            items.append((float(r.get("verified_at") or 0.0),
+                          f"background: '{r.get('label')}' "
+                          + (f"verified for execution via the {r.get('planner')} " if ok else "no feasible grasp ")
+                          + f"(executor probe {float(r.get('probe_s') or 0):.2f} s, {r.get('tried')} tried)"))
+    for r in sel_cycles:
+        sel = r.get("select")
+        if r.get("path") == "precomputed":
+            pc = r.get("precompute") or {}
+            lead = (sel - float(pc.get("job_done") or sel)) if sel else 0.0
+            items.append((float(r.get("hit") or sel or 0.0),
+                          f"pipeline: '{r.get('label')}' precomputed — GraspGen ran {lead:.1f} s before the click "
+                          f"(job {float(pc.get('job_s') or 0):.2f} s), executor verified it via the {pc.get('planner') or '?'} "
+                          f"(probe {float(pc.get('probe_s') or 0):.2f} s)"))
+        else:
+            for key, label in (("detect_done", "detection refreshed"), ("cloud_done", "segmentation + cloud done"),
+                               ("graspgen_start", "GraspGen request sent"), ("graspgen_done", "GraspGen answered")):
+                if r.get(key):
+                    items.append((float(r[key]), f"pipeline: {label}"))
+        if r.get("published"):
+            dt = (float(r["published"]) - sel) if sel else None
+            items.append((float(r["published"]), f"pipeline: {r.get('n_candidates')} candidates published"
+                          + (f" ({dt:.2f} s after the click, {r.get('path')})" if dt is not None else "")))
+    for r in exec_cycles:
+        prev = None
+        for ph in r.get("phases") or []:
+            name, t = ph["name"], float(ph["t"])
+            delta = f" (+{t - prev:.2f} s)" if prev is not None else ""
+            items.append((t, f"executor: {name.replace('_', ' ')}{delta}"))
+            prev = t
+        if r.get("planner"):
+            items.append((float((r.get("phases") or [{}])[-1].get("t", 0.0)) + 1e-3,
+                          f"executor: cycle {r.get('cycle_id')} {'done' if r.get('ok') else 'FAILED'} via the {r.get('planner')}"))
+    items.sort(key=lambda x: x[0])
+
+    lines = [
+        f"TRIAL TIMELINE  start {_dt.datetime.fromtimestamp(t_start_wall):%Y-%m-%d %H:%M:%S}  "
+        f"stop {_dt.datetime.fromtimestamp(t_stop_wall):%H:%M:%S}  ({t_stop_wall - t_start_wall:.1f} s)",
+        "seconds after the trial start; negative = work already done in the background before the trial",
+        "",
+    ]
+    for t, txt in items:
+        lines.append(f"t={rel(t):+8.2f}  {txt}")
+
+    # stage times, from the records where they exist, else from the events
+    t_cmd = _first(events, "transcript"); t_int = _first(events, "intent", after=t_cmd)
+    t_cmd_w = mono_to_wall + t_cmd if t_cmd is not None else None
+    t_int_w = mono_to_wall + t_int if t_int is not None else None
+    sel = sel_cycles[-1] if sel_cycles else None
+    ex = exec_cycles[-1] if exec_cycles else None
+    phases = {ph["name"]: float(ph["t"]) for ph in (ex.get("phases") if ex else [])}
+
+    def d(a, b):
+        return round(b - a, 3) if (a is not None and b is not None) else None
+
+    t_sel = float(sel["select"]) if sel and sel.get("select") else None
+    t_pub = float(sel["published"]) if sel and sel.get("published") else None
+    perception = None; graspgen = None; bg_lead = None
+    if sel:
+        if sel.get("path") == "precomputed":
+            perception = d(t_sel, t_pub); graspgen = 0.0
+            pc = sel.get("precompute") or {}
+            bg_lead = d(float(pc.get("job_done") or 0.0), t_sel) if pc.get("job_done") and t_sel else None
+        else:
+            perception = d(t_sel, float(sel.get("cloud_done") or 0.0)) if sel.get("cloud_done") else None
+            graspgen = d(float(sel.get("graspgen_start") or 0.0), float(sel.get("graspgen_done") or 0.0)) if sel.get("graspgen_done") else None
+    end_t = phases.get("cycle_done") or phases.get("home_done") or phases.get("cycle_failed")
+    stage = {
+        "intent_s": d(t_cmd_w, t_int_w),
+        "yolo_s": perception,
+        "graspgen_s": graspgen,
+        "planning_s": d(phases.get("candidates_received"), phases.get("motion_start")),
+        "approach_s": d(phases.get("motion_start"), phases.get("arrival")),
+        "grasp_s": d(phases.get("arrival"), phases.get("grasp_verdict")),
+        "wait_destination_s": d(phases.get("wait_destination_start"), phases.get("destination_received")),
+        "transport_s": d(phases.get("transport_start"), phases.get("transport_done")),
+        "execution_s": d(phases.get("motion_start"), end_t),
+        "click_to_motion_s": d(t_sel, phases.get("motion_start")),
+        "background_lead_s": bg_lead,
+        "total_s": d(t_cmd_w if t_cmd_w is not None else t_sel, end_t),
+        "planner": (ex or {}).get("planner"),
+        "path": (sel or {}).get("path"),
+    }
+    lines += ["", "SUMMARY"]
+    for k, lab in (("intent_s", "speech -> intent"), ("yolo_s", "click -> perception done"),
+                   ("graspgen_s", "GraspGen at the click (0 = precomputed)"), ("background_lead_s", "precomputed this long before the click"),
+                   ("planning_s", "executor: candidates -> motion start"), ("click_to_motion_s", "click -> motion start"),
+                   ("approach_s", "approach"), ("grasp_s", "arrival -> grasp verdict"), ("wait_destination_s", "waiting for the drop side"),
+                   ("transport_s", "transport to the drop"), ("execution_s", "motion start -> home"), ("total_s", "total")):
+        v = stage.get(k)
+        if v is not None:
+            lines.append(f"  {lab:42s} {v:7.2f} s")
+    if stage.get("planner"):
+        lines.append(f"  {'approach planned by':42s} {stage['planner']} ({stage.get('path')})")
+    data = {"start_wall": t_start_wall, "stop_wall": t_stop_wall, "stage_times": stage,
+            "selection_cycles": sel_cycles, "executor_cycles": exec_cycles, "background": bg,
+            "events": [{"t": round(rel(t), 3), "source": s_, "text": x} for t, s_, x in ev]}
+    return "\n".join(lines) + "\n", data, stage
+
+
 def compute_stage_times(events) -> dict:
     """Derive the four PDF stage durations from the raw event list."""
     t_cmd = _first(events, "transcript")

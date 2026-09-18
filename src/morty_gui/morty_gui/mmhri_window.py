@@ -864,8 +864,25 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             events = self._bridge.trial_stop()
         except Exception:
             return times
-        from .scenario_experiments import compute_stage_times
+        from .scenario_experiments import compute_stage_times, build_timeline
         times = compute_stage_times(events)
+        # Full timeline (2026-09-18): pipeline + executor + background
+        # records, incl. the GraspGen job that ran for this object BEFORE
+        # the trial started; stage times come from the records when present.
+        try:
+            t_start_wall = float(getattr(self._bridge, "trial_start_wall", time.time()))
+            m2w = float(getattr(self._bridge, "trial_mono_to_wall", time.time() - time.monotonic()))
+            text, data, stage = build_timeline(events, self._bridge.timing_snapshot(), t_start_wall, time.time(), m2w)
+            for k, v in stage.items():
+                if v is not None:
+                    times[k] = v
+            if self._trial_dir:
+                with open(os.path.join(self._trial_dir, "timeline.txt"), "w") as f:
+                    f.write(text)
+                with open(os.path.join(self._trial_dir, "timeline.json"), "w") as f:
+                    json.dump(data, f, indent=1, default=str)
+        except Exception as exc:
+            self.status.setText(f"timeline not written: {exc}")
         if self._trial_dir and events:
             t0 = events[0][0]
             try:

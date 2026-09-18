@@ -239,6 +239,12 @@ class MortyGuiBridge(Node):
         self._readiness = None
         self._readiness_t = 0.0
         self.create_subscription(String, "/graspgen/readiness", self._on_readiness, 10)
+        # Timing records (2026-09-18): every selection cycle, background job
+        # and executor cycle, kept ~600 deep so a trial can include the
+        # background work done for its object BEFORE the trial started.
+        self.timing_records: deque = deque(maxlen=600)
+        self.create_subscription(String, "/graspgen/timing", self._on_timing, 20)
+        self.create_subscription(String, "/grasp_executor_lin_llm/timing", self._on_timing, 20)
         # Voice system-control: chat_node publishes start_driver /
         # start_pipeline / start_all / stop_* intents; the GUI owns the
         # launches, so it executes them (Majd, 2026-08-12).
@@ -844,6 +850,8 @@ class MortyGuiBridge(Node):
             self.trial_events = []
             self._trial_last_det_t = 0.0
             self.trial_active = True
+            self.trial_start_wall = time.time()
+            self.trial_mono_to_wall = time.time() - time.monotonic()
         self.trial_mark("trial", "start")
 
     def trial_stop(self) -> List[Tuple[float, str, str]]:
@@ -910,6 +918,16 @@ class MortyGuiBridge(Node):
         self._pub_llm_abort.publish(String(data="abort"))
         self._pub_pipeline_abort.publish(String(data="abort"))
         self.llm_cycle_active = False
+
+    def _on_timing(self, msg) -> None:
+        try:
+            self.timing_records.append((time.time(), json.loads(msg.data)))
+        except Exception:
+            pass
+
+    def timing_snapshot(self):
+        with self._lock:
+            return list(self.timing_records)
 
     def _on_readiness(self, msg) -> None:
         try:
