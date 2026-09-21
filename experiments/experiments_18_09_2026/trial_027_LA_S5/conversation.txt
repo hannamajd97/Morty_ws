@@ -1,7 +1,0 @@
-# trial 027 started 2026-09-18T17:04:24.406750
-[   7.95s] You: Class for me is a vitamin tube.
-[  10.98s] Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
-[  20.97s] You: Lightmost.
-[  22.06s] Morty: I didn't catch that, could you repeat?
-[  29.87s] You: Write most.
-[  30.68s] Morty: I didn't catch that, could you repeat?
