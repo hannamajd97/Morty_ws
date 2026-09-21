@@ -1,6 +1,0 @@
-# trial 032 started 2026-09-18T17:10:44.944951
-[   6.42s] Morty (status): Going to drop right.
-[   9.25s] You: Move to the drop position right, then go back home.
-[  31.55s] You: Move to the drop position right and go back home.
-[  31.64s] Morty (status): Going to drop right.
-[  36.64s] Morty (status): Could not reach the pose. the robot didn't reach pose 'drop_right_side' in time (30s)
