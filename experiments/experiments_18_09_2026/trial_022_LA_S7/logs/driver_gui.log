@@ -1,5 +1,0 @@
-[move_group-15] [INFO] [1789742948.603934554] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
-[move_group-15] [INFO] [1789742948.604487584] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 30 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
-[move_group-15] [INFO] [1789742949.337427342] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 31 points (followed 100.000000% of requested trajectory)
-[gripper_command_adapter-3] [INFO] [1789742950.434898479] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
-[gripper_command_adapter-3] [INFO] [1789742950.442798255] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']

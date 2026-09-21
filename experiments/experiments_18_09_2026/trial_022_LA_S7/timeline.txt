@@ -1,7 +1,0 @@
-TRIAL TIMELINE  start 2026-09-18 16:49:07  stop 16:49:11  (3.8 s)
-seconds after the trial start; negative = work already done in the background before the trial
-
-t=   +0.00  trial start
-t=   +3.84  trial stop
-
-SUMMARY
