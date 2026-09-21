@@ -1,8 +1,0 @@
-# trial 044 started 2026-09-18T17:21:14.606488
-[   5.71s] You: Class for me is a tape dispenser.
-[   7.74s] Morty (status): Starting grasp on the tape dispenser.
-[  12.08s] Morty (status): The object was moved. I'm not grasping anything.
-[  16.28s] Morty (status): Should I go back home?
-[  21.78s] You: Yes, go back home.
-[  21.78s] Morty (status): Going home.
-[  26.69s] Morty (status): The grasp failed: the gripper closed but nothing was caught. Resetting.
