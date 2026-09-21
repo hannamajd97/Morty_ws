@@ -1,3 +1,0 @@
-# trial 010 started 2026-09-18T16:20:19.171343
-[   6.30s] You: Move to the right, then to the left.
-[   7.10s] Morty: The robot driver is up, but the program on the teach pendant is not running. Please press Play so I can move.
