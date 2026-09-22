@@ -2613,78 +2613,52 @@ class ChatIntentNode(Node):
                 "and OVERRIDE anything said earlier in this conversation, "
                 "including your own previous replies."
             )
-        if not self._current_pose_label:
-            # 2026-09-08: mid-cycle the pose label is empty, so nothing
-            # said where the arm was and the LLM fell back on an OLD "I'm
-            # at the home position" line → "You're already at home" while
-            # the arm held the object over the table. State the negative.
-            _cs = getattr(self, "_cycle_state", "") or ""
-            _where = ("at the GRASP position over the table"
-                      if "grasp pose" in _cs.lower() else
-                      "at the DROP position" if "drop pose" in _cs.lower() else
-                      "somewhere mid-cycle")
-            self.chat_agent.add_developer_message(
-                f"Robot arm state: the arm is NOT at any named pose right "
-                f"now — it is {_where}. It is NOT at home. This is LIVE and "
-                f"OVERRIDES any earlier 'I'm at the home position' line. If "
-                f"the user names a destination or asks to go home, that is "
-                f"a real move: emit the intent, never say 'already there'."
-            )
-        if self._current_pose_label:
-            # Tell the LLM where the ARM currently is so it can answer
-            # questions like "which position are you at?" or "are you
-            # home?" and avoid commanding a redundant move to the same
-            # pose. This is the ROBOT'S JOINT POSE, NOT the user's
-            # location. "Where are you?" in general conversation still
-            # refers to Hochschule Reutlingen — see SYSTEM_PROMPT.
-            self.chat_agent.add_developer_message(
-                f"Robot arm state: arm is currently at named pose "
-                f"'{self._current_pose_label}'. This is LIVE and "
-                f"OVERRIDES any position you or the user mentioned earlier "
-                f"in the conversation (2026-08-28: the arm had already "
-                f"moved 'drop_right_side' -> 'home' when Morty still said "
-                f"\"I'm holding the small bottle at the drop right "
-                f"position\"). This is the arm's joint "
-                f"pose. Use it ONLY when the user asks about the arm's "
-                f"position (e.g. 'which position are you at?', 'are you "
-                f"home?', 'are you at drop right?'). Do NOT confuse it "
-                f"with the generic 'where are you?' question, which is "
-                f"about your location (Hochschule Reutlingen). A request "
-                f"to go somewhere is ALWAYS a move: emit the intent even "
-                f"when this says the arm is already there, and NEVER "
-                f"answer 'you're already at ...' (2026-09-22: 'Now come "
-                f"back home' from drop_right_side got 'You're already at "
-                f"the home position' — the router checks the real joints, "
-                f"you do not decide that). Moving to a pose the arm is "
-                f"already at is harmless; refusing is not."
-            )
-        else:
-            # Empty = the arm is between named poses. Compute the NEAREST
-            # named pose by joint-space L2 distance from the live joint
-            # state. Joints are in radians; ~0.05 rad/joint ≈ "basically
-            # at it", up to ~0.5 rad/joint ≈ "in the vicinity".
-            nearest = self._nearest_named_pose()
-            if nearest is not None:
-                name, dist = nearest
-                human = name.replace("_", " ")
-                self.chat_agent.add_developer_message(
-                    f"Robot arm state: the arm is NOT exactly at a named "
-                    f"pose right now (it is between poses — mid pick "
-                    f"cycle or at a grasp/drop waypoint). By joint-space "
-                    f"distance, the NEAREST named pose is "
-                    f"'{name}' (L2 distance = {dist:.2f} rad across all "
-                    f"6 joints). If the user asks 'which position are "
-                    f"you at?', answer 'I'm near to {human}' (or similar "
-                    f"approximate phrasing). Do NOT claim to be exactly "
-                    f"AT that pose."
-                )
+        # 2026-09-22 (Majd: "I sent the robot home with the GUI and he
+        # still thinks he is at detect right"): the router's latched label
+        # follows only the router's OWN named-pose moves; a GUI or executor
+        # move leaves it stale. The joints are the truth. Nearest named
+        # pose by joint-space distance: "at" below 0.15 rad, "near" below
+        # 0.6 rad, otherwise between poses (mid pick cycle). The label is
+        # a fallback for the moment before the first joint sample only.
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        nearest = self._nearest_named_pose() if (now_s - self._last_joint_state_at) < 3.0 else None
+        tail = (
+            " This is the arm's joint pose, LIVE, and OVERRIDES anything said "
+            "earlier in this conversation. Use it ONLY when the user asks about "
+            "the arm's position ('which position are you at?', 'are you home?'); "
+            "the generic 'where are you?' is about your location (Hochschule "
+            "Reutlingen). A request to go somewhere is ALWAYS a move: emit the "
+            "intent even when the arm is already there and NEVER answer "
+            "'you're already at ...' — moving to a pose the arm is at is "
+            "harmless, refusing is not."
+        )
+        if nearest is not None:
+            name, dist = nearest
+            human = name.replace("_", " ")
+            if self._current_pose_label and self._current_pose_label != name and dist < 0.15:
+                self.get_logger().warn(
+                    f"stale pose label {self._current_pose_label!r}: joints say {name!r} "
+                    f"({dist:.2f} rad) — the joints win.")
+            if dist < 0.15:
+                where = f"the arm is AT named pose '{name}' (say: at {human})"
+            elif dist < 0.6:
+                where = (f"the arm is NEAR named pose '{name}' ({dist:.2f} rad away), "
+                         f"not exactly at it (say: near {human})")
             else:
-                self.chat_agent.add_developer_message(
-                    "Robot arm state: the arm's current named pose is "
-                    "unknown (no joint state received yet). If the user "
-                    "asks 'which position are you at?', say so honestly "
-                    "— do NOT guess a pose name."
-                )
+                _cs = (getattr(self, "_cycle_state", "") or "").lower()
+                place = ("at the grasp position over the table" if "grasp pose" in _cs else
+                         "at the drop position" if "drop pose" in _cs else
+                         f"between named poses, nearest '{name}' ({dist:.2f} rad away)")
+                where = f"the arm is NOT at any named pose: it is {place} (do not claim a pose name)"
+            self.chat_agent.add_developer_message(f"Robot arm state: {where}.{tail}")
+        elif self._current_pose_label:
+            self.chat_agent.add_developer_message(
+                f"Robot arm state: last completed named move ended at "
+                f"'{self._current_pose_label}' (no fresh joint state to confirm).{tail}")
+        else:
+            self.chat_agent.add_developer_message(
+                "Robot arm state: unknown (no joint state yet). If asked which "
+                "position the arm is at, say so honestly and do not guess." + tail)
         self.chat_agent.add_user_message(user_text)
         try:
             _t_llm0 = time.monotonic()
