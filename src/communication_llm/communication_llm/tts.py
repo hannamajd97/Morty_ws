@@ -13,6 +13,8 @@ import re
 import threading
 from typing import Any, Callable, List, Optional
 
+import time
+
 import numpy as np
 
 
@@ -344,8 +346,12 @@ class KokoroTTS:
                 if self._kokoro is not None:
                     if on_phase:
                         on_phase("synthesizing")
-                    wav = self._synth_kokoro(text)
-                    if wav is None:
+                    # 2026-09-22 (Majd: "the voice is too slow"): play each
+                    # Kokoro segment as soon as it exists instead of
+                    # synthesising the whole reply first; the first word is
+                    # heard after one segment, not after all of them.
+                    played = self._speak_kokoro_streaming(text, on_phase)
+                    if played is None:
                         if self._stop_event.is_set():
                             # Interrupted mid-synthesis by a newer Speak
                             # goal — do NOT re-speak this text through the
@@ -354,13 +360,6 @@ class KokoroTTS:
                                 on_phase("finished")
                             return True
                         return self._fallback_say(text, on_phase)
-                    if self._stop_event.is_set():
-                        if on_phase:
-                            on_phase("finished")
-                        return True
-                    if on_phase:
-                        on_phase("playing")
-                    self._play_kokoro(wav)
                     if on_phase:
                         on_phase("finished")
                     return True
@@ -412,6 +411,65 @@ class KokoroTTS:
         except Exception as exc:
             self._log("warn", f"Kokoro synth failed: {exc}")
             return None
+
+    def _speak_kokoro_streaming(self, text: str, on_phase=None) -> Optional[bool]:
+        """Synthesise with Kokoro segment by segment and write each segment
+        to the output stream as it arrives. Returns True when something was
+        played, None when nothing came out (caller decides the fallback).
+        Same device buffer, 200 ms write windows and silence pad as
+        _play_kokoro, so an interrupt still halts within one window and the
+        Pulse backend does not eat the last word."""
+        if self._kokoro is None or self._pa is None:
+            return None
+        rate = int(self._sample_rate)
+        t0 = time.monotonic()
+        stream = None
+        chunk_samples = max(256, int(rate * 0.2))
+        n_samples = 0
+        first_audio_s = 0.0
+        try:
+            for _, _, audio in self._kokoro(str(text), voice=self._voice):
+                if self._stop_event.is_set():
+                    break
+                if audio is None:
+                    continue
+                if hasattr(audio, "detach"):
+                    audio = audio.detach().cpu().numpy()
+                wav = np.asarray(audio, dtype=np.float32) * self._volume_gain
+                np.clip(wav, -1.0, 1.0, out=wav)
+                pcm16 = (wav * 32767.0).astype(np.int16)
+                if stream is None:
+                    stream = self._pa.open(
+                        format=pyaudio.paInt16,  # type: ignore[attr-defined]
+                        channels=1, rate=rate, output=True,
+                        frames_per_buffer=max(1024, int(rate * 0.4)),
+                    )
+                    first_audio_s = time.monotonic() - t0
+                    if on_phase:
+                        on_phase("playing")
+                for i in range(0, pcm16.size, chunk_samples):
+                    if self._stop_event.is_set():
+                        break
+                    stream.write(pcm16[i:i + chunk_samples].tobytes())
+                n_samples += int(pcm16.size)
+            if stream is not None and not self._stop_event.is_set():
+                stream.write(np.zeros(int(rate * 0.85), dtype=np.int16).tobytes())
+        except Exception as exc:
+            self._log("warn", f"Kokoro streaming synth failed: {exc}")
+            if stream is None:
+                return None
+        finally:
+            if stream is not None:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except Exception:
+                    pass
+        if stream is None:
+            return None
+        self._log("info", f"[timing] TTS first audio after {first_audio_s:.2f}s, "
+                          f"{n_samples / rate:.1f}s of speech, done {time.monotonic() - t0:.2f}s after the request")
+        return True
 
     def _ensure_piper_de(self) -> None:
         """One-time load of the Piper German voice (preloaded in the
