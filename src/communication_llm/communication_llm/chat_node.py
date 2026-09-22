@@ -797,7 +797,7 @@ class ChatIntentNode(Node):
             # so it does not annoy on every run. A "yes" falls through to
             # the LLM (no pause is open at startup, and "yes" passes the
             # junk filter), which answers from the system prompt.
-            "Hi! I'm Morty. Want to know what I can do?",
+            "Hi! I'm Morty.",
         )
         # Minimum delay before attempting the greeting. The actual greeting
         # is gated on the Speak server being ready (Kokoro takes ~6s to
@@ -1264,11 +1264,15 @@ class ChatIntentNode(Node):
             self.destroy_timer(self._greeting_timer)  # not cancel — see above
             self._greeting_timer = None
         try:
-            self._speak(self._startup_greeting)
-            self.get_logger().info("Startup greeting sent.")
+            # Majd 2026-09-22: one sentence, not two back to back — the
+            # greeting and the "please wait" line are spoken together.
+            line = self._startup_greeting
             if not self._said_ready and not self._said_loading:
                 self._said_loading = True
-                self._speak("Please wait until the system is ready. You can chat with me until we start.")
+                line = (f"{self._startup_greeting.rstrip()} Please wait until the system "
+                        "is ready. You can chat with me until we start.")
+            self._speak(line)
+            self.get_logger().info("Startup greeting sent.")
         except Exception as exc:
             self.get_logger().warn(f"Startup greeting failed: {exc}")
 
