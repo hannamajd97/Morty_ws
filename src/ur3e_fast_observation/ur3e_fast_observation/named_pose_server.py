@@ -551,10 +551,14 @@ class MoveToNamedPoseServer(Node):
         self._replay_seen = True
         if not self._expected_pose:
             return
-        try:
-            phase, name = text.split(":", 1)
-        except ValueError:
+        # replay_node's grammar is phase:label[:reason] — a failure such as
+        # "failed:drop_right_side:status_6" carries the controller's reason.
+        # Splitting once glued the reason onto the label (2026-09-22): every
+        # failure was ignored here and surfaced as a 30 s timeout instead.
+        parts = text.split(":")
+        if len(parts) < 2:
             return
+        phase, name = parts[0], parts[1]
         if name.strip() != self._expected_pose:
             return
         if phase in ("done", "failed"):

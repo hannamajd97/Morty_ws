@@ -1363,6 +1363,7 @@ class IntentRouterNode(Node):
                     SwitchController, "/controller_manager/switch_controller")
             now_heal = now
             if (self._ctrl_switch_cli.service_is_ready()
+                    and self._robot_program_running is not False
                     and now_heal - getattr(self, "_ctrl_heal_at", 0.0) > 10.0):
                 self._ctrl_heal_at = now_heal
                 req = self._SwitchController.Request()
@@ -1380,37 +1381,32 @@ class IntentRouterNode(Node):
             # (_robot_program_running is None) we don't know, so we let
             # motion proceed.
             #
-            # 2026-09-18 (Majd: "the robot is running, why does he give
-            # such an error?"): the topic is latched and the driver only
-            # re-sends it on a change it noticed. When the External
-            # Control link flaps under machine load ("Connection to
-            # reverse interface dropped" bursts) and the GUI's auto-Play
-            # brings the program back, the flag can stay False for the
-            # rest of the session while the robot moves fine. Two live
-            # witnesses outrank it: the trajectory controller is active
-            # (controller_stopper deactivates it the moment the program
-            # stops, so 'active' means the program runs), or the
-            # dashboard reported PLAYING at the last poll.
-            witness = self._program_running_witness(now)
-            if witness:
-                if now - self._stale_flag_warned_at > 30.0:
-                    self._stale_flag_warned_at = now
-                    self.get_logger().warn(
-                        "robot_program_running says False but "
-                        f"{witness}; trusting the live evidence.")
-                return None
+            # 2026-09-22: the flag is AUTHORITATIVE. On 09-18 two "live
+            # witnesses" (trajectory controller active, dashboard PLAYING)
+            # were allowed to outrank a False flag; both are false witnesses
+            # when the External Control link drops: the pendant program
+            # stays PLAYING but disconnected, and this node's own auto-heal
+            # re-activates the controller the stopper had switched off.
+            # Goals were then accepted and aborted on state tolerance while
+            # the operator was told the robot was fine. The witness code is
+            # gone; the reason names what a False flag means.
+            if now - self._stale_flag_warned_at > 30.0:
+                self._stale_flag_warned_at = now
+                self.get_logger().warn(
+                    "robot_program_running is False: the External Control "
+                    f"link is down (controller {self._last_controller_state or '?'}, "
+                    f"dashboard {self._dashboard_state or '?'}).")
             return (
-                "The robot program isn't running. Press play on the teach "
-                "pendant or remote control."
+                "The robot program isn't connected to the driver. Press Stop "
+                "and Play on the teach pendant, or switch it to Remote control "
+                "so I can restart it."
             )
         return None
 
     def _program_running_witness(self, now: float) -> str:
-        """Name the live evidence that the robot program runs, or ''."""
-        if self._last_controller_state == "active":
-            return "scaled_joint_trajectory_controller is active"
-        if self._dashboard_state == "PLAYING" and now - self._dashboard_at < 10.0:
-            return "the dashboard reports PLAYING"
+        """Retired 2026-09-22 (see _check_robot_ready): nothing outranks the
+        driver's own flag. Kept only so the status broadcast can say what
+        the other sources claim."""
         return ""
 
     def _poll_dashboard_program_state(self) -> None:
@@ -2683,7 +2679,7 @@ class IntentRouterNode(Node):
         now = self.get_clock().now().nanoseconds / 1e9
         flag = self._robot_program_running
         witness = self._program_running_witness(now)
-        running = None if flag is None else bool(flag or witness)
+        running = None if flag is None else bool(flag)
         self._robot_status_pub.publish(String(data=json.dumps({
             "program_running": running,
             "flag": flag,
@@ -2716,7 +2712,11 @@ class IntentRouterNode(Node):
                 f"{self._last_controller_state!r} -> {target_state!r}"
             )
             self._last_controller_state = target_state
-        if target_state != "active":
+        # 2026-09-22: controller_stopper deactivates the controller when the
+        # program stops and re-activates it when the program reconnects.
+        # Re-activating it ourselves while the program is down only makes
+        # goals get accepted and aborted; leave it to the stopper then.
+        if target_state != "active" and self._robot_program_running is not False:
             self._activate_traj_controller()
 
     def _activate_traj_controller(self) -> None:
