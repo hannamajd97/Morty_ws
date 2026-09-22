@@ -247,6 +247,13 @@ class YoloLiveSelectGrasp(Node):
             if prompt_topic
             else None
         )
+        # 2026-09-22: the router sets auto_select_label and waits for the
+        # executor's cycle_done; when THIS node gives the label up, no cycle
+        # ever starts and the router sat busy for its 90 s watchdog, dropping
+        # every repeat as a duplicate. The verdict goes out here in the
+        # cycle_done grammar ("failed|0|<reason>") so the router's handler
+        # can take it unchanged.
+        self._result_pub = self.create_publisher(String, "/grasp_pipeline/selection_result", 10)
         self.pub_detection = self.create_publisher(
             Detection2D, str(self.get_parameter("selected_detection_topic").value), 10
         )
@@ -2283,20 +2290,42 @@ class YoloLiveSelectGrasp(Node):
                     if auto_label:
                         # RETRY CAP (2026-08-26, the small-bottle loop:
                         # gated/failing cycles re-fired the same label
-                        # forever). 3 consecutive starts for the same
-                        # label without a completed cycle => give up.
-                        if auto_label == getattr(self, "_auto_label_last", ""):
-                            self._auto_label_starts = getattr(
-                                self, "_auto_label_starts", 0) + 1
-                        else:
+                        # forever). 2026-09-22: the counter counted loop
+                        # PASSES, not started cycles, and no completed
+                        # cycle ever reset it — the small bottle picked at
+                        # 19:47 had spent the budget, and the next request
+                        # died after three frames in which it was simply
+                        # not detected. Now a START is counted where a
+                        # cycle starts (3 allowed), a MISS where the label
+                        # is not among the detections (5 allowed), a
+                        # completed cycle resets both, and the give-up is
+                        # reported to the router (selection_result).
+                        if auto_label != getattr(self, "_auto_label_last", ""):
                             self._auto_label_last = auto_label
-                            self._auto_label_starts = 1
-                        if self._auto_label_starts > 3:
+                            self._auto_label_starts = 0
+                            self._auto_label_missing = 0
+                        found = None
+                        for i, n in enumerate(names):
+                            if str(n).strip().lower() == auto_label:
+                                found = i
+                                break
+                        give_up = ""
+                        spoken_label = auto_label.replace('_', ' ')
+                        if found is None:
+                            self._auto_label_missing = getattr(self, "_auto_label_missing", 0) + 1
                             self.get_logger().warn(
-                                f"auto_select_label='{auto_label}' started "
-                                f"{self._auto_label_starts - 1} cycles without "
-                                "one completing — clearing the label and "
-                                "stopping the retry loop.")
+                                f"auto_select_label='{auto_label}' not found in {names} "
+                                f"({self._auto_label_missing}/5); falling back to interactive.")
+                            if self._auto_label_missing >= 5:
+                                give_up = f"I can't see the {spoken_label} right now."
+                        elif getattr(self, "_auto_label_starts", 0) >= 3:
+                            give_up = (f"I could not grasp the {spoken_label} after "
+                                       "several tries — it may be out of my reach. "
+                                       "Pick something else or move it closer.")
+                        if give_up:
+                            self.get_logger().warn(
+                                f"auto_select_label='{auto_label}': {give_up} — clearing "
+                                "the label and stopping the retry loop.")
                             try:
                                 from rclpy.parameter import Parameter as _P
                                 self.set_parameters([_P(
@@ -2306,28 +2335,16 @@ class YoloLiveSelectGrasp(Node):
                                 pass
                             self._auto_label_last = ""
                             self._auto_label_starts = 0
+                            self._auto_label_missing = 0
                             try:
-                                if self._prompt_pub is not None:
-                                    _m = String()
-                                    _m.data = (
-                                        f"I could not grasp the "
-                                        f"{auto_label.replace('_', ' ')} after "
-                                        "several tries — it may be out of my "
-                                        "reach. Pick something else or move "
-                                        "it closer.")
-                                    self._prompt_pub.publish(_m)
+                                self._result_pub.publish(String(data=f"failed|0|{give_up}"))
                             except Exception:
                                 pass
                             auto_label = ""
-                        else:
-                            for i, n in enumerate(names):
-                                if str(n).strip().lower() == auto_label:
-                                    choice = i
-                                    break
-                            if choice is None:
-                                self.get_logger().warn(
-                                    f"auto_select_label='{auto_label}' not found in {names}; falling back to interactive."
-                                )
+                        elif found is not None:
+                            self._auto_label_starts = getattr(self, "_auto_label_starts", 0) + 1
+                            self._auto_label_missing = 0
+                            choice = found
 
                     if choice is None and auto_idx >= 0 and auto_idx < len(names):
                         choice = auto_idx
@@ -2562,6 +2579,10 @@ class YoloLiveSelectGrasp(Node):
                                     break
                                 if self._executor_cycle_done:
                                     status = self._executor_cycle_status or "done"
+                                    if status != "failed":
+                                        # A completed cycle restores the label's retry budget.
+                                        self._auto_label_starts = 0
+                                        self._auto_label_missing = 0
                                     if status == "failed":
                                         self.get_logger().warn(
                                             "Executor reported failure. Robot should have recovered to initgrasp via fallback. "

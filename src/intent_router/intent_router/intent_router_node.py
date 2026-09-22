@@ -499,6 +499,11 @@ class IntentRouterNode(Node):
             self._on_cycle_done,
             10,
         )
+        # 2026-09-22: the pipeline's own verdict when it gives a label up
+        # before any cycle starts (object not seen / three failed starts);
+        # same grammar as cycle_done, so the same handler frees the pick.
+        self.create_subscription(
+            String, "/grasp_pipeline/selection_result", self._on_cycle_done, 10)
         # Lifecycle status for the interactive drop: 'paused' fires when
         # the executor has finished Step 3 (close gripper) and is now
         # blocking on the resume topic; 'resumed:<dest>' fires when we
@@ -2499,6 +2504,10 @@ class IntentRouterNode(Node):
                     # nothing resets — saying "Resetting." here was a
                     # lie (2026-08-31 narration audit).
                     self._narrate("Stopped. I'm holding position.")
+                elif fields[1].strip() == "0" and reason:
+                    # No cycle ever ran (pipeline gave the label up): the
+                    # reason is already a sentence; nothing is resetting.
+                    self._narrate(reason)
                 elif reason:
                     self._narrate(f"The grasp failed: {reason}. Resetting.")
                 else:
