@@ -326,6 +326,11 @@ _FAST_COMMAND_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
+_SEQUENCE_CONNECTOR = re.compile(
+    r"(?:,\s*|\s)(?:and\s+)?then\b|\bafter\s+that\b|\bafterwards\b|\bund\s+dann\b|\bdanach\b|(?:,\s*|\s)dann\b",
+    re.IGNORECASE)
+
+
 def _match_fast_command(text: str) -> tuple[str, str] | None:
     """If text is a direct command we can route without the LLM, return
     (action_intent, speed). speed is "" if not specified. Returns None
@@ -333,6 +338,12 @@ def _match_fast_command(text: str) -> tuple[str, str] | None:
     import re
     t = (text or "").strip().lower()
     if not t:
+        return None
+    # 2026-09-22: "Go to the drop position right, then go back home" was
+    # matched here as drop_right alone and the second half was lost; the
+    # LLM turns a sequence into one intent per step, so anything with a
+    # sequence connector is its job, not this shortcut's.
+    if _SEQUENCE_CONNECTOR.search(t):
         return None
     for pattern, action in _FAST_COMMAND_PATTERNS:
         m = re.match(pattern, t)
@@ -2634,17 +2645,14 @@ class ChatIntentNode(Node):
                 f"position (e.g. 'which position are you at?', 'are you "
                 f"home?', 'are you at drop right?'). Do NOT confuse it "
                 f"with the generic 'where are you?' question, which is "
-                f"about your location (Hochschule Reutlingen). If they "
-                f"ask you to go somewhere you are already at, "
-                f"acknowledge and skip the move — but ONLY on an EXACT "
-                f"pose match per the POSITION GLOSSARY: detect_right is "
-                f"NOT drop_right_side; a look pose is never a drop pose. "
-                f"HUMILITY RULE: if the user REPEATS the move request or "
-                f"says your position belief is wrong ('no you are at the "
-                f"drop position!'), EMIT THE MOVE INTENT anyway — your "
-                f"state can be stale, moving to a pose you are already "
-                f"at is harmless, and arguing with the operator is not. "
-                f"Never insist more than once."
+                f"about your location (Hochschule Reutlingen). A request "
+                f"to go somewhere is ALWAYS a move: emit the intent even "
+                f"when this says the arm is already there, and NEVER "
+                f"answer 'you're already at ...' (2026-09-22: 'Now come "
+                f"back home' from drop_right_side got 'You're already at "
+                f"the home position' — the router checks the real joints, "
+                f"you do not decide that). Moving to a pose the arm is "
+                f"already at is harmless; refusing is not."
             )
         else:
             # Empty = the arm is between named poses. Compute the NEAREST
