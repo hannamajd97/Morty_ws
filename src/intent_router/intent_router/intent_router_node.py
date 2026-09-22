@@ -2447,8 +2447,13 @@ class IntentRouterNode(Node):
             self._pick_awaiting_destination = False
             # The executor now lifts clear and ASKS before homing
             # (2026-08-26) — don't promise "going back home" here.
+            # 2026-09-22 (Majd: "he must always check before saying such a
+            # thing"): the executor only knows the fingers closed and met
+            # nothing (grasp pin low, no stall). Whether the object moved,
+            # was pushed by the early close or the pose missed is not
+            # known — say what was measured.
             self._narrate(
-                "The object was moved. I'm not grasping anything."
+                "I closed the gripper but caught nothing."
             )
         elif data == "vitamin_retighten":
             # Mid-drop slip-prevention re-tightening (vitamin tube only).
