@@ -123,6 +123,9 @@ class MortyGuiBridge(Node):
         # and its value is the pendant's program running (Play) state.
         self._joint_state_t = 0.0
         self._program_running: Optional[bool] = None
+        # 2026-09-22: pendant PLAYING while the driver's flag is False = the
+        # External Control link is down; only a stop+Play restart cures it.
+        self._program_disconnected: bool = False
         self._program_t = 0.0
         self._camera_t = 0.0
         # Astra (fixed cam on the shuttle PC, relayed over the network) and
@@ -701,30 +704,42 @@ class MortyGuiBridge(Node):
                 # socket was dropped, every trajectory failed with
                 # CONTROL_FAILED while the dashboard reported PLAYING).
                 # Only a program restart reconnects it: stop, then Play.
-                stop_cli = getattr(self, "_dashboard_stop", None)
-                if _retry and stop_cli is not None and stop_cli.service_is_ready():
-                    self.status_text = ("Play refused: program already running but not linked "
-                                        "to the driver — restarting it (stop, then Play)")
-                    self._last_stop_cmd_t = 0.0
-                    sf = stop_cli.call_async(Trigger.Request())
-
-                    def _after_stop(_f):
-                        # the robot needs a moment to unload the program
-                        self._restart_timer = self.create_timer(1.5, _play_again)
-
-                    def _play_again():
-                        try:
-                            self._restart_timer.cancel()
-                        except Exception:
-                            pass
-                        self.play_program(_retry=False)
-                    sf.add_done_callback(_after_stop)
+                if _retry and self.restart_program(
+                        "Play refused: program already running but not linked "
+                        "to the driver — restarting it (stop, then Play)"):
+                    pass
                 else:
                     self.status_text = ("Play refused by the robot: program already running, "
                                         "or robot not ready (safety / brakes)")
             else:
                 self.status_text = f"Play refused: {msg}"[:120]
         fut.add_done_callback(_done)
+        return True
+
+    def restart_program(self, why: str = "") -> bool:
+        """Stop the pendant program and Play it again 1.5 s later: the only
+        way to reconnect an External Control node whose link to the driver
+        dropped (pendant PLAYING, robot_program_running False, every goal
+        accepted and then aborted on state tolerance). Needs Remote mode.
+        Returns True when the stop was sent."""
+        stop_cli = getattr(self, "_dashboard_stop", None)
+        if stop_cli is None or not stop_cli.service_is_ready():
+            return False
+        self.status_text = why or "Restarting the pendant program (stop, then Play)"
+        self._last_stop_cmd_t = 0.0
+        sf = stop_cli.call_async(Trigger.Request())
+
+        def _after_stop(_f):
+            # the robot needs a moment to unload the program
+            self._restart_timer = self.create_timer(1.5, _play_again)
+
+        def _play_again():
+            try:
+                self._restart_timer.cancel()
+            except Exception:
+                pass
+            self.play_program(_retry=False)
+        sf.add_done_callback(_after_stop)
         return True
 
     def _dashboard_lost(self, resp) -> bool:
@@ -782,6 +797,10 @@ class MortyGuiBridge(Node):
                 or now - self._last_autoplay_t < 10.0):
             return False
         self._last_autoplay_t = now
+        if self._program_disconnected:
+            return self.restart_program(
+                "Program PLAYING on the pendant but not linked to the driver — "
+                "restarting it automatically (stop, then Play)")
         sent = self.play_program()
         if sent:
             self.status_text = "Program stopped, pendant in Remote mode — Play sent automatically"
@@ -810,7 +829,18 @@ class MortyGuiBridge(Node):
             if self._dashboard_lost(resp):
                 return
             if resp is not None and resp.success:
-                self._program_running = bool(resp.program_running)
+                val = bool(resp.program_running)
+                if (val and self._program_running is False and self.count_publishers(
+                        "/io_and_status_controller/robot_program_running") > 0):
+                    # 2026-09-22 (18:47): the link dropped, the pendant kept
+                    # PLAYING, and this poll overwrote the driver's False every
+                    # 5 s — the Play LED stayed green and auto_play_tick (which
+                    # needs False) never restarted the program. The driver's
+                    # flag wins; the poll only records the disagreement.
+                    self._program_disconnected = True
+                else:
+                    self._program_disconnected = False
+                    self._program_running = val
                 self._program_t = time.monotonic()
         fut.add_done_callback(_done)
 
@@ -1468,6 +1498,7 @@ class MortyGuiBridge(Node):
                 out["program"] = self._program_running
             else:
                 out["program"] = None
+            out["program_disconnected"] = self._program_disconnected
             out["joints"] = (list(self.joint_names), list(self.joint_positions))
             out["fast_status"] = (self._fast_status, self._fast_status_t)
             if self.pipeline_params_dirty:
