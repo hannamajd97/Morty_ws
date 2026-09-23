@@ -97,7 +97,7 @@ poses:
     captured_at: 1790171042.9817815
     source: 'live joints 2026-09-23 (Majd: ''save new position as vla_drop_right'')'
     via:
-    - vla_via
+    - vla_via_right
   vla_drop_left:
     positions:
     - 0.939732
@@ -108,7 +108,7 @@ poses:
     - 1.567493
     captured_at: 1790171732.363235
     source: 'live joints 2026-09-23 (Majd: ''save this one as vla_left_drop'')'
-  vla_via:
+  vla_via_right:
     positions:
     - 2.354804
     - -1.663988
@@ -117,5 +117,5 @@ poses:
     - 0.030407
     - 1.794216
     captured_at: 1790173570.5106194
-    source: "live joints 2026-09-23 (2nd waypoint, shoulder raised) \u2014 between\
-      \ home and the VLA drop poses"
+    source: "live joints 2026-09-23 \u2014 waypoint between home and vla_drop_right\
+      \ (shoulder raised)"
