@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import re
 from typing import Any
 
@@ -645,6 +646,25 @@ def _bedrock_converse_call(
     raise last_exc  # type: ignore[misc]
 
 
+def _fallback_model_for(model: str) -> str:
+    """The route to try when ``model`` is unavailable: the env override, else
+    the same model id under the global inference profile (eu./us./apac. →
+    global.), else nothing."""
+    env = os.environ.get("MORTY_LLM_FALLBACK_MODEL", "").strip()
+    if env and env != model:
+        return env
+    for pfx in ("eu.", "us.", "apac."):
+        if model.startswith(pfx):
+            return "global." + model[len(pfx):]
+    return ""
+
+
+def _is_capacity_error(exc: Exception) -> bool:
+    text = f"{type(exc).__name__}: {exc}"
+    return any(k in text for k in ("ServiceUnavailable", "Throttling", "ModelNotReady",
+                                    "InternalServer", "unable to process", "TooManyRequests"))
+
+
 class LLMService:
     def __init__(
         self,
@@ -682,7 +702,21 @@ class LLMService:
         # on_tool_call: called with each completed tool call WHILE the reply
         # streams (Bedrock path only) — the intent is dispatched early.
         if _use_bedrock_converse(model):
-            return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call)
+            try:
+                return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call)
+            except Exception as exc:
+                # 2026-09-23: Bedrock's eu profile answered ServiceUnavailable
+                # twice in one afternoon ("Sorry, I couldn't reach the language
+                # model"). The same model exists under the global routing
+                # profile; one retry there costs ~1 s and the user hears an
+                # answer instead of an apology. MORTY_LLM_FALLBACK_MODEL
+                # overrides the choice.
+                fb = _fallback_model_for(model)
+                if fb and _is_capacity_error(exc):
+                    print(f"[llm] {model} unavailable ({type(exc).__name__}); retrying once on {fb}",
+                          file=sys.stderr, flush=True)
+                    return _bedrock_converse_call(fb, self.messages, self.tools, timeout, on_tool_call)
+                raise
         extra_body = _extra_body_for_model(model)
         if USE_CHAT_COMPLETIONS:
             raw = self.client.with_options(timeout=timeout).chat.completions.create(
