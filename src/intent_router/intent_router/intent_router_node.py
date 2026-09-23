@@ -199,6 +199,7 @@ class IntentRouterNode(Node):
             "/io_and_status_controller/robot_program_running",
         )
         self.declare_parameter("joint_states_max_age_s", 2.0)
+        self.declare_parameter("default_speed", "slow")   # voice moves without a speed word; GUI Motion Apply sets it
         # /joint_states is SAMPLED, not subscribed to; see
         # _sample_joint_states_liveness(). The default period leaves 4x
         # margin against joint_states_max_age_s (2.0 s), so even a couple
@@ -861,7 +862,15 @@ class IntentRouterNode(Node):
         colour = shape = position = destination = ""
         ordinal = 0
         ordinal_from = "left"
-        speed = "slow"
+        # Default speed for voice moves without a speed word (2026-09-23):
+        # set live from the GUI's Motion window Apply (parameter
+        # default_speed = very_slow|slow|normal|fast|very_fast).
+        try:
+            speed = str(self.get_parameter("default_speed").value).strip().lower() or "slow"
+        except Exception:
+            speed = "slow"
+        if speed not in {"very_slow", "slow", "normal", "fast", "very_fast"}:
+            speed = "slow"
         if isinstance(attrs, dict):
             colour = str(attrs.get("colour") or "").strip()
             shape = str(attrs.get("shape") or "").strip()

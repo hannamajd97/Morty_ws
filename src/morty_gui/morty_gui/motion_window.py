@@ -81,10 +81,24 @@ class MotionWindow(QtWidgets.QMainWindow):
             "proportionally longer. Read when you press GO — no Apply needed."
         )
         opt_form.addRow("⚡ move duration:", self.fast_dur_spin)
-        hint = QtWidgets.QLabel("Every value above is read at the moment you press GO or EXECUTE — there is nothing to apply.")
+        # Apply (Majd 2026-09-23, "still no apply here?"): the seconds field
+        # already steers GO ⚡ live; Apply makes the same tier the default
+        # for VOICE moves (router parameter default_speed). The executor's
+        # own drop/return speed is the "transport" field in Pick speeds.
+        self.fast_status = QtWidgets.QLabel("")
+        self.fast_status.setWordWrap(True)
+        self.fast_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        self.fast_apply_btn = self._small_apply_button(
+            "GO ⚡ already uses the seconds above. Apply also makes that tier the\n"
+            "default for voice moves (\"go home\", \"look left\" …) on the running router."
+        )
+        opt_form.addRow("", self._apply_row(self.fast_apply_btn, self.fast_status))
+        hint = QtWidgets.QLabel("Planner fields and the ⚡ seconds are read when you press GO. "
+                                "Apply pushes the ⚡ tier to voice moves as well.")
         hint.setStyleSheet("color:#888; font-size:11px;")
         hint.setWordWrap(True)
         opt_form.addRow(hint)
+        self.fast_dur_spin.valueChanged.connect(lambda *_: self._set_status(self.fast_status, self.STALE_TEXT, GREY))
         layout.addWidget(opt_box)
 
         # Executor-mode radios (LIN / PTP / PILZ) removed 2026-09-23 (Majd:
@@ -378,6 +392,16 @@ class MotionWindow(QtWidgets.QMainWindow):
 
     def _mark_speed_stale(self, *_a) -> None:
         self._set_status(self.speed_status, self.STALE_TEXT, GREY)
+
+    def show_fast_apply(self, kind: str, detail: str) -> None:
+        self._set_status(self.fast_status, *self._apply_status_text(kind, detail))
+
+    @staticmethod
+    def speed_tier_for_seconds(seconds: float) -> str:
+        """The named-pose server tier a direct move of ``seconds`` maps to."""
+        d = float(seconds)
+        return ("very_fast" if d <= 1.8 else "fast" if d <= 2.3 else "normal" if d <= 3.3
+                else "slow" if d <= 6.0 else "very_slow")
 
     def show_speed_apply(self, kind: str, detail: str) -> None:
         self._set_status(self.speed_status, *self._apply_status_text(kind, detail))

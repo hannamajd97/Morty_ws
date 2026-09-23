@@ -474,6 +474,8 @@ class MortyGuiBridge(Node):
         self._pipe_set_cli = self.create_client(
             SetParameters, f"/{PIPELINE_NODE_NAME}/set_parameters"
         )
+        self._router_set_cli = self.create_client(
+            SetParameters, "/intent_router_node/set_parameters")
         self._exec_set_cli = self.create_client(
             SetParameters, "/grasp_executor_lin_llm/set_parameters"
         )
@@ -1169,6 +1171,19 @@ class MortyGuiBridge(Node):
             req.parameters.append(Parameter(name=name, value=self._py_to_pv(val)))
         self._exec_set_cli.call_async(req)
         self.get_logger().info(f"Executor params set: {list(mapping.keys())}")
+        return True
+
+    def set_router_params(self, mapping: Dict[str, Any]) -> bool:
+        """Runtime parameters of the intent router (default_speed for voice
+        moves, 2026-09-23); the router reads them per dispatch."""
+        if not self._router_set_cli.service_is_ready():
+            if not self._router_set_cli.wait_for_service(timeout_sec=0.5):
+                return False
+        req = SetParameters.Request()
+        for name, val in mapping.items():
+            req.parameters.append(Parameter(name=name, value=self._py_to_pv(val)))
+        self._router_set_cli.call_async(req)
+        self.get_logger().info(f"Router params set: {list(mapping.keys())}")
         return True
 
     def set_pipeline_params(self, mapping: Dict[str, Any]) -> bool:

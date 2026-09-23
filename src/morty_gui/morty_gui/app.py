@@ -80,6 +80,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.motion_win.neigh_apply_btn.clicked.connect(
             self._apply_neighbour_obstacles)
         self.motion_win.speed_apply_btn.clicked.connect(self._apply_pick_speeds)
+        self.motion_win.fast_apply_btn.clicked.connect(self._apply_fast_speed)
         self.motion_win.grip_apply_btn.clicked.connect(
             self._apply_gripper_holds)
         self.exp_win = ExperimentsWindow(bridge)
@@ -1028,6 +1029,18 @@ class OperatorWindow(QtWidgets.QMainWindow):
         want = self.motion_win.pick_speed_values()
         cmd = [a for a in EXECUTOR_CMD if not any(a.startswith(f"{k}:=") for k in want)]
         return cmd + self.motion_win.pick_speed_launch_args()
+
+    def _apply_fast_speed(self) -> None:
+        """Apply button under "⚡ move duration": the tier for that many
+        seconds becomes the router's default speed for voice moves."""
+        secs = float(self.motion_win.fast_dur_spin.value())
+        tier = self.motion_win.speed_tier_for_seconds(secs)
+        if not self.bridge.set_router_params({"default_speed": tier}):
+            self.motion_win.show_fast_apply(
+                "fail", f"router unreachable (voice stack running?); GO ⚡ still uses {secs:.1f} s")
+            return
+        self.motion_win.show_fast_apply(
+            "sent", f"voice moves now '{tier}' ({secs:.1f} s direct); GO ⚡ uses the seconds live")
 
     def _apply_pick_speeds(self) -> None:
         """Apply button for "Pick speeds": set on the executor, read back."""
