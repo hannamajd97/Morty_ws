@@ -117,6 +117,7 @@ class SpeechInputNode(Node):
         self.declare_parameter("speaker_gate", True)
         self.declare_parameter("morty_voice_path", "~/morty_ws/models/morty_voice_ecapa.npy")
         self.declare_parameter("speaker_gate_threshold", 0.35)
+        self.declare_parameter("speaker_gate_device", "cuda")    # cpu would cost 260 ms per barge-in window
         self.declare_parameter("barge_in", True)
         self.declare_parameter("barge_in_min_ms", 600)
         # Minimum RMS amplitude for a buffer to be transcribed. 0..1 scale
@@ -239,6 +240,7 @@ class SpeechInputNode(Node):
                     speaker_gate=bool(self.get_parameter("speaker_gate").value),
                     morty_voice_path=str(self.get_parameter("morty_voice_path").value),
                     speaker_gate_threshold=float(self.get_parameter("speaker_gate_threshold").value),
+                    speaker_gate_device=str(self.get_parameter("speaker_gate_device").value),
                     on_barge_in=(self._publish_barge_in
                                  if bool(self.get_parameter("barge_in").value) else None),
                     barge_in_min_ms=int(self.get_parameter("barge_in_min_ms").value),

@@ -419,6 +419,7 @@ class WhisperTranscriber:
         speaker_gate: bool = False,
         morty_voice_path: str = "",
         speaker_gate_threshold: float = 0.35,
+        speaker_gate_device: str = "cuda",
         on_barge_in: Optional[Callable[[float], None]] = None,
         barge_in_min_ms: int = 600,
     ) -> None:
@@ -434,6 +435,7 @@ class WhisperTranscriber:
         self._speaker_gate = bool(speaker_gate)
         self._morty_voice_path = os.path.expanduser(morty_voice_path or "")
         self._speaker_thr = float(speaker_gate_threshold)
+        self._speaker_device = str(speaker_gate_device or "cuda").lower()   # cuda 12 ms per window; cpu measured 260 ms — too slow for the 0.3 s barge-in cadence (2026-09-23)
         self._barge_thr = min(0.25, self._speaker_thr)   # short windows of Morty's echo scored 0.14-0.49; whole sentences 0.50-0.86
         self._on_barge_in = on_barge_in
         self._barge_in_min_ms = int(barge_in_min_ms)
@@ -533,11 +535,14 @@ class WhisperTranscriber:
         self._vad_frame_size_samples = int(sample_rate * 0.03)
 
         if logger is not None:
-            logger.info(
-                f"Loading faster-whisper model {model_size!r} "
-                f"(device={device}, compute_type={compute_type}). "
-                "First load may take 30-60s while the model downloads."
-            )
+            if str(engine or "whisper").lower() == "parakeet":
+                logger.info(f"Loading Parakeet STT {parakeet_model!r} on {device} (no Whisper is loaded).")
+            else:
+                logger.info(
+                    f"Loading faster-whisper model {model_size!r} "
+                    f"(device={device}, compute_type={compute_type}). "
+                    "First load may take 30-60s while the model downloads."
+                )
         # ---- ENGINE (2026-09-23) --------------------------------------
         # "parakeet": NVIDIA parakeet-tdt-0.6b-v3 through onnx-asr on the
         # GPU — 25 European languages with per-utterance detection, no
@@ -553,7 +558,14 @@ class WhisperTranscriber:
         self._engine = str(engine or "whisper").lower()
         if self._engine == "parakeet":
             import onnx_asr
-            providers = ([("CUDAExecutionProvider", {"cudnn_conv_algo_search": "DEFAULT"})]
+            # gpu_mem_limit (2026-09-23): without it ONNX Runtime's arena grew
+            # to 3.8 GB for a 2.4 GB model and GraspGen died of CUDA OOM
+            # (8 GB card shared with YOLO, GraspGen and Kokoro). 2.6 GB holds
+            # the weights plus activations for a 12 s utterance.
+            cuda_opts = {"cudnn_conv_algo_search": "DEFAULT",
+                         "gpu_mem_limit": int(2.6 * 1024 ** 3),
+                         "arena_extend_strategy": "kSameAsRequested"}
+            providers = ([("CUDAExecutionProvider", cuda_opts)]
                          if device in ("auto", "cuda") else []) + ["CPUExecutionProvider"]
             self._pk = onnx_asr.load_model(parakeet_model, providers=providers)
             for secs in (2, 4):                      # warm the two common shapes
@@ -774,7 +786,7 @@ class WhisperTranscriber:
             import torch
             from speechbrain.inference.speaker import EncoderClassifier
             ref = np.load(self._morty_voice_path).astype(np.float32)
-            dev = "cuda" if torch.cuda.is_available() else "cpu"
+            dev = "cuda" if (self._speaker_device == "cuda" and torch.cuda.is_available()) else "cpu"
             enc = EncoderClassifier.from_hparams(
                 source="speechbrain/spkrec-ecapa-voxceleb",
                 savedir=os.path.expanduser("~/morty_ws/models/spkrec-ecapa-voxceleb"),
