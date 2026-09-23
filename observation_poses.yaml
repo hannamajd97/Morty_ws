@@ -96,3 +96,13 @@ poses:
     - 1.567457
     captured_at: 1790171042.9817815
     source: 'live joints 2026-09-23 (Majd: ''save new position as vla_drop_right'')'
+  vla_left_drop:
+    positions:
+    - 0.939732
+    - -2.244105
+    - 2.325694
+    - -0.829357
+    - 1.621493
+    - 1.567493
+    captured_at: 1790171732.363235
+    source: 'live joints 2026-09-23 (Majd: ''save this one as vla_left_drop'')'
