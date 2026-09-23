@@ -592,6 +592,7 @@ class MoveToNamedPoseServer(Node):
         # of elbow while the shoulder lifts 142 deg). The file owns the
         # detour, so every client (GUI, executor, router) gets it.
         self._pose_via = {}
+        self._precheck_cache = {}   # (start joints rounded, path names) -> monotonic time of the last pass
         for label, entry in poses.items():
             if not isinstance(entry, dict):
                 continue
@@ -639,7 +640,11 @@ class MoveToNamedPoseServer(Node):
         phase, name = parts[0], parts[1]
         if name.strip() != self._expected_pose:
             return
-        if phase in ("done", "failed"):
+        # 2026-09-23: "cancelled:<pose>" is terminal too — the replay node
+        # reports it when the controller goal is cancelled (GUI stop). It
+        # was ignored here, the goal sat for the 30 s timeout and every
+        # next request was rejected as "another goal is in flight".
+        if phase in ("done", "failed", "cancelled"):
             self._latest_status = text
             self._status_event.set()
 
@@ -870,7 +875,7 @@ class MoveToNamedPoseServer(Node):
         return True, ""
 
     def _path_collision_free_multi(
-        self, nodes: List[List[float]]
+        self, nodes: List[List[float]], steps: Optional[int] = None
     ) -> tuple[bool, str]:
         """Collision-check EVERY segment of a multi-pose path.
 
@@ -884,7 +889,12 @@ class MoveToNamedPoseServer(Node):
         there is a warn-and-continue, exactly as in the single-segment
         path (the robot is already standing in it — refusing cannot help).
         """
-        n = self._blend_collision_waypoints
+        # ``steps``: interpolated states per node pair. The blended path
+        # passes nodes already sampled densely along its spline and uses 1
+        # (2026-09-23: 8 nodes x 3 steps = 22 calls x 0.14 s = 3 s before
+        # the arm moved); the default keeps the old density for callers
+        # that hand over sparse pose nodes.
+        n = int(steps) if steps else self._blend_collision_waypoints
         n_seg = len(nodes) - 1
         if n_seg < 1:
             return True, ""
@@ -1303,7 +1313,22 @@ class MoveToNamedPoseServer(Node):
             t_chk = time.monotonic()
             stride = max(1, self._blend_samples_per_segment // self._blend_collision_waypoints)
             check_nodes = _pos[::stride] + ([_pos[-1]] if (len(_pos) - 1) % stride else [])
-            clean, reason = self._path_collision_free_multi(check_nodes)
+            # 2026-09-23 (Majd: "it needs time before it executes"): each
+            # /check_state_validity call costs ~0.4 s on the loaded machine,
+            # 3 s per blended move. Named-pose paths between the same
+            # two poses are the same path; a check that passed within the
+            # last 10 minutes is reused (the table and wall do not move).
+            key = (tuple(round(q, 1) for q in start), tuple(path_names))
+            if not hasattr(self, "_precheck_cache"):
+                self._precheck_cache = {}
+            cached = self._precheck_cache.get(key)
+            if cached is not None and time.monotonic() - cached < 600.0:
+                clean, reason = True, ""
+                self.get_logger().info(f"Collision pre-check for {path_desc}: reusing the pass from {time.monotonic() - cached:.0f} s ago.")
+            else:
+                clean, reason = self._path_collision_free_multi(check_nodes, steps=1)
+                if clean:
+                    self._precheck_cache[key] = time.monotonic()
             if not clean:
                 return self._fail(goal_handle, f"refusing: {reason}")
             self.get_logger().info(

@@ -2504,18 +2504,23 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.go_btn.setText("GO")
             self.statusBar().showMessage(f"⚡ Fast replay to '{target}' done.")
             return
-        failed = status and not status.startswith("done") and stamp > 0
+        # 2026-09-23: "starting:<pose>" is progress, not failure. Treating
+        # it as failure launched a planner move 2.6 s into every fast move;
+        # move_group's goal preempted the replay's at the controller
+        # ("cancelled:home"), the named-pose server waited 30 s and rejected
+        # the next request as "another goal is in flight". No automatic
+        # planner fallback either: two movers on one arm is never right —
+        # the operator switches ⚡ off and presses GO if he wants MoveIt.
+        failed = bool(status) and stamp > 0 and (
+            status.startswith("failed") or status.startswith("cancelled"))
         if failed or time.monotonic() > deadline:
             self._fast_pending = None
             self.go_btn.setEnabled(True)
             self.go_btn.setText("GO")
-            reason = f"status '{status}'" if failed else "timeout (pipeline running?)"
+            reason = f"status '{status}'" if failed else "no completion report in time"
             self.statusBar().showMessage(
-                f"Fast replay unavailable ({reason}) — falling back to planner."
-            )
-            self._spawn_move(
-                ["-p", f"target_name:={target}"],
-                f"Moving robot to '{target}' (planner fallback).",
+                f"⚡ Fast move to '{target}' did not complete ({reason}). "
+                "Switch ⚡ off and press GO to use the planner instead."
             )
 
     # ── UI refresh ───────────────────────────────────────────────────
