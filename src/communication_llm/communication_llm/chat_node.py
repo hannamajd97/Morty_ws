@@ -2684,7 +2684,10 @@ class ChatIntentNode(Node):
             _t_llm0 = time.monotonic()
             self._t_llm0 = _t_llm0
             self._early_dispatched = {}
-            response = self.chat_agent.chat(model=self.model, on_tool_call=self._early_intent_call)
+            self._stream_buf = ""
+            self._streamed: list[str] = []
+            response = self.chat_agent.chat(model=self.model, on_tool_call=self._early_intent_call,
+                                            on_text=self._on_reply_text)
             cached = getattr(response, "cache_read_tokens", None)
             self.get_logger().info(
                 f"[timing] LLM main call {time.monotonic() - _t_llm0:.2f}s"
@@ -2783,10 +2786,11 @@ class ChatIntentNode(Node):
             for a in action_echoes
         )
 
+        tail = self._unspoken_tail(assistant_text)   # sentences streamed early are not repeated
         if n_intents == 0:
             # Pure conversational reply, always speak it if non-empty.
-            if trimmed:
-                self._speak(assistant_text)
+            if tail:
+                self._speak(tail)
         elif n_intents == 1:
             # Quick narration immediately, then the LLM reply if it adds
             # value. The action-echo check protects against the LLM
@@ -2794,8 +2798,8 @@ class ChatIntentNode(Node):
             # home.") which would just bounce back through the mic.
             _, quick = pending[0]
             self._speak(quick)
-            if reply_is_rich:
-                self._speak(assistant_text)
+            if reply_is_rich and tail:
+                self._speak(tail)
         else:
             # Multi-intent: the SYSTEM_PROMPT instructs the LLM to write
             # a single combined plan announcement that REPLACES the
@@ -2803,8 +2807,8 @@ class ChatIntentNode(Node):
             # action-echo check would mis-classify legitimate combined
             # plans like "Going home, then looking right." because they
             # naturally start with the first action name.
-            if trimmed:
-                self._speak(assistant_text)
+            if tail:
+                self._speak(tail)
             else:
                 # LLM gave nothing — fall back to per-intent narrations
                 # so the user still hears what's happening.
@@ -2883,6 +2887,41 @@ class ChatIntentNode(Node):
             handle.get_result_async().add_done_callback(_on_result)
 
         send_future.add_done_callback(_on_goal_response)
+
+    _SENTENCE_END = re.compile(r"^(.*?[.!?])(?:\s+|\n)(.*)$", re.S)
+
+    def _on_reply_text(self, delta: str) -> None:
+        """Called from the Bedrock stream with each text delta (2026-09-23,
+        Majd: "still slow"): a finished sentence is spoken at once while
+        the model keeps writing — a story used to wait 3–9 s for its last
+        word before the first was heard. Only while no command was
+        dispatched in this turn: command replies stay with the end-of-turn
+        rules (quick narration, withholding)."""
+        self._stream_buf += delta
+        if self._early_dispatched:
+            return
+        while True:
+            m = self._SENTENCE_END.match(self._stream_buf)
+            if not m:
+                return
+            sentence, rest = m.group(1).strip(), m.group(2)
+            self._stream_buf = rest
+            if len(sentence) >= 8:
+                if not self._streamed:
+                    self.get_logger().info(
+                        f"[timing] first sentence spoken {time.monotonic() - self._t_llm0:.2f}s into the LLM call")
+                self._streamed.append(sentence)
+                self._speak(sentence)
+
+    def _unspoken_tail(self, text: str) -> str:
+        """``text`` minus the sentences already spoken while streaming."""
+        rest = (text or "").strip()
+        for sent in getattr(self, "_streamed", []) or []:
+            i = rest.find(sent)
+            if i < 0:
+                break
+            rest = rest[i + len(sent):].lstrip()
+        return rest
 
     def _early_intent_call(self, item: Any) -> None:
         """Streaming callback: the intent tool call is complete before the

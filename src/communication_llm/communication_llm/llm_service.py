@@ -521,7 +521,7 @@ def _bedrock_runtime_client():
 _CACHE_POINTS_OK = True   # cleared when the model/region rejects cache points
 
 
-def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call) -> dict[str, Any]:
+def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_text=None) -> dict[str, Any]:
     """converse_stream, rebuilt into the non-streaming response shape.
 
     Why streaming (2026-09-18, Majd: "make the model reply faster"): a
@@ -555,6 +555,11 @@ def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call) -> di
             if "text" in delta:
                 b = _block(d["contentBlockIndex"], "text")
                 b["text"] = b.get("text", "") + (delta["text"] or "")
+                if on_text is not None and delta["text"]:
+                    try:
+                        on_text(delta["text"])     # chat_node speaks finished sentences early
+                    except Exception:
+                        pass
             elif "toolUse" in delta:
                 b = _block(d["contentBlockIndex"], "toolUse")
                 b["toolUse"]["input_str"] += delta["toolUse"].get("input", "") or ""
@@ -596,6 +601,7 @@ def _bedrock_converse_call(
     tools: list[dict[str, Any]],
     timeout: float,
     on_tool_call=None,
+    on_text=None,
 ) -> _BedrockConverseResponse:
     """Bedrock Converse with prompt caching and streaming (2026-09-18).
 
@@ -630,7 +636,7 @@ def _bedrock_converse_call(
     for attempt in (0, 1):
         cache = _CACHE_POINTS_OK and attempt == 0
         try:
-            raw = _bedrock_converse_stream(client, _build(cache), on_tool_call)
+            raw = _bedrock_converse_stream(client, _build(cache), on_tool_call, on_text)
             out = _BedrockConverseResponse(raw)
             u = raw.get("usage", {}) or {}
             out.cache_read_tokens = int(u.get("cacheReadInputTokens", 0) or 0)
@@ -695,7 +701,7 @@ class LLMService:
         self.tools = tools or []
         self.messages = messages if messages is not None else []
 
-    def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0, on_tool_call=None) -> Any:
+    def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0, on_tool_call=None, on_text=None) -> Any:
         # 20s ceiling — without this the openai client's default is 600s, so
         # a single slow turn would hang the whole rclpy executor thread for
         # 10 minutes and the user sees an unresponsive Morty.
@@ -703,7 +709,7 @@ class LLMService:
         # streams (Bedrock path only) — the intent is dispatched early.
         if _use_bedrock_converse(model):
             try:
-                return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call)
+                return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call, on_text)
             except Exception as exc:
                 # 2026-09-23: Bedrock's eu profile answered ServiceUnavailable
                 # twice in one afternoon ("Sorry, I couldn't reach the language
@@ -715,7 +721,7 @@ class LLMService:
                 if fb and _is_capacity_error(exc):
                     print(f"[llm] {model} unavailable ({type(exc).__name__}); retrying once on {fb}",
                           file=sys.stderr, flush=True)
-                    return _bedrock_converse_call(fb, self.messages, self.tools, timeout, on_tool_call)
+                    return _bedrock_converse_call(fb, self.messages, self.tools, timeout, on_tool_call, on_text)
                 raise
         extra_body = _extra_body_for_model(model)
         if USE_CHAT_COMPLETIONS:
