@@ -89,7 +89,7 @@ from morty_interfaces.action import MoveToNamedPose
 # of per leg — the arm is not pushed harder than one of today's legs, it
 # simply never stops between them.
 
-BLEND_SAMPLES_PER_SEGMENT = 20
+BLEND_SAMPLES_PER_SEGMENT = 40   # 2026-09-23: 20 gave the controller a point every 0.2 s on an 8 s path
 """Trajectory points sampled per path segment (excluding the shared
 start point). 20 keeps the controller interpolating between points that
 are milliseconds apart instead of inventing its own start-stop ramp."""
@@ -230,14 +230,62 @@ def build_blended_trajectory(
     positions: List[List[float]] = [list(nodes[0])]
     times: List[float] = [0.0]
 
+    # GEOMETRY (2026-09-23, Majd: "not smooth, it hits all its joints at
+    # the via"): with vias the path used to be straight joint-space lines
+    # meeting at a corner, and the S-curve keeps full speed there — so the
+    # shoulder and elbow reversed direction instantly at the waypoint
+    # (93 deg turn measured for home -> vla_via -> vla_drop_right). Now
+    # the path is a Catmull-Rom spline THROUGH the nodes (end tangents
+    # clamped): every via is still hit exactly, the direction turns
+    # smoothly, and the curve bulges outward from the corner, i.e. away
+    # from the chord the via was taught to avoid. One segment (no via)
+    # stays the straight line it always was. phi is arc length along the
+    # actual geometry, warped by the S-curve as before.
+    if n_seg == 1:
+        geom = [[list(nodes[0]), list(nodes[1])]]
+    else:
+        ext = [nodes[0]] + nodes + [nodes[-1]]
+
+        def _cr(p0, p1, p2, p3, u):
+            u2, u3 = u * u, u * u * u
+            return [0.5 * ((2 * b) + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2
+                           + (-a + 3 * b - 3 * c + d) * u3)
+                    for a, b, c, d in zip(p0, p1, p2, p3)]
+        fine = 200
+        geom = [[_cr(ext[seg], ext[seg + 1], ext[seg + 2], ext[seg + 3], k / fine) for k in range(fine + 1)]
+                for seg in range(n_seg)]
+    seg_len = [sum(math.sqrt(sum((b - a) ** 2 for a, b in zip(pts[i], pts[i + 1])))
+                   for i in range(len(pts) - 1)) for pts in geom]
+    path_len = sum(seg_len)
+    bounds = [0.0]
+    acc = 0.0
+    for L in seg_len:
+        acc += L
+        bounds.append(acc / path_len if path_len > 0.0 else 0.0)
+    if path_len <= 0.0:
+        bounds = [i / float(n_seg) for i in range(n_seg + 1)]
+    bounds[-1] = 1.0
+
     for seg in range(n_seg):
-        a = nodes[seg]
-        b = nodes[seg + 1]
+        pts = geom[seg]
+        cum = [0.0]                       # arc length inside this segment
+        for i in range(len(pts) - 1):
+            cum.append(cum[-1] + math.sqrt(sum((b - a) ** 2 for a, b in zip(pts[i], pts[i + 1]))))
+        seg_total = cum[-1] if cum[-1] > 0.0 else 1.0
         phi_a = bounds[seg]
         phi_b = bounds[seg + 1]
         for k in range(1, samples_per_segment + 1):
             frac = k / float(samples_per_segment)
-            q = [(1.0 - frac) * ai + frac * bi for ai, bi in zip(a, b)]
+            if k == samples_per_segment:
+                q = list(nodes[seg + 1])                    # the via / target itself
+            else:
+                want = frac * seg_total
+                j = 1
+                while j < len(cum) - 1 and cum[j] < want:
+                    j += 1
+                span = cum[j] - cum[j - 1]
+                w = (want - cum[j - 1]) / span if span > 0.0 else 1.0
+                q = [(1.0 - w) * a + w * b for a, b in zip(pts[j - 1], pts[j])]
             phi = phi_a + (phi_b - phi_a) * frac
             t = total_s * smoothstep_inverse(phi)
             # fp guard: consecutive phi are far apart at these sample
@@ -1241,16 +1289,26 @@ class MoveToNamedPoseServer(Node):
         n_seg = len(targets)
         path_desc = " -> ".join(["<current>"] + path_names)
 
-        # Collision-check EVERY segment, all requests pipelined together.
+        # Collision-check the path the arm will REALLY follow (a spline
+        # through the vias since 2026-09-23): build it first, then check
+        # states sampled along it, all requests pipelined together.
         if self._collision_check:
             self._publish_phase(goal_handle, "checking_collision", 0.05)
             t_chk = time.monotonic()
-            clean, reason = self._path_collision_free_multi(nodes)
+            try:
+                _pos, _ = build_blended_trajectory(
+                    start, targets, [segment_duration_s] * n_seg,
+                    samples_per_segment=self._blend_samples_per_segment)
+            except Exception as exc:
+                return self._fail(goal_handle, f"refusing: could not build the blended path ({exc})")
+            stride = max(1, self._blend_samples_per_segment // self._blend_collision_waypoints)
+            check_nodes = _pos[::stride] + ([_pos[-1]] if (len(_pos) - 1) % stride else [])
+            clean, reason = self._path_collision_free_multi(check_nodes)
             if not clean:
                 return self._fail(goal_handle, f"refusing: {reason}")
             self.get_logger().info(
                 f"Collision pre-check passed for blended path {path_desc} "
-                f"({n_seg * self._blend_collision_waypoints + 1} states in {time.monotonic() - t_chk:.2f} s)."
+                f"({len(check_nodes)} sampled states along the spline in {time.monotonic() - t_chk:.2f} s)."
             )
 
         # One tier duration per segment — no new speeds are invented, the
