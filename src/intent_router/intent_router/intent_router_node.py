@@ -2535,6 +2535,15 @@ class IntentRouterNode(Node):
                     # No cycle ever ran (pipeline gave the label up): the
                     # reason is already a sentence; nothing is resetting.
                     self._narrate(reason)
+                elif reason.startswith("tried "):
+                    # The executor's reason is a planner report ("tried 10
+                    # grasps: 8 had no IK …"); the operator needs the
+                    # conclusion, the log keeps the report (2026-09-23).
+                    what = (self._last_target_label or self._held_object_label
+                            or "it").replace("_", " ")
+                    self._narrate(
+                        f"I couldn't find a way to reach the {what} from here. "
+                        "Move it a bit closer, or ask for another object.")
                 elif reason:
                     self._narrate(f"The grasp failed: {reason}. Resetting.")
                 else:

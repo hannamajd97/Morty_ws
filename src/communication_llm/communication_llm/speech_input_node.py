@@ -250,6 +250,10 @@ class SpeechInputNode(Node):
             self._on_mute,
             10,
         )
+        # The sentence behind each playback window (speak_node publishes
+        # it before playing) — lets the word-time cut keep the operator's
+        # words when he talks over Morty (2026-09-23).
+        self.create_subscription(String, "/speech/ai_said", self._on_ai_said, 10)
 
         self._stt.start()
         # LIVE tuning of the four voice-filter knobs (GUI "Voice filters"
@@ -422,6 +426,11 @@ class SpeechInputNode(Node):
         note = getattr(self._stt, "note_ai_speaking", None)
         if note is not None:
             note(bool(msg.data))
+
+    def _on_ai_said(self, msg: String) -> None:
+        note = getattr(self._stt, "note_ai_text", None)
+        if note is not None:
+            note(str(msg.data or ""))
 
     def _on_mute(self, msg: Bool) -> None:
         self._stt.set_muted(bool(msg.data))

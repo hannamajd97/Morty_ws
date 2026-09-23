@@ -168,7 +168,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.vf_min_rms = QtWidgets.QDoubleSpinBox()
         self.vf_min_rms.setDecimals(3)
         self.vf_min_rms.setRange(0.001, 0.200); self.vf_min_rms.setSingleStep(0.005)
-        self.vf_min_rms.setValue(0.025)
+        # 2026-09-23: 0.025 dropped quiet speech (5 buffers at 0.01-0.025 in one
+        # session); 0.012 is the STT's own default, the noise floor here is 0.0001-0.003.
+        self.vf_min_rms.setValue(0.012)
         self.vf_min_rms.setToolTip(
             "Speech energy gate: buffers quieter than this RMS are ignored as "
             "background noise (−32 dB default). Lower it for quiet mics."
@@ -176,7 +178,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         vf.addRow("Min speech RMS:", self.vf_min_rms)
         self.vf_silence = QtWidgets.QSpinBox()
         self.vf_silence.setRange(100, 3000); self.vf_silence.setSingleStep(50)
-        self.vf_silence.setValue(500); self.vf_silence.setSuffix(" ms")
+        self.vf_silence.setValue(300); self.vf_silence.setSuffix(" ms")   # 2026-09-23: 500 cost 0.2 s per turn
         self.vf_silence.setToolTip("Silence that ends an utterance. Lower = snappier, higher = tolerates pauses.")
         vf.addRow("Silence to finalise:", self.vf_silence)
         self.vf_max_utt = QtWidgets.QDoubleSpinBox()

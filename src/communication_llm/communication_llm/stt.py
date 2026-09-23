@@ -428,6 +428,7 @@ class WhisperTranscriber:
         # Speak goals (the server queues them) so nested starts/stops
         # collapse into ONE union window instead of tearing.
         self._ai_windows: list = []
+        self._ai_texts: list = []      # (wall time, token set) of recent playback sentences
         self._ai_depth = 0
         self._ai_lock = threading.Lock()
         if not _WHISPER_AVAILABLE:
@@ -654,6 +655,39 @@ class WhisperTranscriber:
                 if w[1] is None or w[1] >= cutoff
             ]
 
+    def note_ai_text(self, text: str) -> None:
+        """Remember the sentence the speaker is about to play (from
+        /speech/ai_said) so the word-time cut can tell Morty's echo from
+        the operator talking over him (2026-09-23: the cut removed every
+        word inside a playback window, including "Yes, go back home" and
+        "open the gripper" said while Morty was still finishing)."""
+        toks = self._echo_tokens(text)
+        if not toks:
+            return
+        now = time.time()
+        with self._ai_lock:
+            self._ai_texts.append((now, toks))
+            self._ai_texts = [(t, k) for t, k in self._ai_texts if now - t < 90.0]
+
+    @staticmethod
+    def _echo_tokens(text: str) -> set:
+        return {w for w in re.findall(r"[a-zäöüß']+", (text or "").lower()) if len(w) >= 3}
+
+    def _looks_like_my_echo(self, words: list) -> bool:
+        """True when most of ``words`` (heard during playback) occur in what
+        Morty said recently. Whisper mis-hears its own voice ("grass" for
+        "grasp"), so a token also matches on its first four letters."""
+        toks = self._echo_tokens(" ".join(words))
+        if not toks:
+            return True
+        with self._ai_lock:
+            said = set().union(*[k for _, k in self._ai_texts]) if self._ai_texts else set()
+        if not said:
+            return True     # nothing known about the playback: keep the old behaviour
+        heads = {w[:4] for w in said}
+        hits = sum(1 for w in toks if w in said or w[:4] in heads)
+        return hits >= 0.5 * len(toks)
+
     def set_word_time_cut(self, value: bool) -> bool:
         old = bool(self._word_time_cut)
         self._word_time_cut = bool(value)
@@ -852,6 +886,7 @@ class WhisperTranscriber:
                     parts.append(s.text.strip())
                     continue
                 keep: list[str] = []
+                overlap: list[str] = []      # words inside a playback window
                 for w in words:
                     try:
                         w_start = float(w.start)
@@ -864,9 +899,17 @@ class WhisperTranscriber:
                     # starting.
                     mid = utt_start_wall + 0.5 * (w_start + w_end)
                     if self._time_is_ai_speech(mid):
-                        echoed.append(str(getattr(w, "word", "")).strip())
+                        overlap.append(str(getattr(w, "word", "")))
                     else:
                         keep.append(str(getattr(w, "word", "")))
+                if overlap and not self._looks_like_my_echo(overlap):
+                    # The operator talked over Morty: these are his words.
+                    self._log("info",
+                              f"Word-time cut kept {len(overlap)} overlapping word(s) — "
+                              f"they do not match what Morty said: {''.join(overlap).strip()!r}")
+                    keep = [str(getattr(w, "word", "")) for w in words]
+                    overlap = []
+                echoed.extend(x.strip() for x in overlap)
                 kept = "".join(keep).strip()
                 if kept:
                     parts.append(kept)
