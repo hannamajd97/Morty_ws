@@ -57,9 +57,6 @@ poses:
     captured_at: 1777548000.0
     source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
   drop:
-    # SRDF values had shoulder_lift=6.178 and wrist_1=-3.815 wrapped past
-    # one revolution; normalised to the equivalent position in [-pi, pi]
-    # so the joint trajectory controller doesn't trip joint-limit checks.
     positions:
     - 3.4572880268096924
     - -0.10468125625783173
@@ -89,3 +86,13 @@ poses:
     - 1.5674901008605957
     captured_at: 1777548000.0
     source: srdf:/home/deep/morty_ws/src/ur3e_gripper_3d_moveit_config/config/ur3e_with_gripper_3d.srdf
+  vla_drop_right:
+    positions:
+    - 0.941844
+    - -1.109826
+    - -2.204687
+    - 0.419628
+    - 1.563798
+    - 1.567457
+    captured_at: 1790171042.9817815
+    source: 'live joints 2026-09-23 (Majd: ''save new position as vla_drop_right'')'
