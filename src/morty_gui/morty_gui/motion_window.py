@@ -75,23 +75,22 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.fast_dur_spin.setValue(3.0)
         self.fast_dur_spin.setSuffix(" s")
         self.fast_dur_spin.setToolTip(
-            "The cached trajectory is stretched over this many seconds.\n"
-            "Bigger = slower, calmer motion. Applies per GO ⚡ press."
+            "Seconds for a direct fast move; the named-pose server picks the\n"
+            "matching speed tier: 1.6 s = fastest allowed, 2 s fast, 2.7 s normal,\n"
+            "4 s slow, above 6 s very slow. A move through a via pose takes\n"
+            "proportionally longer. Read when you press GO — no Apply needed."
         )
         opt_form.addRow("⚡ move duration:", self.fast_dur_spin)
+        hint = QtWidgets.QLabel("Every value above is read at the moment you press GO or EXECUTE — there is nothing to apply.")
+        hint.setStyleSheet("color:#888; font-size:11px;")
+        hint.setWordWrap(True)
+        opt_form.addRow(hint)
         layout.addWidget(opt_box)
 
-        mode_box = QtWidgets.QGroupBox("Executor mode (EXECUTE button uses this)")
-        mode_lay = QtWidgets.QHBoxLayout(mode_box)
-        self.mode_group = QtWidgets.QButtonGroup(self)
-        for name, label in [("LIN", "LIN (verified)"), ("PTP", "PTP (try)"), ("PILZ", "PILZ (try)")]:
-            rb = QtWidgets.QRadioButton(label)
-            rb.setProperty("mode", name)
-            if name == "LIN":
-                rb.setChecked(True)
-            self.mode_group.addButton(rb)
-            mode_lay.addWidget(rb)
-        layout.addWidget(mode_box)
+        # Executor-mode radios (LIN / PTP / PILZ) removed 2026-09-23 (Majd:
+        # "we don't need them anymore"): the PTP and PILZ executors are
+        # retired; the LIN executor chooses its own approach chain (curve,
+        # blended lines, direct line). executor_mode() stays for profiles.
 
         # Collision avoidance (2026-08-28): live mirror of the pipeline's
         # neighbour-obstacle knobs. Defaults MUST match
@@ -466,16 +465,7 @@ class MotionWindow(QtWidgets.QMainWindow):
                 problems.append(
                     f"planner_id: {pid!r} is not offered by library "
                     f"'{self.pipeline_combo.currentText()}'")
-        mode = values.get("executor_mode")
-        if mode is not None:
-            hit = False
-            for btn in self.mode_group.buttons():
-                if str(btn.property("mode")) == str(mode):
-                    btn.setChecked(True)
-                    hit = True
-                    break
-            if not hit:
-                problems.append(f"executor_mode: unknown mode {mode!r}")
+        # "executor_mode" in old profiles is accepted and ignored (LIN only).
         if "fast_replay" in values:
             try:
                 self.fast_cb.setChecked(bool(values["fast_replay"]))
@@ -569,8 +559,7 @@ class MotionWindow(QtWidgets.QMainWindow):
             spin.setValue(float(v))
 
     def executor_mode(self) -> str:
-        btn = self.mode_group.checkedButton()
-        return str(btn.property("mode")) if btn else "LIN"
+        return "LIN"      # the only executor since 2026-09-23 (radios removed)
 
     def motion_args(self) -> List[str]:
         """Extra -p args for observation_ptp_commander from the settings."""
