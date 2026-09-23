@@ -35,7 +35,7 @@ __all__ = [
     "GRIP_HELP",
     "MOVE_CMD_BASE",
     "MOVE_EXIT_TEXT",
-    "NAMED_PLACES",
+    "NAMED_PLACES", "named_places", "yaml_poses", "POSES_FILE",
     "NEIGH_HELP",
     "OFFLINE_LAUNCH",
     "ORANGE",
