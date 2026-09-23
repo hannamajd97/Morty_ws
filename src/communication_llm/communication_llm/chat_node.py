@@ -2890,7 +2890,8 @@ class ChatIntentNode(Node):
 
     # A sentence ends at . ! ? followed by whitespace and a capital, digit or
     # quote — so "waited... for" and "Dr. Smith" do not split.
-    _SENTENCE_END = re.compile(r"^(.*?[.!?])\s+(?=[A-ZÄÖÜ0-9\"“(])(.*)$", re.S)
+    _SENTENCE_END = re.compile(r"[.!?](?=\s+[A-ZÄÖÜ0-9\"“(])")
+    _ABBREV = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|Prof|St|vs|e\.g|i\.e|Nr|z\.B|bzw|ca)\.$")
 
     def _on_reply_text(self, delta: str) -> None:
         """Called from the Bedrock stream with each text delta (2026-09-23,
@@ -2903,13 +2904,15 @@ class ChatIntentNode(Node):
         if self._early_dispatched:
             return
         while True:
-            m = self._SENTENCE_END.match(self._stream_buf)
-            if not m:
+            cut = None
+            for m in self._SENTENCE_END.finditer(self._stream_buf):
+                if self._ABBREV.search(self._stream_buf[:m.end()]):
+                    continue        # "Dr." / "z.B." — not a sentence end, look further
+                cut = m.end()
+                break
+            if cut is None:
                 return
-            sentence, rest = m.group(1).strip(), m.group(2)
-            if re.search(r"\b(?:Dr|Mr|Mrs|Ms|Prof|St|vs|e\.g|i\.e|Nr|z\.B|bzw|ca)\.$", sentence):
-                return          # abbreviation, not a sentence end: wait for more text
-            self._stream_buf = rest
+            sentence, self._stream_buf = self._stream_buf[:cut].strip(), self._stream_buf[cut:].lstrip()
             if len(sentence) >= 8:
                 if not self._streamed:
                     self.get_logger().info(
