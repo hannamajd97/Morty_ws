@@ -396,6 +396,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         from collections import deque as _deque
         self._level_hist = _deque(maxlen=30)  # ~3 s of levels
         self._recent_morty_texts = _deque(maxlen=8)  # dedupe 🔊 vs 🤖 lines
+        self._morty_partial = ""   # the reply line being extended while sentences stream (2026-09-23)
         self._was_speech = False
         self._processing_until = 0.0
         self.sidebar = chat_tab  # the Morty panel IS the sidebar now
@@ -2596,6 +2597,15 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 pass
         return changed
 
+    def _extend_last_chat_line(self, delta: str) -> None:
+        """Append ``delta`` to the last line of the chat log (a reply that
+        is still streaming), without starting a new paragraph."""
+        cur = self.chat_log.textCursor()
+        cur.movePosition(QtGui.QTextCursor.End)
+        cur.insertText(" " + delta)
+        self.chat_log.setTextCursor(cur)
+        self.chat_log.ensureCursorVisible()
+
     def _tune_priorities(self) -> None:
         try:
             out = subprocess.run(
@@ -2973,11 +2983,31 @@ class OperatorWindow(QtWidgets.QMainWindow):
                             "⚠ ignored", f"({reason}) {heard}"
                         )
                     continue
+                _norm = lambda s: " ".join(str(s).split())
+                if who == "MortyPartial":
+                    # A reply growing sentence by sentence (Majd 2026-09-23:
+                    # "status is saying too much" — streamed sentences showed
+                    # as 🔊 lines and then the whole reply again as 🤖).
+                    # Extend the open 🤖 line; open one if none.
+                    new = _norm(text)
+                    prev = _norm(self._morty_partial)
+                    if prev and new.startswith(prev):
+                        delta = new[len(prev):].strip()
+                        if delta:
+                            self._extend_last_chat_line(delta)
+                    else:
+                        self.chat_log.appendPlainText(f"🤖 Morty: {new}")
+                    self._morty_partial = new
+                    self._recent_morty_texts.append(new)
+                    continue
                 if who == "Spoken":
                     # Narrations from router/executor via the speak server.
-                    # Chat replies also pass through /speech/ai_said —
-                    # dedupe against Morty's recent messages.
-                    if text in self._recent_morty_texts:
+                    # Chat replies also pass through /speech/ai_said — a
+                    # reply sentence is never a status line (Majd 2026-09-23:
+                    # status = robot stuff only).
+                    t = _norm(text)
+                    if any(t in _norm(x) for x in self._recent_morty_texts) or (
+                            self._morty_partial and t in self._morty_partial):
                         continue
                     self.chat_log.appendPlainText(f"🔊 Morty (status): {text}")
                     self.exp_win.record_event(f"voice status: {text}")
@@ -2988,6 +3018,18 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 icon = "🎤" if who == "You" else "🤖"
                 if who == "Morty":
                     self._recent_morty_texts.append(text)
+                    new = _norm(text)
+                    if self._morty_partial and new.startswith(self._morty_partial):
+                        # The finished reply of a line already shown while
+                        # streaming: add only what was not shown, record once.
+                        delta = new[len(self._morty_partial):].strip()
+                        if delta:
+                            self._extend_last_chat_line(delta)
+                        self._morty_partial = ""
+                        self.exp_win.record_event(f"voice Morty: {text}")
+                        self.mmhri_win.feed_chat("Morty", text)
+                        continue
+                    self._morty_partial = ""
                 self.chat_log.appendPlainText(f"{icon} {who}: {text}")
                 self.voice_status.setText(f"{icon} {text[:70]}")
                 self.voice_status.setStyleSheet("color:#ddd; padding-right:8px;")

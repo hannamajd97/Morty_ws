@@ -218,6 +218,8 @@ class MortyGuiBridge(Node):
         self.create_subscription(
             String, "/robot/assistant_text", self._on_assistant_text, 5
         )
+        self.create_subscription(
+            String, "/robot/assistant_partial", self._on_assistant_partial, 5)
         # EVERYTHING the speak server actually says, including narrations
         # from intent_router/executor ("The grasp failed: ..."). Those never
         # pass through assistant_text, so the chat window missed them
@@ -976,6 +978,11 @@ class MortyGuiBridge(Node):
         self.llm_cycle_active = True
         with self._lock:
             self._cand_status.append(str(msg.data))
+
+    def _on_assistant_partial(self, msg: String) -> None:
+        with self._lock:
+            self.chat_events.append(("MortyPartial", str(msg.data)))
+            self.voice_dirty = True
 
     def _on_assistant_text(self, msg: String) -> None:
         with self._lock:

@@ -870,6 +870,11 @@ class ChatIntentNode(Node):
             str(self.get_parameter("intent_topic").value),
             10,
         )
+        # Growing reply while sentences stream to speech (2026-09-23): the
+        # GUI extends the current "Morty:" line from this and never shows a
+        # reply sentence as a "(status)" line; /robot/assistant_text still
+        # carries the finished reply once.
+        self.assistant_partial_pub = self.create_publisher(String, "/robot/assistant_partial", 5)
         self.assistant_pub = self.create_publisher(
             String,
             str(self.get_parameter("assistant_topic").value),
@@ -2918,6 +2923,7 @@ class ChatIntentNode(Node):
                     self.get_logger().info(
                         f"[timing] first sentence spoken {time.monotonic() - self._t_llm0:.2f}s into the LLM call")
                 self._streamed.append(sentence)
+                self.assistant_partial_pub.publish(String(data=" ".join(self._streamed)))
                 self._speak(sentence)
 
     def _unspoken_tail(self, text: str) -> str:
