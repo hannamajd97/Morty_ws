@@ -495,6 +495,27 @@ class MoveToNamedPoseServer(Node):
 
     # ── YAML loading ────────────────────────────────────────────────────
 
+    def _file_via_poses(self, target: str) -> list:
+        """Detour for current -> target from the file: leaving a pose that
+        has a via list means passing its vias in reverse; arriving at one
+        means passing them forward. The pose we are AT is the nearest
+        listed pose within 0.35 rad (L2 over the six joints)."""
+        vias = getattr(self, "_pose_via", {}) or {}
+        if not vias:
+            return []
+        out: list = []
+        cur = self._current_joint_positions()
+        if cur is not None and len(cur) == len(self._joint_names):
+            best, best_d = "", 1e9
+            for name, pos in self._poses.items():
+                d = sum((a - b) ** 2 for a, b in zip(cur, pos)) ** 0.5
+                if d < best_d:
+                    best, best_d = name, d
+            if best and best != target and best_d < 0.35:
+                out.extend(reversed(vias.get(best, [])))
+        out.extend(v for v in vias.get(target, []) if v not in out)
+        return [v for v in out if v in self._poses and v != target]
+
     def _load_poses(self, path: str) -> None:
         if not os.path.exists(path):
             self.get_logger().warn(
@@ -517,6 +538,12 @@ class MoveToNamedPoseServer(Node):
             )
             return
         self._joint_names = [str(j) for j in joint_names]
+        # 2026-09-23: a pose may name the poses to flow THROUGH on the way
+        # ("via: [vla_via_right]"). Straight joint-space lines from home to
+        # the new VLA drop poses swept the elbow through the table (199 deg
+        # of elbow while the shoulder lifts 142 deg). The file owns the
+        # detour, so every client (GUI, executor, router) gets it.
+        self._pose_via = {}
         for label, entry in poses.items():
             if not isinstance(entry, dict):
                 continue
@@ -526,6 +553,9 @@ class MoveToNamedPoseServer(Node):
                 and len(positions) == len(self._joint_names)
             ):
                 self._poses[str(label)] = [float(v) for v in positions]
+                via = entry.get("via") or []
+                if isinstance(via, list) and via:
+                    self._pose_via[str(label)] = [str(v) for v in via]
         self.get_logger().info(
             f"Loaded {len(self._poses)} pose(s) from {path} for collision pre-check."
         )
@@ -916,6 +946,11 @@ class MoveToNamedPoseServer(Node):
                 for v in (getattr(goal, "via_poses", None) or [])
             ]
             via_poses = [v for v in via_poses if v]
+            if not via_poses:
+                via_poses = self._file_via_poses(pose_name)
+                if via_poses:
+                    self.get_logger().info(
+                        f"via poses from observation_poses.yaml: {via_poses} (before {pose_name!r})")
 
             self._expected_pose = pose_name
             self._status_event.clear()

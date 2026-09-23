@@ -1397,6 +1397,23 @@ class MortyGuiBridge(Node):
             self._fast_status_t = 0.0
         # JSON payload → per-request duration (the node stretches the cached
         # trajectory over this time; bigger = slower, calmer motion).
+        # 2026-09-23: go through the named-pose server when it is up — it
+        # runs the collision pre-check and inserts the via poses the file
+        # declares (home -> vla_drop_right swept the elbow through the
+        # table on the raw replay path). The replay node still executes
+        # and still publishes the status this GUI waits on. Raw replay
+        # stays as the fallback when the server is absent.
+        if self.named_pose_server_available():
+            try:
+                from morty_interfaces.action import MoveToNamedPose
+                goal = MoveToNamedPose.Goal()
+                goal.pose_name = str(target_name)
+                self._named_pose_probe.send_goal_async(goal)
+                self.get_logger().info(
+                    f"[fast-replay] '{target_name}' sent to the named-pose server (pre-check + via poses)")
+                return
+            except Exception as exc:
+                self.get_logger().warn(f"[fast-replay] named-pose server path failed ({exc}); raw replay")
         payload = json.dumps({"label": str(target_name), "duration_s": float(duration_s)})
         self._pub_fast_replay.publish(String(data=payload))
         self.get_logger().info(
