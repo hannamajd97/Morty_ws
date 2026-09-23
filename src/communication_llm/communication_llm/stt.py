@@ -593,13 +593,13 @@ class WhisperTranscriber:
         """
         while not self._stop.is_set():
             try:
-                buf, utt_start_wall = self._utterance_q.get(timeout=0.2)
+                buf, utt_start_wall, skip_echo_cut = self._utterance_q.get(timeout=0.2)
             except queue.Empty:
                 continue
             if not buf or self._stop.is_set():
                 continue
             try:
-                text = self._transcribe(buf, utt_start_wall)
+                text = self._transcribe(buf, utt_start_wall, skip_echo_cut)
             except Exception as exc:
                 self._log("error", f"whisper worker transcribe failed: {exc}")
                 continue
@@ -762,18 +762,22 @@ class WhisperTranscriber:
         with self._ai_lock:
             return self._ai_depth > 0
 
-    def _maybe_barge_in(self, pcm16_buffer: bytes) -> None:
-        score = self._morty_score(pcm16_buffer)
+    def _barge_in_check(self, window: bytes, quiet: bool = False) -> bool:
+        """Score the latest window; True (and on_barge_in fired) when it is
+        a human voice. ``quiet`` silences the Morty verdict on repeats."""
+        score = self._morty_score(window)
         if score is None:
-            return
+            return False
         if score < self._speaker_thr:
             self._log("info", f"[speaker] barge-in: a human is talking over Morty (cos {score:.2f}) — stopping playback")
             try:
                 self._on_barge_in(score)
             except Exception:
                 pass
-        else:
-            self._log("info", f"[speaker] overlap is Morty's own voice (cos {score:.2f}); playback continues")
+            return True
+        if not quiet:
+            self._log("info", f"[speaker] overlap so far is Morty's own voice (cos {score:.2f}); still listening")
+        return False
 
     def set_word_time_cut(self, value: bool) -> bool:
         old = bool(self._word_time_cut)
@@ -880,7 +884,8 @@ class WhisperTranscriber:
         return norm in cls._HALLUCINATION_PHRASES
 
     def _enqueue_utterance(self, pcm16_buffer: bytes,
-                          utt_start_wall: float = 0.0) -> None:
+                          utt_start_wall: float = 0.0,
+                          skip_echo_cut: bool = False) -> None:
         """Hand a finished utterance to the worker thread, dropping it
         silently if the worker is still busy with the previous one.
 
@@ -891,7 +896,7 @@ class WhisperTranscriber:
         if not pcm16_buffer:
             return
         try:
-            self._utterance_q.put_nowait((pcm16_buffer, utt_start_wall))
+            self._utterance_q.put_nowait((pcm16_buffer, utt_start_wall, skip_echo_cut))
         except queue.Full:
             self._log(
                 "info",
@@ -901,7 +906,8 @@ class WhisperTranscriber:
             )
 
     def _transcribe(self, pcm16_buffer: bytes,
-                   utt_start_wall: float = 0.0) -> str:
+                   utt_start_wall: float = 0.0,
+                   skip_echo_cut: bool = False) -> str:
         if not pcm16_buffer:
             return ""
         # PCM16 → float32 in [-1, 1]
@@ -972,8 +978,13 @@ class WhisperTranscriber:
                     )
                     continue
                 words = getattr(s, "words", None) or []
+                # skip_echo_cut: this utterance starts at a barge-in the
+                # speaker fingerprint confirmed as human — every word in it
+                # overlaps the playback Morty was cutting short, and all of
+                # them are the operator's (2026-09-23 test: the cut deleted
+                # "Now what kind of object are you seeing right now?").
                 cut_ok = (self._word_time_cut and utt_start_wall > 0.0
-                          and words)
+                          and words and not skip_echo_cut)
                 if not cut_ok:
                     # No word times (older faster-whisper, or the cut is
                     # disarmed): behave exactly as before.
@@ -1104,7 +1115,9 @@ class WhisperTranscriber:
             in_speech = False
             silence_ms = 0
             speech_ms = 0
-            barge_checked = False
+            barge_fired = False
+            next_barge_ms = self._barge_in_min_ms
+            skip_echo_cut = False
             # Wall clock of the FIRST sample in `buffer`. Whisper reports
             # word times relative to the buffer, so this anchors them to
             # the same clock as the TTS playback windows.
@@ -1158,17 +1171,33 @@ class WhisperTranscriber:
                         # `data` was captured over the PRECEDING chunk_ms,
                         # so the first sample is one chunk in the past.
                         utt_start_wall = time.time() - chunk_ms / 1000.0
-                        barge_checked = False
+                        barge_fired = False
+                        next_barge_ms = self._barge_in_min_ms
+                        skip_echo_cut = False
                     buffer.extend(data)
                     speech_ms += chunk_ms
                     silence_ms = 0
                     # Cap utterance length to avoid huge transcribe calls.
-                    if (self._on_barge_in is not None and not barge_checked
-                            and speech_ms >= self._barge_in_min_ms and self._tts_playing()):
-                        barge_checked = True          # once per utterance, ~12 ms
-                        self._maybe_barge_in(bytes(buffer))
+                    # Morty's own playback trips the VAD, so an utterance
+                    # heard during TTS BEGINS with his echo; the operator
+                    # joins later. Judge the LATEST 0.8 s every 0.3 s (12 ms
+                    # each) — one check on the buffer's head saw only Morty
+                    # (2026-09-23 test). On a human verdict the utterance
+                    # restarts at that window: Whisper then gets the
+                    # operator's words, not the story they interrupted.
+                    if (self._on_barge_in is not None and not barge_fired
+                            and speech_ms >= next_barge_ms and self._tts_playing()):
+                        next_barge_ms = speech_ms + 300
+                        win = 2 * int(0.8 * self._sample_rate)
+                        if self._barge_in_check(bytes(buffer[-win:]),
+                                                quiet=(speech_ms > self._barge_in_min_ms)):
+                            barge_fired = True
+                            skip_echo_cut = True
+                            del buffer[:-win]
+                            utt_start_wall = time.time() - 0.8
+                            speech_ms = 800
                     if speech_ms / 1000.0 >= self._max_utterance_s:
-                        self._enqueue_utterance(bytes(buffer), utt_start_wall)
+                        self._enqueue_utterance(bytes(buffer), utt_start_wall, skip_echo_cut)
                         buffer.clear()
                         in_speech = False
                         silence_ms = 0
@@ -1181,7 +1210,7 @@ class WhisperTranscriber:
                     if silence_ms >= self._silence_ms:
                         if speech_ms >= self._min_utterance_ms:
                             self._enqueue_utterance(bytes(buffer),
-                                                    utt_start_wall)
+                                                    utt_start_wall, skip_echo_cut)
                         buffer.clear()
                         in_speech = False
                         silence_ms = 0
