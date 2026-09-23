@@ -1126,6 +1126,11 @@ class ChatIntentNode(Node):
         self._router_status_at = 0.0
         self.create_subscription(
             String, "/intent_router/robot_status", self._on_router_status, 1)
+        # speech_input_node's speaker verdict (2026-09-23): when the voice
+        # fingerprint already said "human", the text-overlap echo rule below
+        # must not veto it ("What kind of one?" was dropped as 75 % overlap).
+        self._speaker_verdict: tuple = (0.0, "", False)
+        self.create_subscription(String, "/speech/speaker_verdict", self._on_speaker_verdict, 10)
         # /tf freshness — half-dead driver detection (2026-08-20).
         from tf2_msgs.msg import TFMessage
         self._tf_msg_type = TFMessage
@@ -1805,8 +1810,19 @@ class ChatIntentNode(Node):
         )
         return True
 
+    def _on_speaker_verdict(self, msg: String) -> None:
+        try:
+            d = json.loads(msg.data)
+            self._speaker_verdict = (time.monotonic(), str(d.get("text", "")), bool(d.get("human")))
+        except Exception:
+            pass
+
     def _is_likely_echo(self, transcript: str) -> bool:
         if self._echo_window_s <= 0.0 or self._echo_min_overlap <= 0.0:
+            return False
+        t_v, txt_v, human_v = self._speaker_verdict
+        if human_v and txt_v == transcript and time.monotonic() - t_v < 5.0:
+            self.get_logger().info("speaker gate said human — text echo rule skipped")
             return False
         now = self.get_clock().now().nanoseconds / 1e9
         # Drop expired entries.

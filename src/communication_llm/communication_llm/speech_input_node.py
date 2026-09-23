@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import os
 
+import json
 import rclpy
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
@@ -182,6 +183,10 @@ class SpeechInputNode(Node):
         )
         self._state_pub = self.create_publisher(String, "/speech/state", 10)
         self._barge_pub = self.create_publisher(Bool, "/speech/barge_in", 10)
+        # Who spoke, per transcript (2026-09-23): cos to Morty's fingerprint,
+        # published just before the transcript so chat_node can skip its
+        # text-overlap echo rule when the voice was already judged human.
+        self._verdict_pub = self.create_publisher(String, "/speech/speaker_verdict", 10)
         self._wave_pub = self.create_publisher(
             Float32MultiArray, "/speech/waveform", 10
         )
@@ -398,6 +403,10 @@ class SpeechInputNode(Node):
             )
             self._publish_rejected("no wake word", text)
             return
+        score = getattr(self._stt, "_last_speaker_score", None)
+        if score is not None:
+            self._verdict_pub.publish(String(data=json.dumps(
+                {"text": forwarded, "cos": round(float(score), 3), "human": True})))
         msg = String()
         msg.data = forwarded
         self._pub.publish(msg)

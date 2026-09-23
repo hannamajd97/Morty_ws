@@ -434,6 +434,7 @@ class WhisperTranscriber:
         self._spk_encoder = None
         self._spk_ref = None
         self._spk_failed = False
+        self._last_speaker_score: Optional[float] = None
         # ---- WORD-TIME ECHO CUT (Majd 2026-08-28) ------------------
         # Whisper knows when every word was spoken; we know exactly when
         # Morty's loudspeaker was playing. Intersect the two and the
@@ -762,22 +763,13 @@ class WhisperTranscriber:
         with self._ai_lock:
             return self._ai_depth > 0
 
-    def _barge_in_check(self, window: bytes, quiet: bool = False) -> bool:
-        """Score the latest window; True (and on_barge_in fired) when it is
-        a human voice. ``quiet`` silences the Morty verdict on repeats."""
+    def _barge_in_check(self, window: bytes, quiet: bool = False) -> Optional[float]:
+        """Fingerprint score of the latest window (None = gate off / too
+        short). The loop decides; ``quiet`` silences the Morty verdict."""
         score = self._morty_score(window)
-        if score is None:
-            return False
-        if score < self._speaker_thr:
-            self._log("info", f"[speaker] barge-in: a human is talking over Morty (cos {score:.2f}) — stopping playback")
-            try:
-                self._on_barge_in(score)
-            except Exception:
-                pass
-            return True
-        if not quiet:
+        if score is not None and score >= self._speaker_thr and not quiet:
             self._log("info", f"[speaker] overlap so far is Morty's own voice (cos {score:.2f}); still listening")
-        return False
+        return score
 
     def set_word_time_cut(self, value: bool) -> bool:
         old = bool(self._word_time_cut)
@@ -931,6 +923,7 @@ class WhisperTranscriber:
             )
             return ""
         score = self._morty_score(pcm16_buffer)
+        self._last_speaker_score = score      # read by the node when it publishes the transcript
         if score is not None:
             if score >= self._speaker_thr:
                 self._log("info", f"[speaker] Morty's own voice (cos {score:.2f}) — not transcribed")
@@ -1118,6 +1111,8 @@ class WhisperTranscriber:
             barge_fired = False
             next_barge_ms = self._barge_in_min_ms
             skip_echo_cut = False
+            barge_hits = 0
+            barge_ref_rms = -1.0
             # Wall clock of the FIRST sample in `buffer`. Whisper reports
             # word times relative to the buffer, so this anchors them to
             # the same clock as the TTS playback windows.
@@ -1174,6 +1169,8 @@ class WhisperTranscriber:
                         barge_fired = False
                         next_barge_ms = self._barge_in_min_ms
                         skip_echo_cut = False
+                        barge_hits = 0
+                        barge_ref_rms = -1.0
                     buffer.extend(data)
                     speech_ms += chunk_ms
                     silence_ms = 0
@@ -1189,8 +1186,27 @@ class WhisperTranscriber:
                             and speech_ms >= next_barge_ms and self._tts_playing()):
                         next_barge_ms = speech_ms + 300
                         win = 2 * int(0.8 * self._sample_rate)
-                        if self._barge_in_check(bytes(buffer[-win:]),
-                                                quiet=(speech_ms > self._barge_in_min_ms)):
+                        window = bytes(buffer[-win:])
+                        rms = _compute_rms_normalised(window)
+                        if barge_ref_rms < 0.0:
+                            barge_ref_rms = rms      # first window = the echo alone (or the human, if loud)
+                        # A human interrupting is LOUD in a clip-on mic; Morty's
+                        # echo is faint (rms ~0.006 vs speech 0.03+, 2026-09-23).
+                        # Short 0.8 s windows of his echo scored 0.14-0.49 on the
+                        # fingerprint, so the voice test alone stopped him at
+                        # every first sentence; loudness + two consecutive
+                        # human verdicts is what a real interruption looks like.
+                        loud = rms >= self._min_rms and (
+                            rms >= 2.5 * barge_ref_rms or barge_ref_rms >= self._min_rms)
+                        score = self._barge_in_check(window, quiet=(barge_hits > 0 or speech_ms > self._barge_in_min_ms)) if loud else None
+                        barge_hits = barge_hits + 1 if (score is not None and score < self._speaker_thr) else 0
+                        if barge_hits >= 2:
+                            self._log("info", f"[speaker] barge-in: a human is talking over Morty "
+                                              f"(cos {score:.2f}, rms {rms:.3f} vs echo {barge_ref_rms:.3f}) — stopping playback")
+                            try:
+                                self._on_barge_in(score)
+                            except Exception:
+                                pass
                             barge_fired = True
                             skip_echo_cut = True
                             del buffer[:-win]
