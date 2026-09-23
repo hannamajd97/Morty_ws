@@ -429,6 +429,7 @@ class WhisperTranscriber:
         self._speaker_gate = bool(speaker_gate)
         self._morty_voice_path = os.path.expanduser(morty_voice_path or "")
         self._speaker_thr = float(speaker_gate_threshold)
+        self._barge_thr = min(0.25, self._speaker_thr)   # short windows of Morty's echo scored 0.14-0.49; whole sentences 0.50-0.86
         self._on_barge_in = on_barge_in
         self._barge_in_min_ms = int(barge_in_min_ms)
         self._spk_encoder = None
@@ -926,10 +927,10 @@ class WhisperTranscriber:
         self._last_speaker_score = score      # read by the node when it publishes the transcript
         if score is not None:
             if score >= self._speaker_thr:
-                self._log("info", f"[speaker] Morty's own voice (cos {score:.2f}) — not transcribed")
+                self._log("info", f"[speaker] Morty's own voice (cos {score:.2f}, rms {rms:.3f}) — not transcribed")
                 self._reject(f"my own voice (speaker gate cos {score:.2f})", "")
                 return ""
-            self._log("info", f"[speaker] human voice (cos {score:.2f})")
+            self._log("info", f"[speaker] human voice (cos {score:.2f}, rms {rms:.3f})")
         try:
             _t0 = time.monotonic()
             segments, info = self._model.transcribe(
@@ -1185,7 +1186,7 @@ class WhisperTranscriber:
                     if (self._on_barge_in is not None and not barge_fired
                             and speech_ms >= next_barge_ms and self._tts_playing()):
                         next_barge_ms = speech_ms + 300
-                        win = 2 * int(0.8 * self._sample_rate)
+                        win = 2 * int(1.2 * self._sample_rate)
                         window = bytes(buffer[-win:])
                         rms = _compute_rms_normalised(window)
                         if barge_ref_rms < 0.0:
@@ -1196,10 +1197,14 @@ class WhisperTranscriber:
                         # fingerprint, so the voice test alone stopped him at
                         # every first sentence; loudness + two consecutive
                         # human verdicts is what a real interruption looks like.
-                        loud = rms >= self._min_rms and (
-                            rms >= 2.5 * barge_ref_rms or barge_ref_rms >= self._min_rms)
+                        # 2026-09-23 14:05: the echo itself reached rms 0.013-0.026
+                        # (above the gate), so "already loud" cannot excuse the
+                        # ratio; a human must be clearly louder than the echo
+                        # heard at the start of this utterance, in a 1.2 s
+                        # window, twice, and below the stricter barge threshold.
+                        loud = rms >= self._min_rms and rms >= 2.0 * barge_ref_rms
                         score = self._barge_in_check(window, quiet=(barge_hits > 0 or speech_ms > self._barge_in_min_ms)) if loud else None
-                        barge_hits = barge_hits + 1 if (score is not None and score < self._speaker_thr) else 0
+                        barge_hits = barge_hits + 1 if (score is not None and score < self._barge_thr) else 0
                         if barge_hits >= 2:
                             self._log("info", f"[speaker] barge-in: a human is talking over Morty "
                                               f"(cos {score:.2f}, rms {rms:.3f} vs echo {barge_ref_rms:.3f}) — stopping playback")
