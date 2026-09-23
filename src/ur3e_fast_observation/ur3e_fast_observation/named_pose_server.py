@@ -592,6 +592,7 @@ class MoveToNamedPoseServer(Node):
         # of elbow while the shoulder lifts 142 deg). The file owns the
         # detour, so every client (GUI, executor, router) gets it.
         self._pose_via = {}
+        self._pose_direct = set()   # poses that may be reached straight from the grasp (pre-checked, home as fallback)
         self._precheck_cache = {}   # (start joints rounded, path names) -> monotonic time of the last pass
         for label, entry in poses.items():
             if not isinstance(entry, dict):
@@ -605,6 +606,8 @@ class MoveToNamedPoseServer(Node):
                 via = entry.get("via") or []
                 if isinstance(via, list) and via:
                     self._pose_via[str(label)] = [str(v) for v in via]
+                if bool(entry.get("direct_carry", False)):
+                    self._pose_direct.add(str(label))
         self.get_logger().info(
             f"Loaded {len(self._poses)} pose(s) from {path} for collision pre-check."
         )
@@ -1009,14 +1012,29 @@ class MoveToNamedPoseServer(Node):
                 if via_poses:
                     self.get_logger().info(
                         f"via poses from observation_poses.yaml: {via_poses} (before {pose_name!r})")
-            elif via_poses == ["home"] and (getattr(self, "_pose_via", {}) or {}).get(pose_name):
+            fallback_vias: list = []
+            direct_carry = False
+            if via_poses == ["home"] and (getattr(self, "_pose_via", {}) or {}).get(pose_name):
                 # The executor's generic detour (lift -> home -> drop). A
                 # pose that declares its own via in the file knows better
                 # (2026-09-23, Majd: "no need to go all the way home"):
-                # lift -> vla_via_right -> vla_drop_right, one spline.
+                # lift -> vla_via_right -> vla_drop_right, one spline. If
+                # that path fails the pre-check, the home detour is tried.
                 via_poses = list(self._pose_via[pose_name])
+                fallback_vias = ["home"]
                 self.get_logger().info(
                     f"'home' detour replaced by the file's via {via_poses} for {pose_name!r}")
+            elif via_poses == ["home"] and pose_name in getattr(self, "_pose_direct", set()):
+                # direct_carry: true in the file — straight from the lifted
+                # grasp to the drop, allowed ONLY when the pre-check along
+                # that line passes (table, wall, neighbour boxes); refused
+                # -> the home detour runs instead. Majd 2026-09-23: "the
+                # main concern is not to hit the table".
+                via_poses = []
+                fallback_vias = ["home"]
+                direct_carry = True
+                self.get_logger().info(
+                    f"direct carry to {pose_name!r} (file: direct_carry) — home detour as fallback")
 
             self._expected_pose = pose_name
             self._status_event.clear()
@@ -1138,9 +1156,9 @@ class MoveToNamedPoseServer(Node):
             # ── blended multi-pose path ──────────────────────────────
             # One dense trajectory through the vias instead of N goals
             # with N start-stop profiles and N fixed overheads.
-            if via_poses:
+            if via_poses or direct_carry:
                 return self._execute_blended(
-                    goal_handle, pose_name, via_poses, duration_s, speed_label
+                    goal_handle, pose_name, via_poses, duration_s, speed_label, fallback_vias
                 )
 
             # ── single-pose request ──────────────────────────────────
@@ -1271,6 +1289,7 @@ class MoveToNamedPoseServer(Node):
         via_poses: List[str],
         segment_duration_s: float,
         speed_label: str,
+        fallback_vias: Optional[List[str]] = None,
     ) -> MoveToNamedPose.Result:
         """Flow current -> via_poses[0] -> ... -> pose_name as ONE move.
 
@@ -1338,6 +1357,11 @@ class MoveToNamedPoseServer(Node):
                 if clean:
                     self._precheck_cache[key] = time.monotonic()
             if not clean:
+                if fallback_vias:
+                    self.get_logger().warn(
+                        f"path {path_desc} refused ({reason}) — taking the detour via {fallback_vias} instead")
+                    return self._execute_blended(
+                        goal_handle, pose_name, list(fallback_vias), segment_duration_s, speed_label, None)
                 return self._fail(goal_handle, f"refusing: {reason}")
             self.get_logger().info(
                 f"Collision pre-check passed for blended path {path_desc} "
