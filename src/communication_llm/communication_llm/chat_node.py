@@ -828,7 +828,11 @@ class ChatIntentNode(Node):
         # greeting-adjacent sentence past 0.45 — a real user command was
         # dropped at 62 % (Majd, 2026-08-12, and he set the bar: "at
         # least 85%"). True mic echo of a full sentence scores ~1.0.
-        self.declare_parameter("echo_min_overlap", 0.85)
+        # 2026-09-23 (Majd: "text comparison — leave only what is very
+        # reliable"): the word-overlap echo rule is OFF (0.0 disables
+        # _is_likely_echo). speech_input_node's speaker fingerprint decides
+        # who spoke; this rule vetoed real questions ("What kind of one?").
+        self.declare_parameter("echo_min_overlap", 0.0)
         # Hard cooldown after the AI speaks: any non-affirmation
         # transcript arriving within this many seconds is treated as
         # echo. Longer = more aggressive. Was 1.5s; 2.5s catches the

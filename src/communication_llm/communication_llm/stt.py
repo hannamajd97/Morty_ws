@@ -977,8 +977,13 @@ class WhisperTranscriber:
                 # overlaps the playback Morty was cutting short, and all of
                 # them are the operator's (2026-09-23 test: the cut deleted
                 # "Now what kind of object are you seeing right now?").
+                # Majd 2026-09-23: keep only what is reliable. When the
+                # fingerprint judged this utterance (score is not None) it is
+                # human, or it was rejected before Whisper — no word of it is
+                # cut by clock or by text. The cut remains only as the
+                # fallback while the speaker gate is unavailable.
                 cut_ok = (self._word_time_cut and utt_start_wall > 0.0
-                          and words and not skip_echo_cut)
+                          and words and not skip_echo_cut and score is None)
                 if not cut_ok:
                     # No word times (older faster-whisper, or the cut is
                     # disarmed): behave exactly as before.
