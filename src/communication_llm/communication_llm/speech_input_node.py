@@ -76,6 +76,8 @@ class SpeechInputNode(Node):
         # is faster-whisper (much better accuracy, segmented utterance mode).
         self.declare_parameter("stt_engine", "vosk")
         self.declare_parameter("parakeet_model", "nemo-parakeet-tdt-0.6b-v3")   # stt_engine:=parakeet (2026-09-23)
+        self.declare_parameter("parakeet_device", "cpu")          # cpu int8 = 430 ms, no GPU; cuda = 50 ms, 2.6 GB
+        self.declare_parameter("parakeet_quantization", "int8")
         self.declare_parameter("vad_engine", "silero")       # "silero" (default since 2026-09-23) or "webrtc"
         self.declare_parameter("silero_onset", 0.5)
         self.declare_parameter("silero_offset", 0.35)
@@ -207,6 +209,8 @@ class SpeechInputNode(Node):
                     silero_onset=float(self.get_parameter("silero_onset").value),
                     silero_offset=float(self.get_parameter("silero_offset").value),
                     parakeet_model=str(self.get_parameter("parakeet_model").value),
+                    parakeet_device=str(self.get_parameter("parakeet_device").value),
+                    parakeet_quantization=str(self.get_parameter("parakeet_quantization").value),
                     model_size=str(self.get_parameter("whisper_model").value),
                     on_transcript=self._on_transcript,
                     sample_rate=int(self.get_parameter("sample_rate").value),

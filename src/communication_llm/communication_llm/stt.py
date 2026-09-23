@@ -413,6 +413,8 @@ class WhisperTranscriber:
         logger: Any = None,
         engine: str = "whisper",
         parakeet_model: str = "nemo-parakeet-tdt-0.6b-v3",
+        parakeet_device: str = "cpu",
+        parakeet_quantization: str = "int8",
         vad_engine: str = "webrtc",
         silero_onset: float = 0.5,
         silero_offset: float = 0.35,
@@ -536,7 +538,7 @@ class WhisperTranscriber:
 
         if logger is not None:
             if str(engine or "whisper").lower() == "parakeet":
-                logger.info(f"Loading Parakeet STT {parakeet_model!r} on {device} (no Whisper is loaded).")
+                logger.info(f"Loading Parakeet STT {parakeet_model!r} on {parakeet_device} (no Whisper is loaded).")
             else:
                 logger.info(
                     f"Loading faster-whisper model {model_size!r} "
@@ -565,12 +567,20 @@ class WhisperTranscriber:
             cuda_opts = {"cudnn_conv_algo_search": "DEFAULT",
                          "gpu_mem_limit": int(2.6 * 1024 ** 3),
                          "arena_extend_strategy": "kSameAsRequested"}
-            providers = ([("CUDAExecutionProvider", cuda_opts)]
-                         if device in ("auto", "cuda") else []) + ["CPUExecutionProvider"]
-            self._pk = onnx_asr.load_model(parakeet_model, providers=providers)
+            # Majd 2026-09-23: "I don't want a full GPU". Default = CPU in
+            # int8: 430 ms per utterance measured (GPU fp32: 50 ms), and the
+            # speech node keeps only the 0.5 GB speaker model on the card.
+            # parakeet_device:=cuda brings the 50 ms back (2.6 GB, capped).
+            pk_dev = str(parakeet_device or "cpu").lower()
+            providers = ([("CUDAExecutionProvider", cuda_opts)] if pk_dev == "cuda" else []) + ["CPUExecutionProvider"]
+            kw = {"providers": providers}
+            if pk_dev != "cuda" and parakeet_quantization:
+                kw["quantization"] = str(parakeet_quantization)
+            self._pk = onnx_asr.load_model(parakeet_model, **kw)
             for secs in (2, 4):                      # warm the two common shapes
                 self._pk.recognize((np.random.randn(16000 * secs) * 0.003).astype(np.float32))
-            self._log("info", f"Parakeet STT ready ({parakeet_model}, providers {[p if isinstance(p, str) else p[0] for p in providers]}).")
+            self._log("info", f"Parakeet STT ready ({parakeet_model}, {pk_dev}"
+                              f"{', ' + parakeet_quantization if pk_dev != 'cuda' and parakeet_quantization else ''}).")
         else:
             self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         if self._speaker_gate:
