@@ -2835,6 +2835,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             # replay node exists anywhere, start ours.
             if (self._driver.running() and not self._replay_extra.running()
                     and not self.bridge.fast_replay_available()):
+                self._retire_orphan_pose_servers()
                 self._replay_extra.start(list(REPLAY_CMD), log_path=REPLAY_LOG)
             if (self._driver.running() and not self._named_pose_extra.running()
                     and not self.bridge.named_pose_server_available()):
@@ -3139,6 +3140,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         (the one that carries the current binary and parameters) and
         SIGINT every older duplicate so ros2 launch tears it down cleanly."""
         self._retire_headless_executors()
+        self._retire_orphan_pose_servers()
         pids = self._pgrep_all(r"ros2 launch .*grasp_executor_lin_ll[m]")
         if not pids:
             return
@@ -3177,6 +3179,30 @@ class OperatorWindow(QtWidgets.QMainWindow):
                       f"(parent {ppid}: {parent[:50]!r})", flush=True)
             except ProcessLookupError:
                 pass
+
+    def _retire_orphan_pose_servers(self) -> None:
+        """Kill replay nodes and named-pose servers that were not started by
+        THIS GUI (their `ros2 run` wrapper's parent is not our pid). 2026-09-23:
+        a replay node from a previous GUI survived a GUI restart; both replay
+        nodes executed every carry, the controller cancelled the duplicate
+        goal and every drop failed ("replay reported: cancelled")."""
+        me = os.getpid()
+        for pid in self._pgrep_all(r"ur3e_fast_observation/(replay_node|move_to_named_pose_server) --ros-arg[s]"):
+            try:
+                with open(f"/proc/{pid}/stat") as f:
+                    ppid = int(f.read().rsplit(")", 1)[1].split()[1])
+                with open(f"/proc/{ppid}/stat") as f:
+                    gppid = int(f.read().rsplit(")", 1)[1].split()[1])
+            except (OSError, ValueError, IndexError):
+                continue
+            if ppid == me or gppid == me:
+                continue
+            for victim in (pid, ppid):
+                try:
+                    os.kill(victim, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            print(f"[gui] killed orphan pose-server process {pid} (not started by this GUI)", flush=True)
 
     def _write_latest_html(self) -> None:
         """~/morty_ws/experiments/latest/view3d.html — refreshed on every
