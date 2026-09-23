@@ -1197,12 +1197,13 @@ class WhisperTranscriber:
                         # fingerprint, so the voice test alone stopped him at
                         # every first sentence; loudness + two consecutive
                         # human verdicts is what a real interruption looks like.
-                        # 2026-09-23 14:05: the echo itself reached rms 0.013-0.026
-                        # (above the gate), so "already loud" cannot excuse the
-                        # ratio; a human must be clearly louder than the echo
-                        # heard at the start of this utterance, in a 1.2 s
-                        # window, twice, and below the stricter barge threshold.
-                        loud = rms >= self._min_rms and rms >= 2.0 * barge_ref_rms
+                        # Majd 2026-09-23: "no more loudness". The echo canceller
+                        # (PulseAudio module-echo-cancel on the Hollyland mic and
+                        # the analog speaker) removes Morty's voice from the mic;
+                        # what is left is judged by the fingerprint alone: two
+                        # consecutive 1.2 s windows below the barge threshold.
+                        # The plain background gate (min_rms) still applies.
+                        loud = rms >= self._min_rms
                         score = self._barge_in_check(window, quiet=(barge_hits > 0 or speech_ms > self._barge_in_min_ms)) if loud else None
                         barge_hits = barge_hits + 1 if (score is not None and score < self._barge_thr) else 0
                         if barge_hits >= 2:
