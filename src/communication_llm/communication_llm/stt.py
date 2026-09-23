@@ -411,6 +411,8 @@ class WhisperTranscriber:
         tts_lead_s: float = 0.15,
         tts_tail_s: float = 0.25,
         logger: Any = None,
+        engine: str = "whisper",
+        parakeet_model: str = "nemo-parakeet-tdt-0.6b-v3",
         speaker_gate: bool = False,
         morty_voice_path: str = "",
         speaker_gate_threshold: float = 0.35,
@@ -510,7 +512,29 @@ class WhisperTranscriber:
                 f"(device={device}, compute_type={compute_type}). "
                 "First load may take 30-60s while the model downloads."
             )
-        self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        # ---- ENGINE (2026-09-23) --------------------------------------
+        # "parakeet": NVIDIA parakeet-tdt-0.6b-v3 through onnx-asr on the
+        # GPU — 25 European languages with per-utterance detection, no
+        # prompt, no word times. Benchmarked on 9 trial clips of 2–8 s
+        # against Whisper large-v3-turbo int8 (both on the GTX 1080, one at
+        # a time, warmed up): 52 ms vs 641 ms per utterance, texts equal,
+        # German perfect, and it returns '' where Whisper hallucinated
+        # ("Thank you.", "Hold on."). cudnn_conv_algo_search=DEFAULT is
+        # load-bearing: the default search re-runs for every new clip
+        # length and cost 5–9 s per utterance in the first benchmark.
+        self._pk = None
+        self._model = None
+        self._engine = str(engine or "whisper").lower()
+        if self._engine == "parakeet":
+            import onnx_asr
+            providers = ([("CUDAExecutionProvider", {"cudnn_conv_algo_search": "DEFAULT"})]
+                         if device in ("auto", "cuda") else []) + ["CPUExecutionProvider"]
+            self._pk = onnx_asr.load_model(parakeet_model, providers=providers)
+            for secs in (2, 4):                      # warm the two common shapes
+                self._pk.recognize((np.random.randn(16000 * secs) * 0.003).astype(np.float32))
+            self._log("info", f"Parakeet STT ready ({parakeet_model}, providers {[p if isinstance(p, str) else p[0] for p in providers]}).")
+        else:
+            self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         if self._speaker_gate:
             self._speaker_ready()      # load now, not on the first utterance (1.3 s)
         if logger is not None:
@@ -898,6 +922,37 @@ class WhisperTranscriber:
                 "for your hardware.)",
             )
 
+    @staticmethod
+    def _post_correct(text: str) -> str:
+        """Mishearings that are certain in this room: there is no grass on
+        the table, both engines write it for "grasp" (bench 2026-09-23)."""
+        return re.sub(r"\bgrass\b", "grasp", text, flags=re.IGNORECASE) if text else text
+
+    def _transcribe_parakeet(self, audio: np.ndarray) -> str:
+        """Parakeet path: one call, no segments, no word times."""
+        try:
+            _t0 = time.monotonic()
+            text = str(self._pk.recognize(audio) or "").strip()
+            self._log("info", f"[timing] parakeet {time.monotonic() - _t0:.2f}s for "
+                              f"{audio.size / self._sample_rate:.1f}s audio")
+        except Exception as exc:
+            self._log("error", f"Parakeet transcribe failed: {exc}")
+            return ""
+        if not text:
+            self._reject("nothing recognisable (parakeet returned empty)", "")
+            return ""
+        if _NON_LATIN_RE.search(text):
+            self._reject("contains non-Latin characters", text)
+            return ""
+        toks = [t.strip(".,!?;:").lower() for t in text.split() if t.strip(".,!?;:")]
+        if len(toks) >= 6:
+            from collections import Counter
+            top, cnt = Counter(toks).most_common(1)[0]
+            if cnt >= 4 and cnt / len(toks) >= 0.4:
+                self._reject(f"one word repeated {cnt} times", text)
+                return ""
+        return self._post_correct(text)
+
     def _transcribe(self, pcm16_buffer: bytes,
                    utt_start_wall: float = 0.0,
                    skip_echo_cut: bool = False) -> str:
@@ -931,6 +986,8 @@ class WhisperTranscriber:
                 self._reject(f"my own voice (speaker gate cos {score:.2f})", "")
                 return ""
             self._log("info", f"[speaker] human voice (cos {score:.2f}, rms {rms:.3f})")
+        if self._pk is not None:
+            return self._transcribe_parakeet(audio)
         try:
             _t0 = time.monotonic()
             segments, info = self._model.transcribe(
@@ -1078,6 +1135,7 @@ class WhisperTranscriber:
                             f"one word repeated {cnt} times (hallucinated "
                             "noise)", text)
                         return ""
+            text = self._post_correct(text)
             if text and self._looks_like_hallucination(text):
                 self._log(
                     "info",

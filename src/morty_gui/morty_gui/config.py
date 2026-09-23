@@ -89,14 +89,20 @@ VOICE_COMMON_ARGS = ["mic_visualizer:=false", "with_replay:=false", "with_named_
 # produced "STALE TO ALL" for "start all". First voice start downloads
 # ~1.6 GB once; later loads come from the HF cache.
 WHISPER_TURBO = "deepdml/faster-whisper-large-v3-turbo-ct2"
+# 2026-09-23: the live engine is NVIDIA Parakeet TDT 0.6B v3 (stt_engine:=
+# parakeet): 52 ms per utterance vs 641 ms for Whisper turbo on this GPU,
+# equal texts on the trial recordings, German included, no hallucinated
+# "Thank you." on silence. It detects the language per utterance itself,
+# so the EN/DE pins below only matter when stt_engine:=whisper is chosen.
+STT_ENGINE = "parakeet"
 VOICE_LANG_ARGS = {
     # AUTO: multilingual model + per-utterance language detection — EN and
     # DE (and others) both just work. EN/DE remain as explicit pins.
-    "AUTO": [f"whisper_model:={WHISPER_TURBO}", "whisper_language:=auto",
+    "AUTO": [f"stt_engine:={STT_ENGINE}", f"whisper_model:={WHISPER_TURBO}", "whisper_language:=auto",
              "whisper_device:=cuda", "whisper_compute_type:=int8"],
-    "EN": [f"whisper_model:={WHISPER_TURBO}", "whisper_language:=en",
+    "EN": [f"stt_engine:={STT_ENGINE}", f"whisper_model:={WHISPER_TURBO}", "whisper_language:=en",
            "whisper_device:=cuda", "whisper_compute_type:=int8"],
-    "DE": [f"whisper_model:={WHISPER_TURBO}", "whisper_language:=de",
+    "DE": [f"stt_engine:={STT_ENGINE}", f"whisper_model:={WHISPER_TURBO}", "whisper_language:=de",
            "whisper_device:=cuda", "whisper_compute_type:=int8"],
 }
 

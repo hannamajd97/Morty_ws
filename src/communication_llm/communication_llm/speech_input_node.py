@@ -75,6 +75,7 @@ class SpeechInputNode(Node):
         # STT engine selection. "vosk" is fast/streaming/cheap; "whisper"
         # is faster-whisper (much better accuracy, segmented utterance mode).
         self.declare_parameter("stt_engine", "vosk")
+        self.declare_parameter("parakeet_model", "nemo-parakeet-tdt-0.6b-v3")   # stt_engine:=parakeet (2026-09-23)
         # faster-whisper config (used when stt_engine=whisper)
         self.declare_parameter("whisper_model", "base.en")
         # Transcription language ("en", "de", ...). Use a MULTILINGUAL model
@@ -195,8 +196,10 @@ class SpeechInputNode(Node):
         try:
             mic_device_name = str(self.get_parameter("mic_device_name").value).strip()
             engine = str(self.get_parameter("stt_engine").value).strip().lower()
-            if engine == "whisper":
+            if engine in ("whisper", "parakeet"):
                 self._stt = WhisperTranscriber(
+                    engine=engine,
+                    parakeet_model=str(self.get_parameter("parakeet_model").value),
                     model_size=str(self.get_parameter("whisper_model").value),
                     on_transcript=self._on_transcript,
                     sample_rate=int(self.get_parameter("sample_rate").value),
