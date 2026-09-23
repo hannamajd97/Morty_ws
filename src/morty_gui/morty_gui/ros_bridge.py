@@ -1408,7 +1408,14 @@ class MortyGuiBridge(Node):
                 from morty_interfaces.action import MoveToNamedPose
                 goal = MoveToNamedPose.Goal()
                 goal.pose_name = str(target_name)
-                goal.velocity_scaling = float(velocity_scaling)   # Motion window's value -> server speed tier
+                # The Motion window's "fast duration" (seconds for a direct
+                # move) picks the server's speed tier (2026-09-23, Majd:
+                # "how do I make it faster in the GUI"): 1.6 s = very fast
+                # (0.50, the ceiling), 2.0 fast, 2.7 normal, 4 slow, longer
+                # = very slow. Via moves scale that by their extra length.
+                d = float(duration_s)
+                tier = 0.50 if d <= 1.8 else 0.40 if d <= 2.3 else 0.30 if d <= 3.3 else 0.20 if d <= 6.0 else 0.10
+                goal.velocity_scaling = float(velocity_scaling) if velocity_scaling > 0 else tier
                 self._named_pose_probe.send_goal_async(goal)
                 self.get_logger().info(
                     f"[fast-replay] '{target_name}' sent to the named-pose server (pre-check + via poses)")
