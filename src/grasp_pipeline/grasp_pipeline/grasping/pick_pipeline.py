@@ -90,7 +90,11 @@ class PickPipeline:
             # the click on that object then finds it stored (HIT), and a
             # click on another object waits that second for the model lock
             # (Majd 2026-09-17: "no cancel on click").
-            return bool(getattr(self._node, "selection_made", False)) and not self._bg_committed
+            # A voice label (router → auto_select_label) is a selection too;
+            # it used to wait for the whole job (2026-09-23).
+            pending = bool(getattr(self._node, "selection_made", False)) or bool(
+                getattr(self._node, "_voice_label_pending", lambda: False)())
+            return pending and not self._bg_committed
         if getattr(self._node, "_pick_abort", False):
             self._node.get_logger().warn(
                 f"[abort] operator stop honoured during {where} — "

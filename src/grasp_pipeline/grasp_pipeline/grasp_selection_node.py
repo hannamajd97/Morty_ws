@@ -2136,6 +2136,20 @@ class YoloLiveSelectGrasp(Node):
                 f"Image-view click at ({int(msg.x)},{int(msg.y)}) hit no detection box."
             )
 
+    def _voice_label_pending(self) -> bool:
+        """True while the router has set auto_select_label and no pass has
+        consumed it yet. 2026-09-23 (12.4 s from "tape dispenser" to the
+        first motion): a voice label is read only at the top of a loop
+        pass, so one that arrived during the pointing chooser's wait, the
+        retry nap or a background GraspGen job waited them all out — 7 s
+        of the 12. A label now cancels the chooser's wait, skips the nap
+        and interrupts an uncommitted background job, exactly as a click
+        does through _pending_manual_choice."""
+        try:
+            return bool(str(self.get_parameter("auto_select_label").value).strip())
+        except Exception:
+            return False
+
     def _on_executor_cycle_done(self, msg: String) -> None:
         """Receive commander completion notification ('done' or 'failed')."""
         # Selections queued before this moment belong to the cycle that
@@ -2387,7 +2401,7 @@ class YoloLiveSelectGrasp(Node):
                             frame_provider=lambda: self.fb.rgb_frame,
                             listen_seconds=float(self.get_parameter("listen_seconds").value),
                             overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
-                            cancel=lambda: self._pending_manual_choice is not None or self._pick_abort,
+                            cancel=lambda: self._pending_manual_choice is not None or self._pick_abort or self._voice_label_pending(),
                         )
                     if choice is None:
                         if not bool(self.get_parameter("selection_prompt_once").value):
@@ -2439,7 +2453,7 @@ class YoloLiveSelectGrasp(Node):
                                     frame_provider=lambda: self.fb.rgb_frame,
                                     listen_seconds=float(self.get_parameter("listen_seconds").value),
                                     overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
-                                    cancel=lambda: self._pending_manual_choice is not None or self._pick_abort,
+                                    cancel=lambda: self._pending_manual_choice is not None or self._pick_abort or self._voice_label_pending(),
                                 )
                             self._selection_nap(0.1)
                     if choice is None:
@@ -2448,7 +2462,8 @@ class YoloLiveSelectGrasp(Node):
                         if bool(self.get_parameter("require_selection").value):
                             self.get_logger().info("No selection yet; retrying until a valid selection is made.")
                             self._selection_in_progress = False
-                            self._selection_nap(float(self.get_parameter("selection_retry_sleep_s").value))
+                            if not self._voice_label_pending():
+                                self._selection_nap(float(self.get_parameter("selection_retry_sleep_s").value))
                             continue
                         if not bool(self.get_parameter("repeat").value):
                             self.get_logger().info("Single-shot mode: stopping.")
