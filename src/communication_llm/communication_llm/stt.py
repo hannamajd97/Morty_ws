@@ -413,6 +413,9 @@ class WhisperTranscriber:
         logger: Any = None,
         engine: str = "whisper",
         parakeet_model: str = "nemo-parakeet-tdt-0.6b-v3",
+        vad_engine: str = "webrtc",
+        silero_onset: float = 0.5,
+        silero_offset: float = 0.35,
         speaker_gate: bool = False,
         morty_voice_path: str = "",
         speaker_gate_threshold: float = 0.35,
@@ -503,6 +506,29 @@ class WhisperTranscriber:
         self._initial_prompt = initial_prompt or None
 
         self._vad = webrtcvad.Vad(int(vad_aggressiveness))
+        # ---- VAD ENGINE (2026-09-23, Majd approved Silero) ------------
+        # "silero": the neural detector bundled with faster-whisper
+        # (assets/silero_vad.onnx, CPU, ~1 ms per 100 ms chunk), fed each
+        # 100 ms capture chunk whole with carried LSTM state; onset/offset
+        # hysteresis instead of WebRTC's per-frame yes/no. Fewer segments
+        # from motor and room noise, softer word endings kept. The loop's
+        # speech_ms / silence_ms bookkeeping is untouched — the barge-in
+        # check depends on it. "webrtc" stays for A/B.
+        self._vad_engine = str(vad_engine or "webrtc").lower()
+        self._silero = None
+        self._silero_state = None
+        self._silero_on = float(silero_onset)
+        self._silero_off = float(silero_offset)
+        self._silero_speaking = False
+        if self._vad_engine == "silero":
+            try:
+                from faster_whisper.vad import get_vad_model
+                self._silero = get_vad_model()
+                self._silero_state = self._silero.get_initial_state(batch_size=1)
+                self._log("info", f"Silero VAD ready (onset {self._silero_on:.2f}, offset {self._silero_off:.2f}).")
+            except Exception as exc:
+                self._log("warn", f"Silero VAD unavailable ({exc}); using WebRTC VAD.")
+                self._vad_engine = "webrtc"
         # 30 ms frames at the configured rate (WebRTC VAD only accepts 10/20/30 ms).
         self._vad_frame_size_samples = int(sample_rate * 0.03)
 
@@ -848,6 +874,18 @@ class WhisperTranscriber:
     def _has_voice(self, pcm16: bytes) -> bool:
         if not pcm16:
             return False
+        if getattr(self, "_silero", None) is not None:
+            try:
+                x = np.frombuffer(pcm16, dtype=np.int16).astype(np.float32) / 32768.0
+                if x.size < 512:
+                    return self._silero_speaking
+                out, self._silero_state = self._silero(x, self._silero_state, self._sample_rate)
+                p = float(np.asarray(out).reshape(-1)[0])
+                thr = self._silero_off if self._silero_speaking else self._silero_on
+                self._silero_speaking = p >= thr
+                return self._silero_speaking
+            except Exception as exc:
+                self._log("warn", f"Silero VAD failed ({exc}); falling back to WebRTC for this chunk.")
         bytes_per_frame = self._vad_frame_size_samples * 2
         if bytes_per_frame <= 0 or len(pcm16) < bytes_per_frame:
             return False

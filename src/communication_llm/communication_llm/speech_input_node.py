@@ -76,6 +76,9 @@ class SpeechInputNode(Node):
         # is faster-whisper (much better accuracy, segmented utterance mode).
         self.declare_parameter("stt_engine", "vosk")
         self.declare_parameter("parakeet_model", "nemo-parakeet-tdt-0.6b-v3")   # stt_engine:=parakeet (2026-09-23)
+        self.declare_parameter("vad_engine", "silero")       # "silero" (default since 2026-09-23) or "webrtc"
+        self.declare_parameter("silero_onset", 0.5)
+        self.declare_parameter("silero_offset", 0.35)
         # faster-whisper config (used when stt_engine=whisper)
         self.declare_parameter("whisper_model", "base.en")
         # Transcription language ("en", "de", ...). Use a MULTILINGUAL model
@@ -199,6 +202,9 @@ class SpeechInputNode(Node):
             if engine in ("whisper", "parakeet"):
                 self._stt = WhisperTranscriber(
                     engine=engine,
+                    vad_engine=str(self.get_parameter("vad_engine").value),
+                    silero_onset=float(self.get_parameter("silero_onset").value),
+                    silero_offset=float(self.get_parameter("silero_offset").value),
                     parakeet_model=str(self.get_parameter("parakeet_model").value),
                     model_size=str(self.get_parameter("whisper_model").value),
                     on_transcript=self._on_transcript,
