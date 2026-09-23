@@ -9,6 +9,7 @@ output (TTS) is active, preventing self-feedback loops.
 from __future__ import annotations
 
 import json
+import os
 import queue
 import re
 import threading
@@ -410,8 +411,29 @@ class WhisperTranscriber:
         tts_lead_s: float = 0.15,
         tts_tail_s: float = 0.25,
         logger: Any = None,
+        speaker_gate: bool = False,
+        morty_voice_path: str = "",
+        speaker_gate_threshold: float = 0.35,
+        on_barge_in: Optional[Callable[[float], None]] = None,
+        barge_in_min_ms: int = 600,
     ) -> None:
         self._on_reject = on_reject
+        # ---- SPEAKER GATE + BARGE-IN (2026-09-23) -------------------
+        # Morty's voices are fixed (Kokoro bf_emma, Piper de_DE-thorsten);
+        # an ECAPA-TDNN fingerprint of them (models/morty_voice_ecapa.npy,
+        # built from trial recordings in this room) tells his echo from
+        # ANY human: on 19 trials Morty scored >= 0.50 against it, every
+        # human segment <= 0.10, 12 ms per check on the GPU. Utterances
+        # that match are dropped before Whisper; a human voice heard while
+        # Morty plays triggers on_barge_in (speak_node stops playback).
+        self._speaker_gate = bool(speaker_gate)
+        self._morty_voice_path = os.path.expanduser(morty_voice_path or "")
+        self._speaker_thr = float(speaker_gate_threshold)
+        self._on_barge_in = on_barge_in
+        self._barge_in_min_ms = int(barge_in_min_ms)
+        self._spk_encoder = None
+        self._spk_ref = None
+        self._spk_failed = False
         # ---- WORD-TIME ECHO CUT (Majd 2026-08-28) ------------------
         # Whisper knows when every word was spoken; we know exactly when
         # Morty's loudspeaker was playing. Intersect the two and the
@@ -487,6 +509,8 @@ class WhisperTranscriber:
                 "First load may take 30-60s while the model downloads."
             )
         self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        if self._speaker_gate:
+            self._speaker_ready()      # load now, not on the first utterance (1.3 s)
         if logger is not None:
             # Faster-whisper resolves "auto" to "cuda" if it can load
             # libcublas + libcudnn; otherwise it silently falls back to
@@ -688,6 +712,69 @@ class WhisperTranscriber:
         hits = sum(1 for w in toks if w in said or w[:4] in heads)
         return hits >= 0.5 * len(toks)
 
+    # ── speaker gate ─────────────────────────────────────────────────
+    def _speaker_ready(self) -> bool:
+        if self._spk_encoder is not None:
+            return True
+        if not self._speaker_gate or self._spk_failed:
+            return False
+        try:
+            import torch
+            from speechbrain.inference.speaker import EncoderClassifier
+            ref = np.load(self._morty_voice_path).astype(np.float32)
+            dev = "cuda" if torch.cuda.is_available() else "cpu"
+            enc = EncoderClassifier.from_hparams(
+                source="speechbrain/spkrec-ecapa-voxceleb",
+                savedir=os.path.expanduser("~/morty_ws/models/spkrec-ecapa-voxceleb"),
+                run_opts={"device": dev})
+            ref = np.atleast_2d(ref)                       # one row per voice (Kokoro EN, Piper DE)
+            self._spk_ref = ref / (np.linalg.norm(ref, axis=1, keepdims=True) + 1e-9)
+            self._spk_encoder = enc
+            self._log("info", f"Speaker gate ready (ECAPA on {dev}, fingerprint {self._morty_voice_path}, "
+                              f"threshold {self._speaker_thr:.2f}).")
+            return True
+        except Exception as exc:
+            self._spk_failed = True
+            self._log("warn", f"Speaker gate unavailable ({exc}); Whisper runs without it.")
+            return False
+
+    def _morty_score(self, pcm16_buffer: bytes) -> Optional[float]:
+        """Cosine similarity of the buffer's voice to Morty's fingerprint,
+        None when the gate is off or the clip is too short."""
+        if not self._speaker_ready() or len(pcm16_buffer) < 2 * int(0.5 * self._sample_rate):
+            return None
+        try:
+            import torch
+            audio = np.frombuffer(pcm16_buffer, dtype=np.int16).astype(np.float32) / 32768.0
+            wav = torch.from_numpy(audio)
+            if self._sample_rate != 16000:
+                import torchaudio
+                wav = torchaudio.functional.resample(wav, self._sample_rate, 16000)
+            with torch.no_grad():
+                e = self._spk_encoder.encode_batch(wav[None].to(self._spk_encoder.device)).squeeze()
+                e = e / (e.norm() + 1e-9)
+            return float(np.max(self._spk_ref @ e.cpu().numpy()))   # best-matching voice
+        except Exception as exc:
+            self._log("warn", f"speaker gate scoring failed: {exc}")
+            return None
+
+    def _tts_playing(self) -> bool:
+        with self._ai_lock:
+            return self._ai_depth > 0
+
+    def _maybe_barge_in(self, pcm16_buffer: bytes) -> None:
+        score = self._morty_score(pcm16_buffer)
+        if score is None:
+            return
+        if score < self._speaker_thr:
+            self._log("info", f"[speaker] barge-in: a human is talking over Morty (cos {score:.2f}) — stopping playback")
+            try:
+                self._on_barge_in(score)
+            except Exception:
+                pass
+        else:
+            self._log("info", f"[speaker] overlap is Morty's own voice (cos {score:.2f}); playback continues")
+
     def set_word_time_cut(self, value: bool) -> bool:
         old = bool(self._word_time_cut)
         self._word_time_cut = bool(value)
@@ -837,6 +924,13 @@ class WhisperTranscriber:
                 f"too quiet (rms {rms:.3f} < gate {self._min_rms:.3f})", ""
             )
             return ""
+        score = self._morty_score(pcm16_buffer)
+        if score is not None:
+            if score >= self._speaker_thr:
+                self._log("info", f"[speaker] Morty's own voice (cos {score:.2f}) — not transcribed")
+                self._reject(f"my own voice (speaker gate cos {score:.2f})", "")
+                return ""
+            self._log("info", f"[speaker] human voice (cos {score:.2f})")
         try:
             _t0 = time.monotonic()
             segments, info = self._model.transcribe(
@@ -1010,6 +1104,7 @@ class WhisperTranscriber:
             in_speech = False
             silence_ms = 0
             speech_ms = 0
+            barge_checked = False
             # Wall clock of the FIRST sample in `buffer`. Whisper reports
             # word times relative to the buffer, so this anchors them to
             # the same clock as the TTS playback windows.
@@ -1063,10 +1158,15 @@ class WhisperTranscriber:
                         # `data` was captured over the PRECEDING chunk_ms,
                         # so the first sample is one chunk in the past.
                         utt_start_wall = time.time() - chunk_ms / 1000.0
+                        barge_checked = False
                     buffer.extend(data)
                     speech_ms += chunk_ms
                     silence_ms = 0
                     # Cap utterance length to avoid huge transcribe calls.
+                    if (self._on_barge_in is not None and not barge_checked
+                            and speech_ms >= self._barge_in_min_ms and self._tts_playing()):
+                        barge_checked = True          # once per utterance, ~12 ms
+                        self._maybe_barge_in(bytes(buffer))
                     if speech_ms / 1000.0 >= self._max_utterance_s:
                         self._enqueue_utterance(bytes(buffer), utt_start_wall)
                         buffer.clear()

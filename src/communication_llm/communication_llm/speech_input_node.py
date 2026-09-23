@@ -106,6 +106,14 @@ class SpeechInputNode(Node):
         # sentence from every node, and stamps True at execute start /
         # False on finish — one authoritative window source.
         self.declare_parameter("ai_speaking_topic", "/speech/tts_active")
+        # Speaker gate + barge-in (2026-09-23, see stt.py): Morty's own
+        # voice is recognised by fingerprint and never transcribed; a human
+        # talking over him stops the playback via /speech/barge_in.
+        self.declare_parameter("speaker_gate", True)
+        self.declare_parameter("morty_voice_path", "~/morty_ws/models/morty_voice_ecapa.npy")
+        self.declare_parameter("speaker_gate_threshold", 0.35)
+        self.declare_parameter("barge_in", True)
+        self.declare_parameter("barge_in_min_ms", 600)
         # Minimum RMS amplitude for a buffer to be transcribed. 0..1 scale
         # (audio normalised to [-1, 1]). Higher = louder voice required.
         # 0.025 rejects whispered AI echo bleeding through the speaker
@@ -173,6 +181,7 @@ class SpeechInputNode(Node):
             String, "/speech/rejected", 10
         )
         self._state_pub = self.create_publisher(String, "/speech/state", 10)
+        self._barge_pub = self.create_publisher(Bool, "/speech/barge_in", 10)
         self._wave_pub = self.create_publisher(
             Float32MultiArray, "/speech/waveform", 10
         )
@@ -213,6 +222,12 @@ class SpeechInputNode(Node):
                     ),
                     tts_lead_s=float(self.get_parameter("tts_lead_s").value),
                     tts_tail_s=float(self.get_parameter("tts_tail_s").value),
+                    speaker_gate=bool(self.get_parameter("speaker_gate").value),
+                    morty_voice_path=str(self.get_parameter("morty_voice_path").value),
+                    speaker_gate_threshold=float(self.get_parameter("speaker_gate_threshold").value),
+                    on_barge_in=(self._publish_barge_in
+                                 if bool(self.get_parameter("barge_in").value) else None),
+                    barge_in_min_ms=int(self.get_parameter("barge_in_min_ms").value),
                     logger=self.get_logger(),
                 )
             else:
@@ -426,6 +441,9 @@ class SpeechInputNode(Node):
         note = getattr(self._stt, "note_ai_speaking", None)
         if note is not None:
             note(bool(msg.data))
+
+    def _publish_barge_in(self, score: float) -> None:
+        self._barge_pub.publish(Bool(data=True))
 
     def _on_ai_said(self, msg: String) -> None:
         note = getattr(self._stt, "note_ai_text", None)

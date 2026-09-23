@@ -86,3 +86,6 @@ src/rosgraph2.png
 # the pipeline on first start) stay out of the repository.
 models/vlm/*.gguf
 src/grasp_pipeline/grasp_pipeline/models/yoloe-*.pt
+
+# ECAPA speaker model (downloaded from HuggingFace by the speech node); the tiny fingerprint models/morty_voice_ecapa.npy IS tracked
+models/spkrec-ecapa-voxceleb/

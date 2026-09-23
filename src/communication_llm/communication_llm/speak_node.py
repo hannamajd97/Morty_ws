@@ -104,6 +104,10 @@ class SpeakActionServer(Node):
         self._tts_active_pub = self.create_publisher(
             Bool, "/speech/tts_active", 10
         )
+        # Barge-in (2026-09-23): speech_input_node says a HUMAN started
+        # talking while we play (speaker fingerprint, not Morty's echo).
+        # Stop the sentence within one 200 ms write window and listen.
+        self.create_subscription(Bool, "/speech/barge_in", self._on_barge_in, 10)
 
         self._server = ActionServer(
             self,
@@ -118,6 +122,15 @@ class SpeakActionServer(Node):
         self.get_logger().info(
             f"Speak action server ready on {self.get_parameter('server_action_name').value}"
         )
+
+    def _on_barge_in(self, msg: Bool) -> None:
+        if not bool(msg.data):
+            return
+        with self._goal_lock:
+            active = self._active_goal is not None
+        if active:
+            self.get_logger().info("Barge-in: the operator is talking — stopping playback.")
+            self._tts.stop()
 
     def _goal_cb(self, _request) -> GoalResponse:
         if not self._tts.available:
