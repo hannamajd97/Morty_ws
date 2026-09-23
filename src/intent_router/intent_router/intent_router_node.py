@@ -265,6 +265,13 @@ class IntentRouterNode(Node):
         # dedup repeat requests for the same action while it's still running.
         self._currently_dispatched_action: str = ""
         self._pick_deadline: float = 0.0
+        # 2026-09-23: a follow-up ("give me the object, open the gripper,
+        # then go back home") that arrives while the pick is still moving to
+        # the drop pose. The executor clears its resume flag when a pause
+        # OPENS, so a token sent earlier is lost and a queued intent came
+        # back after the cycle as "not recognised". The plan is kept here
+        # and answers the release pause the moment it opens.
+        self._followup_plan: str = ""   # "", "release" or "release_home"
         # Periodic watchdog so a hung pick doesn't block the queue forever.
         self._pick_timeout_s = float(self.get_parameter("queue_pick_timeout_s").value)
         self.create_timer(1.0, self._queue_watchdog)
@@ -791,6 +798,15 @@ class IntentRouterNode(Node):
                 ):
                     self._narrate_ignored_resume(action, redirect)
                 return
+            if action in ("release_home", "open_gripper", "release"):
+                plan = "release_home" if action == "release_home" else "release"
+                if plan == "release" and self._followup_plan == "release_home":
+                    plan = "release_home"   # never downgrade an earlier "then home"
+                self._followup_plan = plan
+                self.get_logger().info(
+                    f"Follow-up {action!r} noted while the pick is in flight — "
+                    f"it answers the release pause when it opens (plan={plan}).")
+                return
 
         # Deduplicate: don't queue the same action twice in a row, and don't
         # queue an action that matches what is currently running. This stops
@@ -1184,6 +1200,7 @@ class IntentRouterNode(Node):
 
         self._busy_kind = "pick"
         self._pick_deadline = time.monotonic() + self._pick_timeout_s
+        self._followup_plan = ""
 
         # The pick cycle moves the arm through several non-named poses
         # (grasp → lift → drop → home). Clear the latched current-pose so
@@ -2343,6 +2360,15 @@ class IntentRouterNode(Node):
                 "home": "home",
             }.get(_dest, "drop")
             self._stayed_pose = ""
+            if self._followup_plan:
+                # The operator already said what comes next (2026-09-23):
+                # answer the pause instead of asking.
+                plan, self._followup_plan = self._followup_plan, ""
+                token = "release_home" if plan == "release_home" else "release"
+                if self._claim_executor_resume(token, f"follow-up said earlier: {plan}"):
+                    self._narrate("Opening the gripper and going home."
+                                  if plan == "release_home" else "Opening the gripper.")
+                    return
             # Name what we are holding (Majd 2026-08-31: "should i open
             # the gripper, I'm still holding the object? ... more
             # nature"). Also re-spoken after every REDIRECT, naming the
@@ -2491,6 +2517,7 @@ class IntentRouterNode(Node):
             return
         outcome = data.split("|", 1)[0].lower()
         self.get_logger().info(f"cycle_done received: {data!r} (outcome={outcome})")
+        self._followup_plan = ""
         if self._narrate_lifecycle:
             # Silent on success — same reasoning as MoveToNamedPose: avoid
             # extra TTS that the mic loops back. Failure still narrates,
