@@ -588,7 +588,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         move_row = QtWidgets.QHBoxLayout()
         move_row.addWidget(QtWidgets.QLabel("Move to:"))
         self.place_combo = QtWidgets.QComboBox()
-        self.place_combo.addItems(NAMED_PLACES)
+        self.place_combo.addItems(named_places())   # SRDF states + yaml-only poses
         move_row.addWidget(self.place_combo)
         self.go_btn = QtWidgets.QPushButton("GO")
         self.go_btn.clicked.connect(self._on_go)
@@ -2448,6 +2448,21 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.statusBar().showMessage(
                 f"Fast replay to '{target}' over {dur:.1f}s requested…"
             )
+            return
+        if target not in NAMED_PLACES:
+            # A pose that lives only in observation_poses.yaml (e.g.
+            # vla_drop_right): MoveIt has no named target for it, so the
+            # planner gets its six joints, exactly as the Motion window's
+            # joint move does.
+            joints = yaml_poses().get(target)
+            if not joints or len(joints) != 6:
+                self.statusBar().showMessage(f"'{target}' is not in the SRDF nor in observation_poses.yaml.")
+                return
+            params = ["-p", "use_joint_target:=true"]
+            for i, val in enumerate(joints):
+                params += ["-p", f"joint_target_{i}:={val:.5f}"]
+            self._spawn_move(params, f"Moving robot to '{target}' (yaml pose as joint goal, "
+                                     f"{self.motion_win.planner_combo.currentText()}).")
             return
         self._spawn_move(
             ["-p", f"target_name:={target}"],

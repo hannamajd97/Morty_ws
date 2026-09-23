@@ -165,6 +165,28 @@ NAMED_PLACES = [
     "home", "init", "drop_left_side", "drop_right_side",
     "detect_left", "detect_right", "detect_higher", "old_initgrasp", "sleep_home",
 ]
+POSES_FILE = os.path.expanduser("~/morty_ws/observation_poses.yaml")
+
+
+def yaml_poses() -> Dict[str, List[float]]:
+    """Joint poses from observation_poses.yaml (the replay node's and the
+    named-pose server's source), name -> six radians. Empty if unreadable."""
+    try:
+        import yaml
+        with open(POSES_FILE) as fh:
+            d = yaml.safe_load(fh) or {}
+        return {str(k): [float(x) for x in v.get("positions", [])]
+                for k, v in (d.get("poses") or {}).items() if isinstance(v, dict)}
+    except Exception:
+        return {}
+
+
+def named_places() -> List[str]:
+    """Dropdown entries: the SRDF states, then poses that exist only in the
+    yaml (2026-09-23, Majd: vla_drop_right "isn't included in the GUI").
+    The planner path reaches a yaml-only pose as a joint target."""
+    extra = [n for n in yaml_poses() if n not in NAMED_PLACES]
+    return list(NAMED_PLACES) + extra
 
 # UR kinematic chain order — matches MoveIt's group joint order, which is
 # what observation_ptp_commander's joint_target_<i> params index into.
