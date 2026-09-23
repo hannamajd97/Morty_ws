@@ -1390,7 +1390,7 @@ class MortyGuiBridge(Node):
         """True when the pipeline's replay node is subscribed and listening."""
         return self._pub_fast_replay.get_subscription_count() > 0
 
-    def request_fast_replay(self, target_name: str, duration_s: float = 2.0) -> None:
+    def request_fast_replay(self, target_name: str, duration_s: float = 2.0, velocity_scaling: float = 0.0) -> None:
         import json
         with self._lock:
             self._fast_status = ""
@@ -1408,6 +1408,7 @@ class MortyGuiBridge(Node):
                 from morty_interfaces.action import MoveToNamedPose
                 goal = MoveToNamedPose.Goal()
                 goal.pose_name = str(target_name)
+                goal.velocity_scaling = float(velocity_scaling)   # Motion window's value -> server speed tier
                 self._named_pose_probe.send_goal_async(goal)
                 self.get_logger().info(
                     f"[fast-replay] '{target_name}' sent to the named-pose server (pre-check + via poses)")

@@ -2442,7 +2442,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
             )
         elif self.motion_win.fast_cb.isChecked():
             dur = float(self.motion_win.fast_dur_spin.value())
-            self.bridge.request_fast_replay(target, duration_s=dur)
+            self.bridge.request_fast_replay(target, duration_s=dur,
+                                            velocity_scaling=float(self.motion_win.vel_spin.value()))
             self._fast_pending = (target, time.monotonic() + max(8.0, dur + 4.0))
             self.go_btn.setText("■ STOP ⚡")
             self.statusBar().showMessage(

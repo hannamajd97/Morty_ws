@@ -1292,15 +1292,15 @@ class MoveToNamedPoseServer(Node):
         # Collision-check the path the arm will REALLY follow (a spline
         # through the vias since 2026-09-23): build it first, then check
         # states sampled along it, all requests pipelined together.
+        try:
+            _pos, _ = build_blended_trajectory(
+                start, targets, [segment_duration_s] * n_seg,
+                samples_per_segment=self._blend_samples_per_segment)
+        except Exception as exc:
+            return self._fail(goal_handle, f"refusing: could not build the blended path ({exc})")
         if self._collision_check:
             self._publish_phase(goal_handle, "checking_collision", 0.05)
             t_chk = time.monotonic()
-            try:
-                _pos, _ = build_blended_trajectory(
-                    start, targets, [segment_duration_s] * n_seg,
-                    samples_per_segment=self._blend_samples_per_segment)
-            except Exception as exc:
-                return self._fail(goal_handle, f"refusing: could not build the blended path ({exc})")
             stride = max(1, self._blend_samples_per_segment // self._blend_collision_waypoints)
             check_nodes = _pos[::stride] + ([_pos[-1]] if (len(_pos) - 1) % stride else [])
             clean, reason = self._path_collision_free_multi(check_nodes)
@@ -1313,7 +1313,22 @@ class MoveToNamedPoseServer(Node):
 
         # One tier duration per segment — no new speeds are invented, the
         # blend only removes the dead time BETWEEN the legs.
-        durations = [segment_duration_s] * n_seg
+        # DURATION (2026-09-23, Majd: "smooth but slow"): the tier's time
+        # used to be charged per segment (2 segments = 8 s for 'slow'),
+        # although a via only makes the path somewhat longer than the
+        # direct line. Now the tier time is scaled by the length ratio
+        # path/direct (never below the tier time): home -> vla_via ->
+        # vla_drop_right is 1.5x the direct line, so 'slow' gives ~6 s,
+        # 'fast' ~3 s. Only the sum of the segment times is binding.
+        _direct = math.sqrt(sum((b - a) ** 2 for a, b in zip(start, targets[-1])))
+        _path = 0.0
+        for _i in range(1, len(_pos)):
+            _path += math.sqrt(sum((b - a) ** 2 for a, b in zip(_pos[_i - 1], _pos[_i])))
+        _ratio = (_path / _direct) if _direct > 1e-6 else 1.0
+        total_planned = segment_duration_s * max(1.0, _ratio)
+        self.get_logger().info(
+            f"blended duration: tier {segment_duration_s:.1f}s x path/direct {_ratio:.2f} = {total_planned:.1f}s")
+        durations = [total_planned / n_seg] * n_seg
         try:
             positions, times = build_blended_trajectory(
                 start,
