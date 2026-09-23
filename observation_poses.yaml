@@ -112,12 +112,12 @@ poses:
     - vla_via
   vla_via:
     positions:
-    - 1.784181
-    - -3.434481
-    - 1.486294
-    - 0.59278
-    - 1.82245
-    - 0.708707
-    captured_at: 1790172970.86984
-    source: "live joints 2026-09-23 \u2014 waypoint between home and the VLA drop\
-      \ poses (elbow clear of the table)"
+    - 2.354804
+    - -1.663988
+    - -1.664083
+    - 0.062723
+    - 0.030407
+    - 1.794216
+    captured_at: 1790173570.5106194
+    source: "live joints 2026-09-23 (2nd waypoint, shoulder raised) \u2014 between\
+      \ home and the VLA drop poses"
