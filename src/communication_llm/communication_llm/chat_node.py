@@ -2907,6 +2907,8 @@ class ChatIntentNode(Node):
             if not m:
                 return
             sentence, rest = m.group(1).strip(), m.group(2)
+            if re.search(r"\b(?:Dr|Mr|Mrs|Ms|Prof|St|vs|e\.g|i\.e|Nr|z\.B|bzw|ca)\.$", sentence):
+                return          # abbreviation, not a sentence end: wait for more text
             self._stream_buf = rest
             if len(sentence) >= 8:
                 if not self._streamed:
