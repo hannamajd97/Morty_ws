@@ -2888,7 +2888,9 @@ class ChatIntentNode(Node):
 
         send_future.add_done_callback(_on_goal_response)
 
-    _SENTENCE_END = re.compile(r"^(.*?[.!?])(?:\s+|\n)(.*)$", re.S)
+    # A sentence ends at . ! ? followed by whitespace and a capital, digit or
+    # quote — so "waited... for" and "Dr. Smith" do not split.
+    _SENTENCE_END = re.compile(r"^(.*?[.!?])\s+(?=[A-ZÄÖÜ0-9\"“(])(.*)$", re.S)
 
     def _on_reply_text(self, delta: str) -> None:
         """Called from the Bedrock stream with each text delta (2026-09-23,
