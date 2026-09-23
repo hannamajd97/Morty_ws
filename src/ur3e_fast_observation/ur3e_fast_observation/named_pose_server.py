@@ -130,6 +130,7 @@ def build_blended_trajectory(
     segment_durations: Sequence[float],
     samples_per_segment: int = BLEND_SAMPLES_PER_SEGMENT,
     min_dt_s: float = 1e-4,
+    rounding: float = 1.0,
 ) -> Tuple[List[List[float]], List[float]]:
     """Build ONE dense, S-curve-timed joint path through several poses.
 
@@ -246,10 +247,18 @@ def build_blended_trajectory(
     else:
         ext = [nodes[0]] + nodes + [nodes[-1]]
 
+        # Cubic Hermite with Catmull-Rom tangents scaled by ``rounding``:
+        # 1.0 = the full curve, 0.0 = straight segments through the vias
+        # (the corner comes back, but the geometry never leaves the
+        # taught lines). The server tries 1.0, 0.5, 0.0 against the
+        # collision check before giving up on the via (2026-09-23: the
+        # full curve from a grasp dipped the gripper base into the table).
+        r = max(0.0, min(1.0, float(rounding)))
+
         def _cr(p0, p1, p2, p3, u):
             u2, u3 = u * u, u * u * u
-            return [0.5 * ((2 * b) + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2
-                           + (-a + 3 * b - 3 * c + d) * u3)
+            h00, h10, h01, h11 = (2 * u3 - 3 * u2 + 1, u3 - 2 * u2 + u, -2 * u3 + 3 * u2, u3 - u2)
+            return [h00 * b + h10 * (r * 0.5 * (c - a)) + h01 * c + h11 * (r * 0.5 * (d - b))
                     for a, b, c, d in zip(p0, p1, p2, p3)]
         fine = 200
         geom = [[_cr(ext[seg], ext[seg + 1], ext[seg + 2], ext[seg + 3], k / fine) for k in range(fine + 1)]
@@ -1329,10 +1338,12 @@ class MoveToNamedPoseServer(Node):
         # Collision-check the path the arm will REALLY follow (a spline
         # through the vias since 2026-09-23): build it first, then check
         # states sampled along it, all requests pipelined together.
+        rounding_ladder = [1.0, 0.5, 0.0] if n_seg > 1 else [1.0]
+        chosen_rounding = rounding_ladder[0]
         try:
             _pos, _ = build_blended_trajectory(
                 start, targets, [segment_duration_s] * n_seg,
-                samples_per_segment=self._blend_samples_per_segment)
+                samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding)
         except Exception as exc:
             return self._fail(goal_handle, f"refusing: could not build the blended path ({exc})")
         if self._collision_check:
@@ -1345,17 +1356,28 @@ class MoveToNamedPoseServer(Node):
             # 3 s per blended move. Named-pose paths between the same
             # two poses are the same path; a check that passed within the
             # last 10 minutes is reused (the table and wall do not move).
-            key = (tuple(round(q, 1) for q in start), tuple(path_names))
             if not hasattr(self, "_precheck_cache"):
                 self._precheck_cache = {}
-            cached = self._precheck_cache.get(key)
-            if cached is not None and time.monotonic() - cached < 600.0:
-                clean, reason = True, ""
-                self.get_logger().info(f"Collision pre-check for {path_desc}: reusing the pass from {time.monotonic() - cached:.0f} s ago.")
-            else:
+            clean, reason, reason_prev = False, "", ""
+            for chosen_rounding in rounding_ladder:
+                if chosen_rounding != rounding_ladder[0]:
+                    _pos, _ = build_blended_trajectory(
+                        start, targets, [segment_duration_s] * n_seg,
+                        samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding)
+                    check_nodes = _pos[::stride] + ([_pos[-1]] if (len(_pos) - 1) % stride else [])
+                key = (tuple(round(q, 1) for q in start), tuple(path_names), chosen_rounding)
+                cached = self._precheck_cache.get(key)
+                if cached is not None and time.monotonic() - cached < 600.0:
+                    clean, reason = True, ""
+                    self.get_logger().info(f"Collision pre-check for {path_desc} (rounding {chosen_rounding:.1f}): reusing the pass from {time.monotonic() - cached:.0f} s ago.")
+                    break
                 clean, reason = self._path_collision_free_multi(check_nodes, steps=1)
                 if clean:
                     self._precheck_cache[key] = time.monotonic()
+                    if chosen_rounding != rounding_ladder[0]:
+                        self.get_logger().info(f"path {path_desc}: the rounded curve was refused ({reason_prev}); rounding {chosen_rounding:.1f} passes.")
+                    break
+                reason_prev = reason
             if not clean:
                 if fallback_vias:
                     self.get_logger().warn(
@@ -1365,7 +1387,7 @@ class MoveToNamedPoseServer(Node):
                 return self._fail(goal_handle, f"refusing: {reason}")
             self.get_logger().info(
                 f"Collision pre-check passed for blended path {path_desc} "
-                f"({len(check_nodes)} sampled states along the spline in {time.monotonic() - t_chk:.2f} s)."
+                f"(rounding {chosen_rounding:.1f}, {len(check_nodes)} sampled states in {time.monotonic() - t_chk:.2f} s)."
             )
 
         # One tier duration per segment — no new speeds are invented, the
@@ -1391,7 +1413,7 @@ class MoveToNamedPoseServer(Node):
                 start,
                 targets,
                 durations,
-                samples_per_segment=self._blend_samples_per_segment,
+                samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding,
             )
         except Exception as exc:
             return self._fail(
