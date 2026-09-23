@@ -331,6 +331,11 @@ public:
     // hits me"). The voice flow's home-confirm has its own 3 s.
     post_release_wait_s_ = get_or_declare_param<double>(node_, "post_release_wait_s", 2.0);
     drop_target_name_ = get_or_declare_param<std::string>(node_, "drop_target_name", "drop_right_side");
+    // 2026-09-23: which named poses "drop right" / "drop left" mean. The
+    // GUI's Pick speeds "Drop poses" selector sets them live (standard
+    // drop_*_side, or the VLA poses vla_drop_right / vla_drop_left).
+    drop_right_target_ = get_or_declare_param<std::string>(node_, "drop_right_target", "drop_right_side");
+    drop_left_target_ = get_or_declare_param<std::string>(node_, "drop_left_target", "drop_left_side");
     reset_target_name_ = get_or_declare_param<std::string>(node_, "reset_target_name", "home");
     // Fast-replay short-circuit: when enabled, named-target moves
     // (reset_target, drop_target) bypass MoveIt PTP and are sent straight
@@ -1891,10 +1896,10 @@ public:
       // configured drop_target_name_ so old behaviour still works.
       if (dest_lc == "drop_right" || dest_lc == "right" ||
           dest_lc == "drop right" || dest_lc == "drop_right_side") {
-        drop_target_name_ = "drop_right_side";
+        drop_target_name_ = drop_right_target_;
       } else if (dest_lc == "drop_left" || dest_lc == "left" ||
                  dest_lc == "drop left" || dest_lc == "drop_left_side") {
-        drop_target_name_ = "drop_left_side";
+        drop_target_name_ = drop_left_target_;
       } else if (dest_lc == "home") {
         drop_target_name_ = "home";
       } else if (!dest_lc.empty()) {
@@ -2200,9 +2205,9 @@ public:
           if (inc_lc.rfind("drop", 0) == 0 &&
               inc_lc.find("+release") != std::string::npos) {
             if (inc_lc.find("left") != std::string::npos) {
-              inc_lc = "carry_release:drop_left_side";
+              inc_lc = "carry_release:" + drop_left_target_;
             } else if (inc_lc.find("right") != std::string::npos) {
-              inc_lc = "carry_release:drop_right_side";
+              inc_lc = "carry_release:" + drop_right_target_;
             }
           }
           // ATOMIC carry+release (v2): "carry_release:<named_target>"
@@ -2214,6 +2219,8 @@ public:
             const std::string tgt =
               inc_lc.substr(std::string("carry_release:").size());
             const bool known = (tgt == reset_target_name_ ||
+                                tgt == drop_left_target_ ||
+                                tgt == drop_right_target_ ||
                                 tgt == "drop_left_side" ||
                                 tgt == "drop_right_side");
             if (!known) {
@@ -6127,6 +6134,12 @@ public:
       drop_target_name_ =
         node_->get_parameter("drop_target_name").as_string();
     } catch (...) {}
+    try {
+      drop_right_target_ =
+        node_->get_parameter("drop_right_target").as_string();
+      drop_left_target_ =
+        node_->get_parameter("drop_left_target").as_string();
+    } catch (...) {}
     // Blend knobs are re-read per pick so the A/B can be flipped live
     // with `ros2 param set` between cycles, without a relaunch.
     try {
@@ -6462,6 +6475,8 @@ public:
   double acceleration_scaling_;
   double drop_hold_s_;
   std::string drop_target_name_;
+  std::string drop_right_target_;
+  std::string drop_left_target_;
   std::string reset_target_name_;
   std::string gripper_open_name_;
   std::string gripper_close_name_;

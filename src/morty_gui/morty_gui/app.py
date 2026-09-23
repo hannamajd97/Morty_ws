@@ -897,6 +897,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
             if isinstance(want, bool):
                 if bool(have) != bool(want):
                     return False
+            elif isinstance(want, str):
+                if str(have) != want:
+                    return False
             elif abs(float(have) - float(want)) > 1e-6:
                 return False
         return True
@@ -1057,7 +1060,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if not got or any(got.get(k) is None for k in want):
             self.motion_win.show_speed_apply("sent", "executor did not answer the read-back")
             return
-        detail = (f"approach {float(got['velocity_scaling']):.2f}/{float(got['acceleration_scaling']):.2f}, "
+        detail = (f"drop {got.get('drop_right_target')} / {got.get('drop_left_target')}, "
+                  f"approach {float(got['velocity_scaling']):.2f}/{float(got['acceleration_scaling']):.2f}, "
                   f"arc {float(got['blend_velocity_scaling']):.1f}, return {float(got['fast_replay_duration_s']):.1f} s, "
                   f"approach duration {float(got.get('approach_duration_s', 0.0)):.1f} s, "
                   f"open {float(got['gripper_open_time_s']):.1f}+{float(got['open_before_arrival_margin_s']):.1f} s, "

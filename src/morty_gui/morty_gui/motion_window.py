@@ -251,6 +251,19 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.cb_slip.setChecked(qs.value("pick_speed/check_slip", True, type=bool))
         self.cb_slip.setToolTip("On: the slip pin slows the arm while carrying. Off: the slip pin is ignored.")
         speed_form.addRow("", self.cb_slip)
+        # Drop poses (2026-09-23): which named poses "drop right/left" mean
+        # for the executor. VLA = vla_drop_right/left, which carry their
+        # own via in observation_poses.yaml, so the carry goes lift ->
+        # via -> drop without passing home (one spline, pre-checked).
+        self.drop_poses_combo = QtWidgets.QComboBox()
+        self._drop_pose_sets = [("standard — drop_right_side / drop_left_side", ("drop_right_side", "drop_left_side")),
+                                ("VLA — vla_drop_right / vla_drop_left", ("vla_drop_right", "vla_drop_left"))]
+        for label, _ in self._drop_pose_sets:
+            self.drop_poses_combo.addItem(label)
+        _saved_right = str(qs.value("pick_speed/drop_right_target", "drop_right_side"))
+        self.drop_poses_combo.setCurrentIndex(1 if _saved_right == "vla_drop_right" else 0)
+        self.drop_poses_combo.setToolTip("Apply sends the pair to the running executor; it is used from the next pick.")
+        speed_form.addRow("Drop poses:", self.drop_poses_combo)
         self.speed_status = QtWidgets.QLabel("")
         self.speed_status.setWordWrap(True)
         self.speed_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
@@ -420,15 +433,18 @@ class MotionWindow(QtWidgets.QMainWindow):
             "post_release_wait_s": float(self.speed_after_spin.value()),
             "check_grasp_sensor": bool(self.cb_grasp_sensor.isChecked()),
             "check_slip": bool(self.cb_slip.isChecked()),
+            "drop_right_target": self._drop_pose_sets[self.drop_poses_combo.currentIndex()][1][0],
+            "drop_left_target": self._drop_pose_sets[self.drop_poses_combo.currentIndex()][1][1],
         }
 
     def pick_speed_launch_args(self) -> List[str]:
-        return [f"{k}:={str(v).lower() if isinstance(v, bool) else f'{v:.2f}'}" for k, v in self.pick_speed_values().items()]
+        return [f"{k}:={str(v).lower() if isinstance(v, bool) else (v if isinstance(v, str) else f'{v:.2f}')}"
+                for k, v in self.pick_speed_values().items()]
 
     def save_pick_speeds(self) -> None:
         qs = QtCore.QSettings("morty", "morty_gui")
         for k, v in self.pick_speed_values().items():
-            qs.setValue(f"pick_speed/{k}", float(v))
+            qs.setValue(f"pick_speed/{k}", v if isinstance(v, str) else float(v))
 
     def gui_state(self) -> Dict[str, object]:
         """The Motion tab's pure-GUI tunables (nothing on a node holds

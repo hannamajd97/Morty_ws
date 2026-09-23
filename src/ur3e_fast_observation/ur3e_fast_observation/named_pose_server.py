@@ -1009,6 +1009,14 @@ class MoveToNamedPoseServer(Node):
                 if via_poses:
                     self.get_logger().info(
                         f"via poses from observation_poses.yaml: {via_poses} (before {pose_name!r})")
+            elif via_poses == ["home"] and (getattr(self, "_pose_via", {}) or {}).get(pose_name):
+                # The executor's generic detour (lift -> home -> drop). A
+                # pose that declares its own via in the file knows better
+                # (2026-09-23, Majd: "no need to go all the way home"):
+                # lift -> vla_via_right -> vla_drop_right, one spline.
+                via_poses = list(self._pose_via[pose_name])
+                self.get_logger().info(
+                    f"'home' detour replaced by the file's via {via_poses} for {pose_name!r}")
 
             self._expected_pose = pose_name
             self._status_event.clear()
