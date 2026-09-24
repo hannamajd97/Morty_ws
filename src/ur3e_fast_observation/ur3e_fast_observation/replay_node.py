@@ -71,8 +71,7 @@ from action_msgs.msg import GoalStatus
 from builtin_interfaces.msg import Duration as DurationMsg
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
-from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
@@ -150,9 +149,17 @@ class ReplayNode(Node):
         self._joint_names: List[str] = []
         self._poses: Dict[str, List[float]] = {}
         self._latest_joint_state: Optional[JointState] = None
-        # Group for the momentary /joint_states subscription used to
-        # anchor a smoothed path (see _capture_current_joints).
-        self._js_cb_group = ReentrantCallbackGroup()
+        # The momentary /joint_states subscription that anchors a smoothed
+        # path lives on a private node that only the calling thread spins
+        # (see _capture_current_joints). No rosout, no parameter services,
+        # no global remaps (a launch-time __node:= would rename it too).
+        self._js_probe = rclpy.create_node(
+            f'{self.get_name()}_joint_probe', context=self.context,
+            use_global_arguments=False, enable_rosout=False,
+            start_parameter_services=False)
+        self._js_probe_exec = SingleThreadedExecutor(context=self.context)
+        self._js_probe_exec.add_node(self._js_probe)
+        self._js_probe_lock = threading.Lock()
         # 2026-09-18 watchdog: two moves today produced no controller goal
         # for 30-40 s and nothing was logged (stderr went to a terminal).
         # A request is 'pending' from arrival until the controller answers
@@ -255,6 +262,14 @@ class ReplayNode(Node):
 
     # -------------------------------------------------------------- Helpers
 
+    def destroy_node(self) -> bool:
+        try:
+            self._js_probe_exec.shutdown(timeout_sec=0.5)
+            self._js_probe.destroy_node()
+        except Exception:
+            pass
+        return super().destroy_node()
+
     def _on_joint_state(self, msg: JointState) -> None:
         self._latest_joint_state = msg
 
@@ -288,33 +303,34 @@ class ReplayNode(Node):
         if self._default_pose:
             return _extract(self._latest_joint_state)
 
-        self._latest_joint_state = None
-        # OWN callback group, and this is load-bearing. Every other
-        # subscription here sits in the node's default group, which rclpy
-        # makes MUTUALLY EXCLUSIVE — a /joint_states callback in that
-        # group could never run while _on_replay_request (our caller) is
-        # still on the stack, so this wait would always time out and
-        # every move would silently pay 0.5 s and go out unsmoothed.
-        # A separate group lets the MultiThreadedExecutor deliver it.
-        sub = self.create_subscription(
-            JointState, '/joint_states', self._on_joint_state, 10,
-            callback_group=self._js_cb_group,
-        )
-        try:
-            deadline = time.monotonic() + max(0.0, self._smooth_js_timeout_s)
-            while True:
-                joints = _extract(self._latest_joint_state)
-                if joints is not None:
-                    return joints
-                if time.monotonic() >= deadline:
-                    return None
-                time.sleep(0.002)
-        finally:
+        # On the private probe node, spun right here (2026-09-24). This
+        # subscription used to live on THIS node, in its own callback group
+        # so the MultiThreadedExecutor could deliver it while we wait —
+        # and destroying it while that executor was still taking a message
+        # from it (the stream runs at ~490 Hz) raised InvalidHandle inside
+        # spin() and killed the node: 7 times on 09-23/24, right after
+        # "smoothed ..." or "sending goal ...", and the caller waited for
+        # a move that never started or never reported (the grasp
+        # pipeline's sweep, 63 s, until Majd killed it). No executor but
+        # the one below ever sees this subscription, so creating and
+        # destroying it here cannot race.
+        latest: List[Optional[JointState]] = [None]
+        with self._js_probe_lock:
+            sub = self._js_probe.create_subscription(
+                JointState, '/joint_states',
+                lambda m: latest.__setitem__(0, m), 10)
             try:
-                self.destroy_subscription(sub)
-            except Exception:
-                pass
-            self._latest_joint_state = None
+                deadline = time.monotonic() + max(0.0, self._smooth_js_timeout_s)
+                while True:
+                    joints = _extract(latest[0])
+                    if joints is not None:
+                        return joints
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0.0:
+                        return None
+                    self._js_probe_exec.spin_once(timeout_sec=min(0.05, remaining))
+            finally:
+                self._js_probe.destroy_subscription(sub)
 
     def _publish_status(self, text: str) -> None:
         self._status_pub.publish(String(data=text))
