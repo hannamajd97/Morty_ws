@@ -1088,6 +1088,20 @@ class ChatIntentNode(Node):
             self._on_held_object,
             latched,
         )
+        # 2026-09-24 (Majd: "why does he still think he is holding an
+        # object — it happens a lot"). The announcements the LLM reads as
+        # robot status were every line Morty spoke, its OWN answers
+        # included, and the cycle state followed only phrases it knew: after
+        # the release, "Opening the gripper." and "I'm at the home position.
+        # What's next?" matched none, the state stayed "HOLDING … waiting for
+        # release confirmation", and the next answer ("I'm holding the
+        # Multivitamin tube — drop it first") went into the feed and became
+        # the evidence for the one after. Now the model's own lines stay
+        # out of the feed, and the state follows the gripper topic above and
+        # the executor's cycle end below.
+        self._own_answer_lines: dict[str, float] = {}
+        self.create_subscription(
+            String, "/grasp_executor_lin_llm/cycle_done", self._on_cycle_done_state, 10)
         # What the user is currently pointing at via mediapipe (or ""
         # when no finger is over an object). The grasp pipeline emits
         # this only while it's running its selection cycle, so it tells
@@ -2102,7 +2116,8 @@ class ChatIntentNode(Node):
         text = (msg.data or "").strip()
         if text:
             self._record_ai_speech(text)
-            self._track_robot_status(text)
+            if text not in getattr(self, "_own_answer_lines", {}):
+                self._track_robot_status(text)
 
     def _track_robot_status(self, text: str) -> None:
         """Feed status narrations into the LLM's world model (Majd
@@ -2588,6 +2603,138 @@ class ChatIntentNode(Node):
         except Exception:
             pass
 
+    def _add_robot_context(self) -> None:
+        """What the LLM is told about the robot every turn: the scene, what
+        the operator points at, the robot's own recent announcements, and —
+        last, so they outrank everything before them — the live gripper and
+        arm state (2026-09-24: the gripper state moved below the
+        announcements, which no longer carry the model's own replies)."""
+        scene = self._scene_summary()
+        if scene:
+            # Provide perception context to the LLM as a developer-role message
+            # right before the user turn. Refreshed every turn so it tracks the
+            # current scene rather than going stale in the chat history.
+            self.chat_agent.add_developer_message(scene)
+
+        if self._pointed_object_label:
+            # The user's finger is currently over a detection. Tell the
+            # LLM so phrases like "pick this one" / "this object" / "that
+            # one" resolve to a specific label, and so the LLM can
+            # acknowledge ("You're pointing at the wooden maze puzzle —
+            # should I pick it?") if the user asks.
+            pointed_human = self._pointed_object_label.replace("_", " ")
+            self.chat_agent.add_developer_message(
+                f"User pointing context: the operator is currently "
+                f"pointing at the '{self._pointed_object_label}' "
+                f"({pointed_human}) detection. If the user says 'pick "
+                f"this one' / 'pick that' / 'this object' / 'grab this' "
+                f"without naming an object, resolve to "
+                f"'{self._pointed_object_label}'. If the user asks 'what "
+                f"am I pointing at?', answer with '{pointed_human}'."
+            )
+        _st_hist = getattr(self, "_status_history", [])
+        if _st_hist:
+            _now_s = self.get_clock().now().nanoseconds / 1e9
+            _lines = "; ".join(
+                f"[-{max(0.0, _now_s - _t):.0f}s] {_x}" for _t, _x in _st_hist)
+            _cs = getattr(self, "_cycle_state", "unknown")
+            if not self._held_object_label and "HOLDING" in _cs:
+                _cs = "gripper open, holding nothing"   # the gripper topic outranks an old phrase
+            self.chat_agent.add_developer_message(
+                "ROBOT ANNOUNCEMENTS (what the robot itself said recently, "
+                "newest last; your own replies are not in it): "
+                + _lines + ". Current cycle state: " + _cs
+                + ". Use them to know what the robot is doing — if they say "
+                "a grasp is running, a grasp IS running even if you never "
+                "commanded one this turn. The older a line, the more it may "
+                "be outdated: where a line disagrees with the 'Robot state' "
+                "or 'Robot arm state' messages below, the line is OLD and "
+                "those messages are right. "
+                "NO PARROTING: these status lines are CONTEXT, not a "
+                "script. NEVER re-emit one verbatim (or near-verbatim) as "
+                "your own reply — repeating 'I'm at the home position. "
+                "Should I open the gripper?' back at the operator who just "
+                "answered it is a bug, not an answer (2026-08-28: the same "
+                "line went out four times while the operator said 'No', "
+                "'No, close the gripper', 'Don't open it'). If the "
+                "operator answered a question in the feed, ACT on their "
+                "answer or say something NEW; if they said NO to opening "
+                "the gripper, emit close_gripper — never re-ask. "
+                "FRESHNESS: the 'Robot state' / 'Robot arm state' messages "
+                "below describe the robot NOW and OVERRIDE anything said "
+                "earlier — these announcements and your own previous "
+                "replies included."
+            )
+        if self._held_object_label:
+            # Pronoun grounding: tell the LLM what's currently in the gripper
+            # so "drop it on the left" / "stell es ab" can resolve "it".
+            human_label = self._held_object_label.replace("_", " ")
+            self.chat_agent.add_developer_message(
+                f"Robot state: gripper is currently holding a {human_label}. "
+                f"If the user says 'it' / 'that' / 'this one', resolve to "
+                f"the {human_label}. This is LIVE and OVERRIDES anything "
+                f"earlier in the conversation, including your own previous "
+                f"replies."
+            )
+        else:
+            # 2026-08-28: after a release the operator said "you are not
+            # holding it anymore" and Morty kept insisting "I'm still
+            # holding the small bottle" — the absence of a held-object
+            # message left the last-mentioned object standing.
+            self.chat_agent.add_developer_message(
+                "Robot state: the gripper is EMPTY — it is holding "
+                "NOTHING right now. This is LIVE and OVERRIDES anything "
+                "earlier in the conversation, including your own previous "
+                "replies. Never claim to be holding an object; if the user "
+                "says 'it' without a fresh referent, ask which object."
+            )
+        # 2026-09-22 (Majd: "I sent the robot home with the GUI and he
+        # still thinks he is at detect right"): the router's latched label
+        # follows only the router's OWN named-pose moves; a GUI or executor
+        # move leaves it stale. The joints are the truth. Nearest named
+        # pose by joint-space distance: "at" below 0.15 rad, "near" below
+        # 0.6 rad, otherwise between poses (mid pick cycle). The label is
+        # a fallback for the moment before the first joint sample only.
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        nearest = self._nearest_named_pose() if (now_s - self._last_joint_state_at) < 3.0 else None
+        tail = (
+            " This is the arm's joint pose, LIVE, and OVERRIDES anything said "
+            "earlier in this conversation. Use it ONLY when the user asks about "
+            "the arm's position ('which position are you at?', 'are you home?'); "
+            "the generic 'where are you?' is about your location (Hochschule "
+            "Reutlingen). A request to go somewhere is ALWAYS a move: emit the "
+            "intent even when the arm is already there and NEVER answer "
+            "'you're already at ...' — moving to a pose the arm is at is "
+            "harmless, refusing is not."
+        )
+        if nearest is not None:
+            name, dist = nearest
+            human = name.replace("_", " ")
+            if self._current_pose_label and self._current_pose_label != name and dist < 0.15:
+                self.get_logger().warn(
+                    f"stale pose label {self._current_pose_label!r}: joints say {name!r} "
+                    f"({dist:.2f} rad) — the joints win.")
+            if dist < 0.15:
+                where = f"the arm is AT named pose '{name}' (say: at {human})"
+            elif dist < 0.6:
+                where = (f"the arm is NEAR named pose '{name}' ({dist:.2f} rad away), "
+                         f"not exactly at it (say: near {human})")
+            else:
+                _cs = (getattr(self, "_cycle_state", "") or "").lower()
+                place = ("at the grasp position over the table" if "grasp pose" in _cs else
+                         "at the drop position" if "drop pose" in _cs else
+                         f"between named poses, nearest '{name}' ({dist:.2f} rad away)")
+                where = f"the arm is NOT at any named pose: it is {place} (do not claim a pose name)"
+            self.chat_agent.add_developer_message(f"Robot arm state: {where}.{tail}")
+        elif self._current_pose_label:
+            self.chat_agent.add_developer_message(
+                f"Robot arm state: last completed named move ended at "
+                f"'{self._current_pose_label}' (no fresh joint state to confirm).{tail}")
+        else:
+            self.chat_agent.add_developer_message(
+                "Robot arm state: unknown (no joint state yet). If asked which "
+                "position the arm is at, say so honestly and do not guess." + tail)
+
     def _handle_user_text_locked(self, user_text: str) -> None:
         # Reset per-turn flags. _handle_intent_tool_call sets
         # _intent_fired_this_turn=True if the LLM extracted an action; we
@@ -2645,128 +2792,12 @@ class ChatIntentNode(Node):
                 "fragment of one of these lines with no command or answer "
                 "content ('Starting Greif.'). When unsure, act on the "
                 "user's words. You may reference these announcements when "
-                "the user asks what is happening."
+                "the user asks what is happening. They are the PAST: the "
+                "'Robot state' and 'Robot arm state' messages further below "
+                "describe the robot NOW."
             )
 
-        scene = self._scene_summary()
-        if scene:
-            # Provide perception context to the LLM as a developer-role message
-            # right before the user turn. Refreshed every turn so it tracks the
-            # current scene rather than going stale in the chat history.
-            self.chat_agent.add_developer_message(scene)
-
-        if self._pointed_object_label:
-            # The user's finger is currently over a detection. Tell the
-            # LLM so phrases like "pick this one" / "this object" / "that
-            # one" resolve to a specific label, and so the LLM can
-            # acknowledge ("You're pointing at the wooden maze puzzle —
-            # should I pick it?") if the user asks.
-            pointed_human = self._pointed_object_label.replace("_", " ")
-            self.chat_agent.add_developer_message(
-                f"User pointing context: the operator is currently "
-                f"pointing at the '{self._pointed_object_label}' "
-                f"({pointed_human}) detection. If the user says 'pick "
-                f"this one' / 'pick that' / 'this object' / 'grab this' "
-                f"without naming an object, resolve to "
-                f"'{self._pointed_object_label}'. If the user asks 'what "
-                f"am I pointing at?', answer with '{pointed_human}'."
-            )
-        if self._held_object_label:
-            # Pronoun grounding: tell the LLM what's currently in the gripper
-            # so "drop it on the left" / "stell es ab" can resolve "it".
-            human_label = self._held_object_label.replace("_", " ")
-            self.chat_agent.add_developer_message(
-                f"Robot state: gripper is currently holding a {human_label}. "
-                f"If the user says 'it' / 'that' / 'this one', resolve to "
-                f"the {human_label}. This is LIVE and OVERRIDES anything "
-                f"earlier in the conversation, including your own previous "
-                f"replies."
-            )
-        else:
-            # 2026-08-28: after a release the operator said "you are not
-            # holding it anymore" and Morty kept insisting "I'm still
-            # holding the small bottle" — the absence of a held-object
-            # message left the last-mentioned object standing.
-            self.chat_agent.add_developer_message(
-                "Robot state: the gripper is EMPTY — it is holding "
-                "NOTHING right now. This is LIVE and OVERRIDES anything "
-                "earlier in the conversation, including your own previous "
-                "replies. Never claim to be holding an object; if the user "
-                "says 'it' without a fresh referent, ask which object."
-            )
-        _st_hist = getattr(self, "_status_history", [])
-        if _st_hist:
-            _now_s = self.get_clock().now().nanoseconds / 1e9
-            _lines = "; ".join(
-                f"[-{max(0.0, _now_s - _t):.0f}s] {_x}" for _t, _x in _st_hist)
-            self.chat_agent.add_developer_message(
-                "ROBOT STATUS FEED (authoritative, newest last): "
-                + _lines + ". Current cycle state: "
-                + getattr(self, "_cycle_state", "unknown")
-                + ". Trust THIS over your own assumptions about what the "
-                "robot is doing — if it says a grasp is running, a grasp "
-                "IS running even if you never commanded one this turn. "
-                "NO PARROTING: these status lines are CONTEXT, not a "
-                "script. NEVER re-emit one verbatim (or near-verbatim) as "
-                "your own reply — repeating 'I'm at the home position. "
-                "Should I open the gripper?' back at the operator who just "
-                "answered it is a bug, not an answer (2026-08-28: the same "
-                "line went out four times while the operator said 'No', "
-                "'No, close the gripper', 'Don't open it'). If the "
-                "operator answered a question in the feed, ACT on their "
-                "answer or say something NEW; if they said NO to opening "
-                "the gripper, emit close_gripper — never re-ask. "
-                "FRESHNESS: the newest status line and the 'Robot state' / "
-                "'Robot arm state' messages below describe the robot NOW "
-                "and OVERRIDE anything said earlier in this conversation, "
-                "including your own previous replies."
-            )
-        # 2026-09-22 (Majd: "I sent the robot home with the GUI and he
-        # still thinks he is at detect right"): the router's latched label
-        # follows only the router's OWN named-pose moves; a GUI or executor
-        # move leaves it stale. The joints are the truth. Nearest named
-        # pose by joint-space distance: "at" below 0.15 rad, "near" below
-        # 0.6 rad, otherwise between poses (mid pick cycle). The label is
-        # a fallback for the moment before the first joint sample only.
-        now_s = self.get_clock().now().nanoseconds / 1e9
-        nearest = self._nearest_named_pose() if (now_s - self._last_joint_state_at) < 3.0 else None
-        tail = (
-            " This is the arm's joint pose, LIVE, and OVERRIDES anything said "
-            "earlier in this conversation. Use it ONLY when the user asks about "
-            "the arm's position ('which position are you at?', 'are you home?'); "
-            "the generic 'where are you?' is about your location (Hochschule "
-            "Reutlingen). A request to go somewhere is ALWAYS a move: emit the "
-            "intent even when the arm is already there and NEVER answer "
-            "'you're already at ...' — moving to a pose the arm is at is "
-            "harmless, refusing is not."
-        )
-        if nearest is not None:
-            name, dist = nearest
-            human = name.replace("_", " ")
-            if self._current_pose_label and self._current_pose_label != name and dist < 0.15:
-                self.get_logger().warn(
-                    f"stale pose label {self._current_pose_label!r}: joints say {name!r} "
-                    f"({dist:.2f} rad) — the joints win.")
-            if dist < 0.15:
-                where = f"the arm is AT named pose '{name}' (say: at {human})"
-            elif dist < 0.6:
-                where = (f"the arm is NEAR named pose '{name}' ({dist:.2f} rad away), "
-                         f"not exactly at it (say: near {human})")
-            else:
-                _cs = (getattr(self, "_cycle_state", "") or "").lower()
-                place = ("at the grasp position over the table" if "grasp pose" in _cs else
-                         "at the drop position" if "drop pose" in _cs else
-                         f"between named poses, nearest '{name}' ({dist:.2f} rad away)")
-                where = f"the arm is NOT at any named pose: it is {place} (do not claim a pose name)"
-            self.chat_agent.add_developer_message(f"Robot arm state: {where}.{tail}")
-        elif self._current_pose_label:
-            self.chat_agent.add_developer_message(
-                f"Robot arm state: last completed named move ended at "
-                f"'{self._current_pose_label}' (no fresh joint state to confirm).{tail}")
-        else:
-            self.chat_agent.add_developer_message(
-                "Robot arm state: unknown (no joint state yet). If asked which "
-                "position the arm is at, say so honestly and do not guess." + tail)
+        self._add_robot_context()
         if self._interrupt_note:
             self.chat_agent.add_developer_message(self._interrupt_note)
             self._interrupt_note = ""
@@ -2935,6 +2966,11 @@ class ChatIntentNode(Node):
         # Remember what the AI is about to say so we can drop matching
         # transcripts caused by speaker→mic feedback.
         self._record_ai_speech(text)
+        if answer:   # the model's own words: never robot status (see __init__)
+            now_m = time.monotonic()
+            self._own_answer_lines = {t: ts for t, ts in self._own_answer_lines.items()
+                                      if now_m - ts < 120.0}
+            self._own_answer_lines[text.strip()] = now_m
         # Mark "responding" so the visualizer shows we're speaking.
         self._publish_chat_state("responding")
 
@@ -3339,6 +3375,26 @@ class ChatIntentNode(Node):
                 f"Held-object update: {self._held_object_label!r} -> {new_label!r}"
             )
             self._held_object_label = new_label
+            cs = str(getattr(self, "_cycle_state", "") or "")
+            if not new_label and "HOLDING" in cs:
+                self._set_cycle_state("gripper open, holding nothing")
+            elif new_label and "HOLDING" not in cs:
+                self._set_cycle_state(f"HOLDING the {new_label.replace('_', ' ')}")
+
+    def _on_cycle_done_state(self, msg: String) -> None:
+        """The executor's cycle end ("done|id…", "failed|id|reason")."""
+        outcome = (msg.data or "").strip().split("|", 1)[0].lower()
+        if outcome == "done":
+            self._set_cycle_state("IDLE — last pick finished")
+        elif outcome == "failed":
+            self._set_cycle_state("IDLE — last pick FAILED or stopped, arm recovered")
+
+    def _set_cycle_state(self, state: str) -> None:
+        if state != getattr(self, "_cycle_state", None):
+            self.get_logger().info(f"Cycle state: {state}")
+        self._cycle_state = state
+        if state.startswith("IDLE"):
+            self._open_question = ""     # a finished cycle has no open question
 
     def _on_current_pose(self, msg: String) -> None:
         new_label = (msg.data or "").strip()
