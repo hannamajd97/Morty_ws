@@ -25,19 +25,26 @@ from pathlib import Path
 
 import numpy as np
 
-from .raw_dataset import Episode, derive_actions, list_episodes, state_vectors
+from .raw_dataset import Episode, derive_actions, list_episodes, quality_issues, state_vectors, training_segments
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--raw", required=True, help="raw dataset dir (contains episode_*/)")
+    ap.add_argument("--raw", required=True, help="raw root: a dataset dir (episode_*/), an experiments root "
+                    "(day folders with trial_*/ holding meta.json), or one trial folder")
     ap.add_argument("--repo-id", required=True, help="e.g. majd/morty_ur3e (local name if not pushing)")
     ap.add_argument("--root", default=None, help="output root (default: ~/.cache/huggingface/lerobot/<repo-id>)")
     ap.add_argument("--fps", type=int, default=None, help="default: fps from meta.json")
     ap.add_argument("--image-size", type=int, default=256, help="resize both cameras to NxN (0 = keep native)")
     ap.add_argument("--action-space", choices=["joint_abs", "joint_delta", "eef_delta"], default="joint_abs")
     ap.add_argument("--state-space", choices=["joint7", "pos_euler8"], default="joint7")
-    ap.add_argument("--include-failed", action="store_true")
+    ap.add_argument("--include-failed", action="store_true", help="also episodes with outcome=failure")
+    ap.add_argument("--include-unknown", action="store_true", help="also episodes with outcome=unknown")
+    ap.add_argument("--allow-quality-issues", action="store_true",
+                    help="keep episodes the recorder flagged (step gaps, stale poses, gripper lag); default: skip and list them")
+    ap.add_argument("--keep-idle", action="store_true",
+                    help="export every step under the first instruction (pre-2026-09-24 behaviour) instead of one "
+                         "training episode per instruction from its task segment only")
     ap.add_argument("--push", action="store_true", help="push_to_hub after conversion")
     ap.add_argument("--overwrite", action="store_true")
     a = ap.parse_args(argv)
@@ -49,7 +56,16 @@ def main(argv=None):
               "then run:  python -m vla_experiments.convert_to_lerobot ...", file=sys.stderr)
         return 1
 
-    eps = list_episodes(Path(a.raw).expanduser(), include_failed=a.include_failed)
+    eps = list_episodes(Path(a.raw).expanduser(), include_failed=a.include_failed, include_unknown=a.include_unknown)
+    if not a.allow_quality_issues:
+        kept = []
+        for p in eps:
+            issues = quality_issues(Episode(p))
+            if issues:
+                print(f"skipping {p.name} (quality): " + "; ".join(issues), file=sys.stderr)
+            else:
+                kept.append(p)
+        eps = kept
     if not eps:
         print("no episodes found", file=sys.stderr)
         return 1
@@ -80,23 +96,28 @@ def main(argv=None):
         image_writer_processes=2,
     )
     key = {"joint_abs": "joint_abs_next", "joint_delta": "joint_delta", "eef_delta": "eef_delta"}[a.action_space]
-    total = 0
+    total = 0; n_out = 0
     for p in eps:
         ep = Episode(p)
         acts = derive_actions(ep)[key]
         st = state_vectors(ep)[a.state_space]
-        for i in range(ep.n):
-            ds.add_frame({
-                "image": ep.load_image("exterior", i, size),
-                "wrist_image": ep.load_image("wrist", i, size),
-                "state": st[i].astype(np.float32),
-                "actions": acts[i].astype(np.float32),
-                "task": ep.task,
-            })
-        ds.save_episode()
-        total += ep.n
-        print(f"{p.name}: {ep.n} frames  task='{ep.task}'")
-    print(f"done: {len(eps)} episodes, {total} frames -> {ds.root}")
+        segs = training_segments(ep, keep_idle=a.keep_idle)
+        if not segs:
+            print(f"{ep.episode_id}: no task segment (no instruction) — skipped", file=sys.stderr)
+            continue
+        for text, sel in segs:
+            for i in sel:
+                ds.add_frame({
+                    "image": ep.load_image("exterior", int(i), size),
+                    "wrist_image": ep.load_image("wrist", int(i), size),
+                    "state": st[i].astype(np.float32),
+                    "actions": acts[i].astype(np.float32),
+                    "task": text,
+                })
+            ds.save_episode()
+            total += len(sel); n_out += 1
+            print(f"{ep.episode_id}: steps {sel[0]}-{sel[-1]} ({len(sel)} frames)  task='{text}'")
+    print(f"done: {len(eps)} raw episodes -> {n_out} training episodes, {total} frames -> {ds.root}")
     if a.push:
         ds.push_to_hub(tags=["ur3e", "morty", "vla"], private=True)
     return 0

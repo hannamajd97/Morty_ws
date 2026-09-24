@@ -15,14 +15,17 @@ vla_episode_recorder:
     require_wrist: true
     joint_states_topic: "/joint_states"
     controller_state_topic: "/scaled_joint_trajectory_controller/controller_state"
-    tcp_pose_topic: "/tcp_pose_broadcaster/pose"
+    tcp_pose_topic: "/tcp_pose_broadcaster/pose"   # the driver's own TCP (frame "base"), stored as ur_tcp_* next to the TF pose
     io_states_topic: "/io_and_status_controller/io_states"
+    gripper_cmd_topic: "/gripper_controller/command_event"   # stamped open/close events from the gripper adapter
+    timing_topic: "/grasp_executor_lin_llm/timing"                  # executor phase marks (absolute stamps)
+    interactive_status_topic: "/grasp_executor_lin_llm/interactive_status"
     transcript_topic: "/speech/accepted_transcript"
     task_from_transcript: false
     # auto mode: one episode per Morty trial (accepted transcript -> motion intent -> cycle_done)
     auto_mode: false
     intent_topic: "/robot/intent"
-    motion_intents: ["pick_and_place", "place", "drop_held", "drop_left", "drop_right", "go_home", "carry_release", "release_home", "release", "open_gripper", "close_gripper"]
+    motion_intents: ["pick_and_place", "pick", "place", "drop_held", "drop_left", "drop_right", "go_home", "carry_release", "release_home", "release", "open_gripper", "close_gripper"]
     cycle_done_topic: "/grasp_executor_lin_llm/cycle_done"
     intent_wait_s: 25.0
     max_episode_s: 240.0
@@ -35,6 +38,9 @@ vla_episode_recorder:
     grasp_pin: 16
     max_image_age_s: 0.5
     max_joint_age_s: 0.2
+    max_tf_age_s: 0.2        # an ee transform older than this is rejected (NaN), never repeated
+    max_step_gap_s: 0.5      # quality report: gaps between steps longer than this
+    preflight: true          # refuse to open an episode while joints / cameras / TF are stale
     jpeg_quality: 95
     # copied into every episode's meta.json so the dataset documents the camera pose it was recorded with
     astra_tf_xyz: [-0.51, 0.51, 0.065]

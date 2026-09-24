@@ -1,12 +1,15 @@
 """Tiny CLI for the recorder.
 
     vla_episode start "pick up the vitamin c and put it in the box"
-    vla_episode stop            # success
-    vla_episode stop fail       # keep but mark failed
+    vla_episode stop            # outcome success
+    vla_episode stop fail       # keep, outcome failure
+    vla_episode stop unknown    # keep, outcome unknown
+    vla_episode stop auto       # the executor's cycle_done verdict, else unknown
     vla_episode discard
     vla_episode task "new instruction"
+    vla_episode hint <trial folder>  # the next trial episode is written INTO that folder
     vla_episode status
-    vla_episode gripper open|close   # tell the recorder what the gripper was commanded to
+    vla_episode gripper open|close   # manual note of a gripper command (the adapter publishes the real ones)
 """
 import json
 import sys
@@ -23,7 +26,7 @@ LATCHED = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE,
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if not argv or argv[0] not in ("start", "stop", "discard", "task", "status", "gripper"):
+    if not argv or argv[0] not in ("start", "stop", "discard", "task", "hint", "status", "gripper"):
         print(__doc__)
         return 2
     rclpy.init()
@@ -52,6 +55,14 @@ def main(argv=None):
         if pub.get_subscription_count() == 0:
             print("recorder not listening (is episode_recorder running?)")
             return 1
+        # The count says WE discovered the recorder's reader; the reader
+        # may not have matched this brand-new writer yet, and a message
+        # sent in that window is silently lost (seen 2026-09-24: the
+        # first "hint" after start-up never arrived). Give discovery a
+        # moment to complete on both sides.
+        t0 = time.time()
+        while time.time() - t0 < 0.5:
+            rclpy.spin_once(node, timeout_sec=0.1)
         pub.publish(String(data=text))
         rclpy.spin_once(node, timeout_sec=0.2)
         print(f"sent: {text}")

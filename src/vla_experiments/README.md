@@ -30,16 +30,52 @@ after you start recording.
 
 ## Raw format (recorder output)
 
+Since 2026-09-24 a trial's episode is written INTO its trial folder, next to the bag
+and the MMHRI files, so one experiment is one folder; the episode id is the folder
+name and `episode_index` the trial number (trial.json names it as `vla_episode`):
+
 ```
-~/morty_ws/vla_experiments/datasets/morty_ur3e/
-  episode_000000/
-    meta.json        task, fps, success, intrinsics of both cameras, Astra TF, drop stats
-    steps.npz        joint_pos/vel/cmd, tcp_pos/quat, tool0 pose, gripper, gripper_cmd, grasp_detected, ages
+~/morty_ws/experiments/experiments_24_09_2026/trial_070_LA_S4/
+    meta.json        task, instructions (one per motion intent, with stamps), outcome, events, quality, intrinsics, Astra TF
+    steps.npz        joint_pos/vel/cmd + joint_stamp, tcp/tool0 pose + tcp_stamp, ur_tcp_* (driver TCP), gripper,
+                     gripper_cmd + gripper_cmd_age, grasp_detected, img_stamp_*/img_age_*, instruction_idx, phase, segment
     images/exterior/000000.jpg ...    Astra colour
     images/wrist/000000.jpg ...       RealSense colour
+    bag/ audio.wav camera.mp4 trial.json ...
+~/morty_ws/vla_experiments/datasets/morty_ur3e/episode_000000/   # episodes started from the CLI, same files
 ```
 Actions are derived at conversion time from consecutive states (or the controller
 reference when present), so one recording feeds both joint-space and EEF-delta targets.
+
+What the v2 recorder guarantees (see `raw_dataset.py` for the exact keys):
+
+* **Original stamps.** Every stream keeps its own header stamp next to the value
+  (`joint_stamp`, `img_stamp_exterior/wrist`, `tcp_stamp`, `ur_tcp_stamp`, gripper
+  command `stamp`), plus the tick time `stamp_ros`; delays are measurable afterwards.
+* **No stale poses.** The ee/tool0 pose from TF is rejected (NaN, counted as
+  `tf_stale`) when its stamp is older than `max_tf_age_s`; the driver's own
+  `/tcp_pose_broadcaster/pose` is stored as `ur_tcp_*` (expressed in `base_link`)
+  as an independent witness. The status topic lists every required stream and
+  `stale` names the missing ones; an episode is **refused** while one is stale.
+* **Gripper commands as events.** The gripper adapter publishes every open/close
+  it executes on `/gripper_controller/command_event` with its stamp; the recorder
+  stores the events (`events.gripper_cmd`), the last command per step
+  (`gripper_cmd`) and its age, separately from the finger joint (`gripper`) and
+  the grasp pin (`grasp_detected`). The quality report measures the state lag.
+* **Instructions with stamps.** Every accepted transcript and every intent is an
+  event; each motion intent becomes an instruction (transcript + canonical text
+  from the resolved intent, e.g. "pick up the bottle", "drop it on the right side",
+  "go back home"), and every step carries `instruction_idx`.
+* **Segments.** `segment` is idle / task / reset per step: task from the intent
+  until the executor's verdict (or the next instruction), reset after a failure
+  or an explicit reset-home. Holds inside an instruction (waiting at the hand-over)
+  are task. The executor's phase marks are stored per step as `phase`.
+* **Outcome** is `success` / `failure` / `unknown` (never silently true): the human
+  verdict from the trial form, else the executor's `cycle_done` of that episode,
+  else unknown.
+* **Quality** (`meta.quality`): step gaps > `max_step_gap_s`, dropped ticks, image
+  age, stale/frozen poses, gripper state lag, missing command events, missing
+  instruction. The converters skip flagged episodes unless told otherwise.
 
 ## Recording alongside the MMHRI experiments (from the GUI — the normal way)
 
@@ -48,9 +84,9 @@ command), and the trial recorder's own buttons drive it:
 
 | you press | MMHRI record | VLA episode |
 |---|---|---|
-| ⏺ Start trial | `experiments/mmhri/trial_NNN_LX_SN/` opens | `trial <fallback task>` → episode opens **provisional** |
+| ⏺ Start trial | `experiments/experiments_DD_MM_YYYY/trial_NNN_LX_SN/` opens (the VLA episode is written into it) | `trial <fallback task>` → episode opens **provisional** |
 | (during the trial) | video/audio/events | confirmed the moment an arm joint moves > 0.1 rad (or a motion intent arrives); the last command heard before that becomes the task |
-| ⏹ Stop & save | folder + CSV row written | `stop ok/fail` if you filled *Full Task Success?*, else `stop auto` (the executor's `cycle_done` decides) |
+| ⏹ Stop & save | folder + CSV row written | `stop ok/fail` if you filled *Full Task Success?*, else `stop auto` (the executor's `cycle_done` of this episode decides, otherwise outcome **unknown**) |
 | ✖ discard | nothing saved | `discard` |
 
 A trial in which the arm never moves (S1 "what do you see", S2 an absent object) is discarded by the
@@ -86,7 +122,8 @@ GUI: both would try to own the episode.
    vla_episode status
    ```
    With `task_from_transcript:=true` the first accepted voice transcript becomes the task.
-5. Inspect: `vla_dataset_info ~/morty_ws/vla_experiments/datasets/morty_ur3e`
+5. Inspect: `vla_dataset_info ~/morty_ws/experiments/experiments_24_09_2026 --all` (any root: a
+   day folder, one trial folder, or the standalone dataset dir; without `--all` only successes)
 
 Ticks are dropped (not written) when any required source is older than
 `max_image_age_s` / `max_joint_age_s`; `meta.json` records how many and why, so a
@@ -115,16 +152,24 @@ machine without ROS.
 
 ## Export
 
+`<raw dir>` is any root holding episodes: `~/morty_ws/experiments` (every campaign day),
+one day folder, one trial folder, or the standalone dataset dir. Both exports emit **one
+training episode per instruction** from its task segment only (conversation, waiting and
+resets are left out), with the canonical instruction as the language input; failures,
+unknown outcomes and recorder-flagged episodes are skipped unless asked for.
+
 openpi:
 ```bash
 # on the training machine, inside openpi's uv env (lerobot pinned there)
 python -m vla_experiments.convert_to_lerobot --raw <raw dir> --repo-id <user>/morty_ur3e --image-size 256
+#   --include-failed --include-unknown --allow-quality-issues --keep-idle  (whole episode under one task)
 uv run scripts/compute_norm_stats.py --config-name pi0_morty_ur3e_lora   # after adding the config
 ```
 OpenVLA:
 ```bash
 convert_to_rlds --raw <raw dir> --out ~/rlds/morty_ur3e
 cd ~/rlds/morty_ur3e && MORTY_VLA_RAW=<raw dir> tfds build --overwrite   # in the rlds_dataset_builder conda env
+#   MORTY_VLA_ALL=1 keeps failures/unknowns/flagged episodes and exports whole episodes
 ```
 The builder docstring contains the exact `configs.py` entry for OpenVLA.
 

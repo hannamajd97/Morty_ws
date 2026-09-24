@@ -642,9 +642,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._vla_ended = False
         vla_note = ""
         if want_vla:
-            hint = os.path.relpath(self._trial_dir, EXPERIMENTS_DIR) if self._trial_dir else ""
-            vla_note = (" + VLA episode" if self._vla.begin(self._fallback_task(), hint)
-                        else " — VLA recorder NOT up, MMHRI only")
+            # The episode is written into this trial's folder (next to bag/).
+            why = self._vla.begin(self._fallback_task(), self._trial_dir or "")
+            vla_note = " + VLA episode" if not why else f" — VLA episode NOT started ({why})"
         # One ROS bag per trial, inside the trial folder when there is one.
         self._bag_ended = True
         bag_note = ""
@@ -718,6 +718,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                     rows[name] = sum(1 for r in csv.DictReader(f) if str(r.get("Trial ID", "")).strip() == tid)
         # VLA episodes that point at one of these folders (reported, never deleted here)
         episodes = []
+        # Episodes recorded since 2026-09-24 live inside the trial folder and go with it;
+        # the older dataset episodes only NAME the trial and are listed for the record.
         for meta in glob.glob(os.path.expanduser("~/morty_ws/vla_experiments/datasets/*/episode_*/meta.json")):
             try:
                 with open(meta) as f:
@@ -738,7 +740,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText(f"nothing recorded for trial {tid} — nothing to delete.")
             return
         lines = [f"Trial {tid} will be erased from the records:"]
-        lines += [f"  • folder {os.path.relpath(d, EXPERIMENTS_DIR)}/" for d in rec["folders"]]
+        lines += [f"  • folder {os.path.relpath(d, EXPERIMENTS_DIR)}/"
+                  + (" (with its VLA episode)" if os.path.exists(os.path.join(d, "steps.npz")) else "")
+                  for d in rec["folders"]]
         lines += [f"  • {n} row(s) in {name}" for name, n in rec["rows"].items() if n]
         if rec["episodes"]:
             lines.append("VLA episodes referencing it (kept, delete by hand if wanted):")

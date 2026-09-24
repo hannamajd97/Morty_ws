@@ -49,7 +49,7 @@ def _pgrep_oldest(pattern: str) -> Optional[int]:
 
 class VlaLink(QtCore.QObject):
     def __init__(self, bridge, parent=None) -> None:
-        self.last_episode: Optional[int] = None   # index of the episode end() closed
+        self.last_episode: Optional[str] = None   # id (folder name) of the episode end() closed
         super().__init__(parent)
         self._bridge = bridge          # may be None (window opened standalone)
         self._proc = ManagedLaunch(self)
@@ -82,17 +82,27 @@ class VlaLink(QtCore.QObject):
             self._proc.stop()
 
     # ── episode lifecycle (mirrors the trial's ⏺ / ⏹ / ✖) ────────────
-    def begin(self, fallback_task: str, trial_hint: str = "") -> bool:
-        """Open a provisional episode. False = no recorder to talk to.
-        ``trial_hint`` is the trial folder (relative to the experiments
-        root) the episode's meta.json will name."""
+    def begin(self, fallback_task: str, trial_dir: str = "") -> str:
+        """Open a provisional episode. Returns "" when the recorder took
+        it, else the reason it could not ("no recorder", "stale wrist,
+        tf_ee"). ``trial_dir`` is the absolute trial folder: the recorder
+        writes images/, meta.json and steps.npz INTO it, next to bag/
+        (2026-09-24), so one experiment is one folder.
+
+        The recorder refuses an episode while a required stream is stale;
+        its status names them (``stale``), so the window can say so at ⏺
+        instead of discovering an empty episode at ⏹."""
         if self._bridge is None or not self.node_up():
-            return False
+            return "no recorder"
+        st = self._bridge.vla_status() or {}
+        stale = list(st.get("stale") or [])
+        if stale:
+            return "stale " + ", ".join(stale)
         self.last_episode = None
-        if trial_hint:
-            self._bridge.vla_cmd(f"hint {trial_hint}")
+        if trial_dir:
+            self._bridge.vla_cmd(f"hint {trial_dir}")
         self._bridge.vla_cmd(f"trial {fallback_task}")
-        return True
+        return ""
 
     def end(self, success: Optional[bool]) -> None:
         """Close the episode. None = no human verdict, let the executor's
@@ -103,7 +113,7 @@ class VlaLink(QtCore.QObject):
             # says "episode: None" once it is no longer recording. The
             # trial's trial.json names this episode (2026-09-18).
             st = self._bridge.vla_status() or {}
-            self.last_episode = st.get("episode") if st.get("recording") else None
+            self.last_episode = (st.get("episode_id") or st.get("episode")) if st.get("recording") else None
             self._bridge.vla_cmd(
                 "stop " + {True: "ok", False: "fail", None: "auto"}[success])
 

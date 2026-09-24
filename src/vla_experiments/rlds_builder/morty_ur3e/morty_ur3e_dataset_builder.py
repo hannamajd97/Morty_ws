@@ -37,8 +37,9 @@ def _load_raw_helpers():
         if (c / "raw_dataset.py").exists():
             sys.path.insert(0, str(c.parent))
             break
-    from vla_experiments.raw_dataset import Episode, derive_actions, list_episodes, state_vectors
-    return Episode, derive_actions, list_episodes, state_vectors
+    from vla_experiments.raw_dataset import (Episode, derive_actions, list_episodes, quality_issues, state_vectors,
+                                             training_segments)
+    return Episode, derive_actions, list_episodes, state_vectors, quality_issues, training_segments
 
 
 class MortyUr3e(tfds.core.GeneratorBasedBuilder):
@@ -81,35 +82,43 @@ class MortyUr3e(tfds.core.GeneratorBasedBuilder):
         return {"train": self._generate_examples(raw)}
 
     def _generate_examples(self, raw: Path):
-        Episode, derive_actions, list_episodes, state_vectors = _load_raw_helpers()
+        Episode, derive_actions, list_episodes, state_vectors, quality_issues, training_segments = _load_raw_helpers()
+        # MORTY_VLA_RAW may be the dataset dir, an experiments root or one trial folder (see raw_dataset.py).
+        # Failures / unknown outcomes and recorder-flagged episodes are left out unless MORTY_VLA_ALL=1.
+        take_all = os.environ.get("MORTY_VLA_ALL", "") == "1"
         embed = None
         try:
             import tensorflow_hub as hub
             embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
         except Exception:
             pass
-        for p in list_episodes(raw):
+        for p in list_episodes(raw, include_failed=take_all, include_unknown=take_all):
             ep = Episode(p)
+            if not take_all and quality_issues(ep):
+                print(f"skipping {ep.episode_id} (quality): " + "; ".join(quality_issues(ep)))
+                continue
             acts = derive_actions(ep)["eef_delta"]
             sv = state_vectors(ep)
-            lang = ep.task
-            emb = embed([lang])[0].numpy().astype(np.float32) if embed else np.zeros(512, np.float32)
-            steps = []
-            for i in range(ep.n):
-                steps.append({
-                    "observation": {
-                        "image": ep.load_image("exterior", i, (IMG, IMG)),
-                        "wrist_image": ep.load_image("wrist", i, (IMG, IMG)),
-                        "state": sv["pos_euler8"][i],
-                        "joint_state": sv["joint8"][i],
-                    },
-                    "action": acts[i],
-                    "discount": 1.0,
-                    "reward": float(i == ep.n - 1),
-                    "is_first": i == 0,
-                    "is_last": i == ep.n - 1,
-                    "is_terminal": i == ep.n - 1,
-                    "language_instruction": lang,
-                    "language_embedding": emb,
-                })
-            yield p.name, {"steps": steps, "episode_metadata": {"file_path": str(p), "success": bool(ep.meta.get("success", True))}}
+            for k, (lang, sel) in enumerate(training_segments(ep, keep_idle=take_all)):
+                emb = embed([lang])[0].numpy().astype(np.float32) if embed else np.zeros(512, np.float32)
+                steps = []
+                last = len(sel) - 1
+                for j, i in enumerate(sel):
+                    i = int(i)
+                    steps.append({
+                        "observation": {
+                            "image": ep.load_image("exterior", i, (IMG, IMG)),
+                            "wrist_image": ep.load_image("wrist", i, (IMG, IMG)),
+                            "state": sv["pos_euler8"][i],
+                            "joint_state": sv["joint8"][i],
+                        },
+                        "action": acts[i],
+                        "discount": 1.0,
+                        "reward": float(j == last),
+                        "is_first": j == 0,
+                        "is_last": j == last,
+                        "is_terminal": j == last,
+                        "language_instruction": lang,
+                        "language_embedding": emb,
+                    })
+                yield f"{ep.episode_id}_{k}", {"steps": steps, "episode_metadata": {"file_path": str(p), "success": ep.outcome == "success"}}

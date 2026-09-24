@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -11,6 +12,7 @@ from rcl_interfaces.msg import SetParametersResult
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 from ur_msgs.srv import SetIO
 
 
@@ -83,6 +85,14 @@ class GripperCommandAdapter(Node):
 
         self._js_pub = self.create_publisher(JointState, self._params.joint_states_topic, 10)
         self._js_pub_alt = self.create_publisher(JointState, self._params.joint_states_topic_alt, 10)
+        # The command as an EVENT, stamped when it reaches the hardware
+        # (2026-09-24): every gripper goal passes through this adapter, so
+        # this is the one place that knows the instant "open"/"close" was
+        # issued. The VLA recorder stores these events next to the
+        # gripper joint state, which lags the command by up to a second
+        # (pulse + finger travel) and could never say WHEN the command
+        # was given. JSON: {"cmd","target","stamp","backend"}.
+        self._cmd_event_pub = self.create_publisher(String, "/gripper_controller/command_event", 10)
 
         self._set_io = self.create_client(SetIO, "/io_and_status_controller/set_io", callback_group=self._cbg)
         self._fake_client = ActionClient(
@@ -261,6 +271,12 @@ class GripperCommandAdapter(Node):
 
         want_open = target > self._params.threshold
         pos = self._params.open_pos if want_open else self._params.closed_pos
+        try:
+            self._cmd_event_pub.publish(String(data=json.dumps({
+                "cmd": "open" if want_open else "close", "target": target,
+                "stamp": self.get_clock().now().nanoseconds * 1e-9, "backend": backend})))
+        except Exception:
+            pass
 
         if backend == "io":
             if not self._wait_for_set_io(timeout_s=0.5):
