@@ -15,6 +15,14 @@ export MORTY_LLM_MODEL="${MORTY_MODEL_OVERRIDE:-${BEDROCK_MODEL:-anthropic.claud
 
 # Detect backend based on model prefix.
 case "$MORTY_LLM_MODEL" in
+    gwdg/*)
+        # GWDG Academic Cloud chat model (2026-09-24), called by llm_service
+        # with GWDG_API_KEY from .morty_env; Claude on Bedrock answers any
+        # turn GWDG cannot (BEDROCK_MODEL, or MORTY_GWDG_FALLBACK_MODEL).
+        unset OPENAI_BASE_URL
+        unset OPENAI_API_KEY
+        BACKEND="GWDG Academic Cloud (streamed), fallback ${MORTY_GWDG_FALLBACK_MODEL:-${BEDROCK_MODEL:-Claude Haiku}}"
+        ;;
     openai.*|gpt-*)
         # OpenAI-compatible Bedrock endpoint. Needs OPENAI_API_KEY (use the
         # Bedrock bearer token) and OPENAI_BASE_URL pointing at /openai/v1.

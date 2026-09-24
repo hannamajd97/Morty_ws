@@ -499,7 +499,11 @@ class OperatorWindow(QtWidgets.QMainWindow):
         sys_lay.addWidget(self.voice_btn)
         self.voice_combo = QtWidgets.QComboBox()
         self.voice_combo.addItems(list(VOICE_BASE.keys()))
-        self.voice_combo.setToolTip("LLM provider: claude (debug/cheap) or openai (production).")
+        self.voice_combo.setToolTip(
+            "Morty's brain (the chat model), chosen at Start voice.\n"
+            "gemma 4 / deepseek v4 flash (gwdg): GWDG Academic Cloud, ~0.8 s per answer; Claude on "
+            "Bedrock answers any turn GWDG cannot (timeout, error, quota). Uses the same GWDG quota "
+            "as Omni hearing.\nclaude (debug): Claude Haiku on AWS Bedrock.  openai: OpenAI API.")
         self.voice_combo.currentTextChanged.connect(self._update_model_label)
         self._refresh_devices()
         self._update_model_label()
@@ -2174,10 +2178,12 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.out_combo.setCurrentText(cur_out)
 
     def _update_model_label(self, *_a) -> None:
-        provider = {"claude (debug)": "☁ AWS Bedrock", "openai": "☁ OpenAI API"}.get(
-            self.voice_combo.currentText(), "☁ ?"
-        )
-        model = self._model_names.get(self.voice_combo.currentText()) or "(default model)"
+        name = self.voice_combo.currentText()
+        if name in GWDG_BRAINS:
+            self.model_label.setText(f"☁ GWDG — {GWDG_BRAINS[name][len('gwdg/'):]} (Claude fallback)")
+            return
+        provider = {"claude (debug)": "☁ AWS Bedrock", "openai": "☁ OpenAI API"}.get(name, "☁ ?")
+        model = self._model_names.get(name) or "(default model)"
         self.model_label.setText(f"{provider} — {model}")
 
     # ── mic strip ────────────────────────────────────────────────────
@@ -2370,6 +2376,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
             f"min_chars:={self.vf_min_chars.value()}",
         ]
         env = os.environ.copy()
+        env.pop("MORTY_MODEL_OVERRIDE", None)
+        if provider in GWDG_BRAINS:
+            env["MORTY_MODEL_OVERRIDE"] = GWDG_BRAINS[provider]
+            model = GWDG_BRAINS[provider]
         # Capture the voice stack's output so crash reasons (e.g. missing
         # API key) can be SHOWN instead of guessed.
         os.makedirs(os.path.expanduser("~/morty_ws/logs"), exist_ok=True)

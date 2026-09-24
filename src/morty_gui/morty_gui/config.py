@@ -54,6 +54,7 @@ __all__ = [
     "RVIZ_STANDALONE",
     "UR_JOINTS",
     "VOICE_BASE",
+    "GWDG_BRAINS",
     "VOICE_COMMON_ARGS",
     "VOICE_FILTER_PARAMS",
     "VOICE_LANG_ARGS",
@@ -78,7 +79,18 @@ SHUTTLE_IP = "168.192.1.102"
 # Morty 🎤 tab. with_replay:=false — the GUI already runs the replay node
 # with the driver (the voice launch bringing its own caused DUPLICATE replay
 # nodes, observed live 2026-08-11).
+# GWDG brains (2026-09-24, Majd: Gemma 4 default): the Bedrock launch path
+# with MORTY_MODEL_OVERRIDE set to the gwdg/ model id; llm_service streams
+# from GWDG and lets Claude (BEDROCK_MODEL) answer any turn GWDG cannot.
+# Measured on Morty's prompt: Gemma 0.80 s, DeepSeek 0.86 s, Haiku 1.16 s
+# per full answer, commands 4/4 each; DeepSeek replied in English to German.
+GWDG_BRAINS = {
+    "gemma 4 (gwdg)": "gwdg/gemma-4-31b-it",
+    "deepseek v4 flash (gwdg)": "gwdg/deepseek-v4-flash-0731",
+}
 VOICE_BASE = {
+    **{name: ["bash", os.path.expanduser("~/morty_ws/morty.sh"), "--debug", "--voice-only"]
+       for name in GWDG_BRAINS},          # first entry = the selector's default
     "claude (debug)": ["bash", os.path.expanduser("~/morty_ws/morty.sh"),
                        "--debug", "--voice-only"],
     "openai": ["bash", os.path.expanduser("~/morty_ws/morty.sh"), "--voice-only"],

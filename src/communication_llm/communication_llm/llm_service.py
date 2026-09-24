@@ -40,6 +40,7 @@ import json
 import os
 import sys
 import re
+import time
 from typing import Any
 
 from openai import OpenAI
@@ -693,6 +694,181 @@ def _bedrock_converse_call(
     raise last_exc  # type: ignore[misc]
 
 
+# --------------------------------------------------------------------------
+# GWDG Academic Cloud chat models (2026-09-24, Majd: Gemma 4 default,
+# DeepSeek V4 Flash selectable). Model ids carry the prefix "gwdg/".
+#
+# Why: on Morty's real system prompt + intent tool (5 turns: pick, drop,
+# joke, compound go-home-then-look-left, German question) both got every
+# command right and answered in 0.80 / 0.86 s median vs Claude Haiku's
+# 1.16 s. DeepSeek answered the German question in English; Gemma, like
+# Haiku, invented a clock time. Six other GWDG models were worse (dropped
+# or unsent commands, timeouts, empty replies).
+#
+# How: OpenAI-compatible chat.completions, STREAMED like the Bedrock path —
+# text deltas go to ``on_text`` (sentences are spoken while the model
+# writes) and each tool call goes to ``on_tool_call`` once the next one
+# starts or the stream ends. The result is rebuilt into the Bedrock
+# response shape, so chat_node and the history converters see one format
+# whichever model answered.
+#
+# Fallback: the key's chat quota is shared with the Qwen3-Omni hearing
+# (200/h, 3000/month) and GWDG has stalled on single requests. If a GWDG
+# call fails BEFORE anything was spoken or dispatched, the same turn is
+# answered by Claude on Bedrock (MORTY_GWDG_FALLBACK_MODEL, else
+# BEDROCK_MODEL) and GWDG is skipped for 30 s (429: Retry-After or 60 s),
+# so later turns do not each wait for the timeout. A failure after the
+# first spoken word is raised as before (chat_node apologises) — replaying
+# the turn on another model would repeat what Morty already said or did.
+# --------------------------------------------------------------------------
+GWDG_PREFIX = "gwdg/"
+GWDG_BASE_URL = "https://chat-ai.academiccloud.de/v1"
+# No first token within this many seconds = unavailable, Claude answers.
+# Measured 2026-09-24: Gemma's first word or command came after 0.54-1.41 s
+# (8 turns; one earlier outlier 3.3 s); DeepSeek 0.23-0.56 s, then stalled
+# on 4 of the next 5 requests. 2.5 s + Claude's ~1.1 s keeps a stalled turn
+# near 3.6 s instead of waiting it out (the Bedrock path allows 20 s).
+GWDG_TIMEOUT_S = float(os.environ.get("MORTY_GWDG_TIMEOUT_S", "2.5"))
+_GWDG_CLIENT = None
+_GWDG_PAUSED_UNTIL = 0.0
+
+
+def _is_gwdg(model: str) -> bool:
+    return model.startswith(GWDG_PREFIX)
+
+
+def _gwdg_fallback_model() -> str:
+    return (os.environ.get("MORTY_GWDG_FALLBACK_MODEL", "").strip()
+            or os.environ.get("BEDROCK_MODEL", "").strip()
+            or "eu.anthropic.claude-haiku-4-5-20251001-v1:0")
+
+
+class _GwdgUnavailable(Exception):
+    """GWDG gave nothing usable before the first spoken word or dispatch."""
+    def __init__(self, reason: str, pause_s: float) -> None:
+        super().__init__(reason)
+        self.pause_s = pause_s
+
+
+def _gwdg_client():
+    global _GWDG_CLIENT
+    if _GWDG_CLIENT is None:
+        key = os.environ.get("GWDG_API_KEY", "").strip().strip('"')
+        if not key:
+            raise _GwdgUnavailable("GWDG_API_KEY is not set", 3600.0)
+        # max_retries=0: the SDK's own retries would triple the wait before
+        # the Claude fallback answers.
+        _GWDG_CLIENT = OpenAI(api_key=key, base_url=GWDG_BASE_URL, max_retries=0)
+    return _GWDG_CLIENT
+
+
+def _merge_assistant_turns(msgs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """_messages_for_chat_completions writes each tool call as its own
+    assistant message; the OpenAI format wants one assistant message with
+    all of a turn's text and tool_calls, followed by their tool results."""
+    out: list[dict[str, Any]] = []
+    for m in msgs:
+        prev = out[-1] if out else None
+        if m["role"] == "assistant" and m.get("tool_calls") and prev is not None and prev["role"] == "assistant":
+            prev["tool_calls"] = list(prev.get("tool_calls") or []) + list(m["tool_calls"])
+            continue
+        out.append(dict(m))
+    return out
+
+
+def _gwdg_chat_call(model: str, messages: list[Any], tools: list[dict[str, Any]],
+                    on_tool_call=None, on_text=None) -> _BedrockConverseResponse:
+    """One streamed GWDG turn in the Bedrock response shape. Raises
+    _GwdgUnavailable when it fails before anything reached the callbacks."""
+    emitted = False
+    text = ""
+    calls: dict[int, dict[str, Any]] = {}
+    done: set[int] = set()
+    stopped = False
+
+    def _finish(idx: int) -> None:
+        nonlocal emitted
+        if idx in done:
+            return
+        done.add(idx)
+        c = calls[idx]
+        c["id"] = c["id"] or f"gwdg-{idx}"      # the dispatched id is the one the history keeps
+        try:
+            c["input"] = json.loads(c["args"]) if c["args"] else {}
+        except Exception:
+            c["input"] = {"_raw": c["args"]}
+        if on_tool_call is not None:
+            emitted = True
+            try:
+                on_tool_call(_AdaptedFunctionCall(name=c["name"], arguments=json.dumps(c["input"]),
+                                                  call_id=c["id"]))
+            except Exception:
+                pass
+
+    try:
+        stream = _gwdg_client().with_options(timeout=GWDG_TIMEOUT_S).chat.completions.create(
+            model=model[len(GWDG_PREFIX):],
+            messages=_merge_assistant_turns(_messages_for_chat_completions(messages)),
+            tools=[_responses_tool_to_chat_tool(t) for t in tools] or None,
+            temperature=0.2,             # as in the benchmark
+            max_tokens=1024,             # as on the Bedrock path
+            stream=True,
+        )
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                text += delta.content
+                if on_text is not None:
+                    emitted = True
+                    try:
+                        on_text(delta.content)
+                    except StopStream:
+                        stopped = True
+                    except Exception:
+                        pass
+            for tc in delta.tool_calls or []:
+                for idx in [i for i in calls if i != tc.index and i not in done]:
+                    _finish(idx)                 # the previous call is complete
+                c = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
+                c["id"] = c["id"] or (tc.id or "")
+                if tc.function is not None:
+                    c["name"] += tc.function.name or ""
+                    c["args"] += tc.function.arguments or ""
+            if stopped:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+                break
+        if not stopped:
+            for idx in sorted(calls):
+                _finish(idx)
+    except StopStream:
+        stopped = True
+    except _GwdgUnavailable:
+        raise
+    except Exception as exc:  # noqa: BLE001 — timeouts, HTTP errors, broken streams
+        if emitted:
+            raise
+        status = getattr(exc, "status_code", None)
+        pause = 30.0
+        if status == 429:
+            try:
+                pause = float(exc.response.headers.get("retry-after") or 60)  # type: ignore[attr-defined]
+            except Exception:
+                pause = 60.0
+        raise _GwdgUnavailable(f"{type(exc).__name__}"
+                               + (f" HTTP {status}" if status else "") + f": {str(exc)[:120]}", pause)
+    content: list[dict[str, Any]] = [{"text": text}] if text else []
+    for idx in sorted(done):                     # a call cut by StopStream is never run
+        c = calls[idx]
+        content.append({"toolUse": {"toolUseId": c["id"], "name": c["name"], "input": c["input"]}})
+    return _BedrockConverseResponse({"output": {"message": {"role": "assistant", "content": content}},
+                                     "stopped": stopped})
+
+
 def _fallback_model_for(model: str) -> str:
     """The route to try when ``model`` is unavailable: the env override, else
     the same model id under the global inference profile (eu./us./apac. →
@@ -747,7 +923,18 @@ class LLMService:
         # a single slow turn would hang the whole rclpy executor thread for
         # 10 minutes and the user sees an unresponsive Morty.
         # on_tool_call: called with each completed tool call WHILE the reply
-        # streams (Bedrock path only) — the intent is dispatched early.
+        # streams (Bedrock and GWDG paths) — the intent is dispatched early.
+        if _is_gwdg(model):
+            global _GWDG_PAUSED_UNTIL
+            fb = _gwdg_fallback_model()
+            if time.monotonic() >= _GWDG_PAUSED_UNTIL:
+                try:
+                    return _gwdg_chat_call(model, self.messages, self.tools, on_tool_call, on_text)
+                except _GwdgUnavailable as exc:
+                    _GWDG_PAUSED_UNTIL = time.monotonic() + exc.pause_s
+                    print(f"[llm] {model} unavailable ({exc}); this turn on {fb}, GWDG skipped "
+                          f"for {exc.pause_s:.0f} s", file=sys.stderr, flush=True)
+            return self.chat(fb, timeout, on_tool_call, on_text)
         if _use_bedrock_converse(model):
             try:
                 return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call, on_text)
