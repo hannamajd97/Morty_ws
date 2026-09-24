@@ -595,7 +595,7 @@ class YoloLiveSelectGrasp(Node):
             hysteresis=float(self.get_parameter("mediapipe_hysteresis").value),
             use_tasks_api=bool(self.get_parameter("mediapipe_use_tasks_api").value),
             model_path=str(self.get_parameter("mediapipe_model_path").value),
-            depth_provider=lambda: self.fb.latest(),
+            depth_provider=lambda: self.fb.paired(),   # colour + depth of the same moment (2026-09-24)
             logger=self.get_logger(),
             on_pointer=lambda px: setattr(self, "_pointer_px", px),
             on_hand=_on_hand,

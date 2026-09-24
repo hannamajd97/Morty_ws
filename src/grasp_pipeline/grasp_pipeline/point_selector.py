@@ -414,13 +414,25 @@ class PointOrVoiceSelector:
 
     # ── one frame → (hover index, overlay pixel, mode used) ──────────
     def _evaluate(self, bgr, dets: List[Dict[str, Any]]) -> Tuple[Optional[int], Optional[Tuple[float, float]], str]:
+        # 3d: find the finger in the colour frame that BELONGS to the depth
+        # frame (FrameBuffer.paired, 2026-09-24) — the newest colour frame
+        # and the newest depth frame were up to ~0.2 s apart while the hand
+        # moved, so the joints' depths came from where the finger had been.
+        sample = None
+        if self.pointing_mode == "3d" and self.depth_provider is not None:
+            try:
+                sample = self.depth_provider()
+                if sample is not None and sample[0] is not None and sample[1] is not None:
+                    bgr = sample[0]
+            except Exception:
+                sample = None
         lm = self._landmarks_px(bgr)
         if lm is None:
             self._emit(self.on_pointer, None)
             return None, None, "none"
         self._n_frames += 1
-        if self.pointing_mode == "3d" and self.depth_provider is not None:
-            dm = self._depth_frame(self.depth_provider())
+        if self.pointing_mode == "3d" and sample is not None:
+            dm = self._depth_frame(sample)
             if dm is not None:
                 depth_m, K = dm
                 ray = self._ray_3d(lm, depth_m, K)
@@ -438,7 +450,15 @@ class PointOrVoiceSelector:
                     reach = 0.15
                     if idx is not None and centres[idx] is not None:
                         reach = max(0.05, float(np.dot(centres[idx] - origin, direction)))
-                    px = self._project(origin + reach * direction, K) or lm[INDEX_TIP]
+                    # The arrow starts at the fingertip SEEN in the image and
+                    # points along the projected 3d ray (2026-09-24): drawing
+                    # from the 2-D tip to the end of the SMOOTHED 3d ray bent
+                    # the arrow sideways whenever the two tips differed.
+                    o_px = self._project(origin, K)
+                    e_px = self._project(origin + reach * direction, K)
+                    tip = lm[INDEX_TIP]
+                    px = ((tip[0] + e_px[0] - o_px[0], tip[1] + e_px[1] - o_px[1])
+                          if (o_px and e_px) else tip)
                     self._n_3d += 1
                     self._emit(self.on_pointer, px)
                     return idx, px, "3d"
@@ -461,6 +481,16 @@ class PointOrVoiceSelector:
         if not dets:
             return None
 
+        try:
+            return self._choose_loop(bgr_frame, dets, frame_provider, overall_timeout_s, cancel)
+        finally:
+            # Pointing is over (chosen, cancelled or timed out): take the arrow
+            # and the hand skeleton off the overlay (2026-09-24: the last arrow
+            # stayed drawn on the live image until the next pointing session).
+            self._emit(self.on_pointer, None)
+            self._emit(self.on_hand, None, None)
+
+    def _choose_loop(self, bgr_frame, dets, frame_provider, overall_timeout_s, cancel) -> Optional[int]:
         start = time.time()
         hold_start: Optional[float] = None
         last_idx: Optional[int] = None

@@ -44,6 +44,10 @@ from rclpy.qos import (
 from cv_bridge import CvBridge
 
 
+def _stamp_s(header) -> float:
+    return float(header.stamp.sec) + float(header.stamp.nanosec) * 1e-9
+
+
 class FrameBuffer:
     """Subscribe to RGB and depth topics and cache the latest frames.
 
@@ -77,6 +81,13 @@ class FrameBuffer:
         # ~10 Hz they reach this node); with the arm still they are as good
         # taken before the selection as after it, so keep them ready.
         self.depth_ring: collections.deque = collections.deque(maxlen=8)   # (monotonic_s, frame)
+        # Colour frames by capture stamp, and the newest depth frame WITH its
+        # stamp in one assignment (2026-09-24, pointing): the finger was found
+        # in the newest colour frame and its depth read from the newest depth
+        # frame — two different moments while the hand moves (aligned depth
+        # arrives later, at 5-9 Hz under load). paired() matches them.
+        self.rgb_ring: collections.deque = collections.deque(maxlen=10)    # (stamp_s, bgr, header)
+        self.depth_latest = None                                            # (stamp_s, frame, header)
 
         # Intrinsics defaults
         self.fx: float = 615.0
@@ -134,6 +145,7 @@ class FrameBuffer:
         try:
             self.rgb_frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
             self.rgb_header = msg.header
+            self.rgb_ring.append((_stamp_s(msg.header), self.rgb_frame, msg.header))
         except Exception:
             # ignore conversion errors
             self.rgb_frame = None
@@ -156,6 +168,7 @@ class FrameBuffer:
                 arr[m > 0] = 0
         self.depth_frame = arr
         self.depth_header = msg.header
+        self.depth_latest = (_stamp_s(msg.header), arr, msg.header)
         self.depth_ring.append((time.monotonic(), arr))   # a new array per message: no copy needed
         # infer scale (uint16 mm → m or float32 m)
         if arr.dtype == np.uint16:
@@ -185,6 +198,22 @@ class FrameBuffer:
         if now - frames[-1][0] > max_age_s or frames[-1][0] - frames[0][0] > max_age_s:
             return None
         return [f for _, f in frames]
+
+    def paired(self, max_dt_s: float = 0.04):
+        """Like latest(), but the colour frame is the one captured closest to
+        the newest depth frame (header stamps). depth is None when no colour
+        frame lies within max_dt_s of it; the caller then works in 2-D for
+        that frame rather than reading depth from another moment."""
+        K = (self.fx, self.fy, self.cx, self.cy)
+        d = self.depth_latest
+        ring = list(self.rgb_ring)
+        if d is None or not ring:
+            return self.rgb_frame, None, K, self.depth_scale, self.rgb_header
+        ds, depth, _dh = d
+        st, bgr, hdr = min(ring, key=lambda e: abs(e[0] - ds))
+        if abs(st - ds) > max_dt_s:
+            return self.rgb_frame, None, K, self.depth_scale, self.rgb_header
+        return bgr, depth, K, self.depth_scale, hdr
 
     def latest(self):
         """Return the latest RGB/depth frames and intrinsics.
