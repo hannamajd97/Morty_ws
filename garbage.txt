@@ -1,0 +1,21 @@
+API_KEY=732fb500cd0dbd3749b294ad2eedcff9
+
+
+chat models:
+qwen3-coder-next
+qwen3-omni-30b-a3b-instruct
+BASE_URL = "https://chat-ai.academiccloud.de/v1"
+
+
+
+
+voice models:
+- Whisper large-v2
+- Whisper large-v3
+- Qwen3-ASR 1.7B
+- Cohere Transcribe
+- Qwen3-Omni 30B A3B Instruct
+Current transcription base URL:
+https://saia.gwdg.de/v1
+Qwen3-Omni base URL:
+https://chat-ai.academiccloud.de/v1
