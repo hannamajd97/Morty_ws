@@ -59,7 +59,7 @@ from sensor_msgs.msg import JointState
 
 from morty_interfaces.action import ExecuteGrasp, Speak
 
-from .llm_service import INTENT_TOOL, LLMService, extract_intent, intent_to_json
+from .llm_service import INTENT_TOOL, LLMService, StopStream, extract_intent, intent_to_json
 
 
 PICK_INTENTS = {"pick", "pickup", "pick_up", "pick up", "grasp", "take", "grab"}
@@ -964,6 +964,20 @@ class ChatIntentNode(Node):
         # pile up commands the user has already moved past.
         self._voice_generation = 0
         self._voice_gen_lock = threading.Lock()
+        # Interrupted answers (2026-09-24, Majd: "when I talk while he is
+        # talking he hears me, but keeps answering the old question").
+        # Every LLM turn gets a number. A barge-in, or a newer utterance
+        # accepted as input, hushes the answers up to the current one: its
+        # stream is stopped, nothing more of it is spoken, its sentences
+        # already queued at the speak server are cancelled, a robot command
+        # it had not dispatched yet is not run, and the next turn tells the
+        # model where it was cut off.
+        self._answer_seq = 0
+        self._hushed_seq = 0
+        self._answer_running = False
+        self._answer_goals: list = []            # [(answer_seq, ClientGoalHandle)]
+        self._answer_goals_lock = threading.Lock()
+        self._interrupt_note = ""
 
         # Memory of the last extracted intent JSON; used to satisfy
         # "do it again" / "repeat" without going through the LLM.
@@ -1140,6 +1154,7 @@ class ChatIntentNode(Node):
         # must not veto it ("What kind of one?" was dropped as 75 % overlap).
         self._speaker_verdict: tuple = (0.0, "", False)
         self.create_subscription(String, "/speech/speaker_verdict", self._on_speaker_verdict, 10)
+        self.create_subscription(Bool, "/speech/barge_in", self._on_barge_in, 10)
         # /tf freshness — half-dead driver detection (2026-08-20).
         from tf2_msgs.msg import TFMessage
         self._tf_msg_type = TFMessage
@@ -1819,6 +1834,56 @@ class ChatIntentNode(Node):
         )
         return True
 
+    def _on_barge_in(self, msg: Bool) -> None:
+        if bool(msg.data):
+            self._hush_answer("the operator talked over it")
+
+    def _reply_hushed(self) -> bool:
+        return self._answer_seq <= self._hushed_seq
+
+    def _hush_answer(self, why: str) -> None:
+        """End the answer in progress and any of its sentences still queued
+        at the speak server. Idempotent; router status lines are not ours
+        and stay (the speak server drops those itself on a real barge-in)."""
+        seq = self._answer_seq
+        newly = seq > self._hushed_seq
+        self._hushed_seq = seq
+        with self._answer_goals_lock:
+            live = [h for s_, h in self._answer_goals if s_ <= seq]
+            self._answer_goals = [(s_, h) for s_, h in self._answer_goals if s_ > seq]
+        for h in live:
+            try:
+                h.cancel_goal_async()
+            except Exception:
+                pass
+        if live or (newly and self._answer_running):
+            self.get_logger().info(
+                f"Answer {seq} interrupted ({why}): {len(live)} queued sentence(s) cancelled; "
+                "nothing more of it will be said.")
+
+    def _finish_interrupted_turn(self, response: Any) -> None:
+        """The operator talked over this answer: keep the history valid —
+        every tool call gets its output, the dispatched one or 'not
+        executed' — say nothing more, and leave the next turn a note."""
+        for item in getattr(response, "output", []) or []:
+            if getattr(item, "type", None) == "function_call" and item.name == "intent_extractor":
+                early = (self._early_dispatched.pop(item.call_id, None)
+                         if getattr(self, "_early_dispatched", None) else None)
+                self.chat_agent.add_function_call_output(
+                    item, early if early is not None else json.dumps(
+                        {"status": "not executed: the operator interrupted this answer"}))
+        heard = " ".join(getattr(self, "_streamed", []) or []).strip()
+        self._interrupt_note = (
+            "The operator interrupted your previous answer"
+            + (f"; they heard at most: \"{heard}\"" if heard else " before you said anything")
+            + ". Answer their new message directly. Do not continue or repeat the old "
+              "answer unless they ask for it.")
+        text = (getattr(response, "output_text", "") or "").strip()
+        if text:
+            print(f"Assistant (interrupted): {text}")
+        self.get_logger().info(f"Answer {self._answer_seq} dropped after the interruption.")
+        self._publish_chat_state("idle")
+
     def _on_speaker_verdict(self, msg: String) -> None:
         try:
             d = json.loads(msg.data)
@@ -2202,6 +2267,10 @@ class ChatIntentNode(Node):
         if not any(c.isalpha() for c in cleaned):
             self.get_logger().info(f"Skipping non-alphabetic transcript: {cleaned!r}")
             return
+        # Real input ends whatever answer is still being spoken — also when
+        # the barge-in detector did not fire (the operator spoke between
+        # two sentences, or only briefly). Junk ("Uh.") above does not.
+        self._hush_answer("the operator said something new")
         print(f"User (voice): {text}")
         # [timing] wall-clock decomposition of "why is Morty slow to
         # answer" (Majd 2026-08-31). One line per accepted transcript,
@@ -2454,7 +2523,12 @@ class ChatIntentNode(Node):
         if _is_redo_command(user_text):
             self._fire_redo()
         with self._chat_lock:
-            self._handle_user_text_locked(user_text)
+            self._answer_seq += 1
+            self._answer_running = True
+            try:
+                self._handle_user_text_locked(user_text)
+            finally:
+                self._answer_running = False
 
     def _fire_redo(self) -> None:
         if not self._last_intent_json:
@@ -2684,6 +2758,9 @@ class ChatIntentNode(Node):
             self.chat_agent.add_developer_message(
                 "Robot arm state: unknown (no joint state yet). If asked which "
                 "position the arm is at, say so honestly and do not guess." + tail)
+        if self._interrupt_note:
+            self.chat_agent.add_developer_message(self._interrupt_note)
+            self._interrupt_note = ""
         self.chat_agent.add_user_message(user_text)
         try:
             _t_llm0 = time.monotonic()
@@ -2719,6 +2796,9 @@ class ChatIntentNode(Node):
         # so a buggy prompt can't loop forever.
         max_rounds = 4
         for _ in range(max_rounds):
+            if self._reply_hushed():
+                self._finish_interrupted_turn(response)
+                return
             calls = [
                 item
                 for item in response.output
@@ -2748,6 +2828,9 @@ class ChatIntentNode(Node):
                 return
             self.chat_agent.add_assistant_response(response)
 
+        if self._reply_hushed():
+            self._finish_interrupted_turn(response)
+            return
         assistant_text = getattr(response, "output_text", "")
         if assistant_text:
             print(f"Assistant: {assistant_text}")
@@ -2795,16 +2878,16 @@ class ChatIntentNode(Node):
         if n_intents == 0:
             # Pure conversational reply, always speak it if non-empty.
             if tail:
-                self._speak(tail)
+                self._speak(tail, answer=True)
         elif n_intents == 1:
             # Quick narration immediately, then the LLM reply if it adds
             # value. The action-echo check protects against the LLM
             # accidentally repeating the quick narration (e.g. "Going
             # home.") which would just bounce back through the mic.
             _, quick = pending[0]
-            self._speak(quick)
+            self._speak(quick, answer=True)
             if reply_is_rich and tail:
-                self._speak(tail)
+                self._speak(tail, answer=True)
         else:
             # Multi-intent: the SYSTEM_PROMPT instructs the LLM to write
             # a single combined plan announcement that REPLACES the
@@ -2813,16 +2896,16 @@ class ChatIntentNode(Node):
             # plans like "Going home, then looking right." because they
             # naturally start with the first action name.
             if tail:
-                self._speak(tail)
+                self._speak(tail, answer=True)
             else:
                 # LLM gave nothing — fall back to per-intent narrations
                 # so the user still hears what's happening.
                 for _, quick in pending:
-                    self._speak(quick)
+                    self._speak(quick, answer=True)
         # LLM round-trip done — back to waiting state.
         self._publish_chat_state("idle")
 
-    def _speak(self, text: str, *, interrupt: bool = False) -> None:
+    def _speak(self, text: str, *, interrupt: bool = False, answer: bool = False) -> None:
         """Send a text to the speak action server.
 
         ``interrupt=False`` (default) waits politely for whatever is
@@ -2859,6 +2942,7 @@ class ChatIntentNode(Node):
         # callers; the default `interrupt=False` here means LLM replies
         # and follow-ups queue politely instead of chopping each other off.
         goal.interrupt_current = bool(interrupt) and self._speak_interrupt
+        seq = self._answer_seq if answer else 0     # answer=True: part of LLM turn `seq`, cancellable
 
         send_future = self._speak_client.send_goal_async(goal)
 
@@ -2883,11 +2967,19 @@ class ChatIntentNode(Node):
             # that goal's result, so the ref-count in stt.py stays sane
             # when the Speak server queues sentences back to back.
             _publish_ai_speaking(True)
+            if seq:
+                with self._answer_goals_lock:
+                    self._answer_goals.append((seq, handle))
+                if seq <= self._hushed_seq:      # hushed while this goal was on its way
+                    handle.cancel_goal_async()
 
             def _on_result(_r) -> None:
                 _publish_ai_speaking(False)
                 if self._mute_during_tts:
                     self._set_mic_muted(False)
+                if seq:
+                    with self._answer_goals_lock:
+                        self._answer_goals = [(s_, h) for s_, h in self._answer_goals if h is not handle]
 
             handle.get_result_async().add_done_callback(_on_result)
 
@@ -2905,6 +2997,8 @@ class ChatIntentNode(Node):
         word before the first was heard. Only while no command was
         dispatched in this turn: command replies stay with the end-of-turn
         rules (quick narration, withholding)."""
+        if self._reply_hushed():
+            raise StopStream()      # the operator is talking: end this reply now
         self._stream_buf += delta
         if self._early_dispatched:
             return
@@ -2924,7 +3018,7 @@ class ChatIntentNode(Node):
                         f"[timing] first sentence spoken {time.monotonic() - self._t_llm0:.2f}s into the LLM call")
                 self._streamed.append(sentence)
                 self.assistant_partial_pub.publish(String(data=" ".join(self._streamed)))
-                self._speak(sentence)
+                self._speak(sentence, answer=True)
 
     def _unspoken_tail(self, text: str) -> str:
         """``text`` minus the sentences already spoken while streaming."""
@@ -2942,6 +3036,9 @@ class ChatIntentNode(Node):
         tool output is kept aside and written into the history by the
         drain loop, after the assistant message, so the order stays right."""
         if getattr(item, "name", "") != "intent_extractor":
+            return
+        if self._reply_hushed():
+            self.get_logger().info("Robot command of an interrupted answer: not dispatched.")
             return
         try:
             self._last_tool_output = None

@@ -108,6 +108,17 @@ class SpeakActionServer(Node):
         # talking while we play (speaker fingerprint, not Morty's echo).
         # Stop the sentence within one 200 ms write window and listen.
         self.create_subscription(Bool, "/speech/barge_in", self._on_barge_in, 10)
+        # The operator has the floor (2026-09-24, Majd: "he keeps answering
+        # the old question"). Stopping the sentence was not enough: the rest
+        # of the answer was already queued here, one goal per sentence, and
+        # played on while the operator was still talking. On barge-in every
+        # queued goal is now dropped and new speech waits while
+        # /speech/state says the operator is still speaking (at most
+        # 10 s), so the next thing Morty says answers what was just said.
+        self._flush_mark = 0            # tickets below this were queued before the barge-in
+        self._hold_until = 0.0          # monotonic deadline of the hold ...
+        self._operator_talking = False  # ... which also ends when the operator stops
+        self.create_subscription(String, "/speech/state", self._on_listener_state, 10)
 
         self._server = ActionServer(
             self,
@@ -128,9 +139,24 @@ class SpeakActionServer(Node):
             return
         with self._goal_lock:
             active = self._active_goal is not None
+            queued = len(self._ticket_waiting)
+            self._flush_mark = self._ticket_counter
+            self._hold_until = time.monotonic() + 10.0
+        if active or queued:
+            self.get_logger().info(
+                "Barge-in: the operator is talking — stopping playback"
+                + (f", dropping {queued} queued sentence(s)" if queued else "")
+                + "; new speech waits until they finish.")
         if active:
-            self.get_logger().info("Barge-in: the operator is talking — stopping playback.")
             self._tts.stop()
+
+    def _on_listener_state(self, msg: String) -> None:
+        """speech_input_node's 'speech' / 'idle' / 'muted'. Anything but
+        'speech' after a barge-in means the operator finished: release."""
+        talking = str(msg.data) == "speech"
+        self._operator_talking = talking
+        if not talking:
+            self._hold_until = 0.0
 
     def _goal_cb(self, _request) -> GoalResponse:
         if not self._tts.available:
@@ -161,8 +187,16 @@ class SpeakActionServer(Node):
             )
         return GoalResponse.ACCEPT
 
-    def _cancel_cb(self, _goal_handle) -> CancelResponse:
-        self._tts.stop()
+    def _cancel_cb(self, goal_handle) -> CancelResponse:
+        # Stop the audio only when the cancelled goal is the one PLAYING; a
+        # queued goal is skipped when its turn comes (_execute). Stopping on
+        # every cancel would cut a router status line whenever chat_node
+        # drops the queued sentences of an interrupted answer.
+        with self._goal_lock:
+            playing = (self._active_goal is not None
+                       and bytes(self._active_goal.goal_id.uuid) == bytes(goal_handle.goal_id.uuid))
+        if playing:
+            self._tts.stop()
         return CancelResponse.ACCEPT
 
     def _publish_phase(self, goal_handle: ServerGoalHandle, phase: str, progress: float) -> None:
@@ -198,13 +232,30 @@ class SpeakActionServer(Node):
             self._idle_event.clear()
 
         deadline = 30.0
+        dropped = ""
         while True:
+            held = False
             with self._goal_lock:
-                if self._active_goal is None and (
+                if not jump and my_ticket < self._flush_mark:
+                    dropped = "dropped: the operator started talking"
+                elif goal_handle.is_cancel_requested:
+                    dropped = "cancelled"
+                if dropped:
+                    try:
+                        self._ticket_waiting.remove(my_ticket)
+                    except ValueError:
+                        pass
+                    break
+                held = (not jump and self._operator_talking
+                        and time.monotonic() < self._hold_until)
+                if not held and self._active_goal is None and (
                         jump or (self._ticket_waiting
                                  and self._ticket_waiting[0] == my_ticket)):
                     _claim()
                     break
+            if held:
+                time.sleep(0.05)        # the operator still has the floor
+                continue
             if not self._idle_event.wait(timeout=deadline):
                 self.get_logger().warn(
                     "Queue wait exceeded 30 s; running this Speak anyway."
@@ -215,12 +266,30 @@ class SpeakActionServer(Node):
             # Event is set but it's not our turn yet — yield so the
             # rightful head of the line can claim and clear it.
             time.sleep(0.02)
+        if dropped:
+            result = Speak.Result()
+            result.success = False
+            result.error = dropped
+            try:
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                else:
+                    goal_handle.abort()
+            except Exception:
+                pass
+            return result
 
         try:
             self._tts_active_pub.publish(Bool(data=True))
         except Exception:
             pass
         try:
+            if goal_handle.is_cancel_requested:   # cancelled while it waited its turn
+                goal_handle.canceled()
+                result = Speak.Result()
+                result.success = False
+                result.error = "cancelled"
+                return result
             goal: Speak.Goal = goal_handle.request
 
             if goal.voice:

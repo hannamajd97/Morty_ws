@@ -490,6 +490,7 @@ class _BedrockConverseResponse:
             items.insert(0, _AdaptedTextItem(full_text))
         self.output = items
         self.output_text = full_text
+        self.stopped = bool(raw.get("stopped"))     # ended early by StopStream
 
 
 # Cached Bedrock client — created lazily on first use so importing this
@@ -521,6 +522,14 @@ def _bedrock_runtime_client():
 _CACHE_POINTS_OK = True   # cleared when the model/region rejects cache points
 
 
+class StopStream(Exception):
+    """Raised by an ``on_text`` callback to end a streamed reply early — the
+    operator started talking over it (2026-09-24). The stream is closed and
+    the reply keeps only what was complete: the text written so far and the
+    tool calls whose block had closed (those were already dispatched through
+    ``on_tool_call``). A half-written tool call is dropped, never executed."""
+
+
 def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_text=None) -> dict[str, Any]:
     """converse_stream, rebuilt into the non-streaming response shape.
 
@@ -539,7 +548,10 @@ def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_te
             order.append(idx)
         return blocks[idx]
 
+    stopped = False
     for ev in resp["stream"]:
+        if stopped:
+            break
         if "contentBlockStart" in ev:
             cs = ev["contentBlockStart"]
             start = cs.get("start", {}) or {}
@@ -558,6 +570,8 @@ def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_te
                 if on_text is not None and delta["text"]:
                     try:
                         on_text(delta["text"])     # chat_node speaks finished sentences early
+                    except StopStream:
+                        stopped = True
                     except Exception:
                         pass
             elif "toolUse" in delta:
@@ -582,9 +596,16 @@ def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_te
                         pass
         elif "metadata" in ev:
             usage = ev["metadata"].get("usage", {}) or {}
+    if stopped:
+        try:
+            resp["stream"].close()
+        except Exception:
+            pass
     content = []
     for idx in order:
         b = blocks[idx]
+        if stopped and "toolUse" in b and "input" not in b["toolUse"]:
+            continue                        # cut mid-way: never parsed, never run
         if "toolUse" in b and "input" not in b["toolUse"]:
             raw_in = b["toolUse"].pop("input_str", "")
             try:
@@ -592,7 +613,8 @@ def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_te
             except Exception:
                 b["toolUse"]["input"] = {"_raw": raw_in}
         content.append(b)
-    return {"output": {"message": {"role": "assistant", "content": content}}, "usage": usage}
+    return {"output": {"message": {"role": "assistant", "content": content}}, "usage": usage,
+            "stopped": stopped}
 
 
 def _bedrock_converse_call(
