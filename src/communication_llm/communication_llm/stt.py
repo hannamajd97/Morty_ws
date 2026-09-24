@@ -8,6 +8,7 @@ output (TTS) is active, preventing self-feedback loops.
 
 from __future__ import annotations
 
+import collections
 import json
 import os
 import queue
@@ -375,6 +376,27 @@ class VoskTranscriber:
             return ""
 
 
+def _pulse_source_of_pid(pid: int) -> Optional[str]:
+    """Name of the PulseAudio source the capture stream of `pid` is on, or
+    None (no PulseAudio, no stream yet)."""
+    import subprocess
+    try:
+        outs = subprocess.run(["pactl", "list", "source-outputs"], capture_output=True,
+                              text=True, timeout=2).stdout
+        srcs = dict(ln.split("\t")[:2] for ln in subprocess.run(
+            ["pactl", "list", "short", "sources"], capture_output=True, text=True,
+            timeout=2).stdout.splitlines() if "\t" in ln)
+    except Exception:
+        return None
+    for block in outs.split("Source Output #")[1:]:
+        if f'application.process.id = "{pid}"' in block:
+            for ln in block.splitlines():
+                if ln.strip().startswith("Source:"):
+                    idx = ln.split(":", 1)[1].strip()
+                    return srcs.get(idx, idx)
+    return None
+
+
 class WhisperTranscriber:
     """Continuously transcribe with faster-whisper.
 
@@ -414,7 +436,9 @@ class WhisperTranscriber:
         engine: str = "whisper",
         parakeet_model: str = "nemo-parakeet-tdt-0.6b-v3",
         parakeet_device: str = "cpu",
-        parakeet_quantization: str = "int8",
+        parakeet_quantization: str = "",
+        parakeet_threads: int = 4,
+        preroll_ms: int = 300,
         vad_engine: str = "webrtc",
         silero_onset: float = 0.5,
         silero_offset: float = 0.35,
@@ -506,6 +530,7 @@ class WhisperTranscriber:
         self._silence_ms = int(silence_ms_to_finalise)
         self._max_utterance_s = float(max_utterance_s)
         self._min_utterance_ms = int(min_utterance_ms)
+        self._preroll_ms = max(0, int(preroll_ms))      # see _loop: audio kept from before the detector fired
         self._min_rms = float(min_rms)
         self._initial_prompt = initial_prompt or None
 
@@ -567,20 +592,40 @@ class WhisperTranscriber:
             cuda_opts = {"cudnn_conv_algo_search": "DEFAULT",
                          "gpu_mem_limit": int(2.6 * 1024 ** 3),
                          "arena_extend_strategy": "kSameAsRequested"}
-            # Majd 2026-09-23: "I don't want a full GPU". Default = CPU in
-            # int8: 430 ms per utterance measured (GPU fp32: 50 ms), and the
-            # speech node keeps only the 0.5 GB speaker model on the card.
+            # Majd 2026-09-23: "I don't want a full GPU". Default = CPU, and
+            # the speech node keeps only the 0.5 GB speaker model on the card.
             # parakeet_device:=cuda brings the 50 ms back (2.6 GB, capped).
+            #
+            # FULL PRECISION on the CPU, not int8 (2026-09-24). When the
+            # first phoneme of a sentence is clipped, the int8 model returns
+            # '' for the WHOLE sentence: 5 of 26 lost in a replay of 12 trial
+            # recordings cut exactly like _loop cuts them, 0 of 26 with the
+            # full model (int8 had been the default since 09-23 17:58, and
+            # every silent loss in the logs dates from then). On clean clips
+            # the two agree, and on this CPU (i9-8950HK, no VNNI) int8 is
+            # barely faster: 0.58 vs 0.62 s per clip at 4 threads, measured
+            # while the whole robot stack ran. Cost: +1.7 GB of RAM.
+            # parakeet_threads caps each transcription burst so it never
+            # takes more than that many of the 12 CPU threads from MoveIt,
+            # GraspGen and the rest.
             pk_dev = str(parakeet_device or "cpu").lower()
             providers = ([("CUDAExecutionProvider", cuda_opts)] if pk_dev == "cuda" else []) + ["CPUExecutionProvider"]
             kw = {"providers": providers}
-            if pk_dev != "cuda" and parakeet_quantization:
-                kw["quantization"] = str(parakeet_quantization)
+            pk_desc = pk_dev
+            if pk_dev != "cuda":
+                import onnxruntime as ort
+                so = ort.SessionOptions()
+                so.intra_op_num_threads = max(1, int(parakeet_threads))
+                so.inter_op_num_threads = 1
+                kw["sess_options"] = so
+                if parakeet_quantization:
+                    kw["quantization"] = str(parakeet_quantization)
+                pk_desc = (f"cpu, {parakeet_quantization or 'full precision'}, "
+                           f"{so.intra_op_num_threads} threads")
             self._pk = onnx_asr.load_model(parakeet_model, **kw)
             for secs in (2, 4):                      # warm the two common shapes
                 self._pk.recognize((np.random.randn(16000 * secs) * 0.003).astype(np.float32))
-            self._log("info", f"Parakeet STT ready ({parakeet_model}, {pk_dev}"
-                              f"{', ' + parakeet_quantization if pk_dev != 'cuda' and parakeet_quantization else ''}).")
+            self._log("info", f"Parakeet STT ready ({parakeet_model}, {pk_desc}).")
         else:
             self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         if self._speaker_gate:
@@ -636,7 +681,7 @@ class WhisperTranscriber:
         self._stop.set()
         # Unblock the worker if it's waiting on the queue.
         try:
-            self._utterance_q.put_nowait((b"", 0.0))
+            self._utterance_q.put_nowait((b"", 0.0, False))
         except queue.Full:
             pass
         if self._thread is not None:
@@ -893,6 +938,34 @@ class WhisperTranscriber:
         elif level == "error":
             self._logger.error(msg)
 
+    def _watch_capture_source(self) -> None:
+        """Log which PulseAudio source this process really records from, at
+        start and whenever it changes (2026-09-24).
+
+        The voice launch pins echocancel_mic through PULSE_SOURCE, but a
+        running stream can still be MOVED — the GUI's IN list, GNOME's sound
+        settings and pavucontrol all do it — and nothing showed it: on
+        09-24 the node sat on the raw wireless mic for a whole session and
+        heard Morty's voice under the operator's. Two pactl calls every
+        10 s; logs only, never moves the stream back (a move may be the
+        operator's choice)."""
+        want = os.environ.get("PULSE_SOURCE", "")
+        last = None
+        self._stop.wait(2.0)
+        while not self._stop.is_set():
+            cur = _pulse_source_of_pid(os.getpid())
+            if cur and cur != last:
+                off = bool(want) and cur != want
+                if last is None:
+                    self._log("warn" if off else "info",
+                              f"[audio] recording from PulseAudio source {cur!r}"
+                              + (f" — NOT the requested {want!r}" if off else ""))
+                else:
+                    self._log("warn", f"[audio] capture stream moved from {last!r} to {cur!r}"
+                                      + (f" — the requested source is {want!r}" if off else ""))
+                last = cur
+            self._stop.wait(10.0)
+
     def _has_voice(self, pcm16: bytes) -> bool:
         if not pcm16:
             return False
@@ -998,10 +1071,16 @@ class WhisperTranscriber:
         except Exception as exc:
             self._log("error", f"Parakeet transcribe failed: {exc}")
             return ""
+        # Every drop is logged as well as published (2026-09-24): these
+        # three were only on /speech/rejected, so 9 lost sentences in one
+        # session left no trace in the voice log.
         if not text:
+            self._log("info", f"Dropping: parakeet returned nothing for "
+                              f"{audio.size / self._sample_rate:.1f}s of audio")
             self._reject("nothing recognisable (parakeet returned empty)", "")
             return ""
         if _NON_LATIN_RE.search(text):
+            self._log("info", f"Dropping transcript with non-Latin script: {text!r}")
             self._reject("contains non-Latin characters", text)
             return ""
         toks = [t.strip(".,!?;:").lower() for t in text.split() if t.strip(".,!?;:")]
@@ -1009,6 +1088,7 @@ class WhisperTranscriber:
             from collections import Counter
             top, cnt = Counter(toks).most_common(1)[0]
             if cnt >= 4 and cnt / len(toks) >= 0.4:
+                self._log("info", f"Dropping repetitive transcript ('{top}' x{cnt}): {text!r}")
                 self._reject(f"one word repeated {cnt} times", text)
                 return ""
         return self._post_correct(text)
@@ -1226,9 +1306,22 @@ class WhisperTranscriber:
                 f"WhisperTranscriber listening (rate={self._sample_rate}, "
                 f"mic_index={self._mic_index}, silence_ms={self._silence_ms})",
             )
+            threading.Thread(target=self._watch_capture_source,
+                             name="stt-capture-source", daemon=True).start()
 
             chunk_ms = int(1000 * self._frames_per_buffer / self._sample_rate)
             buffer = bytearray()
+            # PRE-ROLL (2026-09-24): the chunks heard just BEFORE the
+            # detector fired. Silero crosses its onset threshold 100-300 ms
+            # into the first word, so an utterance that began at that chunk
+            # started mid-phoneme ("rasp for me ..."); Parakeet then often
+            # returned '' for the whole sentence, or dropped the first word
+            # ("For me is a tape dispenser"). In a replay of 12 trials, 300 ms
+            # of real audio in front recovered every such loss; digital
+            # silence in front recovered only some. Idle chunks feed this
+            # ring; speech onset moves it into the buffer.
+            preroll: "collections.deque[bytes]" = collections.deque(
+                maxlen=int(round(self._preroll_ms / max(1, chunk_ms))))
             in_speech = False
             silence_ms = 0
             speech_ms = 0
@@ -1273,6 +1366,7 @@ class WhisperTranscriber:
                         pass
                 if self._muted.is_set():
                     buffer.clear()
+                    preroll.clear()
                     in_speech = False
                     silence_ms = 0
                     speech_ms = 0
@@ -1287,9 +1381,13 @@ class WhisperTranscriber:
                         silence_ms = 0
                         speech_ms = 0
                         buffer.clear()
-                        # `data` was captured over the PRECEDING chunk_ms,
-                        # so the first sample is one chunk in the past.
-                        utt_start_wall = time.time() - chunk_ms / 1000.0
+                        for past in preroll:
+                            buffer.extend(past)
+                        # `data` was captured over the PRECEDING chunk_ms and
+                        # the pre-roll before it, so the first sample in the
+                        # buffer is that many chunks in the past.
+                        utt_start_wall = time.time() - chunk_ms * (1 + len(preroll)) / 1000.0
+                        preroll.clear()
                         barge_fired = False
                         next_barge_ms = self._barge_in_min_ms
                         skip_echo_cut = False
@@ -1360,7 +1458,10 @@ class WhisperTranscriber:
                         in_speech = False
                         silence_ms = 0
                         speech_ms = 0
-                # Else: silence outside of speech — ignore.
+                else:
+                    # Silence outside of speech: kept only as the next
+                    # utterance's pre-roll.
+                    preroll.append(data)
         except Exception as exc:
             self._log("error", f"Whisper loop error: {exc}")
         finally:

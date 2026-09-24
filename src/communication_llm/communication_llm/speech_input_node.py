@@ -76,8 +76,12 @@ class SpeechInputNode(Node):
         # is faster-whisper (much better accuracy, segmented utterance mode).
         self.declare_parameter("stt_engine", "vosk")
         self.declare_parameter("parakeet_model", "nemo-parakeet-tdt-0.6b-v3")   # stt_engine:=parakeet (2026-09-23)
-        self.declare_parameter("parakeet_device", "cpu")          # cpu int8 = 430 ms, no GPU; cuda = 50 ms, 2.6 GB
-        self.declare_parameter("parakeet_quantization", "int8")
+        self.declare_parameter("parakeet_device", "cpu")          # cpu = ~0.5 s per sentence, no GPU; cuda = 50 ms, 2.6 GB
+        # "" = full precision (2026-09-24): int8 returned '' for whole
+        # sentences whose first sound was clipped, the full model did not
+        # (see stt.py, ENGINE). "int8" saves 1.7 GB of RAM, not time.
+        self.declare_parameter("parakeet_quantization", "")
+        self.declare_parameter("parakeet_threads", 4)             # CPU threads per transcription (of 12)
         self.declare_parameter("vad_engine", "silero")       # "silero" (default since 2026-09-23) or "webrtc"
         self.declare_parameter("silero_onset", 0.5)
         self.declare_parameter("silero_offset", 0.35)
@@ -89,11 +93,19 @@ class SpeechInputNode(Node):
         self.declare_parameter("whisper_device", "auto")
         self.declare_parameter("whisper_compute_type", "auto")
         # End-of-utterance silence threshold. Lower = faster response,
-        # higher = safer if you pause mid-sentence to think. 500 ms was the
-        # old default; 300 ms since 2026-09-18 (Majd: commands are short,
-        # the wait was the longest piece after the language model).
-        # Override with whisper_silence_ms.
-        self.declare_parameter("whisper_silence_ms", 300)
+        # higher = safer if you pause mid-sentence to think. 300 ms from
+        # 2026-09-18 (Majd: commands are short, the wait was the longest
+        # piece after the language model); back to 500 ms on 2026-09-24:
+        # at 300 ms a hesitation split one command in two ("Uh." dropped
+        # as junk, then "For me the tape dispenser." without its verb;
+        # "Drop it." + "On home position."). 500 kept the recorded
+        # commands whole; 700 began merging the operator's answer with
+        # Morty's question. Costs 0.2 s per turn. The GUI's Voice filters
+        # spinbox mirrors this value.
+        self.declare_parameter("whisper_silence_ms", 500)
+        # Audio kept from BEFORE the voice detector fired, prepended to
+        # every utterance (2026-09-24, see stt.py _loop). 0 disables.
+        self.declare_parameter("preroll_ms", 300)
         self.declare_parameter("whisper_max_utterance_s", 12.0)
         # ---- word-time echo cut (2026-08-28) -----------------------
         # Cut Morty's own words out of a mixed transcript by WHEN they
@@ -211,6 +223,8 @@ class SpeechInputNode(Node):
                     parakeet_model=str(self.get_parameter("parakeet_model").value),
                     parakeet_device=str(self.get_parameter("parakeet_device").value),
                     parakeet_quantization=str(self.get_parameter("parakeet_quantization").value),
+                    parakeet_threads=int(self.get_parameter("parakeet_threads").value),
+                    preroll_ms=int(self.get_parameter("preroll_ms").value),
                     model_size=str(self.get_parameter("whisper_model").value),
                     on_transcript=self._on_transcript,
                     sample_rate=int(self.get_parameter("sample_rate").value),
@@ -279,6 +293,7 @@ class SpeechInputNode(Node):
             self._on_ai_speaking,
             10,
         )
+        self._muted_now = False         # logged on change, see _on_mute
         self.create_subscription(
             Bool,
             str(self.get_parameter("mute_topic").value),
@@ -406,6 +421,8 @@ class SpeechInputNode(Node):
     def _on_transcript(self, text: str) -> None:
         if len(text) < self._min_chars:
             if text.strip():
+                self.get_logger().info(
+                    f"Dropping {text!r}: shorter than min_chars={self._min_chars}")
                 self._publish_rejected(
                     f"shorter than min_chars={self._min_chars}", text
                 )
@@ -475,7 +492,13 @@ class SpeechInputNode(Node):
             note(str(msg.data or ""))
 
     def _on_mute(self, msg: Bool) -> None:
-        self._stt.set_muted(bool(msg.data))
+        muted = bool(msg.data)
+        if muted != self._muted_now:
+            # Logged (2026-09-24) so a mute that did or did not arrive is
+            # visible in the voice log next to what was heard.
+            self.get_logger().info("Microphone muted." if muted else "Microphone live again.")
+        self._muted_now = muted
+        self._stt.set_muted(muted)
 
     def _publish_audio_level(self, level: float) -> None:
         """Forward the STT's per-chunk RMS as a Float32 on /speech/level.

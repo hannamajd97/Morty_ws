@@ -179,7 +179,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         vf.addRow("Min speech RMS:", self.vf_min_rms)
         self.vf_silence = QtWidgets.QSpinBox()
         self.vf_silence.setRange(100, 3000); self.vf_silence.setSingleStep(50)
-        self.vf_silence.setValue(300); self.vf_silence.setSuffix(" ms")   # 2026-09-23: 500 cost 0.2 s per turn
+        # Mirror of speech_input_node's declared default: 500 ms since
+        # 2026-09-24 (300 split hesitant commands in two; costs 0.2 s a turn).
+        self.vf_silence.setValue(500); self.vf_silence.setSuffix(" ms")
         self.vf_silence.setToolTip("Silence that ends an utterance. Lower = snappier, higher = tolerates pauses.")
         vf.addRow("Silence to finalise:", self.vf_silence)
         self.vf_max_utt = QtWidgets.QDoubleSpinBox()
@@ -305,6 +307,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.mute_btn.setToolTip("Toggle microphone mute (publishes /speech/muted).")
         self.mute_btn.toggled.connect(self._on_mute_toggle)
         self._mute_suppress = False
+        self._mute_clicked_t = 0.0      # see _update_mic: re-mute after a speech-node restart
+        self._mute_resent_t = 0.0
         mic_row.addWidget(self.mute_btn)
         self.speech_chip = QtWidgets.QLabel("IDLE")
         self.speech_chip.setStyleSheet(
@@ -2141,6 +2145,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
     def _on_mute_toggle(self, muted: bool) -> None:
         if self._mute_suppress:
             return
+        self._mute_clicked_t = time.monotonic()
         self.bridge.set_muted(muted)
         self.mute_btn.setText("🔇 MUTED" if muted else "🎙 live")
 
@@ -2171,6 +2176,18 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self.mute_btn.setChecked(muted)
             self.mute_btn.setText("🔇 MUTED" if muted else "🎙 live")
             self._mute_suppress = False
+        # A speech node that (re)starts comes up LISTENING: /speech/muted is
+        # volatile, so it never hears a mute sent before it existed
+        # (2026-09-24: the node restarted at 15:29 while the button said
+        # MUTED, and Morty answered a side conversation). The button is the
+        # operator's intent, so while it says muted and the node reports
+        # idle/speech, the mute is sent again — at most every 2 s, never
+        # within 1.5 s of a click, and never an unmute.
+        now = time.monotonic()
+        if (muted and (state or "").lower() in ("idle", "speech")
+                and now - self._mute_clicked_t > 1.5 and now - self._mute_resent_t > 2.0):
+            self._mute_resent_t = now
+            self.bridge.set_muted(True)
 
     def _check_voice_health(self) -> None:
         """If the voice stack runs but its chat node is dead, surface the

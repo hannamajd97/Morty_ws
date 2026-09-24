@@ -407,8 +407,9 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "whisper_silence_ms",
-                default_value="300",
-                description="Silence (ms) that finalises an utterance.",
+                default_value="500",
+                description="Silence (ms) that finalises an utterance "
+                "(mirrors speech_input_node's declared default; see there).",
             ),
             DeclareLaunchArgument(
                 "whisper_max_utterance_s",

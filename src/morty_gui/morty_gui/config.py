@@ -146,17 +146,46 @@ def _pactl_default(kind: str) -> str:
         return ""
 
 
+def _pactl_filters_on(kind: str, master: str) -> Dict[str, str]:
+    """{index: name} of the filter devices (echocancel_mic / echocancel_spk)
+    whose master is `master` — PulseAudio tags them device.master_device."""
+    r = subprocess.run(["pactl", "list", kind + "s"], capture_output=True, text=True, timeout=2)
+    out: Dict[str, str] = {}
+    idx = name = ""
+    for ln in r.stdout.splitlines():
+        s = ln.strip()
+        if s.startswith(("Source #", "Sink #")):
+            idx, name = s.split("#", 1)[1].strip(), ""
+        elif s.startswith("Name:"):
+            name = s.split(":", 1)[1].strip()
+        elif s.startswith("device.master_device") and s.split("=", 1)[1].strip().strip('"') == master:
+            out[idx] = name
+    return out
+
+
 def _pactl_set_default(kind: str, name: str) -> None:
-    """Set default and move running streams, like the old mic window did."""
+    """Set default and move running streams, like the old mic window did.
+
+    Streams on the echo canceller are left where they are when `name` is
+    that canceller's own master (2026-09-24). Picking the wireless mic in
+    the IN list used to move the speech node from echocancel_mic onto the
+    raw mic — the canceller's input — and from then on Morty heard his own
+    voice mixed into the operator's (found 15:26: node on the raw mic although
+    its launch pins echocancel_mic). The same holds for the speaker and
+    echocancel_spk: TTS moved off it leaves the canceller without its
+    reference. Choosing a different device still moves everything."""
     try:
         subprocess.run(["pactl", f"set-default-{kind}", name], timeout=2)
         list_kind = "source-outputs" if kind == "source" else "sink-inputs"
         move_cmd = "move-source-output" if kind == "source" else "move-sink-input"
+        keep = _pactl_filters_on(kind, name)          # device index -> filter name
         r = subprocess.run(["pactl", "list", "short", list_kind],
                            capture_output=True, text=True, timeout=2)
         for ln in r.stdout.splitlines():
-            sid = ln.split("\t")[0]
-            subprocess.run(["pactl", move_cmd, sid, name], timeout=2)
+            cols = ln.split("\t")
+            if len(cols) > 1 and cols[1] in keep:
+                continue
+            subprocess.run(["pactl", move_cmd, cols[0], name], timeout=2)
     except Exception:
         pass
 
