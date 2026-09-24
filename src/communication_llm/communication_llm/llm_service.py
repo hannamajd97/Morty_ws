@@ -219,6 +219,24 @@ INTENT_TOOL = {
                     "'slow' by default."
                 ),
             },
+            "then": {
+                # 2026-09-24: the prompt asked the model for a 'then' plan
+                # since 2026-08-25 and the router consumes it, but the
+                # schema never had the field, so "drop it right, give it
+                # to me, then go home" lost everything after "right".
+                "type": "string",
+                "enum": ["", "release", "release_home"],
+                "description": (
+                    "What the SAME sentence says to do AFTER arriving at the "
+                    "destination (confirm_drop, pick_and_place, and drop_right / "
+                    "drop_left / go_home while holding): 'release' = open the "
+                    "gripper there, give / hand the object over; 'release_home' "
+                    "= open it there and then go back home. Any wording or order "
+                    "('and', 'then', 'after that', German 'dann'). Empty when "
+                    "nothing is said about after. One intent carries the whole "
+                    "plan — never a second intent for the release or the way home."
+                ),
+            },
             "destination": {
                 "type": "string",
                 "enum": [
@@ -228,8 +246,9 @@ INTENT_TOOL = {
                     "home",
                 ],
                 "description": (
-                    "Only used with action_intent='pick_and_place'. Where to "
-                    "place the picked object. Map: 'on the right' / 'right "
+                    "Used with action_intent='pick_and_place', and with "
+                    "'confirm_drop' when the robot asked 'Where should I drop "
+                    "it?'. Where to place the picked object. Map: 'on the right' / 'right "
                     "side' / 'right drop' -> 'drop_right'. 'on the left' / "
                     "'left side' / 'left drop' -> 'drop_left'. 'back home' "
                     "/ 'on the home spot' -> 'home'. If the user did NOT "

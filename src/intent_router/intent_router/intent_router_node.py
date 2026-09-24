@@ -273,6 +273,11 @@ class IntentRouterNode(Node):
         # back after the cycle as "not recognised". The plan is kept here
         # and answers the release pause the moment it opens.
         self._followup_plan: str = ""   # "", "release" or "release_home"
+        # True from the executor's "paused" (Where should I drop it?) until it
+        # starts moving to a destination ("resumed:"), reaches a release pause
+        # or ends the cycle. _pick_awaiting_destination stays set through the
+        # release pause too, so it cannot tell the two questions apart.
+        self._destination_open: bool = False
         # Periodic watchdog so a hung pick doesn't block the queue forever.
         self._pick_timeout_s = float(self.get_parameter("queue_pick_timeout_s").value)
         self.create_timer(1.0, self._queue_watchdog)
@@ -759,6 +764,20 @@ class IntentRouterNode(Node):
             dest = ""
             if isinstance(attrs, dict):
                 dest = str(attrs.get("destination") or "").strip().lower()
+            # "Right side, open the gripper, after that go home" while the
+            # destination question is open: the model sometimes sends
+            # release_home WITH the side instead of confirm_drop + then
+            # (1 of 10 phrasings, 2026-09-24). Same meaning — the side is the
+            # answer, the release is the plan.
+            if (action in ("release_home", "release", "open_gripper") and dest
+                    and self._destination_open):
+                _plan = "release_home" if action == "release_home" else "release"
+                self.get_logger().info(
+                    f"{action!r} with destination {dest!r} at the destination question "
+                    f"-> confirm_drop {dest} then {_plan}")
+                attrs = dict(attrs) if isinstance(attrs, dict) else {}
+                attrs["then"] = _plan
+                action = "confirm_drop"
             if action == "confirm_drop":
                 dest = dest or "drop_right"
                 # Compound plan (2026-08-25): "drop right, open the
@@ -1210,6 +1229,14 @@ class IntentRouterNode(Node):
         self._busy_kind = "pick"
         self._pick_deadline = time.monotonic() + self._pick_timeout_s
         self._followup_plan = ""
+        # "Pick the bottle, put it on the right, then give it to me (and go
+        # home)" in one sentence (2026-09-24): the release plan rides along
+        # and answers the release pause on arrival, exactly like a follow-up
+        # said while the pick was already in flight.
+        _then = str(attrs.get("then") or "").strip().lower() if isinstance(attrs, dict) else ""
+        if is_pick_and_place and _then in ("release", "release_home"):
+            self._followup_plan = _then
+            self.get_logger().info(f"pick_and_place with then={_then!r}: the release pause will be answered on arrival.")
 
         # The pick cycle moves the arm through several non-named poses
         # (grasp → lift → drop → home). Clear the latched current-pose so
@@ -2325,6 +2352,7 @@ class IntentRouterNode(Node):
             # router's own flag is in sync so the confirm_drop bypass
             # routes the user's reply correctly.
             self._pick_awaiting_destination = True
+            self._destination_open = True
             # A NEW pause is open: the one-resume-per-pause window reopens.
             self._resume_claimed = False
             label = self._last_target_label or self._held_object_label or ""
@@ -2349,6 +2377,7 @@ class IntentRouterNode(Node):
             # Make sure the release-pause flag is set even for pointed-
             # at picks that bypassed intent_router's dispatch path.
             self._pick_awaiting_release = True
+            self._destination_open = False
             # A NEW pause is open: the one-resume-per-pause window reopens.
             self._resume_claimed = False
             # A NEW release pause: the keep-holding verdict is not in yet.
@@ -2512,6 +2541,7 @@ class IntentRouterNode(Node):
             self._stayed_pose = data.split(":", 1)[1].strip()
             self._publish_current_pose(self._stayed_pose)
         elif data.startswith("resumed:"):
+            self._destination_open = False
             # The executor is now moving to the chosen drop pose — track
             # it so /robot/current_pose is true for EXECUTOR-driven moves
             # too (2026-08-25, Majd: "Morty must know what position he
@@ -2527,6 +2557,7 @@ class IntentRouterNode(Node):
         outcome = data.split("|", 1)[0].lower()
         self.get_logger().info(f"cycle_done received: {data!r} (outcome={outcome})")
         self._followup_plan = ""
+        self._destination_open = False
         if self._narrate_lifecycle:
             # Silent on success — same reasoning as MoveToNamedPose: avoid
             # extra TTS that the mic loops back. Failure still narrates,

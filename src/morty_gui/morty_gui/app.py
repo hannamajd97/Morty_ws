@@ -402,6 +402,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._level_hist = _deque(maxlen=30)  # ~3 s of levels
         self._recent_morty_texts = _deque(maxlen=8)  # dedupe 🔊 vs 🤖 lines
         self._morty_partial = ""   # the reply line being extended while sentences stream (2026-09-23)
+        self._last_morty_final = ""   # last finished reply (normalised) — see MortyPartial
         self._was_speech = False
         self._processing_until = 0.0
         self.sidebar = chat_tab  # the Morty panel IS the sidebar now
@@ -3048,6 +3049,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
                     # Extend the open 🤖 line; open one if none.
                     new = _norm(text)
                     prev = _norm(self._morty_partial)
+                    # The partial and the finished reply come on two topics
+                    # and can be handled out of order (2026-09-24: the
+                    # finished reply filled the line, then the late partial
+                    # opened a second, shorter copy). A partial that the last
+                    # finished reply already contains is stale: skip it.
+                    if not prev and new and self._last_morty_final.startswith(new):
+                        continue
                     if prev and new.startswith(prev):
                         delta = new[len(prev):].strip()
                         if delta:
@@ -3076,6 +3084,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 if who == "Morty":
                     self._recent_morty_texts.append(text)
                     new = _norm(text)
+                    self._last_morty_final = new
                     if self._morty_partial and new.startswith(self._morty_partial):
                         # The finished reply of a line already shown while
                         # streaming: add only what was not shown, record once.

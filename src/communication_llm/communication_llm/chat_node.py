@@ -698,11 +698,16 @@ drop_left, or home. If they say "drop" with no side, ask "Left or right?"
 and do NOT emit an intent.
 
 PAUSE DESTINATION COMPOUND - if the destination answer ALSO says to open/
-release (and possibly go home) in the same sentence ("drop it right, open
-the gripper and go back home"), set object_attributes.then to
-"release_home" (open + straight home, no more questions) or "release"
-(open on arrival, then the robot asks about home). The robot then never
-pauses again for the parts you already authorized.
+release/give/hand it over (and possibly go home) in the same sentence, in
+ANY wording or order ("drop it right, open the gripper and go back home",
+"drop it on the right side and give me the object then go back home",
+"right side, open it, after that go home", "leg es rechts ab und dann nach
+Hause"), emit ONE confirm_drop with destination AND the tool's `then`
+field: "release_home" (open + straight home, no more questions) or
+"release" (open on arrival, then the robot asks about home). The same
+`then` goes on pick_and_place ("pick the bottle, put it on the right and
+give it to me") and on drop_right / drop_left / go_home while holding. The
+robot then never pauses again for the parts you already authorized.
 
 NO WORDS WITHOUT ACTION - while any robot question is open (destination,
 release, home), your reply MUST include the intent emission. Saying
@@ -2166,6 +2171,8 @@ class ChatIntentNode(Node):
             self._announce_ready_until = now + 180.0
         elif low.startswith("grasp sequence finished") or low.startswith("dropped"):
             self._cycle_state = "IDLE"
+        if str(getattr(self, "_cycle_state", "")).startswith("IDLE"):
+            self._open_question = ""     # a finished cycle has no open question (2026-09-24)
 
     def _record_ai_speech(self, text: str) -> None:
         """Remember a chunk of AI speech for echo suppression."""
@@ -2291,6 +2298,8 @@ class ChatIntentNode(Node):
         fast = _match_fast_command(text) or self._answer_open_question(text)
         if fast is not None:
             action, speed = fast
+            if action in ("go_home", "open_gripper", "release", "release_home", "stop", "close_gripper"):
+                self._open_question = ""     # this answers the executor's question
             self._fire_fast_command(action, speed, text)
             self.get_logger().info(
                 f"[timing] handled in "
@@ -3096,6 +3105,9 @@ class ChatIntentNode(Node):
             "ordinal_from": (args.get("ordinal_from") or None),
             "speed": (args.get("speed") or None),
             "destination": (args.get("destination") or None),
+            # 2026-09-24: the release/home plan said in the same sentence
+            # (router: confirm_drop / drop_* / go_home / pick_and_place).
+            "then": (args.get("then") or None),
         }
         # Drop the attrs dict if everything in it is None (so old consumers
         # that special-case object_attributes is None still work).
@@ -3153,6 +3165,7 @@ class ChatIntentNode(Node):
     def _on_interactive_status_question(self, msg: String) -> None:
         d = str(msg.data or "").strip()
         self._open_question = d if d in ("awaiting_home_confirm", "awaiting_release") else ""
+        self._open_question_t = time.monotonic()
 
     _AFFIRMATIVE = re.compile(
         r"^\s*(?:yes|yeah|yep|yup|sure|ok(?:ay)?|please|go ahead|do it|alright|all right|of course|ja|klar)"
@@ -3161,6 +3174,12 @@ class ChatIntentNode(Node):
     def _answer_open_question(self, text: str):
         """(action, speed) when `text` answers the executor's open question."""
         q = getattr(self, "_open_question", "")
+        # A question is only open until it is answered or its cycle ends
+        # (both clear it) — and never longer than 60 s (2026-09-24: "Should
+        # I go back home?" answered at 16:55:51 stayed "open", and a "Yeah."
+        # in an unrelated chat 2.5 min later sent the arm home).
+        if q and time.monotonic() - getattr(self, "_open_question_t", 0.0) > 60.0:
+            self._open_question = q = ""
         if not q or not self._AFFIRMATIVE.match(text or ""):
             return None
         if q == "awaiting_home_confirm":
