@@ -329,6 +329,10 @@ public:
     // After the release the arm STAYS for this long before going home (Majd
     // 2026-09-16: "it should wait 2 s until I took the object, before it
     // hits me"). The voice flow's home-confirm has its own 3 s.
+    // Since 2026-09-24 it also holds the gripper CLOSE: at least this long
+    // between the release and Step 7, so a release AT home (drop target =
+    // reset pose, no move in between) no longer closes the fingers 0.5 s
+    // after opening them, onto the hand that is taking the object.
     post_release_wait_s_ = get_or_declare_param<double>(node_, "post_release_wait_s", 2.0);
     drop_target_name_ = get_or_declare_param<std::string>(node_, "drop_target_name", "drop_right_side");
     // 2026-09-23: which named poses "drop right" / "drop left" mean. The
@@ -2544,9 +2548,13 @@ public:
     // pre-pause "am I at the reset pose" snapshot can be stale (v2).
     already_at_reset_pose = (drop_target_name_ == reset_target_name_);
     // 5) Open gripper at drop pose, then return to initgrasp and close gripper.
+    bool released_ok = false;                                // for the close guard before Step 7
+    std::chrono::steady_clock::time_point released_t{};
     if (sequence_ok && !skip_release) {
       if (execute_gripper_named_target(gripper_open_name_, "Step 5 - Open gripper at drop") &&
           ensure_fingers_open("Step 5b - Object released?")) {
+        released_ok = true;
+        released_t = std::chrono::steady_clock::now();
         // Only now is "The gripper is open." true.
         try {
           std_msgs::msg::String s_ok;
@@ -2654,6 +2662,23 @@ public:
     // posture. Skip if we kept the object held — gripper is already
     // closed.
     phase_mark("home_done");
+    // Give the operator's hand post_release_wait_s after the release before
+    // the fingers close (see the parameter). After a drop elsewhere the
+    // move home already took longer, so this only waits for a release at home.
+    if (sequence_ok && !skip_release && !stay_in_place && released_ok && execute_ &&
+        post_release_wait_s_ > 0.0) {
+      const auto t_close = released_t + std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(post_release_wait_s_));
+      if (std::chrono::steady_clock::now() < t_close) {
+        RCLCPP_INFO(node_->get_logger(),
+          "Step 7 - keeping the gripper open %.1f s after the release before closing (the hand taking the object).",
+          std::chrono::duration<double>(t_close - std::chrono::steady_clock::now()).count());
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < t_close && !abort_requested_.load()) {
+          rclcpp::spin_some(node_);
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+      }
+    }
     if (sequence_ok && !skip_release && !stay_in_place && !execute_gripper_named_target(gripper_close_name_, "Step 7 - Close gripper at reset")) {
       sequence_ok = false;
     }
