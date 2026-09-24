@@ -49,6 +49,10 @@ class FastReplayHandle:
         self._lock = threading.Lock()
         self._done_event = threading.Event()
         self._final_state: Optional[str] = None  # "done" | "failed" | "cancelled"
+        # True once the replay node answered "starting:<label>" — it took
+        # the request. A slow sweep that never gets this gives up early
+        # instead of waiting its whole timeout (2026-09-24).
+        self.started = False
         self._final_reason: str = ""
         self.returncode: Optional[int] = None
         self.stdout = io.StringIO()

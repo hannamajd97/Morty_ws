@@ -148,6 +148,10 @@ class MotionDispatcher:
                     handle = self._fast_replay_active_handles.pop(label, None)
                     if handle is not None:
                         handle._finish(state, reason)
+                elif state == "starting":
+                    handle = self._fast_replay_active_handles.get(label)
+                    if handle is not None:
+                        handle.started = True
         self._fast_replay_status_event.set()
 
     def cancel_fast_replay(self, label: str) -> None:
@@ -422,17 +426,20 @@ class MotionDispatcher:
             "positions": jv,
             "duration_s": duration_s,
         }
+        # Registered BEFORE the request goes out, so the replay node's
+        # "starting:" answer always finds its handle.
+        with self._fast_replay_status_lock:
+            self._fast_replay_active_handles[target_name] = handle
         try:
             self._fast_replay_pub.publish(String(data=json.dumps(payload)))
         except Exception as exc:
             node.get_logger().warn(
                 f"[fast-replay-sweep] failed to publish '{target_name}': {exc}"
             )
+            with self._fast_replay_status_lock:
+                self._fast_replay_active_handles.pop(target_name, None)
             handle._finish("failed", "publish_error")
             return None
-
-        with self._fast_replay_status_lock:
-            self._fast_replay_active_handles[target_name] = handle
 
         return handle, timeout_s, settle_s
 

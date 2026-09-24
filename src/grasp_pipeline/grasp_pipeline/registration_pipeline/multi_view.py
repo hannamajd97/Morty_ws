@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import math
+import subprocess   # TimeoutExpired from the motion handle's wait()
 import time
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
@@ -332,6 +333,9 @@ class MultiViewRegistrar:
         # the in-motion flag stuck (it would silently disable multiframe
         # fusion for every later stationary capture).
         self._node._sweep_in_motion = False
+        if getattr(self._node, "_pick_abort", False):
+            self._node.get_logger().warn("[continuous] operator stop — no sweep.")
+            return []
         base_name = str(best_cand.get("base_name", best_cand["target_name"]))
         best_alpha = float(best_cand["candidate"].get("alpha", 1.0))
         slow_vel = max(
@@ -389,6 +393,9 @@ class MultiViewRegistrar:
             f"vel={slow_vel:.3f} — capturing frames during motion"
         )
 
+        if getattr(self._node, "_pick_abort", False):   # stopped during the seed move
+            self._node.get_logger().warn("[continuous] operator stop — no sweep.")
+            return []
         # Launch the motion command (non-blocking)
         proc_info = self._node._start_joint_target_process(
             target_spec["display_name"],
@@ -432,6 +439,19 @@ class MultiViewRegistrar:
                 self._node.get_logger().warn(
                     f"[continuous] sweep timeout ({timeout_s:.0f}s) reached."
                 )
+                break
+            # 2026-09-24: an operator stop ends the sweep at once — it ran on
+            # to its end while "Operator abort received" was logged 13 times.
+            if getattr(self._node, "_pick_abort", False):
+                abort_motion, abort_reason = True, "the operator stopped the pick"
+                break
+            # A request the replay node never took (it died with it) no
+            # longer waits out the timeout (360 s for a slow sweep). Only the
+            # replay handle has `started`; the PTP commander path keeps the
+            # old behaviour.
+            if not motion_detected and getattr(proc, "started", True) is False and elapsed > 3.0:
+                abort_motion = True
+                abort_reason = "the replay node did not take the request within 3 s"
                 break
 
             # Check if motion process has finished

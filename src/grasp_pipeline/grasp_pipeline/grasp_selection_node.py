@@ -130,6 +130,25 @@ from .grasp_filters import (
 from .motion.fast_replay import FastReplayHandle as _FastReplayHandle  # noqa: E402,F401
 
 
+def _number_duplicates(dets: List[Dict[str, Any]]) -> None:
+    """Set ``display`` on every detection: the simplified label, and for
+    several objects of one label "<label>", "<label> 2", ... numbered LEFT
+    TO RIGHT by box centre (2026-09-24). Numbered in list order — score
+    order after the dedupe — the two vitamin tubes swapped names whenever
+    their scores crossed, and everything that follows an object by its name
+    saw it jump: the grasp precompute threw the stored grasps away ("object
+    moved during the capture") and the pick took the slow fresh path. The
+    list order itself (the selection indices) is left alone."""
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    for d in dets:
+        groups.setdefault(d["simplified_label"], []).append(d)
+    for label, group in groups.items():
+        group = sorted(group, key=lambda d: (0.5 * (d["bbox"][0] + d["bbox"][2]),
+                                             0.5 * (d["bbox"][1] + d["bbox"][3])))
+        for i, d in enumerate(group, 1):
+            d["display"] = label if i == 1 else f"{label} {i}"
+
+
 def _bbox_colour_name(bgr_frame, bbox) -> str:
     """Basic colour name for the central region of a detection bbox.
 
@@ -1810,13 +1829,10 @@ class YoloLiveSelectGrasp(Node):
                                 continue
                             kept.append(d)
                         simplified_dets = kept
-                    from collections import defaultdict
-                    counts = defaultdict(int)
+                    _number_duplicates(simplified_dets)
                     _cap_frame = self.fb.rgb_frame
                     for d in simplified_dets:
                         simple_label = d["simplified_label"]
-                        counts[simple_label] += 1
-                        d["display"] = f"{simple_label} {counts[simple_label]}" if counts[simple_label] > 1 else simple_label
                         # Cap colour attached to the CACHE itself
                         # (2026-08-25): the debug overlay draws from
                         # detections_cache, and computing cap_colour only
