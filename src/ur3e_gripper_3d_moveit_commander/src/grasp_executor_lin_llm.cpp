@@ -2839,22 +2839,9 @@ private:
     // Try PTP first
     if (!execute_arm_named_target(reset_target_name_, "Recovery - PTP to reset target")) {
       RCLCPP_WARN(node_->get_logger(), "PTP recovery failed. Trying OMPL planner.");
-      arm_group_.clearPoseTargets();
-      arm_group_.setStartStateToCurrentState();
-      arm_group_.setPlanningPipelineId("ompl");
-      arm_group_.setPlannerId("RRTConnect");
-      if (arm_group_.setNamedTarget(reset_target_name_)) {
-        moveit::planning_interface::MoveGroupInterface::Plan plan;
-        auto result = timed_plan(plan, "Recovery - OMPL to reset target");
-        if (result == moveit::core::MoveItErrorCode::SUCCESS) {
-          RCLCPP_INFO(node_->get_logger(), "Recovery - OMPL plan OK, executing.");
-          if (execute_) {
-            execute_with_deadline(plan, __func__);
-          }
-        } else {
-          RCLCPP_ERROR(node_->get_logger(),
-            "Recovery - OMPL also failed. Robot may need manual recovery.");
-        }
+      if (!plan_and_execute_ompl(reset_target_name_, "Recovery - OMPL to reset target")) {
+        RCLCPP_ERROR(node_->get_logger(),
+          "Recovery - OMPL also failed. Robot may need manual recovery.");
       }
     }
   }
@@ -5677,6 +5664,7 @@ public:
         step_name.c_str(), target_name.c_str());
       return true;
     }
+    last_fast_error_ = result.result ? result.result->error : std::string();
     RCLCPP_ERROR(node_->get_logger(),
       "%s: action-fast-replay failed: %s",
       step_name.c_str(),
@@ -5829,7 +5817,29 @@ public:
     // Only when (a) the param is on, (b) the caller doesn't need the
     // planned trajectory back (only Step 4 needs it for reverse-replay).
     if (use_fast_replay_for_named_targets_ && planned_trajectory_out == nullptr) {
-      return execute_arm_named_target_fast(target_name, step_name);
+      last_fast_error_.clear();
+      if (execute_arm_named_target_fast(target_name, step_name)) {
+        return true;
+      }
+      // The fast path's pre-check refused its straight joint-space line
+      // (2026-09-24: lift -> home after a grasp swept a finger through the
+      // tape dispenser standing next to the vitamin tube; the cycle failed
+      // although the recovery then planned around it and got home). For the
+      // move HOME only, MoveIt plans around the obstacle — the planner the
+      // recovery already used — and the sequence carries on. Other targets
+      // keep their fixed routes (observation_poses.yaml via lists, e.g.
+      // home -> vla_via_right -> vla_drop_right) and are never re-planned
+      // freely: a free plan could take the path that hits the real table.
+      if (execute_ && target_name == reset_target_name_ &&
+          last_fast_error_.rfind("refusing:", 0) == 0 &&
+          last_fast_error_.find("would collide") != std::string::npos)
+      {
+        RCLCPP_WARN(node_->get_logger(),
+          "%s: the straight line home is blocked (%s) — planning around it with MoveIt.",
+          step_name.c_str(), last_fast_error_.c_str());
+        return plan_and_execute_ompl(target_name, step_name + " - around the obstacle");
+      }
+      return false;
     }
 
     arm_group_.clearPoseTargets();
@@ -5858,6 +5868,39 @@ public:
       return true;
     }
 
+    auto exec_result = execute_with_deadline(plan, __func__);
+    if (exec_result != moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_ERROR(node_->get_logger(), "%s: execution failed: %s (%d)", step_name.c_str(),
+        moveit::core::error_code_to_string(exec_result).c_str(), exec_result.val);
+      return false;
+    }
+    RCLCPP_INFO(node_->get_logger(), "%s: execution OK.", step_name.c_str());
+    return true;
+  }
+
+  // Collision-aware plan (OMPL RRTConnect) to a named target, executed.
+  // Shared by the recovery and the blocked-home fallback above.
+  bool plan_and_execute_ompl(const std::string & target_name, const std::string & step_name)
+  {
+    arm_group_.clearPoseTargets();
+    arm_group_.setStartStateToCurrentState();
+    arm_group_.setPlanningPipelineId("ompl");
+    arm_group_.setPlannerId("RRTConnect");
+    if (!arm_group_.setNamedTarget(target_name)) {
+      RCLCPP_ERROR(node_->get_logger(), "%s: unknown arm named target '%s'.", step_name.c_str(), target_name.c_str());
+      return false;
+    }
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    auto result = timed_plan(plan, step_name);
+    if (result != moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_ERROR(node_->get_logger(), "%s: OMPL planning failed: %s (%d)", step_name.c_str(),
+        moveit::core::error_code_to_string(result).c_str(), result.val);
+      return false;
+    }
+    RCLCPP_INFO(node_->get_logger(), "%s: OMPL plan OK, executing.", step_name.c_str());
+    if (!execute_) {
+      return true;
+    }
     auto exec_result = execute_with_deadline(plan, __func__);
     if (exec_result != moveit::core::MoveItErrorCode::SUCCESS) {
       RCLCPP_ERROR(node_->get_logger(), "%s: execution failed: %s (%d)", step_name.c_str(),
@@ -6514,6 +6557,7 @@ public:
   double open_before_arrival_margin_s_{0.5};
   double min_exec_duration_s_{0.0};   // consumed by execute_arm_lin_pose for the approach
   std::chrono::steady_clock::time_point open_sent_t_{};
+  std::string last_fast_error_;       // the named-pose server's refusal text of the last fast move
   std::string gripper_adapter_node_name_;
   bool override_gripper_pulse_from_executor_;
   double executor_pulse_hold_s_open_;
