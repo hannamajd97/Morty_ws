@@ -82,6 +82,12 @@ class SpeechInputNode(Node):
         # (see stt.py, ENGINE). "int8" saves 1.7 GB of RAM, not time.
         self.declare_parameter("parakeet_quantization", "")
         self.declare_parameter("parakeet_threads", 4)             # CPU threads per transcription (of 12)
+        # stt_engine:=omni (2026-09-24): Qwen3-Omni at GWDG, Parakeet as the
+        # fallback per sentence (see gwdg_omni.py). The caps stay under the
+        # key's 1000/day and 3000/month so the benchmarks keep some quota.
+        self.declare_parameter("omni_timeout_s", 1.5)
+        self.declare_parameter("omni_day_cap", 950)
+        self.declare_parameter("omni_month_cap", 2900)
         self.declare_parameter("vad_engine", "silero")       # "silero" (default since 2026-09-23) or "webrtc"
         self.declare_parameter("silero_onset", 0.5)
         self.declare_parameter("silero_offset", 0.35)
@@ -214,7 +220,7 @@ class SpeechInputNode(Node):
         try:
             mic_device_name = str(self.get_parameter("mic_device_name").value).strip()
             engine = str(self.get_parameter("stt_engine").value).strip().lower()
-            if engine in ("whisper", "parakeet"):
+            if engine in ("whisper", "parakeet", "omni"):
                 self._stt = WhisperTranscriber(
                     engine=engine,
                     vad_engine=str(self.get_parameter("vad_engine").value),
@@ -224,6 +230,9 @@ class SpeechInputNode(Node):
                     parakeet_device=str(self.get_parameter("parakeet_device").value),
                     parakeet_quantization=str(self.get_parameter("parakeet_quantization").value),
                     parakeet_threads=int(self.get_parameter("parakeet_threads").value),
+                    omni_timeout_s=float(self.get_parameter("omni_timeout_s").value),
+                    omni_day_cap=int(self.get_parameter("omni_day_cap").value),
+                    omni_month_cap=int(self.get_parameter("omni_month_cap").value),
                     preroll_ms=int(self.get_parameter("preroll_ms").value),
                     model_size=str(self.get_parameter("whisper_model").value),
                     on_transcript=self._on_transcript,

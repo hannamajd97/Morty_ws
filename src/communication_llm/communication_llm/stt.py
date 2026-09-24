@@ -438,6 +438,9 @@ class WhisperTranscriber:
         parakeet_device: str = "cpu",
         parakeet_quantization: str = "",
         parakeet_threads: int = 4,
+        omni_timeout_s: float = 1.5,
+        omni_day_cap: int = 950,
+        omni_month_cap: int = 2900,
         preroll_ms: int = 300,
         vad_engine: str = "webrtc",
         silero_onset: float = 0.5,
@@ -562,7 +565,7 @@ class WhisperTranscriber:
         self._vad_frame_size_samples = int(sample_rate * 0.03)
 
         if logger is not None:
-            if str(engine or "whisper").lower() == "parakeet":
+            if str(engine or "whisper").lower() in ("parakeet", "omni"):
                 logger.info(f"Loading Parakeet STT {parakeet_model!r} on {parakeet_device} (no Whisper is loaded).")
             else:
                 logger.info(
@@ -582,8 +585,9 @@ class WhisperTranscriber:
         # length and cost 5–9 s per utterance in the first benchmark.
         self._pk = None
         self._model = None
+        self._omni = None
         self._engine = str(engine or "whisper").lower()
-        if self._engine == "parakeet":
+        if self._engine in ("parakeet", "omni"):
             import onnx_asr
             # gpu_mem_limit (2026-09-23): without it ONNX Runtime's arena grew
             # to 3.8 GB for a 2.4 GB model and GraspGen died of CUDA OOM
@@ -626,6 +630,19 @@ class WhisperTranscriber:
             for secs in (2, 4):                      # warm the two common shapes
                 self._pk.recognize((np.random.randn(16000 * secs) * 0.003).astype(np.float32))
             self._log("info", f"Parakeet STT ready ({parakeet_model}, {pk_desc}).")
+            # "omni" (2026-09-24): Qwen3-Omni at GWDG first, Parakeet above
+            # for every sentence it cannot answer — see gwdg_omni.py.
+            if self._engine == "omni":
+                from .gwdg_omni import OmniTranscriber
+                omni = OmniTranscriber(os.environ.get("GWDG_API_KEY", ""), self._log,
+                                       timeout_s=omni_timeout_s, day_cap=omni_day_cap,
+                                       month_cap=omni_month_cap)
+                if omni.available:
+                    self._omni = omni
+                    self._log("info", f"Qwen3-Omni STT at GWDG ready (timeout {omni_timeout_s:.1f} s, "
+                                      f"caps {omni_day_cap}/day, {omni_month_cap}/month); Parakeet is the fallback.")
+                else:
+                    self._log("warn", "stt_engine omni but GWDG_API_KEY is not set — Parakeet only.")
         else:
             self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         if self._speaker_gate:
@@ -1071,13 +1088,17 @@ class WhisperTranscriber:
         except Exception as exc:
             self._log("error", f"Parakeet transcribe failed: {exc}")
             return ""
+        return self._accept_transcript(text, "parakeet", audio.size / self._sample_rate)
+
+    def _accept_transcript(self, text: str, engine: str, audio_s: float) -> str:
+        """The checks every whole-sentence engine's text passes (Parakeet
+        and Qwen3-Omni alike); '' means the sentence is dropped."""
         # Every drop is logged as well as published (2026-09-24): these
         # three were only on /speech/rejected, so 9 lost sentences in one
         # session left no trace in the voice log.
         if not text:
-            self._log("info", f"Dropping: parakeet returned nothing for "
-                              f"{audio.size / self._sample_rate:.1f}s of audio")
-            self._reject("nothing recognisable (parakeet returned empty)", "")
+            self._log("info", f"Dropping: {engine} returned nothing for {audio_s:.1f}s of audio")
+            self._reject(f"nothing recognisable ({engine} returned empty)", "")
             return ""
         if _NON_LATIN_RE.search(text):
             self._log("info", f"Dropping transcript with non-Latin script: {text!r}")
@@ -1126,6 +1147,10 @@ class WhisperTranscriber:
                 self._reject(f"my own voice (speaker gate cos {score:.2f})", "")
                 return ""
             self._log("info", f"[speaker] human voice (cos {score:.2f}, rms {rms:.3f})")
+        if self._omni is not None:
+            text = self._omni.transcribe(pcm16_buffer, self._sample_rate)
+            if text is not None:
+                return self._accept_transcript(text, "omni", audio.size / self._sample_rate)
         if self._pk is not None:
             return self._transcribe_parakeet(audio)
         try:

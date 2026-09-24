@@ -94,7 +94,11 @@ WHISPER_TURBO = "deepdml/faster-whisper-large-v3-turbo-ct2"
 # equal texts on the trial recordings, German included, no hallucinated
 # "Thank you." on silence. It detects the language per utterance itself,
 # so the EN/DE pins below only matter when stt_engine:=whisper is chosen.
-STT_ENGINE = "parakeet"
+# 2026-09-24: "omni" = Qwen3-Omni at GWDG (grasp 3/3, gripper 2/2, 0.3 s on
+# Majd's voice) with that Parakeet as the per-sentence fallback on timeout,
+# error, rate limit or budget cap (communication_llm/gwdg_omni.py).
+# "parakeet" = local only, nothing leaves the machine.
+STT_ENGINE = "omni"
 VOICE_LANG_ARGS = {
     # AUTO: multilingual model + per-utterance language detection — EN and
     # DE (and others) both just work. EN/DE remain as explicit pins.

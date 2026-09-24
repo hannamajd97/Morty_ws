@@ -395,8 +395,10 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 "stt_engine",
                 default_value="whisper",
-                description="STT backend: 'whisper' (faster-whisper, default, "
-                "much better accuracy, VAD-segmented) or 'vosk' (Kaldi-based, "
+                description="STT backend: 'omni' (Qwen3-Omni at GWDG, Parakeet "
+                "as the per-sentence fallback; needs GWDG_API_KEY), 'parakeet' "
+                "(local, CPU), 'whisper' (faster-whisper, "
+                "VAD-segmented) or 'vosk' (Kaldi-based, "
                 "streaming, lower accuracy). Whisper downloads its model on "
                 "first run; once cached, startup is fast.",
             ),
