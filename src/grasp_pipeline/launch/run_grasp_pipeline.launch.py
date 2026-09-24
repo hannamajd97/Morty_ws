@@ -190,6 +190,10 @@ def generate_launch_description():
                               default_value=os.environ.get("MORTY_OPEN_SET", "true")),
         DeclareLaunchArgument("identity_check_enabled",
                               default_value=os.environ.get("MORTY_OPEN_SET", "true")),
+        # GraspGen checkpoint and its fingertip distance (2026-09-24): the GUI
+        # passes the model its service runs (morty_gui/graspgen_models.py).
+        DeclareLaunchArgument("graspgen_model", default_value=""),
+        DeclareLaunchArgument("graspgen_origin_to_fingertip_m", default_value="0.1034"),
         DeclareLaunchArgument("segmentation_mask_topic", default_value="/yolo/selected_mask"),
         DeclareLaunchArgument("segmentation_overlay_topic", default_value="/yolo/selected_mask_overlay"),
         # Default false for the current single-view experiments (2026-08-06).
@@ -472,6 +476,8 @@ def generate_launch_description():
             {"graspgen_precompute": ParameterValue(LaunchConfiguration("graspgen_precompute"), value_type=bool)},
             {"precompute_stable_s": ParameterValue(LaunchConfiguration("precompute_stable_s"), value_type=float)},
             {"open_set_enabled": ParameterValue(LaunchConfiguration("open_set_enabled"), value_type=bool)},
+            {"graspgen_model": ParameterValue(LaunchConfiguration("graspgen_model"), value_type=str)},
+            {"graspgen_origin_to_fingertip_m": ParameterValue(LaunchConfiguration("graspgen_origin_to_fingertip_m"), value_type=float)},
             {"identity_check_enabled": ParameterValue(LaunchConfiguration("identity_check_enabled"), value_type=bool)},
             {"registration_num_observations": ParameterValue(LaunchConfiguration("registration_num_observations"), value_type=int)},
             {"registration_observation_interval_s": ParameterValue(LaunchConfiguration("registration_observation_interval_s"), value_type=float)},

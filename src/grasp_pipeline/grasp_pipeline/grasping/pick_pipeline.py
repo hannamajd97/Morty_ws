@@ -361,6 +361,17 @@ class PickPipeline:
         # the flag true, the metric values were multiplied by the object's
         # half-size and every grasp collapsed to 2-4 cm from the AABB centre
         # — the 2026-09-11 finding, measured on the service 2026-09-15.)
+        # The service names its gripper (2026-09-24); the fingertip distance
+        # below belongs to the model the GUI said it started.
+        told = str(self._node.get_parameter("graspgen_model").value or "")
+        said = str(resp.get("gripper") or "")
+        if told and said and told != said and getattr(self, "_gripper_warned", None) != (said, told):
+            self._gripper_warned = (said, told)
+            self._node.get_logger().warn(
+                f"[graspgen] the service runs '{said}' but the pipeline was told '{told}' — "
+                f"graspgen_origin_to_fingertip_m "
+                f"{float(self._node.get_parameter('graspgen_origin_to_fingertip_m').value):.4f} m "
+                f"belongs to '{told}'. Switch the model from the GUI (Advanced → GraspGen).")
         if not bool(self._node.get_parameter("graspgen_matrix_normalized").value):
             _shift_grasp_origins(
                 grasps,

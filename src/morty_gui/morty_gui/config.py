@@ -43,7 +43,7 @@ __all__ = [
     "PARAM_SECTIONS",
     "PERCEPTION_PARAMS",
     "PIPELINE_CMD",
-    "GRASPGEN_SERVICE_CMD", "GRASPGEN_LOG", "GRASPGEN_PGREP", "PIPELINE_ENV_EXTRA",
+    "GRASPGEN_LOG", "GRASPGEN_PGREP", "PIPELINE_ENV_EXTRA",
     "NAMING_SERVICE_CMD", "NAMING_LOG", "NAMING_PGREP", "LLAMA_SERVER_BIN", "NAMED_POSE_LOG",
     "PLANNER_LIBS",
     "PROFILE_HELP",
@@ -313,22 +313,8 @@ OFFLINE_LAUNCH = [
 # hand tracker and the camera callbacks share that process's interpreter
 # lock; in a clean process it is 0.10 s. The pipeline talks to it over ZMQ
 # (GRASPGEN_MODE=zmq, grasp_client.py); the GUI starts it with the pipeline.
-GRASPGEN_SERVICE_CMD = [
-    "/usr/bin/python3", "-u", os.path.expanduser("~/morty_ws/GraspGen/scripts/graspgen_service.py"),
-    # Franka Panda checkpoint since 2026-09-11 (Majd): 105 mm opening and
-    # 105 mm depth are far closer to the printed gripper (85 mm / 80 mm)
-    # than the Robotiq 2F-140 (136 mm / 195 mm) the system ran on before;
-    # GraspGen's own FAQ suggests re-targeting to the closest stroke.
-    # Franka Panda checkpoint (Majd, 2026-09-11 17:05): 105 mm opening and
-    # 105 mm depth are far closer to the printed gripper (85 mm / 80 mm
-    # fingers) than the Robotiq 2F-140 (136 mm / 195 mm). Its PTv3 backbone
-    # needs the CUDA build of spconv (spconv-cu121, installed that day; the
-    # CPU wheel failed every request) and compiles its kernels on the first
-    # inference (~50 s) — the service warms up before it reports ready.
-    # Inference 0.30 s against 0.12 s for the Robotiq model.
-    "--config", os.path.expanduser("~/morty_ws/models/graspgen/graspgen_franka_panda.yml"),
-    "--bind", "tcp://127.0.0.1:5555",
-]
+# Which checkpoint it loads — and the switch between them — is
+# graspgen_models.py (2026-09-24).
 GRASPGEN_LOG = os.path.expanduser("~/morty_ws/logs/graspgen_gui.log")
 # Naming service for open-set detection (2026-09-15): Qwen3-VL-8B behind
 # llama.cpp's server, started with the pipeline like the GraspGen service.

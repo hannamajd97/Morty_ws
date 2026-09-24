@@ -132,6 +132,12 @@ def declare_all_parameters(node: "Node") -> None:
     # the pause test is the plan; until then the old behaviour.
     node.declare_parameter("graspgen_matrix_normalized", True)
     node.declare_parameter("graspgen_origin_to_fingertip_m", 0.1034)
+    # The checkpoint the GraspGen service runs (2026-09-24), set by the GUI
+    # at pipeline start and after a model switch, together with the matching
+    # graspgen_origin_to_fingertip_m. Part of the precompute's parameter
+    # hash, so a switch drops the grasps stored from the other model; the
+    # pick warns when the service answers as another gripper.
+    node.declare_parameter("graspgen_model", "")
     node.declare_parameter("graspgen_column_major", False)
     node.declare_parameter("grasp2tcp_rot", "flipY")
     node.declare_parameter("prefer_side_grasps", False)

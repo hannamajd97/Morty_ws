@@ -81,6 +81,14 @@ def main():
 
     print(f"[INFO] Loading GraspGen config: {args.config}")
     sampler = GraspGenSampler(load_grasp_cfg(args.config))
+    # Named in every reply (2026-09-24): the pipeline checks it against the
+    # model the GUI said it started — the grasp origin's distance to the
+    # fingertips differs per gripper (Franka 0.103 m, Robotiq 0.195 m).
+    try:
+        gripper = str(sampler.cfg.data.gripper_name)
+    except Exception:
+        gripper = ""
+    print(f"[INFO] Gripper: {gripper or 'unknown'}")
     # Warm-up (2026-09-11): the PTv3 backbone (Franka checkpoint) compiles
     # its sparse-convolution kernels on the first inference — measured 50 s,
     # then 0.3 s per request. Pay it here, before the socket exists, so the
@@ -235,6 +243,7 @@ def main():
 
                 reply = {
                     "ok": True,
+                    "gripper": gripper,
                     "grasps": payload,
                     "telemetry": {
                         "points": pts_stats,

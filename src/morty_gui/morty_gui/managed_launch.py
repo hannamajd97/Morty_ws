@@ -48,6 +48,14 @@ class ManagedLaunch(QtCore.QObject):
                 self._adopted_pid = None
         return False
 
+    def pid(self) -> Optional[int]:
+        """The running process's pid, own or adopted; None when stopped."""
+        if not self.running():
+            return None
+        if self.proc is not None and self.proc.poll() is None:
+            return self.proc.pid
+        return self._adopted_pid
+
     def adopt(self, pid: int) -> None:
         """Take ownership of a launch started by a previous GUI session,
         so Stop works and Start can't double-launch the stack."""

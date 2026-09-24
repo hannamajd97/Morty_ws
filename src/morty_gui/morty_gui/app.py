@@ -50,6 +50,7 @@ from .ros_bridge import start_bridge
 from .config import *  # noqa: F401,F403 — split 2026-08-25
 from .managed_launch import ManagedLaunch
 from .camera_panel import CameraPanel, CameraWindows
+from .graspgen_models import MODELS as GRASPGEN_MODELS, GraspGenModels, log_ready as graspgen_log_ready
 
 from .motion_window import MotionWindow
 from .experiments_window import ExperimentsWindow
@@ -412,6 +413,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._driver = ManagedLaunch(self)
         self._pipeline = ManagedLaunch(self)
         self._graspgen = ManagedLaunch(self)   # GraspGen service, lives with the pipeline (2026-09-09)
+        # Which checkpoint it runs, and the switch (Advanced → GraspGen, 2026-09-24).
+        self.graspgen_models = GraspGenModels(self._graspgen, QtCore.QSettings("morty", "morty_gui"), self)
+        self._build_graspgen_tab()
         self._exec_holding = False              # executor holds an object and waits for a drop side
         self._driver_restart_pending = False
         self._driver_retries = 0
@@ -1708,6 +1712,68 @@ class OperatorWindow(QtWidgets.QMainWindow):
         dlg.exec_()
 
     # ── Detection tab ─────────────────────────────────────────────────
+    # ── GraspGen model (Advanced → GraspGen, 2026-09-24) ─────────────
+    def _build_graspgen_tab(self) -> None:
+        """Choose the checkpoint; Apply switches the running service only
+        when the chosen one is not loaded, and the status line counts until
+        the new one answers (GraspGenModels owns all of it)."""
+        tab = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(tab)
+        row = QtWidgets.QHBoxLayout()
+        row.addWidget(QtWidgets.QLabel("GraspGen model:"))
+        self.gg_combo = QtWidgets.QComboBox()
+        for m in GRASPGEN_MODELS:
+            self.gg_combo.addItem(m.label, m.key)
+        self.gg_combo.setCurrentIndex(max(0, self.gg_combo.findData(self.graspgen_models.chosen().key)))
+        row.addWidget(self.gg_combo, 1)
+        lay.addLayout(row)
+        self.gg_note = QtWidgets.QLabel("")
+        self.gg_note.setWordWrap(True)
+        self.gg_note.setStyleSheet("font-size:10px;")
+        lay.addWidget(self.gg_note)
+        self.gg_status = QtWidgets.QLabel("")
+        self.gg_status.setWordWrap(True)
+        self.gg_apply_btn = MotionWindow._small_apply_button(
+            "Load the chosen model: the GraspGen service restarts on it — only when it is not the one "
+            "running — and the line to the right counts until it answers.")
+        self.gg_apply_btn.clicked.connect(
+            lambda: self.graspgen_models.apply(self.gg_combo.currentData()))
+        lay.addLayout(MotionWindow._apply_row(self.gg_apply_btn, self.gg_status))
+        note = QtWidgets.QLabel(
+            "Picks that need GraspGen while the model loads fail and can be repeated. Grasps the "
+            "pipeline stored from the other model are dropped once the new one answers. The choice "
+            "is remembered and used when the pipeline next starts.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#888; font-size:10px;")
+        lay.addWidget(note)
+        lay.addStretch(1)
+        self.gg_combo.currentIndexChanged.connect(self._on_gg_combo)
+        self.graspgen_models.status.connect(
+            lambda text, colour: MotionWindow._set_status(self.gg_status, text, colour))
+        self.graspgen_models.switched.connect(self._on_graspgen_switched)
+        self._on_gg_combo()
+        self.adv_tabs.addTab(tab, "GraspGen")
+
+    def _on_gg_combo(self, *_a) -> None:
+        """Also the 5 s refresh: the note of the model in the box, and the
+        state line unless a switch is reporting its own progress."""
+        m = GRASPGEN_MODELS[self.gg_combo.currentIndex()]
+        self.gg_note.setText(m.note)
+        if self.graspgen_models.busy():
+            return
+        if m.key != self.graspgen_models.chosen().key:
+            MotionWindow._set_status(self.gg_status, "changed — press Apply", GREY)
+        else:
+            MotionWindow._set_status(self.gg_status, *self.graspgen_models.describe())
+
+    def _on_graspgen_switched(self, m) -> None:
+        """The new checkpoint answers: tell a running pipeline (the precompute
+        drops the other model's grasps on the parameter change)."""
+        if self._pipeline.running():
+            self.bridge.set_pipeline_params(
+                {"graspgen_model": m.key, "graspgen_origin_to_fingertip_m": float(m.fingertip_m)})
+        self.statusBar().showMessage(f"GraspGen now runs {m.label}.")
+
     def _apply_detection(self) -> None:
         """Apply button of the Detection tab: save, push both switches onto
         the running pipeline, read them back, start/stop the naming service."""
@@ -1793,23 +1859,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
     def _refresh_ready_parts(self) -> None:
         """Every 5 s: the slow checks behind the ready LED."""
         parts = {}
-        parts["graspgen"] = False
-        if self._graspgen.running():
-            # The log is appended across restarts (2026-09-17): look only at
-            # THIS session's part, else a "Service ready" from a previous run
-            # lit the LED orange while the model was still loading
-            # (Majd 2026-09-18: "it still makes orange when it isn't ready").
-            try:
-                with open(GRASPGEN_LOG, "rb") as f:
-                    f.seek(0, 2); size = f.tell()
-                    f.seek(max(0, size - 4 * 1024 * 1024))
-                    data = f.read()
-                cut = data.rfind(b"===== session started")
-                if cut >= 0:
-                    data = data[cut:]
-                parts["graspgen"] = b"Service ready" in data
-            except Exception:
-                parts["graspgen"] = False
+        # Only THIS log session's "Service ready" counts (graspgen_models.log_ready).
+        parts["graspgen"] = self._graspgen.running() and graspgen_log_ready()
+        self._on_gg_combo()
         parts["executor"] = self.bridge.executor_alive()
         if self.cb_open_set.isChecked():
             try:
@@ -2103,8 +2155,11 @@ class OperatorWindow(QtWidgets.QMainWindow):
             if pid is not None:
                 self._graspgen.adopt(pid)
             else:
-                self._graspgen.start(list(GRASPGEN_SERVICE_CMD), env=os.environ.copy(),
-                                     log_path=GRASPGEN_LOG)
+                self.graspgen_models.start()
+        # The pipeline is told which checkpoint answers it (2026-09-24).
+        _gg = self.graspgen_models.serving()
+        cmd.append(f"graspgen_model:={_gg.key}")
+        cmd.append(f"graspgen_origin_to_fingertip_m:={_gg.fingertip_m}")
         # Naming service for unknown objects (2026-09-15), only when the
         # Detection tab asks for it: it holds ~5 GB of the card.
         if self.cb_open_set.isChecked():
