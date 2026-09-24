@@ -356,6 +356,20 @@ class SpeechInputNode(Node):
         """
         pending = []
         for p in params:
+            if p.name == "stt_engine":
+                # Live switch omni <-> parakeet (GUI "hear" selector,
+                # 2026-09-24). Applied FIRST below: set_engine raises before
+                # changing anything (no key, engine not loaded), so a
+                # rejected switch leaves the listener and rclpy's stored
+                # value as they were and the GUI's read-back tells the truth.
+                if str(p.value) not in ("omni", "parakeet"):
+                    return SetParametersResult(
+                        successful=False,
+                        reason=f"stt_engine can switch live only to omni or parakeet, got {p.value!r}")
+                if not callable(getattr(getattr(self, "_stt", None), "set_engine", None)):
+                    return SetParametersResult(successful=False, reason="speech listener not built yet")
+                pending.insert(0, (p.name, str(p.value)))
+                continue
             limits = self._LIVE_PARAM_LIMITS.get(p.name)
             if limits is None:
                 continue
@@ -398,6 +412,11 @@ class SpeechInputNode(Node):
         the parameter is still stored by rclpy and honoured at the next
         construction — we just say so in the log instead of crashing.
         """
+        if name == "stt_engine":
+            old = self._stt._engine
+            self._stt.set_engine(value)          # ValueError -> the caller rejects the request
+            self.get_logger().info(f"[stt] engine {old} -> {value} (live)")
+            return
         if name == "min_chars":
             old = self._min_chars
             self._min_chars = int(value)

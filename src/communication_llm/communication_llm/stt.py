@@ -585,7 +585,8 @@ class WhisperTranscriber:
         # length and cost 5–9 s per utterance in the first benchmark.
         self._pk = None
         self._model = None
-        self._omni = None
+        self._omni = None            # the client in use, None = Parakeet alone
+        self._omni_client = None     # kept once built: its pause and budget state survive a switch
         self._engine = str(engine or "whisper").lower()
         if self._engine in ("parakeet", "omni"):
             import onnx_asr
@@ -632,17 +633,16 @@ class WhisperTranscriber:
             self._log("info", f"Parakeet STT ready ({parakeet_model}, {pk_desc}).")
             # "omni" (2026-09-24): Qwen3-Omni at GWDG first, Parakeet above
             # for every sentence it cannot answer — see gwdg_omni.py.
-            if self._engine == "omni":
-                from .gwdg_omni import OmniTranscriber
-                omni = OmniTranscriber(os.environ.get("GWDG_API_KEY", ""), self._log,
-                                       timeout_s=omni_timeout_s, day_cap=omni_day_cap,
-                                       month_cap=omni_month_cap)
-                if omni.available:
-                    self._omni = omni
-                    self._log("info", f"Qwen3-Omni STT at GWDG ready (timeout {omni_timeout_s:.1f} s, "
-                                      f"caps {omni_day_cap}/day, {omni_month_cap}/month); Parakeet is the fallback.")
-                else:
-                    self._log("warn", "stt_engine omni but GWDG_API_KEY is not set — Parakeet only.")
+            # Parakeet is loaded either way, so set_engine() switches the
+            # two live (GUI "hear" selector) without a voice restart.
+            self._omni_kw = dict(timeout_s=omni_timeout_s, day_cap=omni_day_cap,
+                                 month_cap=omni_month_cap)
+            self._engine = "parakeet"
+            if str(engine).lower() == "omni":
+                try:
+                    self.set_engine("omni")
+                except ValueError as exc:
+                    self._log("warn", f"stt_engine omni unavailable ({exc}) — Parakeet only.")
         else:
             self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         if self._speaker_gate:
@@ -1072,6 +1072,31 @@ class WhisperTranscriber:
                 "for your hardware.)",
             )
 
+    def set_engine(self, name: str) -> str:
+        """Live switch between "omni" (Qwen3-Omni at GWDG, Parakeet as the
+        per-sentence fallback) and "parakeet" (local only, nothing leaves
+        the machine). Takes effect on the next sentence; the worker reads
+        self._omni once per sentence. Returns the engine now in use."""
+        name = str(name).strip().lower()
+        if self._pk is None or name not in ("omni", "parakeet"):
+            raise ValueError(f"can switch only between omni and parakeet while Parakeet is loaded, not to {name!r}")
+        if name == "omni":
+            if self._omni_client is None:
+                from .gwdg_omni import OmniTranscriber
+                client = OmniTranscriber(os.environ.get("GWDG_API_KEY", ""), self._log, **self._omni_kw)
+                if not client.available:
+                    raise ValueError("GWDG_API_KEY is not set in the voice environment")
+                self._omni_client = client
+            self._omni = self._omni_client
+            kw = self._omni_kw
+            self._log("info", f"Qwen3-Omni STT at GWDG in use (timeout {kw['timeout_s']:.1f} s, caps "
+                              f"{kw['day_cap']}/day, {kw['month_cap']}/month); Parakeet is the fallback.")
+        else:
+            self._omni = None
+            self._log("info", "Parakeet STT in use (local only).")
+        self._engine = name
+        return name
+
     @staticmethod
     def _post_correct(text: str) -> str:
         """Mishearings that are certain in this room: there is no grass on
@@ -1147,8 +1172,9 @@ class WhisperTranscriber:
                 self._reject(f"my own voice (speaker gate cos {score:.2f})", "")
                 return ""
             self._log("info", f"[speaker] human voice (cos {score:.2f}, rms {rms:.3f})")
-        if self._omni is not None:
-            text = self._omni.transcribe(pcm16_buffer, self._sample_rate)
+        omni = self._omni            # one read: a live switch lands between sentences
+        if omni is not None:
+            text = omni.transcribe(pcm16_buffer, self._sample_rate)
             if text is not None:
                 return self._accept_transcript(text, "omni", audio.size / self._sample_rate)
         if self._pk is not None:

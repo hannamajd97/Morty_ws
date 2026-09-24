@@ -504,6 +504,22 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._refresh_devices()
         self._update_model_label()
         sys_lay.addWidget(self.voice_combo)
+        # Hearing engine (Majd 2026-09-24: "somewhere I can switch between
+        # them"). Parakeet is loaded in both modes, so a switch applies to
+        # the running speech node on the next sentence — no voice restart —
+        # and is remembered for the next Start voice.
+        self.stt_combo = QtWidgets.QComboBox()
+        self.stt_combo.addItem("hear: Omni (cloud)", "omni")
+        self.stt_combo.addItem("hear: Parakeet (local)", "parakeet")
+        self.stt_combo.setToolTip(
+            "Speech-to-text engine, switched live.\n"
+            "Omni: Qwen3-Omni at GWDG — best on 'grasp'/'gripper', ~0.3–0.6 s; every sentence is sent to "
+            "GWDG (quota 3000/month); Parakeet takes over automatically on a timeout or error.\n"
+            "Parakeet: local on the CPU, ~0.4–0.9 s, nothing leaves the machine.")
+        _stt_saved = QtCore.QSettings("morty", "morty_gui").value("stt_engine", STT_ENGINE, type=str)
+        self.stt_combo.setCurrentIndex(max(0, self.stt_combo.findData(_stt_saved)))
+        self.stt_combo.currentIndexChanged.connect(self._on_stt_engine_changed)
+        sys_lay.addWidget(self.stt_combo)
         sys_lay.addStretch(1)
         # Health LEDs. driver=/joint_states, realsense=camera_info topic,
         # astra=shuttle relay frames, rviz=rviz2 process, robot=real UR
@@ -1031,6 +1047,28 @@ class OperatorWindow(QtWidgets.QMainWindow):
             self._show_vf_apply("mismatch", detail)
             self.statusBar().showMessage(
                 f"⚠ voice filters sent, but node reports {detail}")
+
+    def _on_stt_engine_changed(self, _index: int) -> None:
+        """"hear" selector: remember the engine, and when voice runs switch
+        the live speech node, then READ BACK what it uses (same honesty
+        rule as the Voice-filters Apply: only the node's answer counts)."""
+        want = str(self.stt_combo.currentData())
+        QtCore.QSettings("morty", "morty_gui").setValue("stt_engine", want)
+        if not self._voice.running():
+            self.statusBar().showMessage(f"Hearing engine {want} — used at the next Start voice.")
+            return
+        if not self.bridge.set_voice_filters({"stt_engine": want}):
+            self.statusBar().showMessage(
+                f"⚠ speech node unreachable — {want} will be used at the next Start voice.")
+            return
+        time.sleep(0.1)
+        got = self.bridge.get_stt_engine()
+        if got == want:
+            self.statusBar().showMessage(f"Hearing engine now {want} on the running speech node (next sentence).")
+        else:
+            self.statusBar().showMessage(
+                f"⚠ speech node still reports {got or 'nothing'} (asked for {want}) — see logs/voice_gui.log "
+                "('[stt] engine' / 'omni unavailable'); a voice restart uses the selector.")
 
     def _executor_cmd(self) -> list:
         """EXECUTOR_CMD with the Motion tab's pick speeds as launch overrides."""
@@ -2322,8 +2360,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # No knobs (Majd): AUTO language, default model from .morty_env.
         lang = "AUTO"
         model = ""
-        cmd = list(VOICE_BASE[provider]) + VOICE_COMMON_ARGS + VOICE_LANG_ARGS[lang]
+        cmd = list(VOICE_BASE[provider]) + VOICE_COMMON_ARGS + [
+            a for a in VOICE_LANG_ARGS[lang] if not a.startswith("stt_engine:=")]
         cmd += [
+            f"stt_engine:={self.stt_combo.currentData()}",
             f"whisper_min_rms:={self.vf_min_rms.value():.3f}",
             f"whisper_silence_ms:={self.vf_silence.value()}",
             f"whisper_max_utterance_s:={self.vf_max_utt.value():.1f}",

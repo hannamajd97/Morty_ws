@@ -57,6 +57,7 @@ __all__ = [
     "VOICE_COMMON_ARGS",
     "VOICE_FILTER_PARAMS",
     "VOICE_LANG_ARGS",
+    "STT_ENGINE",
     "WHISPER_TURBO",
     "_pactl_default",
     "_pactl_devices",

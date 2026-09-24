@@ -1291,6 +1291,11 @@ class MortyGuiBridge(Node):
             self._speech_get_cli, self.VOICE_FILTER_PARAMS, "Speech input"
         )
 
+    def get_stt_engine(self) -> Optional[str]:
+        """Read-back of the engine the live speech node uses (omni / parakeet)."""
+        got = self._get_params_sync(self._speech_get_cli, ["stt_engine"], "Speech input")
+        return None if not got or got.get("stt_engine") is None else str(got["stt_engine"])
+
     def stop_motion(self) -> None:
         self._pub_traj_event.publish(String(data="stop"))
         # Fast replay bypasses MoveIt, so trajectory_execution_event alone
