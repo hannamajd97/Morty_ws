@@ -132,9 +132,9 @@ class MortyGuiBridge(Node):
         # the VLA episode recorder — separate LEDs since 2026-09-03 (Majd:
         # "which camera is alive?" was unanswerable with one LED).
         self._astra_t = 0.0
-        # Astra VIEW (2026-09-08): decode the relayed JPEG only while the
-        # GUI's picture panel is switched to it.
-        self._astra_view = False
+        # Astra VIEW (2026-09-08): decode the relayed JPEG only while a view
+        # shows it — the picture panel, or a camera window (2026-09-24).
+        self._astra_viewers: set = set()   # who shows the Astra ("main", "windows") — decode only then
         self.astra_bgr: Optional[np.ndarray] = None
         self.astra_dirty = False
         self._vla_status: Optional[Dict[str, Any]] = None
@@ -508,7 +508,7 @@ class MortyGuiBridge(Node):
     def _on_astra(self, msg) -> None:
         self._astra_t = time.monotonic()
         # CompressedImage (has .format); the CameraInfo feed shares this callback.
-        if self._astra_view and hasattr(msg, "format"):
+        if self._astra_viewers and hasattr(msg, "format"):
             try:
                 img = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
             except Exception:
@@ -518,8 +518,16 @@ class MortyGuiBridge(Node):
                     self.astra_bgr = img
                     self.astra_dirty = True
 
+    def want_astra(self, who: str, on: bool) -> None:
+        """The JPEG is decoded only while some view shows the Astra (the main
+        panel and/or camera windows, 2026-09-24)."""
+        if on:
+            self._astra_viewers.add(who)
+        else:
+            self._astra_viewers.discard(who)
+
     def set_astra_view(self, on: bool) -> None:
-        self._astra_view = bool(on)
+        self.want_astra("main", on)
 
     def _on_vla_status(self, msg: String) -> None:
         try:
@@ -1496,11 +1504,14 @@ class MortyGuiBridge(Node):
         out: Dict[str, Any] = {}
         with self._lock:
             if self.image_dirty:
+                # Cleared here (2026-09-24): the clear sat in the Astra branch,
+                # so the same RealSense frame was redrawn every poll unless an
+                # Astra frame came in. (MMHRI paces its video on its own clock.)
                 out["image"] = self.image_bgr
+                self.image_dirty = False
             if self.astra_dirty:
                 self.astra_dirty = False
                 out["astra_image"] = self.astra_bgr
-                self.image_dirty = False
             if self.cloud_dirty:
                 out["cloud"] = (self.cloud_pts, self.cloud_cols)
                 self.cloud_dirty = False
