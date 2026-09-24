@@ -553,25 +553,44 @@ class MoveToNamedPoseServer(Node):
     # ── YAML loading ────────────────────────────────────────────────────
 
     def _file_via_poses(self, target: str) -> list:
-        """Detour for current -> target from the file: leaving a pose that
+        """Route for current -> target from the file: leaving a pose that
         has a via list means passing its vias in reverse; arriving at one
         means passing them forward. The pose we are AT is the nearest
-        listed pose within 0.35 rad (L2 over the six joints)."""
+        listed pose within 0.35 rad (L2 over the six joints).
+
+        The via list is the ONLY way into and out of its pose (2026-09-24,
+        Majd: "always go through home, then the via, then the drop"):
+        vla_drop_right declares [home, vla_via_right], so the way in is
+        home -> vla_via_right -> vla_drop_right from anywhere, and the way
+        out is vla_via_right -> home. Vias the arm is already standing on
+        (within 0.05 rad) are skipped from the front — from home the path
+        starts at the via, without a standstill at home — and a move to
+        the pose the arm is at gets no vias at all."""
         vias = getattr(self, "_pose_via", {}) or {}
         if not vias:
             return []
+
+        def _dist(a, b) -> float:
+            return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+
         out: list = []
         cur = self._current_joint_positions()
         if cur is not None and len(cur) == len(self._joint_names):
             best, best_d = "", 1e9
             for name, pos in self._poses.items():
-                d = sum((a - b) ** 2 for a, b in zip(cur, pos)) ** 0.5
+                d = _dist(cur, pos)
                 if d < best_d:
                     best, best_d = name, d
+            if best == target and best_d < 0.05:
+                return []
             if best and best != target and best_d < 0.35:
                 out.extend(reversed(vias.get(best, [])))
         out.extend(v for v in vias.get(target, []) if v not in out)
-        return [v for v in out if v in self._poses and v != target]
+        out = [v for v in out if v in self._poses and v != target]
+        if cur is not None and len(cur) == len(self._joint_names):
+            while out and _dist(cur, self._poses[out[0]]) < 0.05:
+                out.pop(0)
+        return out
 
     def _load_poses(self, path: str) -> None:
         if not os.path.exists(path):
@@ -1025,14 +1044,17 @@ class MoveToNamedPoseServer(Node):
             direct_carry = False
             if via_poses == ["home"] and (getattr(self, "_pose_via", {}) or {}).get(pose_name):
                 # The executor's generic detour (lift -> home -> drop). A
-                # pose that declares its own via in the file knows better
-                # (2026-09-23, Majd: "no need to go all the way home"):
-                # lift -> vla_via_right -> vla_drop_right, one spline. If
-                # that path fails the pre-check, the home detour is tried.
-                via_poses = list(self._pose_via[pose_name])
-                fallback_vias = ["home"]
+                # pose that declares its own route in the file gets exactly
+                # that route — for vla_drop_right: lift -> home ->
+                # vla_via_right -> vla_drop_right, one spline — and NO
+                # fallback (2026-09-24). The old fallback (lift -> home ->
+                # drop, skipping the via) is the path that hit the table
+                # whenever the via path failed the pre-check; if the file's
+                # route is refused now, the move is refused.
+                via_poses = self._file_via_poses(pose_name)
+                fallback_vias = []
                 self.get_logger().info(
-                    f"'home' detour replaced by the file's via {via_poses} for {pose_name!r}")
+                    f"'home' detour replaced by the file's route {via_poses} for {pose_name!r}")
             elif via_poses == ["home"] and pose_name in getattr(self, "_pose_direct", set()):
                 # direct_carry: true in the file — straight from the lifted
                 # grasp to the drop, allowed ONLY when the pre-check along
@@ -1384,6 +1406,9 @@ class MoveToNamedPoseServer(Node):
                         f"path {path_desc} refused ({reason}) — taking the detour via {fallback_vias} instead")
                     return self._execute_blended(
                         goal_handle, pose_name, list(fallback_vias), segment_duration_s, speed_label, None)
+                if pose_name in (getattr(self, "_pose_via", {}) or {}):
+                    return self._fail(goal_handle, f"refusing: {reason} — {path_desc} is the only route "
+                                                   f"into {pose_name!r} (observation_poses.yaml via), no detour taken")
                 return self._fail(goal_handle, f"refusing: {reason}")
             self.get_logger().info(
                 f"Collision pre-check passed for blended path {path_desc} "

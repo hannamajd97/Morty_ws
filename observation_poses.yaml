@@ -97,6 +97,7 @@ poses:
     captured_at: 1790171042.9817815
     source: 'live joints 2026-09-23 (Majd: ''save new position as vla_drop_right'')'
     via:
+    - home
     - vla_via_right
   vla_drop_left:
     positions:
