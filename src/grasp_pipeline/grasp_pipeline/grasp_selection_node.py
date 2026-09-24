@@ -596,6 +596,12 @@ class YoloLiveSelectGrasp(Node):
             use_tasks_api=bool(self.get_parameter("mediapipe_use_tasks_api").value),
             model_path=str(self.get_parameter("mediapipe_model_path").value),
             depth_provider=lambda: self.fb.paired(),   # colour + depth of the same moment (2026-09-24)
+            decision=str(self.get_parameter("pointing_decision").value),
+            vote_tau_s=float(self.get_parameter("pointing_vote_tau_s").value),
+            vote_commit_s=float(self.get_parameter("pointing_vote_commit_s").value),
+            vote_margin=float(self.get_parameter("pointing_vote_margin").value),
+            sigma_deg=float(self.get_parameter("pointing_sigma_deg").value),
+            ray_source=str(self.get_parameter("pointing_ray_source").value),
             logger=self.get_logger(),
             on_pointer=lambda px: setattr(self, "_pointer_px", px),
             on_hand=_on_hand,
@@ -618,6 +624,7 @@ class YoloLiveSelectGrasp(Node):
         self.get_logger().info(
             f"Selection input: mediapipe_enabled={self.point_or_voice.use_mediapipe}, "
             f"pointing_mode={self.point_or_voice.pointing_mode}, "
+            f"pointing_decision={self.point_or_voice.decision}, ray_source={self.point_or_voice.ray_source}, "
             f"require_selection={bool(self.get_parameter('require_selection').value)}, "
             f"attempt_timeout_s={float(self.get_parameter('selection_attempt_timeout_s').value):.1f}, "
             f"manual_wait_s={float(self.get_parameter('selection_manual_wait_s').value):.1f}"

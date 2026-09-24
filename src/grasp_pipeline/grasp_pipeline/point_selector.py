@@ -26,16 +26,27 @@ Two geometries, one switch (``pointing_mode``):
 ``3d`` falls back to ``2d`` for any frame in which the fingertip has no valid
 depth (a hole on a thin finger is common), so it can never do worse than
 ``2d`` did. What both share — and what makes pointing safe for a real arm —
-is the DWELL commit (hold the same object for min_hold_ms with the pointer
-steady) and the hover feedback (on_hover / on_pointer / on_hand drive the GUI
-overlay and tell the chat node what is being pointed at). Feedback was the
-statistically significant factor in the 2026 study, so it stays.
+is that nothing is picked on one frame, and the hover feedback (on_hover /
+on_pointer / on_hand drive the GUI overlay and tell the chat node what is
+being pointed at). Feedback was the statistically significant factor in the
+2026 study, so it stays.
+
+The commit (``decision``, 2026-09-24): ``vote`` — every frame spreads its
+evidence over the objects (3d: a Gaussian in the angle off the ray; 2d: the
+pointed box at half weight), evidence fades with ``vote_tau_s``, and an
+object is chosen once it holds ``vote_commit_s`` seconds of evidence and
+``vote_margin`` times the runner-up. ``dwell`` — the old rule, the same
+object for min_hold_ms with the pointer within steady_px; with the live
+steady_px of 10 px the noisy 3-D pointer restarted the hold again and
+again (pointing sessions of 25-35 s). ``begin()`` + ``step(t, frame, dets)``
+are the whole decision, so the offline benchmark (pointing_bench.py)
+replays recordings through exactly this code.
 
 Hand tracking: MediaPipe's Tasks HandLandmarker in VIDEO mode when the model
 file is present (it tracks between frames and re-runs the palm detector only
 when the hand is lost), else the legacy mp.solutions.hands. Measured on this
 laptop's CPU, 640×480 (2026-09-03): 16.7 vs 17.5 ms per frame; the whole 3D
-part adds ~1.4 ms — the method is not what you wait for, the dwell is.
+part adds ~1.4 ms — the method is not what you wait for, the commit rule is.
 
 History: this used to also host a Vosk voice path; voice selection now lives
 in communication_llm and reaches the pipeline via ROS params and
@@ -97,6 +108,7 @@ def _bbox_edge_dist2(p: Tuple[float, float], b: Sequence[float]) -> float:
 # ── hand-tracking backends (same contract: normalised 21 points or None) ──
 class _LegacyHands:
     name = "legacy mp.solutions.hands"
+    world: Optional[List[Tuple[float, float, float]]] = None   # metric 3-D hand of the last frame
 
     def __init__(self, det_conf: float, trk_conf: float) -> None:
         sol = mp.solutions.hands if hasattr(mp, "solutions") else None
@@ -110,7 +122,10 @@ class _LegacyHands:
     def landmarks(self, rgb) -> Optional[List[Tuple[float, float]]]:
         res = self._hands.process(rgb)
         if not res.multi_hand_landmarks:
+            self.world = None
             return None
+        w = getattr(res, "multi_hand_world_landmarks", None)
+        self.world = [(p.x, p.y, p.z) for p in w[0].landmark] if w else None
         return [(p.x, p.y) for p in res.multi_hand_landmarks[0].landmark]
 
     def close(self) -> None:
@@ -119,6 +134,7 @@ class _LegacyHands:
 
 class _TasksHands:
     name = "Tasks HandLandmarker (VIDEO)"
+    world: Optional[List[Tuple[float, float, float]]] = None   # metric 3-D hand of the last frame
 
     def __init__(self, model_path: str, det_conf: float, trk_conf: float) -> None:
         from mediapipe.tasks import python as tp
@@ -141,11 +157,90 @@ class _TasksHands:
         self._last_ts = ts
         res = self._lm.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb), ts)
         if not res.hand_landmarks:
+            self.world = None
             return None
+        w = getattr(res, "hand_world_landmarks", None)
+        self.world = [(p.x, p.y, p.z) for p in w[0]] if w else None
         return [(p.x, p.y) for p in res.hand_landmarks[0]]
 
     def close(self) -> None:
         self._lm.close()
+
+
+PALM = (0, 5, 9, 13, 17)          # wrist + the four knuckles: a large, depth-friendly surface
+
+
+class _DwellDecision:
+    """The rule before 2026-09-24: the same object hovered for min_hold_ms
+    with the pointer within steady_px. A noisy 3-D ray moves the pointer
+    more than steady_px (10 px live), which restarted the hold again and
+    again — pointing sessions of 25-35 s in the 09-2x logs."""
+    name = "dwell"
+
+    def __init__(self, min_hold_ms: int, steady_px: float) -> None:
+        self.min_hold_s = float(min_hold_ms) / 1000.0
+        self.steady2 = float(steady_px) ** 2
+        self.idx = self.t_hold = self.px = None
+
+    def leader(self) -> Optional[int]:
+        return self.idx
+
+    def update(self, t: float, hover: Optional[int], evidence: Dict[int, float],
+               px: Optional[Tuple[float, float]]) -> Optional[int]:
+        if px is None:                       # hand lost: the hold is kept (old behaviour)
+            return None
+        if hover is None:
+            self.idx = self.t_hold = self.px = None
+            return None
+        if hover != self.idx:
+            self.idx, self.t_hold, self.px = hover, t, px
+            return None
+        if self.px is not None and _dist2(px, self.px) > self.steady2:
+            self.t_hold, self.px = t, px
+        if self.t_hold is not None and t - self.t_hold >= self.min_hold_s:
+            return hover
+        return None
+
+
+class _VoteDecision:
+    """Evidence voting (2026-09-24, Majd: "whatever the object is, it should
+    get it correctly"). Every frame spreads its evidence over the objects
+    (3-D: by how far each lies off the finger ray; 2-D: the pointed box), in
+    SECONDS of evidence so the frame rate does not matter; old evidence fades
+    with time constant tau_s. An object is chosen once it holds commit_s of
+    evidence AND margin times more than the runner-up — a noisy frame, a
+    dropped frame or a jittering pointer no longer restarts anything, and two
+    close candidates simply keep collecting until one clearly leads."""
+    name = "vote"
+
+    def __init__(self, tau_s: float, commit_s: float, margin: float) -> None:
+        self.tau = max(0.05, float(tau_s))
+        self.commit = float(commit_s)
+        self.margin = max(1.0, float(margin))
+        self.score: Dict[int, float] = {}
+        self.t_last: Optional[float] = None
+
+    def leader(self) -> Optional[int]:
+        return max(self.score, key=self.score.get) if self.score else None
+
+    def update(self, t: float, hover: Optional[int], evidence: Dict[int, float],
+               px: Optional[Tuple[float, float]]) -> Optional[int]:
+        dt = 0.05 if self.t_last is None else min(0.2, max(0.0, t - self.t_last))
+        self.t_last = t
+        keep = math.exp(-dt / self.tau)
+        for k in list(self.score):
+            self.score[k] *= keep
+            if self.score[k] < 1e-4:
+                del self.score[k]
+        for k, w in evidence.items():
+            self.score[k] = self.score.get(k, 0.0) + float(w) * dt
+        if not self.score:
+            return None
+        ranked = sorted(self.score.values(), reverse=True)
+        best, second = ranked[0], (ranked[1] if len(ranked) > 1 else 0.0)
+        if best >= self.commit and best >= self.margin * second:
+            return self.leader()
+        return None
 
 
 class PointOrVoiceSelector:
@@ -174,7 +269,14 @@ class PointOrVoiceSelector:
                  hysteresis: float = 0.8,
                  use_tasks_api: bool = True,
                  model_path: str = "",
-                 depth_provider: Optional[Callable[[], Any]] = None) -> None:
+                 depth_provider: Optional[Callable[[], Any]] = None,
+                 # 2026-09-24 — evidence voting and the model-based ray
+                 decision: str = "vote",
+                 vote_tau_s: float = 0.8,
+                 vote_commit_s: float = 0.45,
+                 vote_margin: float = 2.0,
+                 sigma_deg: float = 7.0,
+                 ray_source: str = "depth") -> None:
         self.vosk = None  # intentionally ignored in the new architecture
         self.min_hold_ms = int(min_hold_ms)
         self.steady_px = float(steady_px)
@@ -192,6 +294,17 @@ class PointOrVoiceSelector:
         # — the frame buffer's latest(); depth is uint16 (÷ depth_scale → m)
         # or float32 metres. Without it, 3d silently behaves as 2d.
         self.depth_provider = depth_provider
+        # "vote" (default since 2026-09-24) or "dwell" (the old rule) — see the
+        # two decision classes; sigma = the finger ray's angular noise used to
+        # spread each frame's evidence. ray_source "depth" = fit through the
+        # finger's four depth samples; "model" = MediaPipe's metric 3-D hand
+        # for the direction and the PALM's depth for the position (no depth
+        # read on the thin finger) — off until a recording proves it better.
+        self.decision = "dwell" if str(decision).lower() == "dwell" else "vote"
+        self.vote_tau_s, self.vote_commit_s = float(vote_tau_s), float(vote_commit_s)
+        self.vote_margin, self.sigma = float(vote_margin), math.radians(float(sigma_deg))
+        self.ray_source = "model" if str(ray_source).lower() == "model" else "depth"
+        self._decision = None
 
         self.tracker = None
         if bool(use_mediapipe) and mp is not None:
@@ -330,14 +443,33 @@ class PointOrVoiceSelector:
         return (float(fx * p[0] / p[2] + cx), float(fy * p[1] / p[2] + cy))
 
     def _ray_3d(self, lm: List[Tuple[float, float]], depth_m: np.ndarray, K) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        """Finger ray in camera coordinates: origin = fingertip, direction =
-        the least-squares line through the index finger's four joints
-        (MCP, PIP, DIP, tip), oriented knuckle → tip. Four samples instead
-        of two make one bad depth survivable; the MCP→tip length must be a
-        finger's (4–13 cm) — anything longer means a depth bled into the
-        background, and that frame falls back to 2d rather than aiming
-        the ray into the table. None also when the finger is foreshortened
-        below 2 cm (pointing straight at the lens)."""
+        """Finger ray in camera coordinates, smoothed over frames: origin =
+        fingertip, unit direction knuckle → tip. ray_source picks how it is
+        measured (see _ray_3d_depth / _ray_3d_model)."""
+        raw = (self._ray_3d_model(lm, depth_m, K) if self.ray_source == "model"
+               else self._ray_3d_depth(lm, depth_m, K))
+        if raw is None:
+            return None
+        tip, d = raw
+        if self._ray is None:
+            self._ray = (tip, d)
+        else:
+            o0, d0 = self._ray
+            o = (1.0 - self._ray_alpha) * o0 + self._ray_alpha * tip
+            dd = (1.0 - self._ray_alpha) * d0 + self._ray_alpha * d
+            nn = float(np.linalg.norm(dd))
+            self._ray = (o, dd / nn if nn > 1e-9 else d)
+        return self._ray
+
+    def _ray_3d_depth(self, lm: List[Tuple[float, float]], depth_m: np.ndarray, K) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Direction = the least-squares line through the index finger's four
+        joints (MCP, PIP, DIP, tip) deprojected with their depth, oriented
+        knuckle → tip. Four samples instead of two make one bad depth
+        survivable; the MCP→tip length must be a finger's (4–13 cm) —
+        anything longer means a depth bled into the background, and that
+        frame falls back to 2d rather than aiming the ray into the table.
+        None also when the finger is foreshortened below 2 cm (pointing
+        straight at the lens)."""
         pts = []
         for i in INDEX_CHAIN:
             u, v = lm[i]
@@ -360,16 +492,39 @@ class PointOrVoiceSelector:
         n = float(np.linalg.norm(d))
         if n < 1e-9 or span < 0.02:
             return None
-        d /= n
-        if self._ray is None:
-            self._ray = (tip, d)
-        else:
-            o0, d0 = self._ray
-            o = (1.0 - self._ray_alpha) * o0 + self._ray_alpha * tip
-            dd = (1.0 - self._ray_alpha) * d0 + self._ray_alpha * d
-            nn = float(np.linalg.norm(dd))
-            self._ray = (o, dd / nn if nn > 1e-9 else d)
-        return self._ray
+        return tip, d / n
+
+    def _ray_3d_model(self, lm: List[Tuple[float, float]], depth_m: np.ndarray, K) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Direction from MediaPipe's metric 3-D hand (world landmarks, camera-
+        aligned axes, origin at the hand centre): the line through the index
+        joints — the network's estimate, no depth pixel on the thin finger.
+        Position from depth where it is reliable: the PALM (wrist + four
+        knuckles, a large surface); the tip = palm centre + the model's
+        palm→tip offset. Falls back to the depth fit when the model or the
+        palm depth is missing."""
+        W = getattr(self.tracker, "world", None) if self.tracker is not None else None
+        if not W or len(W) < 21:
+            return self._ray_3d_depth(lm, depth_m, K)
+        Wa = np.asarray(W, dtype=np.float64)
+        cam, wld = [], []
+        for i in PALM:
+            z = self._depth_at(depth_m, *lm[i], r=5)
+            if z is not None:
+                cam.append(self._deproject(lm[i][0], lm[i][1], z, K))
+                wld.append(Wa[i])
+        if len(cam) < 3:
+            return self._ray_3d_depth(lm, depth_m, K)
+        tip = np.mean(cam, axis=0) + (Wa[INDEX_TIP] - np.mean(wld, axis=0))
+        F = Wa[list(INDEX_CHAIN)]
+        span = float(np.linalg.norm(F[-1] - F[0]))
+        if not (FINGER_LEN_M[0] <= span <= FINGER_LEN_M[1]):
+            return None
+        c = F.mean(axis=0)
+        d = np.linalg.svd(F - c, full_matrices=False)[2][0]
+        if np.dot(d, F[-1] - F[0]) < 0:
+            d = -d
+        n = float(np.linalg.norm(d))
+        return (tip, d / n) if n > 1e-9 else None
 
     def _centres_3d(self, dets: List[Dict[str, Any]], depth_m: np.ndarray, K) -> List[Optional[np.ndarray]]:
         """Each detection's 3D centre: the box centre pixel at the median
@@ -413,7 +568,30 @@ class PointOrVoiceSelector:
         return best_i
 
     # ── one frame → (hover index, overlay pixel, mode used) ──────────
-    def _evaluate(self, bgr, dets: List[Dict[str, Any]]) -> Tuple[Optional[int], Optional[Tuple[float, float]], str]:
+    def _ray_evidence(self, origin: np.ndarray, direction: np.ndarray,
+                      centres: List[Optional[np.ndarray]]) -> Dict[int, float]:
+        """How this frame's ray splits its evidence over the objects: a
+        Gaussian in the angle off the ray (sigma = the ray's angular noise),
+        inside the cone only, normalised to 1 — a clear aim gives its target
+        almost all of it, an aim between two neighbours splits it."""
+        lik: Dict[int, float] = {}
+        for i, c in enumerate(centres):
+            if c is None:
+                continue
+            v = c - origin
+            dist = float(np.linalg.norm(v))
+            if dist < 0.05:
+                continue
+            cos = float(np.clip(np.dot(direction, v / dist), -1.0, 1.0))
+            if cos < self.cone_cos:
+                continue
+            lik[i] = math.exp(-0.5 * (math.acos(cos) / self.sigma) ** 2)
+        tot = sum(lik.values())
+        return {i: w / tot for i, w in lik.items()} if tot > 1e-9 else {}
+
+    def _evaluate(self, bgr, dets: List[Dict[str, Any]]
+                  ) -> Tuple[Optional[int], Optional[Tuple[float, float]], str, Dict[int, float]]:
+        """One frame → (hover index, overlay pixel, mode, evidence per object)."""
         # 3d: find the finger in the colour frame that BELONGS to the depth
         # frame (FrameBuffer.paired, 2026-09-24) — the newest colour frame
         # and the newest depth frame were up to ~0.2 s apart while the hand
@@ -429,7 +607,7 @@ class PointOrVoiceSelector:
         lm = self._landmarks_px(bgr)
         if lm is None:
             self._emit(self.on_pointer, None)
-            return None, None, "none"
+            return None, None, "none", {}
         self._n_frames += 1
         if self.pointing_mode == "3d" and sample is not None:
             dm = self._depth_frame(sample)
@@ -440,10 +618,13 @@ class PointOrVoiceSelector:
                     origin, direction = ray
                     centres = self._centres_3d(dets, depth_m, K)
                     idx = self._choose_by_ray(origin, direction, centres)
+                    evidence = self._ray_evidence(origin, direction, centres)
                     if idx is None and any(c is None for c in centres):
                         # objects with no depth (glass, chrome) still get the 2d test
                         px2d = self._pointer_2d(lm)
                         idx = self._choose_by_point(px2d, dets, allowed=[i for i, c in enumerate(centres) if c is None])
+                        if idx is not None:
+                            evidence = {idx: 0.5}
                     # overlay: the line ends ON the object being pointed at (the
                     # ray point nearest its centre), else 15 cm ahead — a fixed
                     # 25 cm segment overshot every close object (2026-09-08).
@@ -461,12 +642,48 @@ class PointOrVoiceSelector:
                           if (o_px and e_px) else tip)
                     self._n_3d += 1
                     self._emit(self.on_pointer, px)
-                    return idx, px, "3d"
+                    return idx, px, "3d", evidence
+        # 2d: the box under the extended pointer; half the weight of a 3-D
+        # frame in the vote — it cannot tell neighbours in depth apart.
         px = self._pointer_2d(lm)
         self._emit(self.on_pointer, px)
-        return self._choose_by_point(px, dets), px, "2d"
+        idx = self._choose_by_point(px, dets)
+        return idx, px, "2d", ({idx: 0.5} if idx is not None else {})
 
-    # ── the selection loop (dwell commit — unchanged behaviour) ──────
+    # ── one selection: begin(), then step() per frame ───────────────
+    def begin(self) -> None:
+        """Start a new selection: fresh decision, smoothing and counters."""
+        self._decision = (_VoteDecision(self.vote_tau_s, self.vote_commit_s, self.vote_margin)
+                          if self.decision == "vote" else _DwellDecision(self.min_hold_ms, self.steady_px))
+        self._last_hover = None
+        self._ray = None
+        self._ema = None
+        self._n_frames = self._n_3d = self._n_bleed = 0
+        self._t_begin: Optional[float] = None
+
+    def step(self, t: float, bgr, dets: List[Dict[str, Any]]
+             ) -> Tuple[Optional[int], Optional[int], Optional[Tuple[float, float]], str]:
+        """One frame at time t (seconds, any clock): (chosen index or None,
+        hover index for the UI, overlay pixel, mode). The live loop passes
+        wall time; the offline benchmark passes the recording's stamps — the
+        same code decides in both."""
+        if self._decision is None:
+            self.begin()
+        if self._t_begin is None:
+            self._t_begin = t
+        idx, px, mode, evidence = self._evaluate(bgr, dets)
+        self._last_hover = idx if px is not None else None
+        chosen = self._decision.update(t, idx, evidence if px is not None else {}, px)
+        hover = None
+        if px is not None:
+            hover = self._decision.leader() if self.decision == "vote" else idx
+        if chosen is not None:
+            self._log("info", f"[point] chose index {chosen} by {self._decision.name} via {mode} after "
+                              f"{t - self._t_begin:.1f} s ({self._n_3d}/{self._n_frames} frames had a 3d ray, "
+                              f"{self._n_bleed} rejected for background depth)")
+        return chosen, hover, px, mode
+
+    # ── the live selection loop ──────────────────────────────────────
     def choose(self,
                bgr_frame,
                dets: List[Dict[str, Any]],
@@ -492,14 +709,8 @@ class PointOrVoiceSelector:
 
     def _choose_loop(self, bgr_frame, dets, frame_provider, overall_timeout_s, cancel) -> Optional[int]:
         start = time.time()
-        hold_start: Optional[float] = None
-        last_idx: Optional[int] = None
-        last_px: Optional[Tuple[float, float]] = None
-        last_emitted_idx: Optional[int] = -1  # sentinel distinct from None
-        self._last_hover = None
-        self._ray = None
-        self._ema = None
-
+        self.begin()
+        last_emitted: Optional[int] = -1  # sentinel distinct from None
         while time.time() - start < float(overall_timeout_s):
             # A click or voice choice arrived while we were watching the
             # hand: hand over at once (2026-09-09: a click used to wait for
@@ -507,34 +718,15 @@ class PointOrVoiceSelector:
             if cancel is not None and cancel():
                 return None
             cur_frame = frame_provider() if callable(frame_provider) else bgr_frame
-            idx, px, mode = (None, None, "none")
+            chosen, hover = None, None
             if self.use_mediapipe:
-                idx, px, mode = self._evaluate(cur_frame, dets)
-            if px is not None:
-                self._last_hover = idx
-                # Hover → chat_node can say what the user points at before commit.
-                if self.on_hover and idx != last_emitted_idx:
-                    self._emit(self.on_hover, idx)
-                    last_emitted_idx = idx
-                if idx is not None:
-                    if last_idx != idx:
-                        last_idx, hold_start, last_px = idx, time.time(), px
-                    else:
-                        if last_px is not None and _dist2(px, last_px) > self.steady_px * self.steady_px:
-                            hold_start, last_px = time.time(), px
-                        if hold_start is not None and (time.time() - hold_start) * 1000.0 >= self.min_hold_ms:
-                            self._log("info", f"[point] chose index {idx} via {mode} "
-                                              f"({self._n_3d}/{self._n_frames} frames had a 3d ray, "
-                                              f"{self._n_bleed} rejected for background depth)")
-                            return idx
-                else:
-                    last_idx = hold_start = last_px = None
-            else:
-                # Hand lost from view — clear the hover.
-                if self.on_hover and last_emitted_idx is not None:
-                    self._emit(self.on_hover, None)
-                    last_emitted_idx = None
-                self._last_hover = None
+                chosen, hover, _px, _mode = self.step(time.time(), cur_frame, dets)
+            # Hover → chat_node can say what the user points at before commit.
+            if self.on_hover and hover != last_emitted:
+                self._emit(self.on_hover, hover)
+                last_emitted = hover
+            if chosen is not None:
+                return chosen
             time.sleep(0.05)
         return None
 

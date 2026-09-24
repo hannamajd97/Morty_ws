@@ -502,6 +502,17 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("mediapipe_use_tasks_api", True)
     # "" = the hand_landmarker.task shipped inside the package.
     node.declare_parameter("mediapipe_model_path", "")
+    # Commit rule and ray source (2026-09-24, see point_selector.py):
+    # "vote" = evidence over time (default), "dwell" = the old steady hold;
+    # sigma = the finger ray's angular noise; ray source "model" = MediaPipe's
+    # 3-D hand for the direction + palm depth — off until a recording
+    # (pointing_bench_record / pointing_bench_eval) shows it is better.
+    node.declare_parameter("pointing_decision", "vote")
+    node.declare_parameter("pointing_vote_tau_s", 0.8)
+    node.declare_parameter("pointing_vote_commit_s", 0.45)
+    node.declare_parameter("pointing_vote_margin", 2.0)
+    node.declare_parameter("pointing_sigma_deg", 7.0)
+    node.declare_parameter("pointing_ray_source", "depth")
     # Default changed True -> False (2026-08-06): with True, YOLO stops the
     # moment the selection prompt starts, so the detection boxes in the debug
     # image FREEZE exactly when the user is trying to click one. Keeping

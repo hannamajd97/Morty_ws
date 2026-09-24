@@ -61,6 +61,8 @@ setup(
         'console_scripts': [
             # Core pipeline nodes
             'grasp_selection_node = grasp_pipeline.grasp_selection_node:main',
+            'pointing_bench_record = grasp_pipeline.pointing_bench:record_main',
+            'pointing_bench_eval = grasp_pipeline.pointing_bench:eval_main',
             'run_grasp_pipeline = grasp_pipeline.run_grasp_pipeline:main',
             'scene_obstacle_publisher = grasp_pipeline.scene_obstacle_publisher:main',
             'pose_to_base = grasp_pipeline.pose_to_base:main',
