@@ -5,7 +5,7 @@ copies the ready-made builder in rlds_builder/morty_ur3e/ next to your raw
 data and prints the exact `tfds build` invocation.  The builder reads the raw
 episodes directly (no intermediate .npy files).
 
-    convert_to_rlds --raw ~/morty_ws/vla_experiments/datasets/morty_ur3e --out ~/rlds/morty_ur3e
+    convert_to_rlds --raw ~/morty_ws/experiments --out ~/rlds/morty_ur3e
 
 then, inside the rlds_dataset_builder conda env (tensorflow + tensorflow_datasets):
 

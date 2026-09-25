@@ -7,7 +7,7 @@ openpi's UR5 data config converts absolute -> delta itself).
 Run this on the training machine (or a venv) where `lerobot` is installed at
 the commit openpi pins (python >= 3.11):
 
-    python convert_to_lerobot.py --raw ~/morty_ws/vla_experiments/datasets/morty_ur3e \
+    python convert_to_lerobot.py --raw ~/morty_ws/experiments \
         --repo-id <hf_user>/morty_ur3e --fps 10 --image-size 256
 
 Output keys per frame (openpi expects exactly these in its repack transform):

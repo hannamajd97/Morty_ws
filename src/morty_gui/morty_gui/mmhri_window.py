@@ -45,7 +45,6 @@ from PyQt5 import QtCore, QtWidgets
 from .html_viewer import write_view3d_html
 from .vla_link import VlaLink
 from .bag_link import BagLink
-from .config import BAG_DIR_VLA_ONLY
 
 MMHRI_DIR = os.path.expanduser("~/morty_ws/experiments/mmhri")      # campaign CSVs + the trials before 2026-09-18
 EXPERIMENTS_DIR = os.path.expanduser("~/morty_ws/experiments")      # day folders live directly here
@@ -215,7 +214,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._cancelled = False
         self._rec_header: Dict[str, str] = {}
         self._t0 = 0.0
-        self._trial_dir = ""
+        self._trial_root = ""   # the trial's one folder, always (VLA episode + bag + MMHRI evidence)
+        self._trial_dir = ""    # the same folder when MMHRI evidence is recorded, else "" 
         self._video: Optional["object"] = None
         self._audio_proc: Optional[subprocess.Popen] = None
         self._conv_f = None
@@ -584,13 +584,15 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             return
         la = self.layout_edit.currentText().strip()[-1:]
         sid = self.scenario.currentText().split(":")[0]
-        # MMHRI off = no folder at all; every feed_* checks _trial_dir,
-        # so the evidence writers fall silent by themselves.
+        # One trial = one folder, whatever is recorded (2026-09-25, Majd:
+        # "everything in the same package, not in 2, VLA and experiments").
+        # MMHRI off only silences the evidence writers (every feed_* checks
+        # _trial_dir); the VLA episode and the bag still go into the folder
+        # instead of vla_experiments/datasets and vla_experiments/bags.
         self._refresh_folder_label()
-        self._trial_dir = (os.path.join(self.session_dir(), f"trial_{tid}_L{la}_{sid}")
-                           if want_mmhri else "")
-        if self._trial_dir:
-            os.makedirs(self._trial_dir, exist_ok=True)
+        self._trial_root = os.path.join(self.session_dir(), f"trial_{tid}_L{la}_{sid}")
+        os.makedirs(self._trial_root, exist_ok=True)
+        self._trial_dir = self._trial_root if want_mmhri else ""
         self._t0 = time.monotonic()
         self._interaction_s = None
         self._total_s = None
@@ -656,15 +658,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         vla_note = ""
         if want_vla:
             # The episode is written into this trial's folder (next to bag/).
-            why = self._vla.begin(self._fallback_task(), self._trial_dir or "")
+            why = self._vla.begin(self._fallback_task(), self._trial_root)
             vla_note = " + VLA episode" if not why else f" — VLA episode NOT started ({why})"
-        # One ROS bag per trial, inside the trial folder when there is one.
+        # One ROS bag per trial, inside the trial folder.
         self._bag_ended = True
         bag_note = ""
         if want_bag:
-            parent = self._trial_dir or os.path.join(
-                BAG_DIR_VLA_ONLY, f"trial_{tid}_L{la}_{sid}_{datetime.datetime.now():%Y%m%d_%H%M%S}")
-            bag_dir = self._bag.begin(parent)
+            bag_dir = self._bag.begin(self._trial_root)
             if bag_dir:
                 self._bag_ended = False
                 bag_note = " + bag"
@@ -812,9 +812,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText("delete cancelled — the trial goes on.")
             return
         self._cancelled = True           # a pending ⏹ save must not write it back
-        trial_dir = self._trial_dir
+        trial_dir = self._trial_root or self._trial_dir
         self._on_discard()               # VLA discard, bag stopped + removed, recorders closed
-        self._trial_dir = ""
+        self._trial_dir = self._trial_root = ""
         self._erase_when_idle(trial_dir, tid, time.monotonic() + 5.0)
 
     def _erase_when_idle(self, trial_dir: str, tid: str, deadline: float) -> None:
@@ -1072,8 +1072,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         if not self._trial_dir:
             # VLA-only trial: none of the MMHRI record is written.
             self.status.setText(
-                "✔ VLA-only trial ended — episode handed to the recorder "
-                "(the vla-rec LED shows whether it was kept)")
+                f"✔ trial {tid} ended (no MMHRI evidence) → {self._trial_root}\n"
+                "the VLA episode and the bag are in that folder (the vla-rec LED shows whether the episode was kept)")
             self._reset_buttons()
             return
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as f:

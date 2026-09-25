@@ -1,8 +1,11 @@
 """Raw episode format written by episode_recorder and read by the converters.
 
-Layout — one directory per episode. Since 2026-09-24 a trial-bound episode
-lives INSIDE its MMHRI trial folder next to bag/ (one experiment, one
-folder); a standalone episode keeps the old dataset layout:
+Layout — one directory per episode, and that directory is the trial's own
+folder: since 2026-09-24 the episode is written INSIDE its trial folder next to
+bag/ (one experiment, one folder), with or without MMHRI evidence (09-25);
+the 15 episodes recorded before (09-18 … 09-23) were moved into their trial
+folders on 2026-09-25 (undo manifest in ~/morty_ws/backups/). Only an episode
+started from the CLI (vla_episode start) keeps the old dataset layout:
 
     experiments/experiments_24_09_2026/trial_070_LA_S4/      (episode_id = trial_070_LA_S4)
         meta.json              task, instructions, outcome, events, quality, intrinsics, astra TF
@@ -13,8 +16,8 @@ folder); a standalone episode keeps the old dataset layout:
     vla_experiments/datasets/morty_ur3e/episode_000012/       (CLI-started episodes)
 
 `list_episodes(root)` finds both: it walks `root` for every folder holding
-meta.json + steps.npz, so `--raw ~/morty_ws/experiments` exports a whole
-campaign and `--raw .../datasets/morty_ur3e` the standalone ones.
+meta.json + steps.npz, so `--raw ~/morty_ws/experiments` exports the whole
+campaign and `--raw .../datasets/morty_ur3e` only CLI-started episodes.
 
 Everything a VLA converter needs is here.  Actions are NOT stored; they are
 derived from consecutive states by the converters (see `derive_actions`) so
