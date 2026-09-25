@@ -1059,6 +1059,13 @@ class IntentRouterNode(Node):
                     f"Dedup: dropping repeat intent {action!r} "
                     "(already running or already queued)."
                 )
+                # 2026-09-25 (Majd, live: "The small bottle." while the bottle
+                # was still in the gripper at the release question was dropped
+                # here in silence): a pick repeated while the running pick holds
+                # its object gets the still-holding line instead of nothing.
+                _t = self._live_task() or {}
+                if action == "pick" and _t.get("holding"):
+                    self._say_still_holding(rate_limited=True)
                 return
             self._intent_queue.append(intent)
             queued = len(self._intent_queue)

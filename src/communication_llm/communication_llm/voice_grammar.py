@@ -129,7 +129,9 @@ CLOSE = _whole(
     r"|schließe(?:n)?(?: den)? greifer|zu)")
 DEST_SIDE = _whole(
     r"(?:" + AFF + r" )?" + VERB + r"?(?:(?:on|to|at|in|onto|over) )?(?:the )?"
-    r"(left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?")
+    # 2026-09-25 (Majd, live: "Go to the drop right, …"): "drop (position)" may
+    # also stand BEFORE the side.
+    r"(?:drop (?:position )?)?(left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?")
 DEST_HOME = _whole(r"(?:" + AFF + r" )?" + VERB + r"?" + HOME)
 # 2026-09-25 (Majd, live: "Now back home." / "Go back home." went to the model,
 # which answered "Going home." without sending anything): with NO question
@@ -147,10 +149,14 @@ RELEASE = (r"(?:give (?:me )?(?:it|the object|the objects)(?: to me)?|hand (?:it
 _CONN = r"(?:and )?(?:then )?"
 DEST_COMPOUND = _whole(
     r"(?:" + AFF + r" )?(?:" + VERB + r"?(?:(?:on|to|at|in|onto|over) )?(?:the )?"
-    r"(?P<side>left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?"
+    r"(?:drop (?:position )?)?(?P<side>left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?"
     r"|(?P<home>" + VERB + r"?" + HOME + r"))"
     r" " + _CONN + RELEASE
     + r"(?P<back> " + _CONN + r"(?:go )?(?:back )?(?:to )?(?:the )?home(?: position)?)?")
+# 2026-09-25 (Majd, live: "Give me the object, then go back home." at "Should
+# I open the gripper?"): release here, then home — the release_home answer.
+RELEASE_HOME = _whole(r"(?:" + AFF + r" )?(?:now )?" + RELEASE + r" " + _CONN
+                      + r"(?:now )?(?:go )?(?:back )?(?:to )?(?:the )?home(?: position)?")
 # 2026-09-25 (Majd's I1): a whole NO to "Where should I drop it?" — the
 # executor keeps waiting for a destination, so nothing is sent; the LLM
 # used to answer "Don't drop it." with "Sorry, I'll pick it up instead."
@@ -319,6 +325,23 @@ def classify(text: str, question: str = "", fresh: bool = False,
                 return ("negative", "close_gripper")
             if _release_consent(t):              # 2026-09-25: see _CONSENT_PHRASE
                 return ("answer", "open_gripper")
+            if RELEASE_HOME.match(t):            # 2026-09-25: open here, then home
+                return ("answer", "release_home")
+            if ext_dest:
+                # 2026-09-25 (Majd, live: "Go to the drop right, give me the
+                # objects and go back home." at "Should I open the gripper?"
+                # went to the model, which answered "I'm not holding anything"
+                # / "Left or right?"): a WHOLE side phrase answers this
+                # question too — alone it moves there and asks again (the
+                # router's redirect), with a release (and home) it carries the
+                # object there and opens.
+                m = DEST_COMPOUND.match(t)
+                if m and m.group("side"):
+                    side = _SIDE[m.group("side")]
+                    return ("answer", f"drop_{side}_release" + ("_home" if m.group("back") else ""))
+                m = DEST_SIDE.match(t)
+                if m:
+                    return ("answer", "drop_" + _SIDE[m.group(1)])
         elif question == "home":
             if YES.match(t) or YES_HOME.match(t):
                 return ("answer", "go_home")

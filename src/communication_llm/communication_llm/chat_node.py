@@ -108,6 +108,13 @@ QUICK_NARRATION = {
 # the tool action 'unclear'; this node then speaks this line by itself. A
 # model sentence that says it anyway is never spoken (it marks the turn
 # unclear instead).
+# 2026-09-25: how long before a question opened an answer's measured start
+# may lie and still count (see _route_minimal's freshness rule): speech_start
+# includes the speech node's 300 ms pre-roll, so start + 0.3 s is where the
+# voice really began; 0.35 s = "began at or after the question opened, 50 ms
+# margin". Majd's "Now give it." measured -38 ms (voice +0.26 s) and was
+# re-asked; a "yes" begun 0.5 s or more before stays an answer to something else.
+_FRESH_TOLERANCE_S = 0.35
 UNCLEAR_LINE = "I didn't catch that, could you repeat?"
 # 2026-09-25 (review Y5): FIRST person only — "I didn't catch that", "Sorry,
 # didn't catch it", "I did not quite catch that". A story's "the fisherman
@@ -850,6 +857,12 @@ AUTHORITATIVE; announcements are history. With no pick and an empty
 gripper, no question is open. While the destination question is open,
 emit the destination intent (drop_right / drop_left / home); never claim
 you are not holding anything while that question is open.
+
+DROP MEANS MOVE - drop_left / drop_right / confirm_drop / go_home only CARRY
+the held object to that pose; it is released ONLY by open_gripper / release
+(or a "then" of release). After "drop it on the right side" the robot is
+STILL HOLDING the object until the gripper opens — the ROBOT TASK STATE
+says what the gripper holds.
 
 SENT IS NOT DONE - a command in the conversation (yours or the robot's fast
 path) was only SENT; the robot may have refused or failed it (e.g. "I'm
@@ -2879,6 +2892,28 @@ class ChatIntentNode(Node):
                 args[k] = v
         return args
 
+    @staticmethod
+    def _instant_result(arguments: str) -> str:
+        """2026-09-25 (Majd, live: after "Drop it on the right side." the
+        model said "I'm not holding anything — the bottle is already at the
+        drop right position": in plain English "drop it" means let go, but
+        drop_* only CARRIES the object there and the robot asks before
+        opening). The tool result says what the command does."""
+        try:
+            args = json.loads(arguments)
+        except (TypeError, ValueError):
+            args = {}
+        a = str(args.get("action_intent") or "")
+        then = str(args.get("then") or "")
+        if a in ("drop_left", "drop_right", "confirm_drop", "go_home") and not then:
+            return ("sent: the arm MOVES there still holding the object — it is NOT released; "
+                    "the robot asks before opening the gripper")
+        if a in ("drop_left", "drop_right", "confirm_drop", "go_home"):
+            return f"sent: the arm moves there, then {then.replace('_', ' ')}"
+        if a in ("open_gripper", "release"):
+            return "sent: the gripper opens and releases the held object"
+        return "sent to the robot — the ROBOT TASK STATE says whether it runs (it may be refused)"
+
     def _flush_instant_notes(self) -> None:
         """2026-09-25: write the queued instant turns into the LLM history
         (called under _chat_lock at the start of an LLM turn, before the
@@ -2911,8 +2946,7 @@ class ChatIntentNode(Node):
                 self.chat_agent.messages.append(c)
             for c in calls:
                 self.chat_agent.messages.append({"type": "function_call_output", "call_id": c.call_id,
-                                                 "output": json.dumps({"status": "sent to the robot (fast path) — the "
-                                                                              "ROBOT TASK STATE says whether it runs"})})
+                                                 "output": json.dumps({"status": self._instant_result(c.arguments)})})
 
     def _fire_fast_pick(self, label: str, colour: str | None, text: str) -> None:
         """The FAST-PICK publish (2026-08-26), factored out 2026-09-25 so the
@@ -3001,7 +3035,12 @@ class ChatIntentNode(Node):
                 since = float(task.get("question_since") or 0.0)
             except (TypeError, ValueError):
                 since = 0.0
-            fresh = start is not None and 0.0 < since <= start
+            # 2026-09-25 (Majd, live: "Now give it." began 38 ms before the
+            # release question opened — he answered as the arm arrived — and
+            # was re-asked; speech_start also includes the 300 ms pre-roll):
+            # an utterance begun up to _FRESH_TOLERANCE_S before the question
+            # opened still answers it.
+            fresh = start is not None and 0.0 < since <= start + _FRESH_TOLERANCE_S
         kind, action = voice_grammar.classify(text, question, fresh, self._voice_ext_dest)
         if kind == "negative" and action == "keep":
             # 2026-09-25 (Majd's I1): a NO to "Where should I drop it?" — the
