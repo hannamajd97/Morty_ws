@@ -1439,10 +1439,8 @@ class IntentRouterNode(Node):
                     "Refusing plain-pick of vitamin_c: 2+ visible and no "
                     "position/ordinal/colour qualifier. Asking user to clarify."
                 )
-                self._narrate(
-                    "I see two vitamin tubes. Could you say leftmost or "
-                    "rightmost, or point at the one you want?"
-                )
+                # 2026-09-25: the real count and its positions (_two_of_line).
+                self._narrate(self._two_of_line(label, n_vit))
                 self._mark_busy_done("")
                 return
 
@@ -2272,13 +2270,21 @@ class IntentRouterNode(Node):
         what = (str(task.get("object") or "") or fallback or "object").replace("_", " ")
         self._narrate(f"I'm still holding the {what} — where should I put it first?")
 
-    def _two_of_line(self, label: str) -> str:
-        """2026-09-25: the two-of-a-kind clarification, named for the class.
-        For vitamin_c (display "vitamin_tube") it is exactly the existing
-        two-tubes line."""
+    def _two_of_line(self, label: str, n: int = 2) -> str:
+        """2026-09-25: the several-of-a-kind clarification, named for the
+        class. For vitamin_c (display "vitamin_tube") and n == 2 it is exactly
+        the existing two-tubes line. 2026-09-25 (Majd, live: "I see two
+        vitamin tubes" with THREE on the table — the count was hard-coded):
+        the sentence says the real count and offers the positions that
+        exist (three: leftmost, middle or rightmost)."""
         name = self._to_display_label(label).replace("_", " ").strip() or "object"
         plural = name + ("es" if name.endswith(("s", "x", "z", "ch", "sh")) else "s")
-        return (f"I see two {plural}. Could you say leftmost or rightmost, "
+        count = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}.get(n, str(n))
+        if n > 3:
+            return (f"I see {count} {plural}. Could you say which one, for example "
+                    "the leftmost or the rightmost, or point at it?")
+        choice = "leftmost or rightmost" if n <= 2 else "leftmost, middle or rightmost"
+        return (f"I see {count} {plural}. Could you say {choice}, "
                 "or point at the one you want?")
 
     def _latch_destination(self, token: str, action: str) -> None:
