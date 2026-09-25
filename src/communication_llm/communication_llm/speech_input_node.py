@@ -101,14 +101,40 @@ class SpeechInputNode(Node):
         # End-of-utterance silence threshold. Lower = faster response,
         # higher = safer if you pause mid-sentence to think. 300 ms from
         # 2026-09-18 (Majd: commands are short, the wait was the longest
-        # piece after the language model); back to 500 ms on 2026-09-24:
-        # at 300 ms a hesitation split one command in two ("Uh." dropped
-        # as junk, then "For me the tape dispenser." without its verb;
-        # "Drop it." + "On home position."). 500 kept the recorded
-        # commands whole; 700 began merging the operator's answer with
-        # Morty's question. Costs 0.2 s per turn. The GUI's Voice filters
-        # spinbox mirrors this value.
-        self.declare_parameter("whisper_silence_ms", 500)
+        # piece after the language model); 500 ms from 2026-09-24: at
+        # 300 ms a hesitation split one command in two ("Uh." dropped as
+        # junk, then "For me the tape dispenser." without its verb;
+        # "Drop it." + "On home position.").
+        # 2026-09-25: 800 ms. 500 still split a sentence at a thinking
+        # pause ("The Vitamin C to" / "The vitamin C too."). The old note
+        # "700 began merging the operator's answer with Morty's question"
+        # was measured before the PulseAudio echo canceller became the
+        # default mic and speaker (2026-09-23), when Morty's voice reached
+        # the voice detector at full strength.
+        # Merge risk that remains: each 100 ms chunk's voicing is decided
+        # by Silero on the AEC-cleaned mic (the rms gate only judges whole
+        # buffers), so a merge needs AEC residue of Morty's question to be
+        # voiced within 800 ms of the answer. The speaker gate then scores
+        # the merged buffer (stt.py _transcribe) and may reject it as
+        # Morty's own voice, and the operator has to repeat. Barge-in is
+        # unaffected (it counts voiced chunks only). Watch
+        # /speech/rejected for "my own voice"; the GUI's Voice filters
+        # spinbox mirrors this value, is passed at every Start voice and
+        # is the live rollback. Costs 0.3 s per longer turn; short answers
+        # end sooner, see whisper_short_silence_ms below.
+        self.declare_parameter("whisper_silence_ms", 800)
+        # 2026-09-25: EXT-SHORT (Majd: on by default). An utterance with at
+        # most whisper_short_voiced_ms of VOICED audio ("Yes.", "Stop.",
+        # "Right.") ends after whisper_short_silence_ms of silence instead
+        # of whisper_silence_ms, so the 800 ms above does not slow down
+        # one-word answers. whisper_short_silence_ms 0 turns it off. Both
+        # are live-settable (ros2 param set); not shown in the GUI.
+        # 2026-09-25 (lead): 700 ms of voice, not 1200 — with 1200 a
+        # fragment like "The Vitamin C to" (~1 s of voice) still ended at
+        # 500 ms and split, Majd's original complaint; 700 keeps one-word
+        # commands ("Stop.", "Yes.", "Open.") at 500 ms.
+        self.declare_parameter("whisper_short_silence_ms", 500)
+        self.declare_parameter("whisper_short_voiced_ms", 700)
         # Audio kept from BEFORE the voice detector fired, prepended to
         # every utterance (2026-09-24, see stt.py _loop). 0 disables.
         self.declare_parameter("preroll_ms", 300)
@@ -212,6 +238,12 @@ class SpeechInputNode(Node):
         # published just before the transcript so chat_node can skip its
         # text-overlap echo rule when the voice was already judged human.
         self._verdict_pub = self.create_publisher(String, "/speech/speaker_verdict", 10)
+        # 2026-09-25 (SPEC §1.5): {"text", "speech_end", "voiced_ms"} just
+        # before each transcript, plus (review M1) "speech_start", so
+        # chat_node can tell whether the speech BEGAN after Morty's question
+        # opened (a "Yes." begun before the question is not an answer to
+        # it). /speech/transcript is unchanged.
+        self._meta_pub = self.create_publisher(String, "/speech/utterance_meta", 10)
         self._wave_pub = self.create_publisher(
             Float32MultiArray, "/speech/waveform", 10
         )
@@ -246,6 +278,9 @@ class SpeechInputNode(Node):
                     silence_ms_to_finalise=int(
                         self.get_parameter("whisper_silence_ms").value
                     ),
+                    # 2026-09-25: EXT-SHORT, see the declarations above.
+                    short_silence_ms=int(self.get_parameter("whisper_short_silence_ms").value),
+                    short_voiced_ms=int(self.get_parameter("whisper_short_voiced_ms").value),
                     max_utterance_s=float(
                         self.get_parameter("whisper_max_utterance_s").value
                     ),
@@ -339,11 +374,16 @@ class SpeechInputNode(Node):
         "whisper_silence_ms": (int, 50, 10000, "ms"),
         "whisper_max_utterance_s": (float, 0.5, 120.0, "s"),
         "min_chars": (int, 0, 200, "chars"),
+        # 2026-09-25: EXT-SHORT, live like the silence it shortens (0 = off).
+        "whisper_short_silence_ms": (int, 0, 10000, "ms"),
+        "whisper_short_voiced_ms": (int, 0, 120000, "ms"),
     }
     _LIVE_PARAM_SETTERS = {
         "whisper_min_rms": "set_min_rms",
         "whisper_silence_ms": "set_silence_ms",
         "whisper_max_utterance_s": "set_max_utterance_s",
+        "whisper_short_silence_ms": "set_short_silence_ms",
+        "whisper_short_voiced_ms": "set_short_voiced_ms",
     }
 
     def _on_set_parameters(self, params) -> SetParametersResult:
@@ -467,6 +507,20 @@ class SpeechInputNode(Node):
         if score is not None:
             self._verdict_pub.publish(String(data=json.dumps(
                 {"text": forwarded, "cos": round(float(score), 3), "human": True})))
+        # 2026-09-25 (SPEC §1.5): the meta goes out immediately before the
+        # transcript, with the very text the transcript carries. Only when
+        # the listener measured it (the Whisper/Parakeet/Omni listener
+        # does; Vosk has no voiced-chunk count): chat_node then falls back
+        # to its own estimate rather than trusting a made-up time.
+        meta = getattr(self._stt, "_last_utterance_meta", None)
+        if meta:
+            self._meta_pub.publish(String(data=json.dumps({
+                "text": forwarded,
+                "speech_end": round(float(meta.get("speech_end", 0.0)), 3),
+                "voiced_ms": int(meta.get("voiced_ms", 0)),
+                # 2026-09-25 (review M1): additive — wall s of the
+                # utterance's first audio sample; chat_node's fresh rule.
+                "speech_start": round(float(meta.get("speech_start", 0.0)), 3)})))
         msg = String()
         msg.data = forwarded
         self._pub.publish(msg)

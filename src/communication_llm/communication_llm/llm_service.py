@@ -108,6 +108,18 @@ INTENT_TOOL = {
                     "drop_left",
                     "enable_multiview",
                     "disable_multiview",
+                    # 2026-09-25: 'reset' = the GUI's "Reset pick" by voice
+                    # (end the pick, go home keeping any held object);
+                    # 'unclear' = the transcript is garbled — chat_node then
+                    # speaks "I didn't catch that" itself, alone, and never
+                    # publishes it.
+                    "reset",
+                    "unclear",
+                    # 2026-09-25 (review Y2): 'stay' = NO to "Should I go
+                    # back home?" — the router answers the home pause with
+                    # the same 'stay' token chat_node's deterministic NO
+                    # sends ("Okay, I'll stay here."), not a stop/abort.
+                    "stay",
                 ],
                 "description": (
                     "Single action keyword. There is NO generic 'drop' or "
@@ -128,6 +140,9 @@ INTENT_TOOL = {
                     "opposite: single view, just one view, one shot, "
                     "Einzelansicht, no scanning. Default behaviour is "
                     "single-view; the user has to ask to switch.\n"
+                    "Use 'stay' ONLY when Morty asked 'Should I go back "
+                    "home?' and the user says no / stay / wait / leave it "
+                    "there.\n"
                     "Use 'release' ONLY when the pick is paused at the "
                     "DROP pose waiting for permission to open the "
                     "gripper (Morty just said 'Should I open the "
@@ -144,7 +159,22 @@ INTENT_TOOL = {
                     "to home after dropping). Do NOT emit confirm_drop "
                     "for a 'go to the drop right position' command when "
                     "no pick is in progress — that's a plain named-pose "
-                    "move, use 'drop_right' instead."
+                    "move, use 'drop_right' instead.\n"
+                    "Use 'reset' for 'reset' / 'reset the pick' / 'start "
+                    "over': the robot ends the pick and goes home, keeping "
+                    "any held object. Use 'unclear' when the transcript is "
+                    "garbled or nonsensical — then write NO text."
+                ),
+            },
+            "talk": {
+                # 2026-09-25 (Majd: "he may tell a story while a grasp runs,
+                # but only when asked in that utterance"): chat_node keeps
+                # streaming the reply after the command was dispatched only
+                # for a turn that set this. Never published to the router.
+                "type": "boolean",
+                "description": (
+                    "true ONLY when the same utterance asks for an action AND "
+                    "for talk while it runs; omit otherwise."
                 ),
             },
             "object_intent": {
@@ -637,6 +667,37 @@ def _bedrock_converse_stream(client, kwargs: dict[str, Any], on_tool_call, on_te
             "stopped": stopped}
 
 
+class _StreamProgress:
+    """2026-09-25 (review L2): wraps a turn's ``on_tool_call`` / ``on_text``
+    and records whether the stream DISPATCHED a command (on_tool_call ran)
+    or SPOKE a sentence (on_text returned truthy) — the GWDG path's two
+    kinds of progress. A retry of the same turn after either would dispatch
+    the command twice or repeat what Morty already said, so the Bedrock
+    retries below run only while neither happened."""
+
+    def __init__(self, on_tool_call=None, on_text=None) -> None:
+        self.dispatched = False
+        self.spoke = False
+        self._tool = on_tool_call
+        self._text = on_text
+        self.on_tool_call = self._wrap_tool if on_tool_call is not None else None
+        self.on_text = self._wrap_text if on_text is not None else None
+
+    def _wrap_tool(self, item: Any) -> Any:
+        self.dispatched = True
+        return self._tool(item)
+
+    def _wrap_text(self, delta: str) -> Any:
+        r = self._text(delta)          # StopStream passes through untouched
+        if r:
+            self.spoke = True
+        return r
+
+    @property
+    def progressed(self) -> bool:
+        return self.dispatched or self.spoke
+
+
 def _bedrock_converse_call(
     model: str,
     messages: list[Any],
@@ -663,7 +724,14 @@ def _bedrock_converse_call(
         }
         sys_blocks = list(system)
         if sys_blocks and cache:
-            sys_blocks.append({"cachePoint": {"type": "default"}})
+            # 2026-09-25: the cache point goes right after the STATIC prompt
+            # (system[0] = SYSTEM_PROMPT; chat_node hoists its per-turn state
+            # blocks in order after it). At the end of the list it covered
+            # the clock and the live state too, so the prefix changed on
+            # every call and was never read: 0 of 500 logged calls showed
+            # "prompt cache". The content is unchanged; a prefix that is too
+            # short is simply not cached.
+            sys_blocks = [sys_blocks[0], {"cachePoint": {"type": "default"}}, *sys_blocks[1:]]
         if sys_blocks:
             kwargs["system"] = sys_blocks
         tool_config = _tools_for_converse(tools)
@@ -675,10 +743,14 @@ def _bedrock_converse_call(
 
     client = _bedrock_runtime_client()
     last_exc: Exception | None = None
+    # 2026-09-25 (review L2): the retry without cache points re-runs the
+    # stream with the same callbacks — only while nothing was dispatched or
+    # spoken (a mid-stream error after a tool call would run it twice).
+    prog = _StreamProgress(on_tool_call, on_text)
     for attempt in (0, 1):
         cache = _CACHE_POINTS_OK and attempt == 0
         try:
-            raw = _bedrock_converse_stream(client, _build(cache), on_tool_call, on_text)
+            raw = _bedrock_converse_stream(client, _build(cache), prog.on_tool_call, prog.on_text)
             out = _BedrockConverseResponse(raw)
             u = raw.get("usage", {}) or {}
             out.cache_read_tokens = int(u.get("cacheReadInputTokens", 0) or 0)
@@ -687,7 +759,8 @@ def _bedrock_converse_call(
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
             text = str(exc)
-            if cache and ("cachePoint" in text or "cache" in text.lower() or "ValidationException" in text):
+            if (cache and not prog.progressed
+                    and ("cachePoint" in text or "cache" in text.lower() or "ValidationException" in text)):
                 _CACHE_POINTS_OK = False
                 continue
             raise
@@ -729,6 +802,15 @@ GWDG_BASE_URL = "https://chat-ai.academiccloud.de/v1"
 # on 4 of the next 5 requests. 2.5 s + Claude's ~1.1 s keeps a stalled turn
 # near 3.6 s instead of waiting it out (the Bedrock path allows 20 s).
 GWDG_TIMEOUT_S = float(os.environ.get("MORTY_GWDG_TIMEOUT_S", "2.5"))
+# 2026-09-25 (Majd: EXT-GWDG-STALL): a stream that keeps sending chunks but
+# has neither SPOKEN a sentence (on_text returned truthy) nor DISPATCHED a
+# command after this many seconds is treated as unavailable and Claude
+# answers the turn. The read timeout above only catches a silent stream;
+# whitespace / reasoning chunks kept it alive. 0 = off (default for other
+# callers); chat_node sets it from its gwdg_stall_s parameter (3.0).
+# 2026-09-25 (review Y3): any tool-call delta or non-whitespace text also
+# counts as progress, and only calls with a callback are watched.
+GWDG_STALL_S = float(os.environ.get("MORTY_GWDG_STALL_S", "0"))
 _GWDG_CLIENT = None
 _GWDG_PAUSED_UNTIL = 0.0
 
@@ -781,13 +863,27 @@ def _gwdg_chat_call(model: str, messages: list[Any], tools: list[dict[str, Any]]
     """One streamed GWDG turn in the Bedrock response shape. Raises
     _GwdgUnavailable when it fails before anything reached the callbacks."""
     emitted = False
+    # 2026-09-25: the stall rule's two kinds of progress — a command handed
+    # to on_tool_call, or a sentence on_text reports as spoken (truthy).
+    dispatched = False
+    spoke = False
+    # 2026-09-25 (review Y3): the model is WORKING — a tool-call delta (its
+    # arguments may still be streaming at the limit) or a non-whitespace text
+    # delta (a sentence not finished yet). Only a stream with none of these
+    # is stalled.
+    working = False
+    # 2026-09-25 (review Y3): the stall rule is for a turn somebody is
+    # waiting on (streamed sentences / an early command); a follow-up call
+    # without callbacks just runs to its end (10 of 184 took > 3 s).
+    stall_watch = on_text is not None or on_tool_call is not None
+    t0 = time.monotonic()
     text = ""
     calls: dict[int, dict[str, Any]] = {}
     done: set[int] = set()
     stopped = False
 
     def _finish(idx: int) -> None:
-        nonlocal emitted
+        nonlocal emitted, dispatched
         if idx in done:
             return
         done.add(idx)
@@ -799,6 +895,7 @@ def _gwdg_chat_call(model: str, messages: list[Any], tools: list[dict[str, Any]]
             c["input"] = {"_raw": c["args"]}
         if on_tool_call is not None:
             emitted = True
+            dispatched = True
             try:
                 on_tool_call(_AdaptedFunctionCall(name=c["name"], arguments=json.dumps(c["input"]),
                                                   call_id=c["id"]))
@@ -820,15 +917,19 @@ def _gwdg_chat_call(model: str, messages: list[Any], tools: list[dict[str, Any]]
             delta = chunk.choices[0].delta
             if delta.content:
                 text += delta.content
+                if delta.content.strip():
+                    working = True
                 if on_text is not None:
                     emitted = True
                     try:
-                        on_text(delta.content)
+                        if on_text(delta.content):
+                            spoke = True         # 2026-09-25: a sentence reached the speaker
                     except StopStream:
                         stopped = True
                     except Exception:
                         pass
             for tc in delta.tool_calls or []:
+                working = True
                 for idx in [i for i in calls if i != tc.index and i not in done]:
                     _finish(idx)                 # the previous call is complete
                 c = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
@@ -836,6 +937,20 @@ def _gwdg_chat_call(model: str, messages: list[Any], tools: list[dict[str, Any]]
                 if tc.function is not None:
                     c["name"] += tc.function.name or ""
                     c["args"] += tc.function.arguments or ""
+            if (not stopped and GWDG_STALL_S > 0.0 and stall_watch
+                    and not (spoke or dispatched or working)
+                    and time.monotonic() - t0 > GWDG_STALL_S):
+                # 2026-09-25 (EXT-GWDG-STALL): chunks keep coming but nothing
+                # was said or done — the same "unavailable" as a timeout, so
+                # the turn is re-answered by Claude. Safe: nothing reached
+                # the speaker or the robot (chat_node's on_restart drops the
+                # half sentence it buffered).
+                try:
+                    stream.close()
+                except Exception:
+                    pass
+                raise _GwdgUnavailable(
+                    f"stalled: nothing spoken or dispatched after {GWDG_STALL_S:.1f} s", 30.0)
             if stopped:
                 try:
                     stream.close()
@@ -882,6 +997,17 @@ def _fallback_model_for(model: str) -> str:
     return ""
 
 
+def _call_restart(on_restart) -> None:
+    """2026-09-25: tell the caller a fallback model re-answers the turn; a
+    failing callback must not cost the answer."""
+    if on_restart is None:
+        return
+    try:
+        on_restart()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _is_capacity_error(exc: Exception) -> bool:
     text = f"{type(exc).__name__}: {exc}"
     return any(k in text for k in ("ServiceUnavailable", "Throttling", "ModelNotReady",
@@ -918,12 +1044,16 @@ class LLMService:
         self.tools = tools or []
         self.messages = messages if messages is not None else []
 
-    def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0, on_tool_call=None, on_text=None) -> Any:
+    def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0, on_tool_call=None, on_text=None,
+             on_restart=None) -> Any:
         # 20s ceiling — without this the openai client's default is 600s, so
         # a single slow turn would hang the whole rclpy executor thread for
         # 10 minutes and the user sees an unresponsive Morty.
         # on_tool_call: called with each completed tool call WHILE the reply
         # streams (Bedrock and GWDG paths) — the intent is dispatched early.
+        # on_restart (2026-09-25): called once before a fallback model
+        # re-answers the turn, so the caller can drop what the failed stream
+        # left half-written (chat_node's sentence buffer).
         if _is_gwdg(model):
             global _GWDG_PAUSED_UNTIL
             fb = _gwdg_fallback_model()
@@ -934,10 +1064,15 @@ class LLMService:
                     _GWDG_PAUSED_UNTIL = time.monotonic() + exc.pause_s
                     print(f"[llm] {model} unavailable ({exc}); this turn on {fb}, GWDG skipped "
                           f"for {exc.pause_s:.0f} s", file=sys.stderr, flush=True)
-            return self.chat(fb, timeout, on_tool_call, on_text)
+                    _call_restart(on_restart)
+            return self.chat(fb, timeout, on_tool_call, on_text, on_restart)
         if _use_bedrock_converse(model):
+            # 2026-09-25 (review L2): see _StreamProgress — no capacity retry
+            # once the failed stream dispatched a command or spoke.
+            prog = _StreamProgress(on_tool_call, on_text)
             try:
-                return _bedrock_converse_call(model, self.messages, self.tools, timeout, on_tool_call, on_text)
+                return _bedrock_converse_call(model, self.messages, self.tools, timeout,
+                                              prog.on_tool_call, prog.on_text)
             except Exception as exc:
                 # 2026-09-23: Bedrock's eu profile answered ServiceUnavailable
                 # twice in one afternoon ("Sorry, I couldn't reach the language
@@ -946,9 +1081,12 @@ class LLMService:
                 # answer instead of an apology. MORTY_LLM_FALLBACK_MODEL
                 # overrides the choice.
                 fb = _fallback_model_for(model)
+                if prog.progressed:
+                    raise
                 if fb and _is_capacity_error(exc):
                     print(f"[llm] {model} unavailable ({type(exc).__name__}); retrying once on {fb}",
                           file=sys.stderr, flush=True)
+                    _call_restart(on_restart)
                     return _bedrock_converse_call(fb, self.messages, self.tools, timeout, on_tool_call, on_text)
                 raise
         extra_body = _extra_body_for_model(model)

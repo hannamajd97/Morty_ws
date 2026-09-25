@@ -420,7 +420,7 @@ class WhisperTranscriber:
         compute_type: str = "auto",
         language: str = "en",
         vad_aggressiveness: int = 2,
-        silence_ms_to_finalise: int = 600,
+        silence_ms_to_finalise: int = 800,     # 2026-09-25: 800, as the node (see whisper_silence_ms there)
         max_utterance_s: float = 12.0,
         min_utterance_ms: int = 250,
         min_rms: float = 0.012,
@@ -451,6 +451,8 @@ class WhisperTranscriber:
         speaker_gate_device: str = "cuda",
         on_barge_in: Optional[Callable[[float], None]] = None,
         barge_in_min_ms: int = 600,
+        short_silence_ms: int = 0,
+        short_voiced_ms: int = 700,      # 2026-09-25: 700 (lead), see speech_input_node
     ) -> None:
         self._on_reject = on_reject
         # ---- SPEAKER GATE + BARGE-IN (2026-09-23) -------------------
@@ -531,6 +533,17 @@ class WhisperTranscriber:
         self._on_transcript = on_transcript
         self._language = language
         self._silence_ms = int(silence_ms_to_finalise)
+        # 2026-09-25 (EXT-SHORT): an utterance with at most short_voiced_ms
+        # of voiced audio ends after short_silence_ms of silence instead of
+        # _silence_ms — see _finalise_limit_ms. 0 = off (the class default;
+        # the node turns it on).
+        self._short_silence_ms = max(0, int(short_silence_ms))
+        self._short_voiced_ms = max(0, int(short_voiced_ms))
+        # 2026-09-25: {"speech_end", "speech_start", "voiced_ms"} of the utterance whose text
+        # the worker is about to hand to on_transcript. Set and read on the
+        # worker thread only (the node's _on_transcript runs there), the
+        # same way _last_speaker_score is passed.
+        self._last_utterance_meta: Optional[dict] = None
         self._max_utterance_s = float(max_utterance_s)
         self._min_utterance_ms = int(min_utterance_ms)
         self._preroll_ms = max(0, int(preroll_ms))      # see _loop: audio kept from before the detector fired
@@ -698,7 +711,8 @@ class WhisperTranscriber:
         self._stop.set()
         # Unblock the worker if it's waiting on the queue.
         try:
-            self._utterance_q.put_nowait((b"", 0.0, False))
+            # 2026-09-25: five fields, like every queued utterance (see _enqueue_utterance).
+            self._utterance_q.put_nowait((b"", 0.0, False, 0.0, 0))
         except queue.Full:
             pass
         if self._thread is not None:
@@ -729,7 +743,8 @@ class WhisperTranscriber:
         """
         while not self._stop.is_set():
             try:
-                buf, utt_start_wall, skip_echo_cut = self._utterance_q.get(timeout=0.2)
+                buf, utt_start_wall, skip_echo_cut, speech_end, speech_ms = \
+                    self._utterance_q.get(timeout=0.2)
             except queue.Empty:
                 continue
             if not buf or self._stop.is_set():
@@ -741,6 +756,19 @@ class WhisperTranscriber:
                 continue
             if not text:
                 continue
+            # 2026-09-25: when this utterance's speech ended, for the node's
+            # /speech/utterance_meta (published just before the transcript):
+            # chat_node answers a bare "Yes." by grammar only when the speech
+            # ended after Morty's question opened.
+            # 2026-09-25 (review M1): and when it STARTED — utt_start_wall,
+            # the wall clock of the buffer's first sample (pre-roll
+            # included, so at most ~0.3 s early). chat_node counts a "Yes."
+            # as an answer only when the question opened before the operator
+            # began to say it; the END alone let a "Yes." begun before the
+            # question count.
+            self._last_utterance_meta = {"speech_end": float(speech_end),
+                                         "speech_start": float(utt_start_wall),
+                                         "voiced_ms": int(speech_ms)}
             try:
                 self._on_transcript(text)
             except Exception as exc:
@@ -785,6 +813,38 @@ class WhisperTranscriber:
         old = float(self._max_utterance_s)
         self._max_utterance_s = float(value)
         return old
+
+    def set_short_silence_ms(self, value: int) -> int:
+        """2026-09-25 (EXT-SHORT): set the silence that ends a SHORT
+        utterance, in ms (0 = off). Returns the old value."""
+        old = int(self._short_silence_ms)
+        self._short_silence_ms = max(0, int(value))
+        return old
+
+    def set_short_voiced_ms(self, value: int) -> int:
+        """2026-09-25 (EXT-SHORT): set how much voiced audio (ms) still
+        counts as a short utterance. Returns the old value."""
+        old = int(self._short_voiced_ms)
+        self._short_voiced_ms = max(0, int(value))
+        return old
+
+    def _finalise_limit_ms(self, speech_ms: int) -> int:
+        """2026-09-25 (EXT-SHORT, Majd: on by default): the silence in ms
+        that ends an utterance with ``speech_ms`` of voiced audio so far.
+
+        800 ms keeps a thinking pause from splitting a sentence ("The
+        Vitamin C to" / "The vitamin C too."), but a one-word answer
+        ("Yes.", "Stop.", "Right.") has no second half to wait for: up to
+        short_voiced_ms of voice it ends after short_silence_ms. Never
+        longer than the normal limit, so lowering whisper_silence_ms below
+        the short value (the live rollback) cannot make the short answers
+        the slow ones. No side effects: reads the two scalars the setters
+        rebind, so a live change lands on the next silent chunk."""
+        normal = int(self._silence_ms)
+        short = int(self._short_silence_ms)
+        if 0 < short and int(speech_ms) <= int(self._short_voiced_ms):
+            return min(short, normal)
+        return normal
 
     # ── TTS playback windows for the word-time echo cut ──────────────
     def note_ai_speaking(self, speaking: bool) -> None:
@@ -1052,18 +1112,25 @@ class WhisperTranscriber:
 
     def _enqueue_utterance(self, pcm16_buffer: bytes,
                           utt_start_wall: float = 0.0,
-                          skip_echo_cut: bool = False) -> None:
+                          skip_echo_cut: bool = False,
+                          speech_end: float = 0.0,
+                          speech_ms: int = 0) -> None:
         """Hand a finished utterance to the worker thread, dropping it
         silently if the worker is still busy with the previous one.
 
         ``utt_start_wall`` is the wall clock (time.time()) of the FIRST
         audio sample in the buffer. Whisper reports word times relative
         to the buffer, so this is what converts them to absolute times
-        comparable with the TTS playback windows."""
+        comparable with the TTS playback windows.
+
+        2026-09-25: ``speech_end`` (wall clock of the end of the last
+        voiced chunk) and ``speech_ms`` (voiced ms) ride along to the
+        worker, which hands them to the node as /speech/utterance_meta."""
         if not pcm16_buffer:
             return
         try:
-            self._utterance_q.put_nowait((pcm16_buffer, utt_start_wall, skip_echo_cut))
+            self._utterance_q.put_nowait((pcm16_buffer, utt_start_wall, skip_echo_cut,
+                                          float(speech_end), int(speech_ms)))
         except queue.Full:
             self._log(
                 "info",
@@ -1355,7 +1422,9 @@ class WhisperTranscriber:
             self._log(
                 "info",
                 f"WhisperTranscriber listening (rate={self._sample_rate}, "
-                f"mic_index={self._mic_index}, silence_ms={self._silence_ms})",
+                f"mic_index={self._mic_index}, silence_ms={self._silence_ms}, "
+                # 2026-09-25: EXT-SHORT shown so its default is visible in the voice log.
+                f"short: {self._short_silence_ms} ms up to {self._short_voiced_ms} ms voiced)",
             )
             threading.Thread(target=self._watch_capture_source,
                              name="stt-capture-source", daemon=True).start()
@@ -1491,7 +1560,10 @@ class WhisperTranscriber:
                             utt_start_wall = time.time() - 0.8
                             speech_ms = 800
                     if speech_ms / 1000.0 >= self._max_utterance_s:
-                        self._enqueue_utterance(bytes(buffer), utt_start_wall, skip_echo_cut)
+                        # 2026-09-25: cut at the cap right after a voiced
+                        # chunk, so the speech ends now.
+                        self._enqueue_utterance(bytes(buffer), utt_start_wall, skip_echo_cut,
+                                                speech_end=time.time(), speech_ms=speech_ms)
                         buffer.clear()
                         in_speech = False
                         silence_ms = 0
@@ -1501,10 +1573,16 @@ class WhisperTranscriber:
                     # (a single silent chunk in the middle of a sentence is normal).
                     buffer.extend(data)
                     silence_ms += chunk_ms
-                    if silence_ms >= self._silence_ms:
+                    # 2026-09-25: the silence that ends THIS utterance
+                    # depends on how much of it was voiced (EXT-SHORT).
+                    if silence_ms >= self._finalise_limit_ms(speech_ms):
                         if speech_ms >= self._min_utterance_ms:
+                            # 2026-09-25: the last voiced chunk ended
+                            # silence_ms ago (the chunks since were silent).
                             self._enqueue_utterance(bytes(buffer),
-                                                    utt_start_wall, skip_echo_cut)
+                                                    utt_start_wall, skip_echo_cut,
+                                                    speech_end=time.time() - silence_ms / 1000.0,
+                                                    speech_ms=speech_ms)
                         buffer.clear()
                         in_speech = False
                         silence_ms = 0

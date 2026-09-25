@@ -119,6 +119,11 @@ def generate_launch_description() -> LaunchDescription:
                 "whisper_compute_type": LaunchConfiguration("whisper_compute_type"),
                 "whisper_min_rms": ParameterValue(whisper_min_rms, value_type=float),
                 "whisper_silence_ms": ParameterValue(whisper_silence_ms, value_type=int),
+                # 2026-09-25: EXT-SHORT pass-through (see the arguments).
+                "whisper_short_silence_ms": ParameterValue(
+                    LaunchConfiguration("whisper_short_silence_ms"), value_type=int),
+                "whisper_short_voiced_ms": ParameterValue(
+                    LaunchConfiguration("whisper_short_voiced_ms"), value_type=int),
                 "whisper_max_utterance_s": ParameterValue(
                     whisper_max_utterance_s, value_type=float
                 ),
@@ -409,9 +414,28 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "whisper_silence_ms",
-                default_value="500",
+                # 2026-09-25: 800 (500 split sentences at a thinking pause).
+                default_value="800",
                 description="Silence (ms) that finalises an utterance "
                 "(mirrors speech_input_node's declared default; see there).",
+            ),
+            # 2026-09-25: EXT-SHORT pass-through (Majd: on by default) —
+            # short answers end sooner than the 800 ms above. Not in the GUI.
+            DeclareLaunchArgument(
+                "whisper_short_silence_ms",
+                default_value="500",
+                description="Silence (ms) that finalises a SHORT utterance "
+                "(at most whisper_short_voiced_ms of voiced audio); 0 = off, "
+                "every utterance then waits whisper_silence_ms.",
+            ),
+            DeclareLaunchArgument(
+                "whisper_short_voiced_ms",
+                default_value="700",
+                description="Voiced audio (ms) up to which an utterance counts "
+                "as short for whisper_short_silence_ms. 2026-09-25: 700, not "
+                "1200 — single-word commands (stop/yes/open) stay at 500 ms, "
+                "while ~1 s fragments like 'The Vitamin C to' wait the full "
+                "silence instead of splitting.",
             ),
             DeclareLaunchArgument(
                 "whisper_max_utterance_s",

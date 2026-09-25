@@ -58,7 +58,10 @@ from geometry_msgs.msg import PoseArray, PoseStamped
 from sensor_msgs.msg import JointState
 
 from morty_interfaces.action import ExecuteGrasp, Speak
+from rcl_interfaces.msg import SetParametersResult
 
+from . import llm_service as _llm_service
+from . import voice_grammar
 from .llm_service import INTENT_TOOL, LLMService, StopStream, extract_intent, intent_to_json
 
 
@@ -84,6 +87,9 @@ QUICK_NARRATION = {
     "enable_multiview": "Multi-view scan enabled.",
     "disable_multiview": "Single-view mode.",
     "stop": "Stopping.",
+    # 2026-09-25: reset = the GUI's "Reset pick" by voice; spoken at once
+    # with interrupt, like "Stopping." — nothing else follows it.
+    "reset": "Resetting.",
     # System control — executed by the Morty GUI, which owns the launches.
     "start_driver": "Starting the robot driver.",
     "stop_driver": "Stopping the robot driver.",
@@ -95,6 +101,74 @@ QUICK_NARRATION = {
     # pick/place are intentionally absent — the LLM's contextual reply
     # ("Picking up the leftmost vitamin tube") is more useful than a generic.
 }
+
+# 2026-09-25 (Majd: "'I didn't catch that' must come from CODE and be spoken
+# ALONE — never glued to a real answer"). The model marks a garbled turn with
+# the tool action 'unclear'; this node then speaks this line by itself. A
+# model sentence that says it anyway is never spoken (it marks the turn
+# unclear instead).
+UNCLEAR_LINE = "I didn't catch that, could you repeat?"
+# 2026-09-25 (review Y5): FIRST person only — "I didn't catch that", "Sorry,
+# didn't catch it", "I did not quite catch that". A story's "the fisherman
+# didn't catch it" is not the model saying it misheard.
+_UNCLEAR_SENTENCE_RE = re.compile(
+    r"(?:\bI\s+|(?:^|[.!?,;:\u2014-])\s*(?:sorry,?\s*)?)(?:didn'?t|did\s+not)\s+"
+    r"(?:quite\s+)?catch\s+(?:that|it)\b", re.IGNORECASE)
+
+# 2026-09-25 (review M3): the model's prose that CLAIMS a robot action —
+# the end-of-turn action-echo list, now module level so the streamed
+# sentences are judged by the same list, plus the pick claim. GWDG hands
+# over its tool call only at the end of the stream, and Claude often writes
+# its sentence before the tool block, so "Opening the gripper now." was
+# spoken before the command existed. The router (on acceptance) and this
+# node's QUICK lines (on dispatch) say what happens; the model's claim is
+# never spoken. Leading acknowledgements ("Okay,", "Sure!") are skipped.
+_ACTION_ECHOES = (
+    "going home", "going to ready", "going to start",
+    "going to the drop", "going to drop", "going to sleep",
+    "looking left", "looking right", "looking up",
+    "opening the gripper", "closing the gripper",
+    "stopping",
+    "picking up", "picking the", "grasping the",
+)
+_CLAIM_LEAD_RE = re.compile(
+    r"^(?:(?:okay|ok|sure|alright|all right|got it|on it|yes|yep|right|no problem|now)"
+    r"[\s,.!\u2014-]+)*(?:i'm |i am )?", re.IGNORECASE)
+
+
+def _is_action_claim(sentence: str) -> bool:
+    """2026-09-25 (review M3): True when ``sentence`` announces a robot
+    action ("Opening the gripper now.", "Okay, going home.", "Picking up
+    the small bottle.") — see _ACTION_ECHOES."""
+    s = _CLAIM_LEAD_RE.sub("", (sentence or "").strip().replace("’", "'")).lower()
+    return s.startswith(_ACTION_ECHOES)
+
+
+# 2026-09-25 (review H3): the question said again when an answer to it is
+# not fresh (begun before the question opened) — it is neither acted on nor
+# handed to the LLM as consent.
+_REASK_LINES = {
+    "release": "Should I open the gripper?",
+    "destination": "Where should I drop it? Left, right, or home?",
+    "home": "Should I go back home?",
+}
+# The FAST-NEGATIVE lines (2026-08-28), shared since 2026-09-25 with the LLM
+# path (review Y2): a NO the LLM turned into close_gripper / stay says them too.
+_KEEP_HOLDING_LINE = "Okay, I'll keep holding it. Where should I take it?"
+_STAY_LINE = "Okay, I'll stay here."
+_TASK_STATE_TOPIC = "/grasp_executor_lin_llm/task_state"
+
+# 2026-09-25: the four live-settable voice switches (SPEC C1). Their
+# defaults are Majd's decisions of 2026-09-25: the minimal grammar, bare
+# destination answers on (EXT-DEST), a story yields to a new robot
+# question, and a GWDG stream that neither spoke nor dispatched after 3 s is
+# re-answered by Claude (EXT-GWDG-STALL).
+_VOICE_PARAMS = ("voice_fast_layers", "voice_ext_dest", "story_yields_to_question",
+                 "gwdg_stall_s")
+# Actions whose quick line the router speaks after the executor accepted the
+# answer ("Going to drop right." on resumed:) while a pick is in flight.
+_DEST_ACTIONS = {"drop_right", "drop_left", "confirm_drop", "go_home"}
+_HUSH_BY_QUESTION = "the robot asks a question"
 
 # Actions whose narration is owned by intent_router's CONFIRMATION layer,
 # never by this node.
@@ -546,6 +620,12 @@ def _latched_qos() -> QoSProfile:
     )
 
 
+# 2026-09-25 (SPEC C4): RESET emits the reset intent (it was stop, which
+# froze the arm); PAUSE CONSENT names the executor's ROBOT TASK STATE as the
+# authority (announcements are history); GARBLED input is the tool action
+# 'unclear' with no text (this node speaks the line alone); new rules TALK
+# WHILE ACTING (story only when asked in the same utterance) and RELEASE SIDE
+# (a side at the release question is a drop, never an open).
 SYSTEM_PROMPT = """You are Morty, a robot assistant at Hochschule Reutlingen.
 Reply in the language the user spoke: German questions get German answers,
 everything else gets English. Never mix languages in one reply. Keep replies
@@ -577,7 +657,7 @@ close_gripper, stop, go_home, go_to_ready, go_to_start, sleep,
 look_left, look_right, look_up, drop_right, drop_left,
 enable_multiview, disable_multiview,
 start_driver, stop_driver, start_pipeline, stop_pipeline, start_all,
-stop_all.
+stop_all, reset, unclear.
 
 SYSTEM CONTROL - "start the driver", "start the pipeline", "start
 everything" / "start the system" -> start_driver / start_pipeline /
@@ -592,7 +672,7 @@ TELEGRAPHIC GERMAN - short noun-only German is a command, not noise:
 "Greifbare Objekte?" -> list the visible objects (auf Deutsch).
 "Greifbare Objekte, Vitamin C" / bare "Vitamin C" while objects are
 visible -> grasp the vitamin_c. Same pattern for any known object name.
-Do NOT answer these with "I didn't catch that".
+Do NOT treat these as unclear.
 
 SPEECH MISHEARINGS - the transcript comes from speech recognition and
 "grasp" is often misheard. When the sentence names a known object and the
@@ -669,9 +749,9 @@ questions about the old one. Never refuse a new pick because an old
 question is unanswered. Only an object physically IN THE GRIPPER blocks
 a new pick (then ask to drop it first).
 
-RESET - "reset the pick" / "reset" / "start over" / "cancel the pick"
-all mean: emit the stop intent (abort the current cycle, clear the
-selection, detection starts fresh). Never ask what "reset" means.
+RESET - "reset the pick" / "reset" / "start over" all mean: emit the
+reset intent (the robot ends the pick and goes home, keeping any held
+object; the selection is cleared). Never ask what "reset" means.
 
 POSITION GLOSSARY - the arm has these DISTINCT named positions; never
 mix the families:
@@ -728,24 +808,21 @@ followed by go_home as two intents; that makes the robot ask again.
 Emit action_intent release_home (opens, then goes home with NO extra
 question). A plain "open"/"release" answer opens and then the robot will
 ask "Should I go back home?" — when THAT question is open, "yes" / "go
-home" means emit go_home, and "stay" / "wait" / "stop" means emit stop
-(the robot then stays at the drop position).
+home" means emit go_home, and "no" / "stay" / "wait" means emit stay
+(the robot then stays where it is).
 
 PAUSE CONSENT - when the robot is holding an object and waiting ("Where
 should I drop it?" / "Should I open the gripper?"), ANY consent phrasing
 ("yes", "go ahead", "give me the object", "gib es mir", "let it go")
 means: CALL the tool with open_gripper (or the named destination). Never
-answer a consent with the same question again. The announcements are
-AUTHORITATIVE: if the robot recently said "Got the X. Where should I
-drop it?", it IS holding X right now — earlier failed attempts are
-history. Emit the destination intent (drop_right / drop_left / home);
-never claim you are not holding anything while that question is open.
-EQUALLY AUTHORITATIVE the other way: "The grasp failed: ... Resetting."
-CLOSES any open drop/release question — after it the robot is NOT
-holding anything and the pause is over; never refuse a new pick by
-claiming you still hold the previous object after a failure
-announcement, and trust the held-object state message over older
-conversation turns.
+answer a consent with the same question again. The ROBOT TASK STATE is
+AUTHORITATIVE; announcements are history. With no pick and an empty
+gripper, no question is open. While the destination question is open,
+emit the destination intent (drop_right / drop_left / home); never claim
+you are not holding anything while that question is open.
+
+RELEASE SIDE - at "Should I open the gripper?", "drop it on the
+right/left" -> drop_right / drop_left, never open_gripper / release.
 
 COMPOUND PICK-AND-PLACE - "pick the X and put it on the right" -> ONE
 pick_and_place intent with destination set. Don't split it into pick+place.
@@ -754,8 +831,13 @@ MULTIPLE SEPARATE ACTIONS - "go home and look left" -> call the tool
 ONCE PER ACTION in order.
 
 GARBLED INPUT - if the transcript is nonsensical (random numbers,
-broken grammar, single junk word), do NOT fire an intent. Reply
-"I didn't catch that, could you repeat?"
+broken grammar, single junk word), do NOT fire a robot intent: call the
+tool with unclear and write NO text.
+
+TALK WHILE ACTING - only when one utterance asks for an action and for
+talk ("grasp the bottle and tell me a story"): call the tool FIRST with
+talk=true, then the story (at most 6 short sentences — the one exception
+to SHORT); never talk for a plain command.
 
 REPLY RULES after firing an action:
 - Single intent: empty text reply (the system speaks its own narration).
@@ -845,7 +927,9 @@ class ChatIntentNode(Node):
         self.declare_parameter("echo_cooldown_s", 2.5)
         # Overlap-based echo drops only apply while the TTS is still
         # PLAYING plus this tail (mic capture closes ~silence_ms after
-        # the sound stops + ~1 s Whisper). Beyond it, even a 100%-overlap
+        # the sound stops + ~1 s Whisper; 2026-09-25: silence_ms is 800 ms
+        # now, 500 ms for short answers, so 0.8 + 1.0 s still fits in the
+        # 2.0 s tail). Beyond it, even a 100%-overlap
         # transcript is the USER quoting Morty's words back — which is
         # how humans talk ("the pipeline IS running, how?"). Majd,
         # 2026-08-21: "the echo should be only in the same seconds that
@@ -1102,6 +1186,75 @@ class ChatIntentNode(Node):
         self._own_answer_lines: dict[str, float] = {}
         self.create_subscription(
             String, "/grasp_executor_lin_llm/cycle_done", self._on_cycle_done_state, 10)
+        # 2026-09-25 (Majd: "one owner of task state = the executor"): the
+        # executor's latched task state replaces every guess this node made
+        # from spoken announcements — the cycle state, the open question and
+        # the held object follow it while it is known. Until the first
+        # sample arrives (old executor) everything behaves as before.
+        self._task: dict | None = None
+        self._task_qkey: tuple = (None, 0)      # (boot, question_id) of the last question
+        self.create_subscription(
+            String, "/grasp_executor_lin_llm/task_state", self._on_task_state,
+            QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10,
+                       reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        # 2026-09-25: when the operator started speaking (review M1: it was
+        # the speech end), per transcript (speech_input_node publishes it
+        # right before /speech/transcript). A "yes" answers the open
+        # question only if the question opened before that moment
+        # ("fresh"); a yes begun before it makes Morty ask again (review H3).
+        # 2026-09-25 (review M1): [received wall, text, speech_end,
+        # speech_start (None if the meta has none), used].
+        self._utt_meta: list[list] = []
+        self._utt_meta_lock = threading.Lock()
+        # 2026-09-25 (review M1): a meta was ever received — the speech node
+        # publishes them; without any (an old node, Vosk) the minimal
+        # layer cannot judge freshness and the legacy layers answer.
+        self._utt_meta_seen = False
+        self.create_subscription(String, "/speech/utterance_meta", self._on_utterance_meta, 10)
+        # 2026-09-25: C7 — the router speaks the destination line once the
+        # executor accepted it, so this node must know a pick of its own is
+        # still in flight.
+        self._pick_sent_mono = 0.0
+        self._cycle_done_mono = 0.0
+        # 2026-09-25 (review X2): a pick refused before the executor started
+        # a cycle (the selector's "failed|0|…") ends the pending-pick clause
+        # of _router_narrates too — it never produces a cycle_done.
+        self.create_subscription(
+            String, "/grasp_pipeline/selection_result", self._on_selection_result, 10)
+        # 2026-09-25 (review H1): +1 at every stop / reset this node sends
+        # (grammar or LLM). A transcript remembers the value it arrived
+        # with; a turn that waited on _chat_lock across a stop is dropped
+        # instead of running after it ("grasp the bottle" … "Stop!" must not
+        # start the grasp once the stop's turn lets go of the lock).
+        self._stop_epoch = 0
+        # 2026-09-25 (review Y6/L3): every Speak goal gets a serial; answer
+        # goals sent at or before _cut_serial are cancelled when the speak
+        # server accepts them late (an 'unclear' turn cuts what it streamed
+        # without hushing the turn, whose UNCLEAR_LINE must still play).
+        self._speak_serial = 0
+        self._cut_serial = 0
+        # 2026-09-25: per-turn flags of the LLM turn machinery (SPEC C8);
+        # reset at the start of every turn.
+        self._talk_turn = False
+        self._talk_seq = -1
+        self._unclear_turn = False
+        self._real_intent = False
+        self._withheld_this_turn: set[str] = set()
+        self._interrupt_line_turn = False
+        self._stream_mark = 0
+        self._hush_why = ""
+        # 2026-09-25: the four voice switches (SPEC C1), live-settable.
+        self.declare_parameter("voice_fast_layers", "minimal")      # minimal | legacy
+        self.declare_parameter("voice_ext_dest", True)
+        self.declare_parameter("story_yields_to_question", True)
+        self.declare_parameter("gwdg_stall_s", 3.0)
+        self._voice_fast_layers = "minimal"
+        self._voice_ext_dest = True
+        self._story_yields = True
+        for _name in _VOICE_PARAMS:
+            self._apply_voice_param(_name, self.get_parameter(_name).value)
+        self.add_on_set_parameters_callback(self._on_set_voice_params)
         # What the user is currently pointing at via mediapipe (or ""
         # when no finger is over an object). The grasp pipeline emits
         # this only while it's running its selection cycle, so it tells
@@ -1338,9 +1491,44 @@ class ChatIntentNode(Node):
                 continue
 
             try:
-                self.handle_user_text(user_text)
+                # 2026-09-25: typed terminal text takes the same route as
+                # voice (stop/reset first, then the grammar or the LLM); it
+                # was typed when it arrived, so that is its speech end.
+                self._handle_voice_input(user_text, 0, typed_at=time.time(),
+                                         epoch=self._stop_epoch)
             except Exception as exc:
                 self.get_logger().error(f"LLM chat failed: {exc}")
+
+    def _apply_voice_param(self, name: str, value: Any) -> str:
+        """2026-09-25: apply one of the four voice switches (SPEC C1); returns
+        "" when applied, else why the value is refused."""
+        if name == "voice_fast_layers":
+            v = str(value).strip().lower()
+            if v not in ("minimal", "legacy"):
+                return "voice_fast_layers must be 'minimal' or 'legacy'"
+            self._voice_fast_layers = v
+        elif name == "voice_ext_dest":
+            self._voice_ext_dest = bool(value)
+        elif name == "story_yields_to_question":
+            self._story_yields = bool(value)
+        elif name == "gwdg_stall_s":
+            try:
+                v = float(value)
+            except (TypeError, ValueError):
+                return "gwdg_stall_s must be a number"
+            _llm_service.GWDG_STALL_S = max(0.0, v)
+        return ""
+
+    def _on_set_voice_params(self, params) -> SetParametersResult:
+        """2026-09-25: the voice switches apply live (`ros2 param set`, the
+        GUI); every other parameter passes untouched."""
+        for p in params:
+            if p.name in _VOICE_PARAMS:
+                why = self._apply_voice_param(p.name, p.value)
+                if why:
+                    return SetParametersResult(successful=False, reason=why)
+                self.get_logger().info(f"voice switch {p.name} = {p.value!r}")
+        return SetParametersResult(successful=True)
 
     def _on_typed_transcript(self, msg: String) -> None:
         """Typed GUI input (2026-08-27): keyboard text cannot be an
@@ -1354,8 +1542,12 @@ class ChatIntentNode(Node):
         with self._voice_gen_lock:
             self._voice_generation += 1
             my_gen = self._voice_generation
+            epoch = self._stop_epoch     # 2026-09-25 (review H1): the stop epoch it arrived in
+        # 2026-09-25: typed text has no utterance meta; its arrival is its
+        # "speech start" for the fresh-question rule.
         threading.Thread(
-            target=self._handle_voice_input, args=(text, my_gen), daemon=True
+            target=self._handle_voice_input, args=(text, my_gen),
+            kwargs={"typed_at": time.time(), "epoch": epoch}, daemon=True
         ).start()
 
     def _on_transcript(self, msg: String) -> None:
@@ -1416,8 +1608,12 @@ class ChatIntentNode(Node):
         with self._voice_gen_lock:
             self._voice_generation += 1
             my_gen = self._voice_generation
+            epoch = self._stop_epoch     # 2026-09-25 (review H1): the stop epoch it arrived in
+        # heard_at (2026-09-25): pairs this transcript with the utterance
+        # meta published right before it (_speech_start_for).
         threading.Thread(
-            target=self._handle_voice_input, args=(text, my_gen), daemon=True
+            target=self._handle_voice_input, args=(text, my_gen),
+            kwargs={"heard_at": time.time(), "epoch": epoch}, daemon=True
         ).start()
 
     @staticmethod
@@ -1556,7 +1752,8 @@ class ChatIntentNode(Node):
     #  * TAIL_S = 6.0 — the acoustic-timing discipline still applies, but
     #    a MIXED transcript by construction arrives LATER than a pure
     #    echo: it also contains the operator's reply (~2 s) plus the
-    #    500 ms end-of-utterance silence (whisper_silence_ms) plus
+    #    800 ms end-of-utterance silence (whisper_silence_ms; 500 ms for
+    #    answers under ~1.2 s voiced — 2026-09-25) plus
     #    Whisper inference. The 3.0 s capture tail used for the
     #    whole-utterance decision is too tight for that; 6.0 s covers it
     #    while still refusing to strip long after the speaker went quiet
@@ -1867,7 +2064,28 @@ class ChatIntentNode(Node):
         seq = self._answer_seq
         newly = seq > self._hushed_seq
         self._hushed_seq = seq
+        if newly:
+            self._hush_why = why     # 2026-09-25: the first reason wins (read by _finish_interrupted_turn)
+        live = self._cancel_answer_goals(seq)
+        if live or (newly and self._answer_running):
+            self.get_logger().info(
+                f"Answer {seq} interrupted ({why}): {live} queued sentence(s) cancelled; "
+                "nothing more of it will be said.")
+
+    def _cancel_answer_goals(self, seq: int, cut: bool = False) -> int:
+        """2026-09-25: cancel the Speak goals of answers up to ``seq`` that are
+        still queued or playing, without marking the answer hushed (factored
+        out of _hush_answer: an 'unclear' turn cancels what it streamed and
+        then speaks its one line). Returns how many were cancelled.
+
+        ``cut`` (2026-09-25, review Y6): also cancel the answer goals already
+        SENT but not yet accepted by the speak server — they were not in
+        the list yet and played before the unclear line. Not by raising
+        _hushed_seq, which would also swallow the UNCLEAR_LINE of the same
+        turn: the goals sent so far are cut by their serial."""
         with self._answer_goals_lock:
+            if cut:
+                self._cut_serial = self._speak_serial
             live = [h for s_, h in self._answer_goals if s_ <= seq]
             self._answer_goals = [(s_, h) for s_, h in self._answer_goals if s_ > seq]
         for h in live:
@@ -1875,10 +2093,7 @@ class ChatIntentNode(Node):
                 h.cancel_goal_async()
             except Exception:
                 pass
-        if live or (newly and self._answer_running):
-            self.get_logger().info(
-                f"Answer {seq} interrupted ({why}): {len(live)} queued sentence(s) cancelled; "
-                "nothing more of it will be said.")
+        return len(live)
 
     def _finish_interrupted_turn(self, response: Any) -> None:
         """The operator talked over this answer: keep the history valid —
@@ -1892,11 +2107,20 @@ class ChatIntentNode(Node):
                     item, early if early is not None else json.dumps(
                         {"status": "not executed: the operator interrupted this answer"}))
         heard = " ".join(getattr(self, "_streamed", []) or []).strip()
-        self._interrupt_note = (
-            "The operator interrupted your previous answer"
-            + (f"; they heard at most: \"{heard}\"" if heard else " before you said anything")
-            + ". Answer their new message directly. Do not continue or repeat the old "
-              "answer unless they ask for it.")
+        if self._hush_why == _HUSH_BY_QUESTION:
+            # 2026-09-25: a story told while a pick ran yields to the robot's
+            # question (story_yields_to_question); the model must know the
+            # operator did not interrupt it.
+            self._interrupt_note = (
+                "The robot asked a question and cut your story."
+                + (f" The operator heard at most: \"{heard}\"." if heard else "")
+                + " Do not continue the story unless they ask for it.")
+        else:
+            self._interrupt_note = (
+                "The operator interrupted your previous answer"
+                + (f"; they heard at most: \"{heard}\"" if heard else " before you said anything")
+                + ". Answer their new message directly. Do not continue or repeat the old "
+                  "answer unless they ask for it.")
         text = (getattr(response, "output_text", "") or "").strip()
         if text:
             print(f"Assistant (interrupted): {text}")
@@ -2130,6 +2354,14 @@ class ChatIntentNode(Node):
         hist.append((now, text))
         self._status_history = hist[-6:]
         low = text.lower()
+        if self._task is not None:
+            # 2026-09-25: the executor's task state owns the cycle state; a
+            # phrase read back from the speaker (a late "Starting grasp on…"
+            # after the cycle failed) no longer edits it. The history above
+            # and the start-all readiness hook stay.
+            if low.startswith("starting the whole system"):
+                self._announce_ready_until = now + 180.0
+            return
         if low.startswith("starting grasp on"):
             self._cycle_state = f"BUSY — {text[9:].strip()} (pick running)"
         elif low.startswith("got the"):
@@ -2150,7 +2382,11 @@ class ChatIntentNode(Node):
         elif low.startswith("the grasp failed") or "not grasping anything" in low:
             self._cycle_state = "IDLE — last pick FAILED, arm recovered"
         elif (low.startswith("stopping") or low.startswith("resetting")
-              or "stopped by your command" in low):
+              or "stopped by your command" in low
+              # 2026-09-25: the router's reset outcome lines ("Reset — I'm
+              # back home…", "Reset — but I couldn't…", "Pick reset.").
+              or low.startswith("reset —") or low.startswith("reset -")
+              or low.startswith("pick reset")):
             # Operator stop/reset ends the cycle (Majd 2026-08-26: after
             # "Reset" the AI still refused new picks with "a grasp is
             # currently running" — the tracker never saw the stop).
@@ -2264,7 +2500,17 @@ class ChatIntentNode(Node):
                 f"[timing] pruned {dropped} stale message(s) from the LLM "
                 f"context ({before} -> {len(self.chat_agent.messages)})")
 
-    def _handle_voice_input(self, text: str, my_gen: int = 0) -> None:
+    def _handle_voice_input(self, text: str, my_gen: int = 0,
+                            typed_at: float | None = None,
+                            heard_at: float | None = None,
+                            epoch: int | None = None) -> None:
+        # typed_at (2026-09-25): arrival time of typed input (GUI, terminal);
+        # it stands in for the speech start in the fresh-question rule.
+        # heard_at (2026-09-25): arrival time of a voice transcript.
+        # epoch (2026-09-25, review H1): _stop_epoch when the input arrived;
+        # a turn that reaches _chat_lock after a later stop/reset is dropped.
+        if epoch is None:
+            epoch = self._stop_epoch
         # Generation gate: if a newer transcript arrived while we were
         # waiting for the chat lock or running the LLM, don't act on this
         # stale input. Latest-wins behaviour for piled-up voice activity.
@@ -2306,6 +2552,44 @@ class ChatIntentNode(Node):
             self.accepted_transcript_pub.publish(String(data=text))
         except Exception:
             pass
+        # 2026-09-25 (Majd: "STOP FIRST — a stop word anywhere wins over every
+        # other rule; exactly ONE stop is sent"). In both modes, before any
+        # other layer: a stop word anywhere (not negated) is one stop intent
+        # and "Stopping."; with a reset word too, or a whole reset phrase, it
+        # is one reset intent and "Resetting.". Neither ever reaches the LLM
+        # (it used to send a second stop through its own tool call).
+        kind, action = voice_grammar.classify(text)
+        if kind in ("stop", "reset"):
+            self._note_stop_or_reset()       # 2026-09-25 (review H1/X2)
+            if self._task is None:
+                self._open_question = ""     # no task state: the old bookkeeping
+            if kind == "stop":
+                self._fire_stop()
+                self._speak(QUICK_NARRATION["stop"], interrupt=True)
+            else:
+                self._fire_reset()
+                self._speak(QUICK_NARRATION["reset"], interrupt=True)
+            self.get_logger().info(
+                f"[timing] handled in {time.monotonic() - _t_handle0:.2f}s "
+                f"(route=GRAMMAR {kind}): {text!r}")
+            return
+        # 2026-09-25 (review Y1): the minimal layer needs the executor's
+        # LIVE task state (its only source of the open question). Without it
+        # (an old executor, before the first sample, a dead executor) the
+        # legacy layers answer exactly as before the overhaul — otherwise
+        # every pause answer went to the LLM and "No." at the release
+        # question ended in silence.
+        if self._voice_fast_layers != "legacy" and self._live_task() is not None:
+            self._route_minimal(text, typed_at, _t_handle0, _superseded, heard_at, epoch)
+            return
+        self._route_legacy(text, _t_handle0, _superseded, epoch)
+
+    def _route_legacy(self, text: str, _t_handle0: float, _superseded, epoch: int) -> None:
+        """The pre-2026-09-25 layers (voice_fast_layers=legacy, or no live
+        task state — review Y1), unchanged; factored out of
+        _handle_voice_input (2026-09-25) so the minimal layer can fall back
+        to it when the speech node sends no utterance metas."""
+        # ── legacy layers, unchanged ─────────────────────────────────────
         # Fast path: if the transcript is a recognized direct command,
         # publish the intent ourselves and skip the LLM entirely. Cuts
         # latency from ~1-3s down to ~10ms and avoids piling up calls in
@@ -2381,26 +2665,7 @@ class ChatIntentNode(Node):
                     f"Okay — taking it to {_human} and handing it over."
                     if _with_release else f"Okay — taking it to {_human}.")
                 return
-            _payload = {"action_intent": neg, "object_intent": None,
-                        "object_attributes": None}
-            _intent_json = json.dumps(_payload, separators=(",", ":"))
-            self.intent_pub.publish(String(data=_intent_json))
-            self.get_logger().info(
-                f"FAST-NEGATIVE: {text!r} at pause "
-                f"({getattr(self, '_cycle_state', '')!r}) -> {neg}; "
-                f"published {_intent_json}"
-            )
-            if neg == "close_gripper":
-                # v2: the arm now STAYS at the pose with the question
-                # open (it used to silently carry the object home), so
-                # the cycle state must KEEP saying the release pause is
-                # open — otherwise a later "go home" here would not be
-                # recognised as a pause answer.
-                self._speak(
-                    "Okay, I'll keep holding it. Where should I take it?")
-            else:
-                self._cycle_state = "IDLE"
-                self._speak("Okay, I'll stay here.")
+            self._fire_pause_negative(neg, text)
             return
         # Bare affirmation + tracked robot state = deterministic action
         # (2026-08-26: "Yes, go back home" got "Already heading home" WORDS
@@ -2445,6 +2710,7 @@ class ChatIntentNode(Node):
             intent_json = json.dumps(payload, separators=(",", ":"))
             self.intent_pub.publish(String(data=intent_json))
             self._last_intent_json = intent_json
+            self._note_intent_sent("pick")     # 2026-09-25: bookkeeping for _router_narrates
             self.get_logger().info(
                 f"FAST-PICK: {text!r} -> {label}"
                 f"{f' ({colour})' if colour else ''}; published {intent_json}"
@@ -2457,7 +2723,105 @@ class ChatIntentNode(Node):
             )
             return
         try:
-            self.handle_user_text(text)
+            # 2026-09-25 (review H1): re-checked once _chat_lock is held
+            self.handle_user_text(text, superseded=_superseded, epoch=epoch)
+        except Exception as exc:
+            self.get_logger().error(f"LLM chat failed (voice path): {exc}")
+
+    def _fire_pause_negative(self, neg: str, text: str) -> None:
+        """A NO to the executor's open question (2026-08-28's FAST-NEGATIVE
+        layer; 2026-09-25: factored out so the minimal grammar sends the same
+        payload and says the same line). close_gripper = keep holding at the
+        release question, stay = stay at the home question."""
+        _payload = {"action_intent": neg, "object_intent": None,
+                    "object_attributes": None}
+        _intent_json = json.dumps(_payload, separators=(",", ":"))
+        self.intent_pub.publish(String(data=_intent_json))
+        self.get_logger().info(
+            f"FAST-NEGATIVE: {text!r} at pause "
+            f"({getattr(self, '_cycle_state', '')!r}) -> {neg}; "
+            f"published {_intent_json}"
+        )
+        if neg == "close_gripper":
+            # v2: the arm now STAYS at the pose with the question
+            # open (it used to silently carry the object home), so
+            # the cycle state must KEEP saying the release pause is
+            # open — otherwise a later "go home" here would not be
+            # recognised as a pause answer.
+            self._speak(_KEEP_HOLDING_LINE)
+        else:
+            if self._task is None:       # 2026-09-25: the task state owns it when known
+                self._cycle_state = "IDLE"
+            self._speak(_STAY_LINE)
+
+    def _route_minimal(self, text: str, typed_at: float | None, t0: float,
+                       superseded, heard_at: float | None = None,
+                       epoch: int | None = None) -> None:
+        """2026-09-25 (voice_fast_layers=minimal, Majd's item 3): after stop
+        and reset, only three things skip the LLM, and only when the WHOLE
+        utterance is that thing — a yes/no (or, with EXT-DEST, a bare side)
+        answering the question the executor has open, and a standalone
+        open/close. The question comes only from the live task state and
+        must be fresh: opened before the operator STARTED speaking (review
+        M1 — the speech end let a "Yes." begun before the question count).
+        Picks, compounds and every other sentence go to the LLM; the old
+        FAST-PICK and pattern layers do not run.
+
+        Review H3: an answer that is NOT fresh is not acted on and is not
+        handed to the LLM either (the model read it as consent and opened
+        the gripper anyway) — Morty asks the question again."""
+        task = self._live_task() or {}   # one snapshot: the executor thread replaces it
+        question = str(task.get("question") or "")
+        fresh = False
+        start = None
+        if question:
+            start = self._speech_start_for(text, typed_at, heard_at)
+            if start is None and not self._utt_meta_seen:
+                # No utterance meta has EVER arrived: the speech node does not
+                # send them (an old build, Vosk). Freshness cannot be judged,
+                # and "not fresh" would re-ask forever — the legacy layers
+                # answer, as before the overhaul.
+                self.get_logger().info(
+                    "no utterance metas from the speech node — legacy layers answer "
+                    f"{text!r} at question {question!r}")
+                self._route_legacy(text, t0, superseded,
+                                   self._stop_epoch if epoch is None else epoch)
+                return
+            try:
+                since = float(task.get("question_since") or 0.0)
+            except (TypeError, ValueError):
+                since = 0.0
+            fresh = start is not None and 0.0 < since <= start
+        kind, action = voice_grammar.classify(text, question, fresh, self._voice_ext_dest)
+        if kind == "negative":
+            self._fire_pause_negative(action, text)
+        elif kind in ("answer", "gripper"):
+            self._fire_fast_command(action, "", text)
+        if kind != "llm":
+            self.get_logger().info(
+                f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR "
+                f"{kind} {action}, question={question!r}, fresh={fresh})")
+            return
+        if (question and not fresh and voice_grammar.classify(
+                text, question, True, self._voice_ext_dest)[0] in ("answer", "negative")):
+            # 2026-09-25 (review H3): a bare answer begun before the question
+            # opened (or whose start is unknown) answers something else —
+            # ask again; nothing is published and the LLM is not asked.
+            line = _REASK_LINES.get(question, "")
+            self.get_logger().info(
+                f"question {question!r} opened after this utterance began "
+                f"(start={start}, since={task.get('question_since')}) — not a fresh "
+                f"answer; asking again: {text!r}")
+            if line:
+                self._speak(line)
+            return
+        if superseded():
+            self.get_logger().info(
+                f"Superseded by newer transcript before LLM; dropping: {text!r}")
+            return
+        try:
+            # 2026-09-25 (review H1): re-checked once _chat_lock is held
+            self.handle_user_text(text, superseded=superseded, epoch=epoch)
         except Exception as exc:
             self.get_logger().error(f"LLM chat failed (voice path): {exc}")
 
@@ -2509,10 +2873,14 @@ class ChatIntentNode(Node):
         # Save for redo and play the quick narration line.
         if action not in {"stop", "cancel", "abort"}:
             self._last_intent_json = intent_json
+        self._note_intent_sent(action)
         quick = QUICK_NARRATION.get(action)
-        if action in CONFIRMED_NARRATION_ACTIONS:
+        if self._router_narrates(action):
             # Reality, not intent: intent_router narrates this one once the
-            # gripper (or the executor's 'released' event) actually reports.
+            # gripper (or the executor's 'released' event) actually reports
+            # — and (2026-09-25) a destination said while a pick is in
+            # flight once the executor accepted it ("Going to drop right."
+            # on resumed:).
             self.get_logger().info(
                 f"Withholding pre-emptive narration {quick!r} for {action!r} "
                 "— intent_router speaks it only after the action is "
@@ -2534,19 +2902,30 @@ class ChatIntentNode(Node):
         msg.data = bool(muted)
         self._mute_pub.publish(msg)
 
-    def handle_user_text(self, user_text: str) -> None:
-        # Fast-path: if the user clearly said "stop", cancel local in-flight
-        # actions immediately, then publish an explicit stop intent so
-        # intent_router and downstream nodes also cancel. We still hand the
-        # text to the LLM so the AI acknowledges in conversation.
-        if _is_stop_command(user_text):
-            self._fire_stop()
+    def handle_user_text(self, user_text: str, superseded=None, epoch: int | None = None) -> None:
+        # 2026-09-25: the stop fast path that lived here is gone — stop and
+        # reset are decided once, before this, in _handle_voice_input (it
+        # also sent a SECOND stop when the LLM then called the tool).
         # Fast-path: "do it again" — re-publish the last non-control intent
         # immediately so we don't pay the LLM round-trip cost. Still hand
         # the text to the LLM so it acknowledges in conversation.
-        if _is_redo_command(user_text):
+        # 2026-09-25: legacy layers only (voice_fast_layers=legacy).
+        if self._voice_fast_layers == "legacy" and _is_redo_command(user_text):
             self._fire_redo()
         with self._chat_lock:
+            # 2026-09-25 (review H1): this turn may have waited here while
+            # another ran; a stop / reset sent since the input arrived, or a
+            # newer transcript, makes it stale — "grasp the bottle" then
+            # "Stop!" must never start the grasp after the stop.
+            if epoch is not None and epoch != self._stop_epoch:
+                self.get_logger().info(
+                    f"A stop/reset came after this input; dropping it: {user_text!r}")
+                return
+            if superseded is not None and superseded():
+                self.get_logger().info(
+                    f"Superseded by newer transcript while waiting for the chat lock; "
+                    f"dropping: {user_text!r}")
+                return
             self._answer_seq += 1
             self._answer_running = True
             try:
@@ -2591,6 +2970,20 @@ class ChatIntentNode(Node):
         except Exception as exc:
             self.get_logger().warn(f"STOP: publish failed: {exc}")
 
+    def _fire_reset(self) -> str:
+        """2026-09-25 (Majd: "reset = what the GUI 'Reset pick' does: end the
+        pick, go home keeping any held object, clear selections/queue — NOT
+        a freeze"). Publishes the voice reset intent of SPEC §1.4 byte for
+        byte; the router turns it into the executor reset. Returns the JSON."""
+        payload = json.dumps({"action_intent": "reset", "object_intent": None,
+                              "object_attributes": None}, separators=(",", ":"))
+        try:
+            self.intent_pub.publish(String(data=payload))
+            self.get_logger().info(f"RESET: published {payload}")
+        except Exception as exc:
+            self.get_logger().warn(f"RESET: publish failed: {exc}")
+        return payload
+
     def _publish_chat_state(self, state: str) -> None:
         """Broadcast the current conversation phase on /chat/state. The
         visualizer uses this to show 'thinking…' while we wait for the
@@ -2633,6 +3026,11 @@ class ChatIntentNode(Node):
                 f"am I pointing at?', answer with '{pointed_human}'."
             )
         _st_hist = getattr(self, "_status_history", [])
+        # 2026-09-25: with the executor's task state known, its block (last,
+        # below) replaces the cycle-state clause here and both "Robot state:
+        # gripper …" messages; the announcements stay as history.
+        _task_known = self._task is not None
+        _state_name = "ROBOT TASK STATE" if _task_known else "Robot state"
         if _st_hist:
             _now_s = self.get_clock().now().nanoseconds / 1e9
             _lines = "; ".join(
@@ -2643,11 +3041,11 @@ class ChatIntentNode(Node):
             self.chat_agent.add_developer_message(
                 "ROBOT ANNOUNCEMENTS (what the robot itself said recently, "
                 "newest last; your own replies are not in it): "
-                + _lines + ". Current cycle state: " + _cs
+                + _lines + ("" if _task_known else ". Current cycle state: " + _cs)
                 + ". Use them to know what the robot is doing — if they say "
                 "a grasp is running, a grasp IS running even if you never "
                 "commanded one this turn. The older a line, the more it may "
-                "be outdated: where a line disagrees with the 'Robot state' "
+                f"be outdated: where a line disagrees with the '{_state_name}' "
                 "or 'Robot arm state' messages below, the line is OLD and "
                 "those messages are right. "
                 "NO PARROTING: these status lines are CONTEXT, not a "
@@ -2660,12 +3058,14 @@ class ChatIntentNode(Node):
                 "operator answered a question in the feed, ACT on their "
                 "answer or say something NEW; if they said NO to opening "
                 "the gripper, emit close_gripper — never re-ask. "
-                "FRESHNESS: the 'Robot state' / 'Robot arm state' messages "
+                f"FRESHNESS: the '{_state_name}' / 'Robot arm state' messages "
                 "below describe the robot NOW and OVERRIDE anything said "
                 "earlier — these announcements and your own previous "
                 "replies included."
             )
-        if self._held_object_label:
+        if _task_known:
+            pass     # 2026-09-25: the ROBOT TASK STATE block below says what the gripper holds
+        elif self._held_object_label:
             # Pronoun grounding: tell the LLM what's currently in the gripper
             # so "drop it on the left" / "stell es ab" can resolve "it".
             human_label = self._held_object_label.replace("_", " ")
@@ -2734,6 +3134,86 @@ class ChatIntentNode(Node):
             self.chat_agent.add_developer_message(
                 "Robot arm state: unknown (no joint state yet). If asked which "
                 "position the arm is at, say so honestly and do not guess." + tail)
+        # 2026-09-25: LAST, so it outranks everything before it.
+        self.chat_agent.add_developer_message(self._task_state_block())
+
+    # 2026-09-25: the executor's phases in words, for the LLM's task-state block.
+    _PHASE_WORDS = {
+        "probing": "is starting (checking the grasp for the {obj})",
+        "approaching": "is running: the arm is moving in to grasp the {obj}",
+        "no_grasp": "missed: the gripper closed on nothing",
+        "awaiting_destination": "is paused: holding the {obj} at the grasp pose",
+        "carrying": "is running: carrying the {obj} to {dest}",
+        "awaiting_release": "is paused: holding the {obj} at {dest}",
+        "releasing": "is running: opening the gripper at {dest}",
+        "awaiting_home_confirm": "is paused at the drop pose",
+        "returning_home": "is running: the arm is returning home",
+        "stopped": "was STOPPED by the operator: the arm is frozen where it was",
+    }
+    _QUESTION_WORDS = {
+        "destination": ('OPEN QUESTION: "Where should I drop it? Left, right, or home?" — '
+                        "answer with confirm_drop (destination drop_left / drop_right / home)"),
+        "release": ('OPEN QUESTION: "Should I open the gripper?" — yes = release, '
+                    "no = close_gripper, another side = drop_left / drop_right"),
+        # 2026-09-25 (review Y2): stay, not stop — a NO keeps the arm where
+        # it is with "Okay, I'll stay here." instead of "Stopping." + abort.
+        "home": ('OPEN QUESTION: "Should I go back home?" — yes = go_home, '
+                 "no / stay = stay"),
+    }
+    # 2026-09-25 (review X3): the no-grasp confirm is the home question with
+    # no destination and nothing held — the arm is lifted above the grasp
+    # spot, not at a drop pose.
+    _NO_GRASP_HOME_WORDS = ("missed the grasp — lifted above the grasp position, "
+                            "gripper empty, asking whether to go home")
+
+    @staticmethod
+    def _is_no_grasp_home(t: dict) -> bool:
+        """2026-09-25 (review X3): the task state is the no-grasp home
+        question (phase awaiting_home_confirm / no_grasp, question home, no
+        destination, nothing held)."""
+        return (str(t.get("question") or "") == "home"
+                and str(t.get("phase") or "") in ("awaiting_home_confirm", "no_grasp")
+                and not str(t.get("destination") or "") and not t.get("holding"))
+
+    def _task_state_block(self) -> str:
+        """2026-09-25 (SPEC C3): the one developer message that tells the LLM
+        the pick's state, built from the executor's task state — the only
+        authority on the pick (the announcements feed is history and the
+        model's own earlier replies are not evidence). Unknown until the
+        executor reports (old executor): then the old held-object messages
+        above are still sent."""
+        t = self._task
+        if t is None:
+            return "ROBOT TASK STATE: unknown — the executor has not reported."
+        phase = str(t.get("phase") or "idle")
+        cid = t.get("cycle_id") or 0
+        obj = str(t.get("object") or "").replace("_", " ") or "object"
+        dest_name = str(t.get("destination") or "").replace("_", " ")
+        dest = f"the {dest_name} pose" if dest_name else "the drop pose"
+        if phase == "idle":
+            head = "No pick is running (idle)"
+        elif self._is_no_grasp_home(t):
+            head = f"Pick #{cid} " + self._NO_GRASP_HOME_WORDS    # 2026-09-25 (review X3)
+        else:
+            words = self._PHASE_WORDS.get(phase, phase.replace("_", " "))
+            head = f"Pick #{cid} " + words.format(obj=obj, dest=dest)
+        q = str(t.get("question") or "")
+        qtext = self._QUESTION_WORDS.get(q, "No question is open")
+        if t.get("holding"):
+            grip = f"Gripper: closed on the {obj} (not opened since; no sensor confirms contents)"
+        else:
+            grip = f"Gripper: {str(t.get('gripper') or 'unknown')}, holding NOTHING"
+        last = t.get("last") or {}
+        if isinstance(last, dict) and last.get("cycle_id"):
+            reason = str(last.get("reason") or "")
+            tail = (f"Last pick #{last.get('cycle_id')}: {last.get('outcome') or 'unknown'}"
+                    + (f": {reason}" if reason else "")
+                    + (", arm at home" if last.get("at_home") else ""))
+        else:
+            tail = "No pick has finished yet"
+        return ("ROBOT TASK STATE (live, from the executor — the only authority on the "
+                "pick; overrides the announcements, the conversation and your own "
+                f"earlier replies): {head}. {qtext}. {grip}. {tail}.")
 
     def _handle_user_text_locked(self, user_text: str) -> None:
         # Reset per-turn flags. _handle_intent_tool_call sets
@@ -2747,6 +3227,15 @@ class ChatIntentNode(Node):
         # LLM's combined reply do the talking (no "Going home." +
         # "Going to drop right." stutter before the joke).
         self._pending_quick_narrations: list[tuple[str, str]] = []
+        # 2026-09-25 (SPEC C8): this turn's talk / unclear / real-intent
+        # marks, the router-narrated placeholders, and where the talk turn's
+        # follow-up started streaming.
+        self._talk_turn = False
+        self._unclear_turn = False
+        self._real_intent = False
+        self._withheld_this_turn = set()
+        self._interrupt_line_turn = False
+        self._stream_mark = 0
         self._publish_chat_state("thinking")
 
         # Inject today's date / weekday / local time as a developer
@@ -2793,7 +3282,9 @@ class ChatIntentNode(Node):
                 "content ('Starting Greif.'). When unsure, act on the "
                 "user's words. You may reference these announcements when "
                 "the user asks what is happening. They are the PAST: the "
-                "'Robot state' and 'Robot arm state' messages further below "
+                # 2026-09-25: with the task state known its block is the NOW
+                + ("'ROBOT TASK STATE'" if self._task is not None else "'Robot state'")
+                + " and 'Robot arm state' messages further below "
                 "describe the robot NOW."
             )
 
@@ -2809,7 +3300,8 @@ class ChatIntentNode(Node):
             self._stream_buf = ""
             self._streamed: list[str] = []
             response = self.chat_agent.chat(model=self.model, on_tool_call=self._early_intent_call,
-                                            on_text=self._on_reply_text)
+                                            on_text=self._on_reply_text,
+                                            on_restart=self._on_llm_restart)
             cached = getattr(response, "cache_read_tokens", None)
             self.get_logger().info(
                 f"[timing] LLM main call {time.monotonic() - _t_llm0:.2f}s"
@@ -2847,7 +3339,10 @@ class ChatIntentNode(Node):
             ]
             if not calls:
                 break
+            only_unclear = True
             for call in calls:
+                if self._call_action(call) != "unclear":
+                    only_unclear = False
                 early = self._early_dispatched.pop(call.call_id, None) if getattr(self, "_early_dispatched", None) else None
                 if early is not None:
                     # Dispatched while the reply streamed; only the tool
@@ -2855,9 +3350,24 @@ class ChatIntentNode(Node):
                     self.chat_agent.add_function_call_output(call, early)
                     continue
                 self._handle_intent_tool_call(call)
+            if only_unclear and not self._real_intent:
+                # 2026-09-25: an 'unclear' turn ends here — outputs recorded,
+                # no follow-up call (it would only produce more words); the
+                # end of the turn speaks UNCLEAR_LINE alone.
+                break
             try:
                 _t_llm1 = time.monotonic()
-                response = self.chat_agent.chat(model=self.model)
+                if self._talk_turn:
+                    # 2026-09-25: TALK WHILE ACTING — the story comes in the
+                    # follow-up; stream it sentence by sentence like a plain
+                    # answer, and remember where it started so the end of
+                    # the turn does not repeat it.
+                    self._stream_buf = ""
+                    self._stream_mark = len(self._streamed)
+                    response = self.chat_agent.chat(model=self.model, on_text=self._on_reply_text,
+                                                    on_restart=self._on_llm_restart)
+                else:
+                    response = self.chat_agent.chat(model=self.model, on_restart=self._on_llm_restart)
                 self.get_logger().info(
                     f"[timing] LLM follow-up call "
                     f"{time.monotonic() - _t_llm1:.2f}s")
@@ -2872,6 +3382,32 @@ class ChatIntentNode(Node):
             self._finish_interrupted_turn(response)
             return
         assistant_text = getattr(response, "output_text", "")
+        if (not self._real_intent and not self._unclear_turn and assistant_text
+                and _UNCLEAR_SENTENCE_RE.search(assistant_text.replace("’", "'"))):
+            # 2026-09-25 (review M4): the model said "I didn't catch that" in
+            # a sentence the stream never cut (the reply's last one) and
+            # called no tool — dropping that sentence below left silence.
+            # It is an unclear turn: the line is said from code.
+            self._unclear_turn = True
+            self.get_logger().info(
+                f"model reply says it did not catch the input — unclear turn: {assistant_text!r}")
+        if self._unclear_turn and not self._real_intent:
+            # 2026-09-25 (Majd: "'I didn't catch that' must come from CODE and
+            # be spoken ALONE"): whatever this turn streamed before the model
+            # decided it was garbled is cancelled, and the one line is said.
+            # cut=True (review Y6): also the sentences still on their way.
+            cancelled = self._cancel_answer_goals(self._answer_seq, cut=True)
+            print(f"Assistant: {UNCLEAR_LINE}")
+            self.assistant_pub.publish(String(data=UNCLEAR_LINE))
+            self.get_logger().info(
+                f"unclear turn: {cancelled} streamed sentence(s) cancelled, "
+                f"model text withheld ({(assistant_text or '').strip()!r}); speaking the line")
+            self._speak(UNCLEAR_LINE, answer=True)
+            self._publish_chat_state("idle")
+            return
+        # 2026-09-25: a model sentence saying "I didn't catch that" next to a
+        # real command is dropped — never glued to a real answer.
+        assistant_text = self._drop_marker_sentences(assistant_text)
         if assistant_text:
             print(f"Assistant: {assistant_text}")
             msg = String()
@@ -2888,7 +3424,12 @@ class ChatIntentNode(Node):
         # gripper actually reports, or says why it did not move.
         # The assistant text is still published above, so the GUI/chat
         # transcript keeps it; only the TTS is withheld.
-        if pending and all(a in CONFIRMED_NARRATION_ACTIONS for a, _ in pending):
+        # 2026-09-25: "confirmation-owned" is now every action the router
+        # narrates (_router_narrates, recorded per turn in
+        # _withheld_this_turn) — except in a talk turn, whose prose is the
+        # story the operator asked for.
+        if (pending and all(a in self._withheld_this_turn for a, _ in pending)
+                and not self._talk_turn):
             self.get_logger().info(
                 "Withholding end-of-turn TTS: narration for "
                 f"{[a for a, _ in pending]} is driven by intent_router "
@@ -2902,22 +3443,29 @@ class ChatIntentNode(Node):
         #   - 1 intent + empty/echo reply -> speak quick narration only
         #   - >=2 intents + rich reply -> SKIP quick narrations; LLM reply covers it
         #   - >=2 intents + empty/echo reply -> speak quick narrations sequentially
-        action_echoes = (
-            "going home", "going to ready", "going to start",
-            "going to the drop", "going to drop", "going to sleep",
-            "looking left", "looking right", "looking up",
-            "opening the gripper", "closing the gripper",
-            "stopping",
-        )
+        # 2026-09-25 (review M3): the list is module level (_ACTION_ECHOES),
+        # shared with the streamed-sentence claim filter.
         reply_is_rich = bool(trimmed) and not any(
             trimmed.lower().startswith(a) and len(trimmed) <= 40
-            for a in action_echoes
+            for a in _ACTION_ECHOES
         )
 
-        tail = self._unspoken_tail(assistant_text)   # sentences streamed early are not repeated
+        # sentences streamed early are not repeated (2026-09-25: in a talk
+        # turn only those the follow-up streamed — the final text is its own)
+        tail = self._unspoken_tail(assistant_text, since=self._stream_mark)
+        if n_intents < 2:
+            # 2026-09-25 (review M3): the model's action claims ("Going home.",
+            # "Picking up the X.") are never spoken — the QUICK line (spoken
+            # on dispatch) or the router (on acceptance) says what happens.
+            # A multi-intent turn keeps its combined plan sentence: the
+            # prompt makes it the replacement of the QUICK lines, and it is
+            # spoken only now, after every command was published.
+            tail = self._drop_claim_sentences(tail)
         if n_intents == 0:
             # Pure conversational reply, always speak it if non-empty.
-            if tail:
+            # 2026-09-25: except after an LLM stop/reset — "Stopping." /
+            # "Resetting." was said at once and nothing else follows it.
+            if tail and not self._interrupt_line_turn:
                 self._speak(tail, answer=True)
         elif n_intents == 1:
             # Quick narration immediately, then the LLM reply if it adds
@@ -2988,6 +3536,9 @@ class ChatIntentNode(Node):
         # and follow-ups queue politely instead of chopping each other off.
         goal.interrupt_current = bool(interrupt) and self._speak_interrupt
         seq = self._answer_seq if answer else 0     # answer=True: part of LLM turn `seq`, cancellable
+        with self._answer_goals_lock:               # 2026-09-25 (review Y6): see _cut_serial
+            self._speak_serial += 1
+            serial = self._speak_serial
 
         send_future = self._speak_client.send_goal_async(goal)
 
@@ -3015,7 +3566,9 @@ class ChatIntentNode(Node):
             if seq:
                 with self._answer_goals_lock:
                     self._answer_goals.append((seq, handle))
-                if seq <= self._hushed_seq:      # hushed while this goal was on its way
+                # hushed while this goal was on its way — or (2026-09-25,
+                # review Y6) cut by an 'unclear' turn after it was sent
+                if seq <= self._hushed_seq or serial <= self._cut_serial:
                     handle.cancel_goal_async()
 
             def _on_result(_r) -> None:
@@ -3035,18 +3588,27 @@ class ChatIntentNode(Node):
     _SENTENCE_END = re.compile(r"[.!?](?=\s+[A-ZÄÖÜ0-9\"“(])")
     _ABBREV = re.compile(r"\b(?:Dr|Mr|Mrs|Ms|Prof|St|vs|e\.g|i\.e|Nr|z\.B|bzw|ca)\.$")
 
-    def _on_reply_text(self, delta: str) -> None:
+    def _on_reply_text(self, delta: str) -> bool:
         """Called from the Bedrock stream with each text delta (2026-09-23,
         Majd: "still slow"): a finished sentence is spoken at once while
         the model keeps writing — a story used to wait 3–9 s for its last
         word before the first was heard. Only while no command was
         dispatched in this turn: command replies stay with the end-of-turn
-        rules (quick narration, withholding)."""
+        rules (quick narration, withholding).
+
+        2026-09-25: returns True when a sentence was spoken (the GWDG stall
+        rule counts that as progress); a talk turn keeps streaming after its
+        command was dispatched; an unclear turn streams nothing more, and a
+        sentence saying "I didn't catch that" is never spoken — it marks the
+        turn unclear and the end of the turn says the line from code."""
         if self._reply_hushed():
             raise StopStream()      # the operator is talking: end this reply now
         self._stream_buf += delta
-        if self._early_dispatched:
-            return
+        if self._unclear_turn:
+            return False
+        if self._early_dispatched and not self._talk_turn:
+            return False
+        spoke = False
         while True:
             cut = None
             for m in self._SENTENCE_END.finditer(self._stream_buf):
@@ -3055,8 +3617,18 @@ class ChatIntentNode(Node):
                 cut = m.end()
                 break
             if cut is None:
-                return
+                return spoke
             sentence, self._stream_buf = self._stream_buf[:cut].strip(), self._stream_buf[cut:].lstrip()
+            if _UNCLEAR_SENTENCE_RE.search(sentence.replace("’", "'")):
+                self._unclear_turn = True
+                self.get_logger().info(f"model said it did not catch the input — not spoken: {sentence!r}")
+                return spoke
+            if _is_action_claim(sentence):
+                # 2026-09-25 (review M3): "Opening the gripper now." streamed
+                # before the tool call exists (GWDG sends it at the end of the
+                # stream) — never spoken; see _ACTION_ECHOES.
+                self.get_logger().info(f"action claim in the model's prose — not spoken: {sentence!r}")
+                continue
             if len(sentence) >= 8:
                 if not self._streamed:
                     self.get_logger().info(
@@ -3064,11 +3636,51 @@ class ChatIntentNode(Node):
                 self._streamed.append(sentence)
                 self.assistant_partial_pub.publish(String(data=" ".join(self._streamed)))
                 self._speak(sentence, answer=True)
+                spoke = True
 
-    def _unspoken_tail(self, text: str) -> str:
-        """``text`` minus the sentences already spoken while streaming."""
+    def _on_llm_restart(self) -> None:
+        """2026-09-25: a fallback model re-answers this turn (GWDG stalled or
+        failed before speaking or dispatching anything, or a Bedrock capacity
+        retry): the half sentence the first stream left in the buffer must
+        not be glued to the new answer."""
+        self._stream_buf = ""
+        # 2026-09-25 (review L1): the failed attempt's "I didn't catch that"
+        # sentence (it never reached the speaker — a restart happens only
+        # when nothing was spoken or dispatched) must not replace the
+        # fallback model's answer with UNCLEAR_LINE. An 'unclear' TOOL call
+        # counts as dispatched, so no restart follows one.
+        self._unclear_turn = False
+        self.get_logger().info("LLM restart: a fallback model re-answers this turn")
+
+    def _drop_claim_sentences(self, text: str) -> str:
+        """2026-09-25 (review M3): ``text`` without its action-claim
+        sentences (_is_action_claim); unchanged when it has none."""
+        if not text:
+            return text
+        parts = re.split(r"(?<=[.!?])\s+", text.strip())
+        kept = [p for p in parts if not _is_action_claim(p)]
+        if len(kept) != len(parts):
+            self.get_logger().info(
+                f"action claim(s) in the model's reply not spoken: "
+                f"{[p for p in parts if _is_action_claim(p)]!r}")
+        return " ".join(kept)
+
+    def _drop_marker_sentences(self, text: str) -> str:
+        """2026-09-25: ``text`` without its "I didn't catch that" sentences
+        (unchanged when it has none)."""
+        if not text or not _UNCLEAR_SENTENCE_RE.search(text.replace("’", "'")):
+            return text
+        parts = re.split(r"(?<=[.!?])\s+", text.strip())
+        kept = [p for p in parts if not _UNCLEAR_SENTENCE_RE.search(p.replace("’", "'"))]
+        return " ".join(kept)
+
+    def _unspoken_tail(self, text: str, since: int = 0) -> str:
+        """``text`` minus the sentences already spoken while streaming.
+        2026-09-25: ``since`` = the first streamed sentence that belongs to
+        ``text`` (a talk turn's follow-up; the earlier ones were another
+        response's)."""
         rest = (text or "").strip()
-        for sent in getattr(self, "_streamed", []) or []:
+        for sent in (getattr(self, "_streamed", []) or [])[since:]:
             i = rest.find(sent)
             if i < 0:
                 break
@@ -3095,6 +3707,97 @@ class ChatIntentNode(Node):
         except Exception as exc:  # noqa: BLE001
             self.get_logger().warn(f"early intent dispatch failed: {exc}")
 
+    @staticmethod
+    def _call_action(item: Any) -> str:
+        """2026-09-25: the action_intent of one tool call ("" if unreadable)."""
+        try:
+            return str((json.loads(item.arguments) or {}).get("action_intent") or "").strip()
+        except Exception:
+            return ""
+
+    def _note_intent_sent(self, action: str) -> None:
+        """2026-09-25: remember when this node last sent a pick (C7: a
+        destination said before the executor reports the new cycle is still
+        the router's to announce). Review X1: a plain "pick" only — the
+        router latches an early destination for a plain pick; a
+        pick_and_place already carries its destination and is not latched."""
+        if str(action or "").strip().lower() == "pick":
+            self._pick_sent_mono = time.monotonic()
+
+    def _note_stop_or_reset(self) -> None:
+        """2026-09-25 (review H1/X2): this node sent a stop or reset — every
+        input that arrived before it and still waits for the chat lock is
+        stale (_stop_epoch), and no pick of ours is pending any more."""
+        with self._voice_gen_lock:
+            self._stop_epoch += 1
+        self._pick_sent_mono = 0.0
+
+    def _on_selection_result(self, msg: String) -> None:
+        """2026-09-25 (review X2): the grasp selector refused the pick
+        ("failed|0|…", the cycle_done grammar) before the executor began a
+        cycle — no cycle_done follows, so the pending-pick clause of
+        _router_narrates ends here."""
+        if (msg.data or "").strip().lower().startswith("failed"):
+            self._pick_sent_mono = 0.0
+
+    def _plain_pick_pending(self) -> bool:
+        """2026-09-25 (C7, review X2): this node sent a plain pick < 90 s ago
+        and neither a cycle end, a selector refusal nor a stop/reset came
+        since."""
+        return bool(self._pick_sent_mono
+                    and time.monotonic() - self._pick_sent_mono < 90.0
+                    and self._cycle_done_mono < self._pick_sent_mono)
+
+    def _live_task(self) -> dict | None:
+        """2026-09-25 (review X4): the executor's task state, or None while it
+        is unknown OR its publisher is gone — a dead executor's latched last
+        sample must not be trusted (as the GUI checks). Used where a stale
+        state would act: the open question and _router_narrates."""
+        t = self._task
+        if t is None:
+            return None
+        try:
+            if self.count_publishers(_TASK_STATE_TOPIC) == 0:
+                return None
+        except Exception:  # noqa: BLE001 — a graph query failing is not "dead"
+            pass
+        return t
+
+    def _router_narrates(self, action: str) -> bool:
+        """2026-09-25 (SPEC C7, Majd: "never announce what was not accepted").
+        True when intent_router speaks this action's line after the robot
+        confirmed it, so this node must stay silent: the gripper actions
+        always. A destination action (drop_right / drop_left / confirm_drop
+        / go_home) with a live task state (review M2: in every state except
+        these two, nobody has accepted it yet and the router narrates on
+        acceptance):
+          * the home question is open → False, chat says "Going home." as
+            before;
+          * idle, no question → False ("Going home." as before), unless a
+            plain pick of ours is pending (_plain_pick_pending, review X2):
+            the router latches the destination and announces it;
+          * probing / approaching → only when the pick asks for a
+            destination (review X1: the router latches only then; a
+            pick_and_place's "No, put it on the left" was left in silence);
+          * any other question or phase → True.
+        Without a live task state only the gripper actions, as before."""
+        if action in CONFIRMED_NARRATION_ACTIONS:
+            return True
+        t = self._live_task()
+        if t is None or action not in _DEST_ACTIONS:
+            return False
+        q = str(t.get("question") or "")
+        if q == "home":
+            return False
+        if q:
+            return True
+        phase = str(t.get("phase") or "")
+        if phase == "idle":
+            return self._plain_pick_pending()
+        if phase in ("probing", "approaching"):
+            return bool(t.get("asks_destination"))
+        return True
+
     def _handle_intent_tool_call(self, item: Any, record_output: bool = True) -> None:
         # Single-call path: the LLM now returns the structured fields
         # directly via the tool call. No second extract_intent() round-trip.
@@ -3112,22 +3815,85 @@ class ChatIntentNode(Node):
                 self.chat_agent.add_function_call_output(item, self._last_tool_output)
             return
 
+        if action == "unclear":
+            # 2026-09-25: the model found the input garbled. Nothing is
+            # published (the router never sees 'unclear'); the turn stops
+            # streaming and its end speaks UNCLEAR_LINE alone — unless a real
+            # command came in the same turn, which then wins.
+            self._unclear_turn = True
+            self._last_tool_output = '{"handled":"unclear"}'
+            # 2026-09-25 (review L3/Y6): GWDG hands the tool call over only
+            # at the end of its stream, after its prose was streamed — cut
+            # that prose now (queued and still on its way), not only at the
+            # end of the turn.
+            cut = self._cancel_answer_goals(self._answer_seq, cut=True)
+            self.get_logger().info(
+                f"LLM marked the input unclear — nothing published ({cut} streamed sentence(s) cut)")
+            if record_output:
+                self.chat_agent.add_function_call_output(item, self._last_tool_output)
+            return
+        self._real_intent = True       # 2026-09-25: anything but 'unclear' is a real command
+        if args.get("talk") in (True, "true", "True"):
+            # 2026-09-25 (Majd: "a story while a grasp runs, only when asked
+            # in that utterance"): the reply keeps streaming after this
+            # dispatch; a new robot question may cut it (_on_task_state).
+            self._talk_turn = True
+            self._talk_seq = self._answer_seq
+
         # Stop narrations are time-critical — speak immediately,
         # interrupting whatever else was playing. Everything else gets
         # buffered for end-of-turn flushing so a multi-intent turn
         # ("go home then drop right and tell a joke") can be narrated
         # by the LLM as one coherent sentence rather than three
         # back-to-back fragments.
+        # 2026-09-25 (review Y2): the live question decides what a NO means.
+        live_q = str((self._live_task() or {}).get("question") or "")
+        if action == "stop" and live_q == "home":
+            # A stop word never reaches the LLM (the grammar sends it), so
+            # an LLM stop at "Should I go back home?" is its reading of a NO
+            # ("leave it there") — the same 'stay' as the deterministic NO:
+            # the arm stays, "Okay, I'll stay here.", no abort.
+            self.get_logger().info("LLM stop at the home question → stay")
+            action = "stay"
+            args["action_intent"] = "stay"
         quick = QUICK_NARRATION.get(action)
-        if action in CONFIRMED_NARRATION_ACTIONS:
+        if action == "reset":
+            # 2026-09-25: an LLM reset is said at once, like stop, and
+            # published as the exact voice reset intent (SPEC §1.4).
+            self._note_stop_or_reset()       # 2026-09-25 (review H1/X2)
+            self._interrupt_line_turn = True
+            self._intent_fired_this_turn = True
+            self._speak(quick, interrupt=True)
+            self._last_tool_output = self._fire_reset()
+            if record_output:
+                self.chat_agent.add_function_call_output(item, self._last_tool_output)
+            return
+        if action == "close_gripper" and live_q == "release":
+            # 2026-09-25 (review Y2): a NO the LLM understood ("Wait a
+            # second.", "No, keep it for now") — say the FAST-NEGATIVE line
+            # as HEAD did; withheld, it ended in silence.
+            self._pending_quick_narrations.append((action, _KEEP_HOLDING_LINE))
+        elif action == "stay":
+            # 2026-09-25 (review Y2): the router answers the home pause with
+            # it (and keeps holding at the release pause); elsewhere it is a
+            # straggler the router swallows — nothing to say.
+            line = {"home": _STAY_LINE, "release": _KEEP_HOLDING_LINE}.get(live_q, "")
+            self._pending_quick_narrations.append((action, line))
+            if not line:
+                self._withheld_this_turn.add(action)
+        elif self._router_narrates(action):
             # Silent placeholder: keeps this intent in the per-turn
             # accounting (so a mixed turn still narrates its OTHER actions)
             # while saying nothing about the gripper here. _speak("") is a
             # no-op, and the all-confirmed case below withholds the LLM's
-            # own reply too.
+            # own reply too. 2026-09-25: also a destination the router
+            # announces once the executor accepted it (_router_narrates).
             self._pending_quick_narrations.append((action, ""))
+            self._withheld_this_turn.add(action)
         elif quick:
             if action == "stop":
+                self._note_stop_or_reset()           # 2026-09-25 (review H1/X2)
+                self._interrupt_line_turn = True     # 2026-09-25: nothing else follows it
                 self._speak(quick, interrupt=True)
             else:
                 self._pending_quick_narrations.append((action, quick))
@@ -3159,6 +3925,7 @@ class ChatIntentNode(Node):
         output_msg.data = intent_json
         self.intent_pub.publish(output_msg)
         self.get_logger().info(f"Published intent on {self.intent_pub.topic_name}: {intent_json}")
+        self._note_intent_sent(action)
         # Mark that this turn produced an action so we can skip the slow
         # LLM final-reply TTS (the quick narration already covered it).
         self._intent_fired_this_turn = True
@@ -3199,6 +3966,8 @@ class ChatIntentNode(Node):
         return self._speak_client is not None and self._speak_client.server_is_ready()
 
     def _on_interactive_status_question(self, msg: String) -> None:
+        if self._task is not None:
+            return      # 2026-09-25: the task state owns the open question when known
         d = str(msg.data or "").strip()
         self._open_question = d if d in ("awaiting_home_confirm", "awaiting_release") else ""
         self._open_question_t = time.monotonic()
@@ -3370,6 +4139,10 @@ class ChatIntentNode(Node):
 
     def _on_held_object(self, msg: String) -> None:
         new_label = (msg.data or "").strip()
+        if self._task is not None:
+            # 2026-09-25: the router derives /robot/held_object from the task
+            # state, which this node reads directly — no second writer.
+            return
         if new_label != self._held_object_label:
             self.get_logger().info(
                 f"Held-object update: {self._held_object_label!r} -> {new_label!r}"
@@ -3383,18 +4156,142 @@ class ChatIntentNode(Node):
 
     def _on_cycle_done_state(self, msg: String) -> None:
         """The executor's cycle end ("done|id…", "failed|id|reason")."""
+        self._cycle_done_mono = time.monotonic()     # 2026-09-25: for _router_narrates
+        if self._task is not None:
+            return      # 2026-09-25: the task state's 'last' says it (published first)
         outcome = (msg.data or "").strip().split("|", 1)[0].lower()
         if outcome == "done":
             self._set_cycle_state("IDLE — last pick finished")
         elif outcome == "failed":
             self._set_cycle_state("IDLE — last pick FAILED or stopped, arm recovered")
 
-    def _set_cycle_state(self, state: str) -> None:
+    def _set_cycle_state(self, state: str, from_task: bool = False) -> None:
+        if self._task is not None and not from_task:
+            return      # 2026-09-25: only the task state edits it while known
         if state != getattr(self, "_cycle_state", None):
             self.get_logger().info(f"Cycle state: {state}")
         self._cycle_state = state
-        if state.startswith("IDLE"):
+        if state.startswith("IDLE") and not from_task:
             self._open_question = ""     # a finished cycle has no open question
+
+    # ── executor task state (2026-09-25) ─────────────────────────────────
+
+    # The legacy cycle-state phrases per task question / phase, so the old
+    # matchers and the arm-pose hint keep working while the task is known.
+    _TASK_CYCLE_STATE = {
+        "destination": "HOLDING the object at the grasp pose — waiting for a drop destination",
+        "release": "HOLDING at the drop pose — waiting for release confirmation",
+        "home": "at the drop pose, gripper open — asked about going home",
+    }
+
+    def _on_task_state(self, msg: String) -> None:
+        """2026-09-25 (SPEC §1.1, C2): the executor's latched task state, read
+        as a LEVEL: a sample older than the last one (seq ≤ last, same boot)
+        is dropped, the latched first sample is adopted silently. While it is
+        known it alone sets the cycle state, the open question and the held
+        object; a NEW question (new question_id) cuts a story this node is
+        telling while a pick runs (story_yields_to_question)."""
+        try:
+            d = json.loads(msg.data or "")
+        except Exception:
+            return
+        if not isinstance(d, dict):
+            return
+        prev = self._task
+        try:
+            seq = int(d.get("seq") or 0)
+            prev_seq = int((prev or {}).get("seq") or 0)
+        except (TypeError, ValueError):
+            return
+        if prev is not None and d.get("boot") == prev.get("boot") and seq <= prev_seq:
+            return
+        first = prev is None
+        self._task = d
+        q = str(d.get("question") or "")
+        qkey = (d.get("boot"), d.get("question_id") or 0)
+        new_question = bool(q) and qkey != self._task_qkey and not first
+        self._task_qkey = qkey
+        # The legacy view, derived.
+        phase = str(d.get("phase") or "")
+        if self._is_no_grasp_home(d):
+            # 2026-09-25 (review X3): not "at the drop pose"; keeps the legacy
+            # matchers' "asked about going home".
+            cs = "missed the grasp — lifted above the grasp pose, gripper empty — asked about going home"
+        elif q in self._TASK_CYCLE_STATE:
+            cs = self._TASK_CYCLE_STATE[q]
+        elif phase == "idle":
+            outcome = str((d.get("last") or {}).get("outcome") or "") if isinstance(d.get("last"), dict) else ""
+            cs = ("IDLE — last pick FAILED or stopped"
+                  if outcome in ("failed", "stopped", "reset") else "IDLE — last pick finished")
+        elif phase in ("probing", "approaching"):
+            cs = "BUSY — pick running"
+        elif phase == "returning_home":
+            cs = "moving to home"
+        elif phase == "stopped":
+            cs = "STOPPED by the operator — the arm is frozen"
+        else:
+            cs = f"BUSY — pick running ({phase.replace('_', ' ')})"
+        self._set_cycle_state(cs, from_task=True)
+        oq = {"release": "awaiting_release", "home": "awaiting_home_confirm"}.get(q, "")
+        if oq != self._open_question:
+            self._open_question_t = time.monotonic()
+        self._open_question = oq
+        label = (str(d.get("object") or "") or "object") if d.get("holding") else ""
+        if label != self._held_object_label:
+            self.get_logger().info(f"Held-object update (task state): {self._held_object_label!r} -> {label!r}")
+        self._held_object_label = label
+        if first:
+            self.get_logger().info(f"Task state adopted: phase={phase!r} question={q!r}")
+        if new_question and self._story_yields and self._talk_seq == self._answer_seq:
+            self._hush_answer(_HUSH_BY_QUESTION)
+
+    def _on_utterance_meta(self, msg: String) -> None:
+        """2026-09-25 (SPEC §1.5): remember the last 8 utterances' metas —
+        review M1: with the speech START (None when the meta has none)."""
+        try:
+            d = json.loads(msg.data or "")
+            text = str(d.get("text") or "").strip()
+            end = float(d.get("speech_end") or 0.0)
+            start = d.get("speech_start")
+            start = float(start) if start not in (None, "") and float(start) > 0.0 else None
+        except Exception:
+            return
+        self._utt_meta_seen = True
+        with self._utt_meta_lock:
+            self._utt_meta.append([time.time(), text, end, start, False])
+            del self._utt_meta[:-8]
+
+    def _speech_start_for(self, text: str, typed_at: float | None,
+                          heard_at: float | None = None) -> float | None:
+        """2026-09-25 (SPEC C6, review M1): when the operator STARTED saying
+        ``text``: typed input → its arrival; voice → the speech_start of the
+        exact-text match among the last 8 utterance metas (≤ 10 s old; the
+        meta is published just before the transcript, so wait ≤ 100 ms for
+        it); no match, or a meta without a start → None, which is NOT fresh
+        (the old fallback "now − 1.5 s" could lie later than the real
+        speech and make a stale "Yes." look fresh).
+
+        A meta answers one transcript only (it is marked used), and with the
+        transcript's arrival known it must have arrived with it (≤ 2 s
+        before): the harness caught a second "Yes." paired with the FIRST
+        "Yes."'s meta when its own meta was a few ms late."""
+        if typed_at is not None:
+            return typed_at
+        want = (text or "").strip()
+        deadline = time.monotonic() + 0.1
+        while True:
+            now = time.time()
+            with self._utt_meta_lock:
+                for entry in reversed(self._utt_meta):
+                    rx, t, _end, start, used = entry
+                    if (t == want and not used and now - rx <= 10.0
+                            and (heard_at is None or rx >= heard_at - 2.0)):
+                        entry[4] = True
+                        return start
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
+        return None
 
     def _on_current_pose(self, msg: String) -> None:
         new_label = (msg.data or "").strip()
