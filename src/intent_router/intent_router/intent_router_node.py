@@ -346,6 +346,9 @@ class IntentRouterNode(Node):
         # when that cycle ends — it used to be published to a pause that
         # never opened again and was lost. See _defer_after_cycle.
         self._after_cycle_intent: Optional[dict] = None
+        # 2026-09-25: the drop pose (and speed) to go to once the separate
+        # move home that _send_drop_pose started has arrived; see there.
+        self._home_then: Optional[tuple] = None
         # 2026-09-25: when "I'm still holding the X — where should I put it
         # first?" was last said (monotonic); the executor's refusals of
         # pointing / GUI picks repeat it at most every 15 s.
@@ -1292,7 +1295,7 @@ class IntentRouterNode(Node):
             _side = {"drop_left_side": "left", "drop_right_side": "right"}.get(_pose, "")
             if _side:
                 _pose = self._configured_drop_pose(_side) or _pose
-            self._send_named_pose(_pose, "", velocity_scaling)
+            self._send_drop_pose(_pose, velocity_scaling)
             return
 
         # "place" intent: when the user says "place it on the right" or
@@ -1312,7 +1315,7 @@ class IntentRouterNode(Node):
             else:
                 pose = "drop"
             self._busy_kind = "named_pose"
-            self._send_named_pose(pose, "", velocity_scaling)
+            self._send_drop_pose(pose, velocity_scaling)   # 2026-09-25: home first, see there
             return
 
         # ── pick_and_place compound intent ───────────────────────────────
@@ -1504,6 +1507,7 @@ class IntentRouterNode(Node):
         # answer this one.
         self._drop_early_dest("new pick dispatched")
         self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
+        self._home_then = None             # 2026-09-25: and a drop pose waiting for its move home
 
         self._busy_kind = "pick"
         self._pick_deadline = time.monotonic() + self._pick_timeout_s
@@ -2845,6 +2849,7 @@ class IntentRouterNode(Node):
             self._intent_queue.clear()
         self._followup_plan = ""
         self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
+        self._home_then = None             # 2026-09-25: and a drop pose waiting for its move home
         self._drop_early_dest(f"reset ({src})")
         self._dest_answer_pending = False
         self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
@@ -2883,6 +2888,7 @@ class IntentRouterNode(Node):
         abort, the cancels and the clears."""
         self._followup_plan = ""
         self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
+        self._home_then = None             # 2026-09-25: and a drop pose waiting for its move home
         self._drop_early_dest("stop")
         self._dest_answer_pending = False
         self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
@@ -3083,8 +3089,34 @@ class IntentRouterNode(Node):
 
         send_future.add_done_callback(_on_response)
 
+    def _send_drop_pose(self, pose: str, velocity_scaling: float) -> None:
+        """2026-09-25 (Majd, live: "Go to the drop right position.", then
+        "Now go to the drop left." — the named-pose server blended
+        vla_drop_right -> vla_via_right -> home -> vla_drop_left into ONE
+        rounded spline that never really stopped at home, the arm ran into
+        the table / mount and the pendant program stopped): a drop pose is
+        reached from anywhere but home in TWO separate moves — home first,
+        stopping there, then the drop pose (sent from _on_named_pose_result
+        once home is reached; a failed or stopped home move drops it). When
+        the router does not know where the arm is ("" after a start, a pick
+        or a failed move) it goes home first as well — at worst one short
+        extra move, never a sweep across the table."""
+        here = str(getattr(self, "_current_pose_name", "") or "").strip()
+        if pose == "home" or here in ("home", pose):
+            self._send_named_pose(pose, "", velocity_scaling)
+            return
+        self._home_then = (pose, velocity_scaling)
+        self.get_logger().info(
+            f"drop pose {pose!r} from {here or 'an unknown pose'!r}: home first, "
+            "as its own move, then the drop pose")
+        self._send_named_pose("home", "", velocity_scaling)
+
     def _on_named_pose_result(self, fut) -> None:
         self._active_named_pose_handle = None
+        # 2026-09-25: the drop pose waiting for this move home (see
+        # _send_drop_pose) — taken now, so every failure path below drops it.
+        _then = self._home_then
+        self._home_then = None
         try:
             wrapper = fut.result()
         except Exception as exc:
@@ -3111,6 +3143,12 @@ class IntentRouterNode(Node):
                 except Exception:
                     pass
                 self._pending_pose_name = ""
+            if _then and self._current_pose_name == "home":
+                # 2026-09-25: home reached as its own move — now the drop
+                # pose (_send_drop_pose); the router stays busy with it.
+                self.get_logger().info(f"home reached — now {_then[0]!r}")
+                self._send_named_pose(_then[0], "", _then[1])
+                return
         else:
             self.get_logger().warn(f"MoveToNamedPose failed: {result.error}")
             self._narrate(f"Could not reach the pose. {result.error}".strip())
