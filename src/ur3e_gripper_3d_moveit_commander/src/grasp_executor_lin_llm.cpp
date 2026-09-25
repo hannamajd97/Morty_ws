@@ -741,6 +741,24 @@ public:
           grasp_rise_t_ = std::chrono::steady_clock::now();   // 0 -> 1 edge
         }
         grasp_detected_.store(grasp);
+        // 2026-09-25 (Majd, live: every pick refused with "I'm still holding
+        // the wooden maze puzzle" although the puzzle had been taken out —
+        // task_state said holding:true with ti0:false). held_object_ is
+        // cleared only by an open Morty or the GUI sends; an object removed
+        // by hand or a gripper opened on the pendant left it standing. The
+        // pin is HIGH whenever the fingers stall — on an object or on each
+        // other — so HIGH proves nothing, but LOW means they are NOT closed
+        // on anything. With the sensor check on, LOW for a full second
+        // between picks clears the record (clear_stale_hold).
+        if (grasp) {
+          grasp_low_valid_ = false;
+        } else if (!grasp_low_valid_) {
+          grasp_low_valid_ = true;
+          grasp_low_since_ = std::chrono::steady_clock::now();
+        } else if (held_object_.load() && check_grasp_sensor_ &&
+                   std::chrono::steady_clock::now() - grasp_low_since_ > std::chrono::seconds(1)) {
+          clear_stale_hold();
+        }
       });
     speed_slider_client_ =
       node_->create_client<ur_msgs::srv::SetSpeedSliderFraction>(
@@ -1018,6 +1036,10 @@ public:
     (void)pose;
   }
   std::atomic<bool> held_object_{false};
+  // 2026-09-25: since when the grasp pin has been LOW (io_states callback,
+  // main node thread only); see clear_stale_hold.
+  bool grasp_low_valid_{false};
+  std::chrono::steady_clock::time_point grasp_low_since_{};
   std::chrono::steady_clock::time_point grasp_rise_t_{};
   std::chrono::steady_clock::time_point close_cmd_t_{};
   bool grasp_verdict_holding_ = false;
@@ -3379,6 +3401,22 @@ public:
   // the adapter's record of every open/close it was given — executor, GUI
   // and router alike. Any open ends "holding"; the pin (TI0) is never used
   // for that (it is also HIGH when empty fingers stall on each other).
+  // 2026-09-25: the grasp pin has been LOW for a second between picks while
+  // the record says "holding" — the object is gone (see the io_states
+  // callback). Only while no pick runs (phase idle): a flicker mid-carry
+  // must never clear it. Clears the record and republishes the task state.
+  void clear_stale_hold()
+  {
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    if (task_phase_ != "idle" || !held_object_.load()) { return; }
+    held_object_.store(false);
+    RCLCPP_WARN(node_->get_logger(),
+      "Grasp pin LOW for 1 s while the record said holding '%s' — the object is gone "
+      "(taken out by hand or the gripper opened outside Morty); record cleared.",
+      task_held_label_.c_str());
+    publish_task_state_locked();
+  }
+
   void note_gripper_command(const std::string & payload)
   {
     const bool opened = payload.find("\"cmd\": \"open\"") != std::string::npos ||

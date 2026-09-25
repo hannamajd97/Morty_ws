@@ -851,6 +851,13 @@ gripper, no question is open. While the destination question is open,
 emit the destination intent (drop_right / drop_left / home); never claim
 you are not holding anything while that question is open.
 
+SENT IS NOT DONE - a command in the conversation (yours or the robot's fast
+path) was only SENT; the robot may have refused or failed it (e.g. "I'm
+still holding the X — where should I put it first?"). Never say a pick or a
+move is running, finished or "already" happening unless the ROBOT TASK STATE
+says so this turn; when it says idle, nothing is running — send the command
+again or ask.
+
 RELEASE SIDE - at "Should I open the gripper?", "drop it on the
 right/left" -> drop_right / drop_left, never open_gripper / release.
 
@@ -2904,7 +2911,8 @@ class ChatIntentNode(Node):
                 self.chat_agent.messages.append(c)
             for c in calls:
                 self.chat_agent.messages.append({"type": "function_call_output", "call_id": c.call_id,
-                                                 "output": json.dumps({"status": "dispatched"})})
+                                                 "output": json.dumps({"status": "sent to the robot (fast path) — the "
+                                                                              "ROBOT TASK STATE says whether it runs"})})
 
     def _fire_fast_pick(self, label: str, colour: str | None, text: str) -> None:
         """The FAST-PICK publish (2026-08-26), factored out 2026-09-25 so the
