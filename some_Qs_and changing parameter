@@ -1,0 +1,12 @@
+if this will work we can do the latest thing and it is adding something to let it detecte anything 
+but we need to check how we can do that perfectly and check latest local models and stuff to make this happen. like instead of using yolo alone we keept as first detection because we already know it is correct 
+but i need to hear your suggestion what should we do....
+
+
+
+deep@Alienware15R3:~/morty_ws$ ros2 param set /yolo_live_select_grasp grasp2tcp_offset_m "[-0.02, 0.0, 0.0]"
+Set parameter successful
+
+
+
+and btw it should like know while it is moving if there is an object inside or not like not only when it go to grasp but always and like say 

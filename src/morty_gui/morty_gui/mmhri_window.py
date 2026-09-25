@@ -209,6 +209,11 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.resize(560, 720)
         os.makedirs(MMHRI_DIR, exist_ok=True)
         self._active = False
+        # One trial = one save (2026-09-25): see _on_stop_clicked / _on_stop_save_final.
+        self._stop_pressed = False
+        self._saved = False
+        self._cancelled = False
+        self._rec_header: Dict[str, str] = {}
         self._t0 = 0.0
         self._trial_dir = ""
         self._video: Optional["object"] = None
@@ -401,7 +406,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         btn_row.addWidget(self.start_btn)
         self.stop_btn = QtWidgets.QPushButton("⏹ Stop && save")
         self.stop_btn.setEnabled(False)
-        self.stop_btn.clicked.connect(self._on_stop_save)
+        self.stop_btn.clicked.connect(self._on_stop_clicked)
         btn_row.addWidget(self.stop_btn)
         self.discard_btn = QtWidgets.QPushButton("✖ discard")
         self.discard_btn.setEnabled(False)
@@ -480,7 +485,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "Abort the RUNNING trial: nothing is saved, the trial number is\n"
             "reused. (A folder already opened stays — use delete.)")
         self.delete_btn.setToolTip(
-            "Erase the trial whose number is in 'Trial ID' from the records:\n"
+            "While a trial RECORDS: stop it and erase everything it recorded\n"
+            "(audio, video, bag, VLA images) — nothing is saved, the number is reused.\n"
+            "Otherwise: erase the trial whose number is in 'Trial ID' from the records:\n"
             "its folder (if any), its rows in mmhri_experiments.csv and\n"
             "mmhri_meta.csv (modifiers included). Asks first; CSV backups\n"
             "go to backups/. VLA episodes are NOT touched — only reported.")
@@ -603,6 +610,12 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             except OSError:
                 self._log_offsets[path] = 0
         self._active = True
+        # The record's header is fixed at ⏺ (2026-09-25): the save read the
+        # form again at ⏹, and trial 067 was written as "068" after the form
+        # had moved on to the next trial. Outcome fields stay live until ⏹.
+        self._rec_header = {"tid": tid, "layout": self.layout_edit.currentText().strip(),
+                            "scenario": self.scenario.currentText(), "level": self.level.currentText()}
+        self._stop_pressed = self._saved = self._cancelled = False
         # Wall-clock video pacer (10 Hz): duplicates the newest frame so
         # camera.mp4 duration always equals real time (audio sync).
         if getattr(self, "_video_timer", None) is None:
@@ -636,7 +649,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.discard_btn.setEnabled(True)
-        self.delete_btn.setEnabled(False)
+        self.delete_btn.setEnabled(True)      # stops and erases the running trial
         # One provisional VLA episode per trial; the recorder keeps it
         # only if the arm moves (vla_link.py has the reasoning).
         self._vla_ended = False
@@ -693,6 +706,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self._conv_f = None
 
     def _on_discard(self) -> None:
+        self._cancelled = True           # a ⏹ still waiting for Morty must not save it after all
         self._vla.abort()
         self._bag.abort()
         self._bag_ended = True
@@ -731,8 +745,11 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         return {"folders": folders, "rows": rows, "episodes": episodes}
 
     def _on_delete(self) -> None:
+        if self._active or (self._stop_pressed and not self._saved and not self._cancelled):
+            self._delete_running_trial()
+            return
         tid = self.trial_id.text().strip()
-        if not tid or self._active:
+        if not tid:
             return
         rec = self._trial_records(tid)
         n_rows = sum(rec["rows"].values())
@@ -775,6 +792,50 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.status.setText(
             f"🗑 trial {tid} erased: {len(rec['folders'])} folder(s), {n_rows} CSV row(s)"
             + (f"; {len(rec['episodes'])} VLA episode(s) still reference it" if rec["episodes"] else ""))
+        self._refresh_progress()
+        self.trial_id.setText(self._next_trial_id())
+
+    def _delete_running_trial(self) -> None:
+        """🗑 while a trial records, or while its ⏹ waits for Morty to finish
+        talking (Majd 2026-09-25: "delete doesn't work while recording, only
+        discard" — discard stops but leaves the folder). Stops everything like
+        ✖ discard, cancels a pending save, then erases what the trial wrote.
+        No CSV row exists yet; the trial number is free again."""
+        tid = self._rec_header.get("tid") or self.trial_id.text().strip()
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle("Delete running trial " + tid)
+        box.setText(f"Stop trial {tid} and erase everything it recorded so far "
+                    "(audio, video, bag, VLA images)? Nothing is saved.")
+        box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel)
+        box.setDefaultButton(QtWidgets.QMessageBox.Cancel)
+        if box.exec_() != QtWidgets.QMessageBox.Yes:
+            self.status.setText("delete cancelled — the trial goes on.")
+            return
+        self._cancelled = True           # a pending ⏹ save must not write it back
+        trial_dir = self._trial_dir
+        self._on_discard()               # VLA discard, bag stopped + removed, recorders closed
+        self._trial_dir = ""
+        self._erase_when_idle(trial_dir, tid, time.monotonic() + 5.0)
+
+    def _erase_when_idle(self, trial_dir: str, tid: str, deadline: float) -> None:
+        # The VLA recorder drains its image writer and removes its files when
+        # the discard arrives over ROS; the folder goes only after it has
+        # stopped, else a late image would bring the folder back.
+        st = {}
+        if self._bridge is not None:
+            try:
+                st = self._bridge.vla_status() or {}
+            except Exception:
+                st = {}
+        if st.get("recording") and time.monotonic() < deadline:
+            QtCore.QTimer.singleShot(200, lambda: self._erase_when_idle(trial_dir, tid, deadline))
+            return
+        if trial_dir and os.path.isdir(trial_dir):
+            shutil.rmtree(trial_dir, ignore_errors=True)
+        if trial_dir and os.path.exists(trial_dir):
+            self.status.setText(f"trial {tid} stopped, but its folder could not be removed: {trial_dir}")
+        else:
+            self.status.setText(f"🗑 trial {tid} stopped and erased — nothing saved; number {tid} is free again.")
         self._refresh_progress()
         self.trial_id.setText(self._next_trial_id())
 
@@ -921,7 +982,19 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.t_interact.setText(str(times["intent_s"]))
         return times
 
+    def _on_stop_clicked(self) -> None:
+        """⏹ counts once per trial (2026-09-25): a second press started a
+        second save chain that re-wrote trial 067 from the reset form 20 s
+        later (trial.json "068", a phantom CSV row)."""
+        if self._stop_pressed:
+            return
+        self._stop_pressed = True
+        self.stop_btn.setEnabled(False)
+        self._on_stop_save()
+
     def _on_stop_save(self) -> None:
+        if self._cancelled:              # 🗑 pressed while ⏹ waited for Morty
+            return
         # The VLA episode ends at the PRESS — the speech tail below is
         # Morty talking, not the robot acting. (Re-entered by timers,
         # hence the flag.)
@@ -960,16 +1033,20 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._on_stop_save_final()
 
     def _on_stop_save_final(self) -> None:
+        if self._saved or self._cancelled:
+            return
+        self._saved = True
         self._finish_recorders()
         stage_times = self._harvest_stage_times()
         if self._trial_dir:
             self._mux_trial_video()
             self._save_log_slices()
-        tid = self.trial_id.text().strip()
+        hdr = self._rec_header
+        tid = hdr.get("tid") or self.trial_id.text().strip()
         row = {
             "Trial ID": tid,
             "Task ID": "",
-            "Scene Layout": self.layout_edit.currentText().strip(),
+            "Scene Layout": hdr.get("layout") or self.layout_edit.currentText().strip(),
             "Command Used": self.command.text().strip(),
             "Intended Target": self.target.currentText().strip(),
             "Intended Destination": self.destination.currentText().strip(),
@@ -987,9 +1064,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         meta = {
             "Trial ID": tid,
             "Date": datetime.date.today().isoformat(),
-            "Scenario": self.scenario.currentText(),
+            "Scenario": hdr.get("scenario") or self.scenario.currentText(),
             "Modifiers": self._modifiers_str(),
-            "Level": self.level.currentText(),
+            "Level": hdr.get("level") or self.level.currentText(),
             "Stage Times": stage_times,
         }
         if not self._trial_dir:

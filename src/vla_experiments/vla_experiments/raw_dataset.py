@@ -110,6 +110,26 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
         return "open the gripper and go back home"
     if a == "carry_release":
         return "go back home and hand it over" if dest == "home" else f"carry it to {side} and hand it over"
+    if a == "confirm_drop":
+        # The answer to "where should I drop it?" through the LLM: destination
+        # "drop_right" / "right" / "home", then "" / "release" / "release_home".
+        d = dest.replace("drop_", "").replace("_side", "")
+        text = {"right": "drop it on the right side", "left": "drop it on the left side",
+                "home": "bring it home"}.get(d, "drop it")
+        then = str(attrs.get("then") or "").strip().lower()
+        if then == "release":
+            text += " and hand it over"
+        elif then == "release_home":
+            text += ", hand it over and go back home"
+        return text
+    if a in ("look_left", "look_right"):
+        return f"look to the {a.split('_')[1]}"
+    if a == "look_up":
+        return "look up"
+    if a in ("go_to_ready", "go_to_start"):
+        return f"go to the {a.split('_')[2]} position"
+    if a == "sleep":
+        return "go to the sleep position"
     return fallback or a.replace("_", " ")
 
 ARM_JOINTS = [

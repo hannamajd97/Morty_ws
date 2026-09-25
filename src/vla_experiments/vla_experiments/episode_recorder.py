@@ -99,8 +99,14 @@ from cv_bridge import CvBridge
 
 LATCHED = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE,
                      durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+# Every intent that moves the arm or the gripper (2026-09-25: the LLM's answer
+# to "where should I drop it?" is confirm_drop, and it was missing — trial 067's
+# drop-and-hand-over was labelled with the pick instruction; the look / sleep /
+# ready moves were missing too).
 MOTION_INTENTS = ["pick_and_place", "pick", "place", "drop_held", "drop_left", "drop_right", "go_home",
-                  "carry_release", "release_home", "release", "open_gripper", "close_gripper"]
+                  "carry_release", "release_home", "release", "open_gripper", "close_gripper",
+                  "confirm_drop", "look_left", "look_right", "look_up", "go_to_ready", "go_to_start",
+                  "sleep"]
 OUTCOMES = ("success", "failure", "unknown")
 
 
