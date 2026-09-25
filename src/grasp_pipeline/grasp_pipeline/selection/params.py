@@ -339,7 +339,10 @@ def declare_all_parameters(node: "Node") -> None:
     # zeroed in every depth frame. See perception/self_filter.py.
     node.declare_parameter("post_cycle_settle_s", 0.3)
     # One automatic second try of the clicked object with a fresh grasp set when no candidate could be planned (2026-09-18).
-    node.declare_parameter("auto_retry_once", True)   # was a hard 3.0 s sleep after every cycle (until 2026-09-17)
+    # 2026-09-25 (Majd): OFF by default — after Morty said "I couldn't find a way
+    # to reach the small bottle" the pipeline tried again on its own (cycle 8);
+    # a failed pick now ends there and is retried only when he asks.
+    node.declare_parameter("auto_retry_once", False)
     node.declare_parameter("self_filter_enabled", True)
     node.declare_parameter("self_filter_links",
                            ["gripper_base", "gripper_finger_left", "gripper_finger_right"])

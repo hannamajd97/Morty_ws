@@ -339,6 +339,10 @@ class IntentRouterNode(Node):
         # and going home."); "" = the usual "Opening the gripper.". Spoken
         # once, on 'releasing' (the claim used to say it too).
         self._releasing_line: str = ""
+        # 2026-09-25: when "I'm still holding the X — where should I put it
+        # first?" was last said (monotonic); the executor's refusals of
+        # pointing / GUI picks repeat it at most every 15 s.
+        self._still_holding_mono: float = -1e9
         # Periodic watchdog so a hung pick doesn't block the queue forever.
         self._pick_timeout_s = float(self.get_parameter("queue_pick_timeout_s").value)
         self.create_timer(1.0, self._queue_watchdog)
@@ -729,28 +733,44 @@ class IntentRouterNode(Node):
         # 2026-09-25: the question comes from the executor's task state
         # when it has reported (_question_open), else from the legacy flag.
         if self._question_open("release"):
-            # 2026-09-25: at "Should I open the gripper?", "drop it on the
-            # right" means put it there AND let go — a redirect re-asked the
-            # same question at the other side. drop_<side>+release is the
-            # executor's existing compound token: it becomes
-            # carry_release:<configured target>, which opens IN PLACE when
-            # the arm is already there. Only with the new executor (task
-            # state known); the old one keeps today's redirect.
-            # (review R4: a live task state only.)
-            _side = self._release_side(action, intent) if self._live_task() is not None else ""
-            if _side:
+            # 2026-09-25 (Majd, live test): a SIDE named at "Should I open the
+            # gripper?" is a REDIRECT — "No, go to drop left." (confirm_drop
+            # drop_left, no then) was sent as drop_left+release and the
+            # executor carried the object there AND OPENED without asking.
+            # Only an explicit release (then = release / release_home, or
+            # open_gripper / release WITH a side) becomes drop_<side>+release
+            # (carry_release: opens on arrival, or in place when already
+            # there); a bare side is the plain redirect token drop_<side>:
+            # the executor carries it there and asks the release question
+            # again. See _release_side_token. Only with a live task state
+            # (review R4); without one today's paths below run unchanged.
+            _tok = (self._release_side_token(action, intent)
+                    if self._live_task() is not None else "")
+            if _tok:
+                if "+" not in _tok and self._arm_at_side(_tok):
+                    # 2026-09-25: the executor ignores a redirect to where the
+                    # arm already is (stale-echo rule) and keeps waiting in
+                    # silence — say so and re-ask instead of claiming.
+                    _sp = {"drop_left": "drop left", "drop_right": "drop right"}[_tok]
+                    self.get_logger().info(
+                        f"release pause: {action!r} -> {_tok!r}, but the arm is "
+                        "already there — nothing published, question re-asked.")
+                    self._narrate(
+                        f"I'm already at the {_sp} position. Should I open the gripper?")
+                    return
                 # 2026-09-25 (review R5): the router answered, so the router
                 # narrates what the executor does with it (chat_node no
                 # longer speaks it): "Going to drop <side>." on its
                 # redirect:<target>, or just "Opening the gripper." on
-                # 'releasing' when the arm is already at that side (it opens
-                # in place). See _on_interactive_status.
+                # 'releasing' when an explicit release opens in place. See
+                # _on_interactive_status.
                 self._dest_answer_pending = True
                 if not self._claim_executor_resume(
-                    _side + "+release",
-                    f"release pause: {action!r} names a side -> carry and release",
+                    _tok,
+                    f"release pause: {action!r} names a side -> "
+                    + ("carry and release" if "+release" in _tok else "redirect, ask again"),
                 ):
-                    self._narrate_ignored_resume(action, _side + "+release")
+                    self._narrate_ignored_resume(action, _tok)
                 return
             if action == "carry_release":
                 # v2 (2026-08-31): ATOMIC "take it to <dest> and give it
@@ -763,12 +783,17 @@ class IntentRouterNode(Node):
                 if not isinstance(_attrs, dict):
                     _attrs = {}
                 _d = str(_attrs.get("destination", "")).lower()
-                _tgt = {"home": "home", "left": "drop_left_side",
-                        "right": "drop_right_side"}.get(_d, "")
+                # 2026-09-25: left/right go out as drop_<side>+release, which
+                # the executor maps to its CONFIGURED drop targets (Majd's
+                # vla_drop_left / vla_drop_right); the hard-coded
+                # carry_release:drop_*_side named other poses.
+                _tok = {"home": "carry_release:home", "left": "drop_left+release",
+                        "right": "drop_right+release"}.get(_d, "")
+                _tgt = _tok
                 if _tgt:
                     if not self._claim_executor_resume(
-                        f"carry_release:{_tgt}",
-                        f"release pause: carry+release to {_tgt}",
+                        _tok,
+                        f"release pause: carry+release ({_tok})",
                     ):
                         self._narrate_ignored_resume(action, "carry_release")
                 else:
@@ -1290,6 +1315,21 @@ class IntentRouterNode(Node):
             self._mark_busy_done("")
             return
 
+        # 2026-09-25 (Majd approved): never start a pick while the gripper is
+        # closed on something — the executor's live task state says holding
+        # (closed on an object, not opened since). Checked here, at DISPATCH,
+        # not at intake: a pick queued behind a running cycle is judged when
+        # that cycle is over (it normally ends released). Nothing is sent to
+        # the executor or the pipeline. Legacy (no live task state): as before.
+        _held_task = self._live_task()
+        if _held_task is not None and _held_task.get("holding"):
+            self.get_logger().warn(
+                f"Pick {obj!r} refused: the executor is still holding "
+                f"{_held_task.get('object')!r}.")
+            self._say_still_holding()
+            self._mark_busy_done("")
+            return
+
         if not obj:
             self.get_logger().warn("Pick intent has no object_intent; skipping.")
             self._narrate("I didn't catch which object to pick.")
@@ -1353,6 +1393,23 @@ class IntentRouterNode(Node):
                 )
                 self._mark_busy_done("")
                 return
+
+        # 2026-09-25 (Majd, live): with exactly TWO of the requested class in
+        # view, "the middle one" / "the one in the centre" names neither —
+        # _resolve_index_by_position took matches[len // 2], i.e. silently
+        # the right-hand one. Ask with the two-tubes line instead (named for
+        # the class; identical for the vitamin tubes). An ordinal or a colour
+        # still decides (the colour filter runs first), and three or more
+        # keep today's middle.
+        if (position in ("middle", "centre", "center", "central")
+                and not ordinal and not colour
+                and self._count_visible_for_label(label) == 2):
+            self.get_logger().info(
+                f"Refusing {position!r} with exactly two {label!r} visible: "
+                "neither is in the middle. Asking user to clarify.")
+            self._narrate(self._two_of_line(label))
+            self._mark_busy_done("")
+            return
 
         # All checks passed — now commit to the executor. Order matters:
         # set drop_target FIRST (so pick_and_place's destination lands),
@@ -2051,11 +2108,80 @@ class IntentRouterNode(Node):
         attrs = attrs if isinstance(attrs, dict) else {}
         if action in ("drop_right", "drop_left"):
             return action
-        if action in ("confirm_drop", "open_gripper", "release"):
+        # 2026-09-25: release_home carrying a side too — without it "drop it
+        # on the left, give it to me and go home" at the release question fell
+        # through to the plain release_home token and opened WHERE THE ARM IS.
+        if action in ("confirm_drop", "open_gripper", "release", "release_home"):
             side = _DESTINATION_WORDS.get(
                 str(attrs.get("destination") or "").strip().lower(), "")
             return side if side in ("drop_right", "drop_left") else ""
         return ""
+
+    def _release_side_token(self, action: str, intent: dict) -> str:
+        """2026-09-25 (Majd, live test): the resume token for a SIDE named at
+        the release question, or "" when no side is named. An explicit
+        release — open_gripper / release with a side, or a ``then`` of
+        release / release_home — gives drop_<side>+release; a bare side
+        (confirm_drop / drop_left / drop_right) gives the plain redirect
+        drop_<side>, after which the executor asks again. Never opens on a
+        side alone."""
+        side = self._release_side(action, intent)
+        if not side:
+            return ""
+        attrs = intent.get("object_attributes")
+        attrs = attrs if isinstance(attrs, dict) else {}
+        then_s = str(attrs.get("then") or "").strip().lower()
+        # release_home with a side: carry there and open (the executor's
+        # carry_release then asks "Should I go back home?" — the home part is
+        # asked, never assumed, rather than opening at the wrong side).
+        if (action in ("open_gripper", "release", "release_home")
+                or then_s in ("release", "release_home")):
+            return side + "+release"
+        return side
+
+    def _arm_at_side(self, side: str) -> bool:
+        """2026-09-25: is the arm already at ``side`` ("drop_left" /
+        "drop_right")? From the task state's destination (the executor's
+        drop target while it waits at the release question), else the last
+        resumed:<pose>. Matched by "left" / "right" in the target name, so
+        configured target names work too; unknown -> False (claim as usual)."""
+        task = self._live_task() or {}
+        where = (str(task.get("destination") or "")
+                 or str(getattr(self, "_executor_drop_dest", "") or "")).lower()
+        if not where:
+            return False
+        if side == "drop_left":
+            return "left" in where
+        if side == "drop_right":
+            return "right" in where
+        return False
+
+    def _say_still_holding(self, fallback: str = "", *, rate_limited: bool = False) -> None:
+        """2026-09-25 (Majd approved): the answer to a pick while the gripper
+        is closed on something — "I'm still holding the {object} — where
+        should I put it first?", the object from the live task state (else
+        ``fallback``, else "object"). ``rate_limited`` (the executor's
+        refusal of a pointing / GUI pick) speaks at most once per 15 s so
+        repeated pointing cannot spam it; a spoken pick always gets it."""
+        now = time.monotonic()
+        if rate_limited and now - self._still_holding_mono < 15.0:
+            self.get_logger().info(
+                "Still-holding line suppressed (said "
+                f"{now - self._still_holding_mono:.1f} s ago).")
+            return
+        self._still_holding_mono = now
+        task = self._live_task() or {}
+        what = (str(task.get("object") or "") or fallback or "object").replace("_", " ")
+        self._narrate(f"I'm still holding the {what} — where should I put it first?")
+
+    def _two_of_line(self, label: str) -> str:
+        """2026-09-25: the two-of-a-kind clarification, named for the class.
+        For vitamin_c (display "vitamin_tube") it is exactly the existing
+        two-tubes line."""
+        name = self._to_display_label(label).replace("_", " ").strip() or "object"
+        plural = name + ("es" if name.endswith(("s", "x", "z", "ch", "sh")) else "s")
+        return (f"I see two {plural}. Could you say leftmost or rightmost, "
+                "or point at the one you want?")
 
     def _latch_destination(self, token: str, action: str) -> None:
         """2026-09-25: keep ``token`` for the destination pause of this pick
@@ -2936,6 +3062,16 @@ class IntentRouterNode(Node):
                     f"{self._last_done_cycle_id}, stopped/reset at "
                     f"{self._start_suppressed_upto}).")
                 return
+            # 2026-09-25: while the gripper holds an object the executor
+            # refuses the pick (its cycle_done says "still holding …", which
+            # _on_cycle_done answers) — no "Starting grasp" before that, and
+            # no start line per pointing attempt.
+            _t = self._live_task()
+            if _t is not None and _t.get("holding"):
+                self.get_logger().info(
+                    f"cycle_id={cycle}: start narration suppressed (still holding "
+                    f"{_t.get('object')!r}; the executor refuses this pick).")
+                return
             target = (
                 self._last_target_label.replace("_", " ")
                 if self._last_target_label else ""
@@ -3326,7 +3462,17 @@ class IntentRouterNode(Node):
             if outcome == "failed":
                 fields = data.split("|", 2)
                 reason = fields[2].strip() if len(fields) > 2 else ""
-                if reason == "stopped by your command":
+                if reason.lower().startswith("still holding"):
+                    # 2026-09-25 (Majd approved): the executor refused a
+                    # pointing / GUI pick because the gripper still holds an
+                    # object ("still holding the <label> — tell me where to
+                    # drop it first"). Not a failed grasp; rate-limited so
+                    # repeated pointing cannot spam it.
+                    _m = re.match(r"still holding the (.+?)(?:\s+[—–-]+\s|,|$)", reason,
+                                  flags=re.IGNORECASE)
+                    self._say_still_holding(_m.group(1).strip() if _m else "",
+                                            rate_limited=True)
+                elif reason == "stopped by your command":
                     # Operator STOP at a pause: the arm froze in place,
                     # nothing resets — saying "Resetting." here was a
                     # lie (2026-08-31 narration audit).
@@ -3418,8 +3564,15 @@ class IntentRouterNode(Node):
         # decides (_sync_held_object) — a stop or reset that ends the cycle
         # still holding no longer wipes the memory. The chain below is the
         # legacy fallback — also for a dead executor (review R4: _live_task).
+        # 2026-09-25: a pick the executor refused because it still holds
+        # an object never touches the held-object memory or the pose.
+        _refused_holding = outcome == "failed" and (
+            data.split("|", 2)[2].strip().lower().startswith("still holding")
+            if data.count("|") >= 2 else False)
         if self._live_task() is not None:
             self._sync_held_object()
+        elif _refused_holding:
+            pass
         elif outcome == "done" and self._release_skipped_this_cycle:
             _kept = self._last_target_label or self._held_object_label
             if _kept:
@@ -3446,7 +3599,9 @@ class IntentRouterNode(Node):
             _reason = data.split("|", 2)[2].strip().lower() if data.count("|") >= 2 else ""
         except Exception:
             _reason = ""
-        if "stopped by your command" in _reason:
+        if _refused_holding:
+            pass   # 2026-09-25: the refused pick never moved the arm
+        elif "stopped by your command" in _reason:
             self._publish_current_pose("")
         elif getattr(self, "_stayed_pose", ""):
             self._publish_current_pose(self._stayed_pose)

@@ -985,26 +985,35 @@ public:
   std::chrono::steady_clock::time_point grasp_rise_t_{};
   std::chrono::steady_clock::time_point close_cmd_t_{};
   bool grasp_verdict_holding_ = false;
-  // "Holding" = the grasp pin says so AND the gripper is closed. The pin
-  // alone would block every pick if it ever stuck HIGH with the fingers
-  // open; the gripper joint on /joint_states (0.0 closed, ~0.23 open)
-  // settles it. Unknown joint -> trust the pin.
+  // (Until 2026-09-25 "holding" also needed the grasp pin HIGH and the
+  // gripper joint closed, and only with the sensor check on — see below.)
   // "Holding" (Majd 2026-09-11 18:45): only an object THIS executor closed
   // on and has not released since. Pin 16 also goes HIGH when the empty
   // fingers stall on each other, so outside a pick the pin means nothing.
   // Set after a close whose check said holding, cleared by every gripper
   // open the executor sends; a GUI open shows as an open gripper joint.
-  bool holding_object()
+  // 2026-09-25 (Majd approved "refuse a new pick while holding"): the guard
+  // is the executor's own record ALONE, whatever check_grasp_sensor says.
+  // It used to answer "not holding" whenever the sensor check was off (the
+  // GUI default), so a pointing pick opened the gripper for its approach
+  // and dropped the small bottle. held_object_ is set at the grasp verdict
+  // for every path and cleared by every open — the executor's own and, via
+  // /gripper_controller/command_event, the GUI's and the router's. The pin
+  // is not used (it is also HIGH when empty fingers stall on each other).
+  bool holding_object() const { return held_object_.load(); }
+
+  // 2026-09-25: the cycle_done reason of a refused pick. The "still holding"
+  // prefix is matched by the pipeline and must stay; the object is the label
+  // frozen at the grasp verdict.
+  std::string holding_refusal_reason()
   {
-    if (!check_grasp_sensor_) { return false; }   // without the sensor there is nothing to refuse on
-    if (!held_object_.load()) { return false; }
-    if (!grasp_detected_.load()) { return false; }
-    sensor_msgs::msg::JointState js;
-    { std::lock_guard<std::mutex> lk(joint_state_mutex_); js = last_joint_state_; }
-    for (size_t i = 0; i < js.name.size() && i < js.position.size(); ++i) {
-      if (js.name[i] == "gripper_close_open_joint") { return std::fabs(js.position[i]) < 0.1; }
+    std::string label;
+    {
+      std::lock_guard<std::mutex> lk(task_mutex_);
+      label = task_held_label_;
     }
-    return true;
+    if (label.empty()) { label = "previous object"; }
+    return "still holding the " + label + " — tell me where to drop it first";
   }
 
   // Picks start from the reset target ("home"); a background check from
@@ -2483,14 +2492,24 @@ public:
           {
             const std::string & t = inc_lc;
             const bool droppy = (t.rfind("drop", 0) == 0);
+            // 2026-09-25 (Majd, live: the configured drop poses are
+            // vla_drop_left / vla_drop_right): "left" / "right" at the release
+            // question mean the CONFIGURED drop poses — the ones the
+            // destination answer and carry_release already use — not the
+            // hard-coded drop_*_side. The router now sends a plain drop_left /
+            // drop_right here for "No, go to drop left": carry there via home
+            // and ask the release question again, never open. Comparing the
+            // configured name with drop_target_name_ below also makes "the
+            // side I am already at" the ignored stale echo again (it compared
+            // drop_right_side with vla_drop_right and redirected).
             if (t == "home" || t == "go_home" || t == "reset") {
               redirect_target = reset_target_name_;
             } else if (t == "left" ||
                        (droppy && t.find("left") != std::string::npos)) {
-              redirect_target = "drop_left_side";
+              redirect_target = drop_left_target_.empty() ? std::string("drop_left_side") : drop_left_target_;
             } else if (t == "right" ||
                        (droppy && t.find("right") != std::string::npos)) {
-              redirect_target = "drop_right_side";
+              redirect_target = drop_right_target_.empty() ? std::string("drop_right_side") : drop_right_target_;
             }
           }
           if (!redirect_target.empty()) {
@@ -7720,6 +7739,26 @@ int main(int argc, char ** argv)
     pub_completion->publish(msg);
   };
 
+  // 2026-09-25 (Majd approved item 5): a new pick while the executor still
+  // holds an object is refused before anything moves — no motion, gripper
+  // untouched, the object stays held (task_state holding:true) and the cycle
+  // ends failed|id|still holding the <object> — tell me where to drop it
+  // first. Shared by the candidate path and the single-pose fallback.
+  auto refuse_if_holding = [&](int64_t cycle_id) {
+    if (!grasp_executor.holding_object()) { return false; }
+    const std::string reason = grasp_executor.holding_refusal_reason();
+    RCLCPP_ERROR(node->get_logger(),
+      "Still holding an object (the executor closed on it and has not opened since) — "
+      "not starting pick cycle_id=%ld. Choose where to drop it (Drop left / Drop right / "
+      "Release in the GUI, or say it), or open the gripper yourself.",
+      static_cast<long>(cycle_id));
+    grasp_executor.set_failure_reason(reason);
+    last_processed_cycle_id = cycle_id;
+    publish_completion(false, cycle_id);
+    { std::lock_guard<std::mutex> lock(mutex); processing = false; }
+    return true;
+  };
+
   // Background LIN check (2026-09-11): candidate sets from the pipeline's
   // precompute cache, checked while the arm is idle; verdicts back to the
   // pipeline so a set with no feasible grasp is recomputed before anyone
@@ -7975,20 +8014,11 @@ int main(int argc, char ** argv)
       // 1.2 s + 0.5 s the fingers need. Never while an object is held.
       grasp_executor.clear_abort();
       grasp_executor.begin_cycle(cycle_id);   // 2026-09-25: task state: this cycle, probing
-      if (grasp_executor.holding_object()) {
-        // The previous pick was stopped while holding (Reset during the
-        // "where do I drop it?" wait). Probing would open the gripper early
-        // and drop the object wherever the arm is (2026-09-11: a bottle
-        // released mid-air), and every plan from that pose fails anyway.
-        RCLCPP_ERROR(node->get_logger(),
-          "Still holding an object (grasp pin HIGH) — not starting a new pick. "
-          "Choose where to drop it (Drop left / Drop right / Release in the GUI, "
-          "or say it), or open the gripper yourself.");
-        grasp_executor.set_failure_reason(
-          "still holding the previous object — tell me where to drop it first");
-        last_processed_cycle_id = cycle_id;
-        publish_completion(false, cycle_id);
-        { std::lock_guard<std::mutex> lock(mutex); processing = false; }
+      // The previous pick was stopped while holding (Reset during the
+      // "where do I drop it?" wait). Probing would open the gripper early
+      // and drop the object wherever the arm is (2026-09-11: a bottle
+      // released mid-air), and every plan from that pose fails anyway.
+      if (refuse_if_holding(cycle_id)) {
         rate.sleep();
         continue;
       }
@@ -8073,6 +8103,12 @@ int main(int argc, char ** argv)
       }
       RCLCPP_INFO(node->get_logger(), "Grasp pose received, will process.");
       grasp_executor.begin_cycle(cycle_id);   // 2026-09-25: task state: this cycle (single-pose path)
+      // 2026-09-25: the single-pose fallback had no holding guard at all — its
+      // approach opens the gripper too.
+      if (refuse_if_holding(cycle_id)) {
+        rate.sleep();
+        continue;
+      }
       bool ok = grasp_executor.execute_grasp(*grasp);
       last_processed_cycle_id = cycle_id;
       if (!ok) { grasp_executor.finish_reset(); }   // 2026-09-25: as on the candidate path
