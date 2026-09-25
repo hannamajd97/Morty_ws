@@ -551,6 +551,16 @@ public:
     // `if (vitamin_mode_active_)` branches restores the original flow.
     vitamin_mode_active_ = get_or_declare_param<bool>(
       node_, "vitamin_mode_active", false);
+    // 2026-09-25: the name of the object this pick is for. intent_router sets
+    // it at the voice-pick dispatch and on a new selection, and "" at the
+    // cycle end. The executor never knew its object's name; the task state
+    // reports it so no consumer has to infer it from what Morty said. Read
+    // live (begin_cycle, the approach, the grasp verdict), never cached here.
+    get_or_declare_param<std::string>(node_, "task_object_label", "");
+    // 2026-09-25: what a STOP at the destination pause does. "freeze" (Majd:
+    // stop always means freeze) keeps the object at the grasp pose; "home"
+    // runs the reset path instead (home, object kept). Read live at the pause.
+    get_or_declare_param<std::string>(node_, "destination_stop_mode", "freeze");
     vitamin_first_close_s_ = get_or_declare_param<double>(
       node_, "vitamin_first_close_s", 1.1);
     vitamin_retighten_close_s_ = get_or_declare_param<double>(
@@ -688,11 +698,10 @@ public:
         resume_cv_.notify_all();
       });
 
-    // Any message on the abort topic requests an immediate stop of the
-    // current pick cycle (payload ignored).
-    abort_sub_ = node_->create_subscription<std_msgs::msg::String>(
-      "/grasp_executor_lin_llm/abort", 10,
-      [this](const std_msgs::msg::String::SharedPtr) { request_abort(); });
+    // 2026-09-25: the abort topic is heard ONLY by the dedicated listener
+    // node in main() (its own spinner thread). A second subscription here on
+    // the main node ran request_abort twice per stop ("ABORT requested"
+    // logged twice) and only at the main thread's spin points.
 
     // Lifecycle status for the interactive drop. intent_router subscribes
     // to this and triggers chat_node's "Where should I drop it?" prompt
@@ -702,6 +711,13 @@ public:
     // is now" and the prompt would never be spoken at the right time.
     interactive_status_pub_ = node_->create_publisher<std_msgs::msg::String>(
       "/grasp_executor_lin_llm/interactive_status", 10);
+    // 2026-09-25: ONE owner of the pick's state (Majd's item 2). The router,
+    // chat_node, the GUI and the LLM context read this latched JSON level
+    // instead of inferring the state from spoken announcements and volatile
+    // status tokens. Latched like selected_pose so a late subscriber adopts
+    // the current state at once. Format: publish_task_state().
+    task_state_pub_ = node_->create_publisher<std_msgs::msg::String>(
+      "/grasp_executor_lin_llm/task_state", rclcpp::QoS(1).reliable().transient_local());
     // Per-candidate probe status for the GUI ("Execute 2: fail because ...",
     // Majd 2026-08-12). One String per tried candidate.
     candidate_status_pub_ = node_->create_publisher<std_msgs::msg::String>(
@@ -792,6 +808,15 @@ public:
         gripper_action_timeout_s_ = min_timeout;
       }
     }
+
+    // 2026-09-25: the first task state — idle, nothing held, no cycle yet —
+    // latched at start so every consumer has a level from the beginning.
+    {
+      std::lock_guard<std::mutex> lk(task_mutex_);
+      task_boot_ = wall_now_s();
+      task_sensor_check_ = check_grasp_sensor_;
+      publish_task_state_locked();
+    }
   }
 
   bool is_one_shot() const { return one_shot_; }
@@ -851,7 +876,8 @@ public:
     skip_next_precheck_ = false;
     rec->n_tried = precheck_tried_;
     rec->rejected = precheck_rejected_;
-    if (precheck_interrupted_ || abort_requested_.load()) {
+    // 2026-09-25: a reset interrupts the background check exactly like a stop.
+    if (precheck_interrupted_ || stop_requested()) {
       invalidate_cached_lin_plan("the background check was interrupted");
       rec->partial = true;
       return false;
@@ -990,6 +1016,13 @@ public:
   {
     std::vector<double> now;
     if (!arm_joints_now(&now)) { if (why) { *why = "no fresh joint state"; } return false; }
+    return joints_at_reset_target(now, why);
+  }
+
+  // 2026-09-25: the comparison half of arm_at_reset_target, shared with
+  // end_cycle's non-spinning check (joints in arm_group_ joint order).
+  bool joints_at_reset_target(const std::vector<double> & now, std::string * why)
+  {
     std::map<std::string, double> target;
     try { target = arm_group_.getNamedTargetValues(reset_target_name_); } catch (...) {}
     if (target.empty()) { if (why) { *why = "named target '" + reset_target_name_ + "' unknown"; } return false; }
@@ -1145,6 +1178,9 @@ public:
     // vitamin-tube mode / wait_for_destination / drop_target_name stay
     // at whatever they were when the node started.
     refresh_runtime_params();
+    // 2026-09-25: the approach begins — the task state re-reads the object
+    // label and wait_for_destination now that the per-pick params are fresh.
+    set_task_phase("approaching");
     last_failure_reason_.clear();
     cycle_done_note_.clear();
     open_pending_ = false; open_done_ = false; early_close_fired_.store(false);
@@ -1152,18 +1188,30 @@ public:
     // Operator-stop check used between the irreversible-ish steps. Sets
     // the narration reason FIRST so recover_to_reset_target keeps it.
     auto aborted_at = [&](const char * where) {
-      if (!abort_requested_.load()) {
+      if (!stop_requested()) {
         return false;
       }
-      last_failure_reason_ = "stopped by your command";
-      // INVALIDATION: the operator froze the arm mid-cycle.
-      invalidate_cached_lin_plan("operator STOP during the pick");
-      // FREEZE in place — no recovery move. "Stop means stop instantly in
-      // its position, whatever it is doing" (Majd, 2026-08-12). The
-      // operator resumes with go_home / drop commands when ready.
-      RCLCPP_WARN(node_->get_logger(),
-        "Operator STOP honoured at %s — freezing in place (no recovery move).",
-        where);
+      if (abort_requested_.load()) {
+        last_failure_reason_ = "stopped by your command";
+        // INVALIDATION: the operator froze the arm mid-cycle.
+        invalidate_cached_lin_plan("operator STOP during the pick");
+        // FREEZE in place — no recovery move. "Stop means stop instantly in
+        // its position, whatever it is doing" (Majd, 2026-08-12). The
+        // operator resumes with go_home / drop commands when ready.
+        RCLCPP_WARN(node_->get_logger(),
+          "Operator STOP honoured at %s — freezing in place (no recovery move).",
+          where);
+        slip_monitor_armed_.store(false);
+        set_task_phase("stopped");
+        return true;
+      }
+      // 2026-09-25: a RESET (GUI "Reset pick" or the spoken reset) is not a
+      // freeze: the pick ends here and the arm goes home with the gripper as
+      // it is. The move itself is finish_reset()'s, after execute_grasp
+      // returns, so every checkpoint shares one path home.
+      enter_reset(where);
+      // INVALIDATION: the arm leaves for home; nothing planned from here holds.
+      invalidate_cached_lin_plan("operator RESET during the pick");
       slip_monitor_armed_.store(false);
       return true;
     };
@@ -1267,12 +1315,13 @@ public:
               std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_));
             const auto lead_at = t_start + std::chrono::duration_cast<ns>(std::chrono::duration<double>(dur - close_lead_s_));
             const auto arrival = t_start + std::chrono::duration_cast<ns>(std::chrono::duration<double>(dur));
+            // 2026-09-25: a reset ends the approach like a stop — no close on the way in.
             early_close_thread_ = std::thread([this, open_ready, lead_at, arrival]() {
               const auto earliest = std::max(open_ready, lead_at);
-              while (std::chrono::steady_clock::now() < earliest && !abort_requested_.load()) {
+              while (std::chrono::steady_clock::now() < earliest && !stop_requested()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
               }
-              while (!abort_requested_.load() && std::chrono::steady_clock::now() < arrival) {
+              while (!stop_requested() && std::chrono::steady_clock::now() < arrival) {
                 if (!check_grasp_sensor_ || !grasp_detected_.load()) {
                   early_close_fired_.store(true);
                   begin_gripper_close_async();
@@ -1280,7 +1329,7 @@ public:
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
               }
-              if (!abort_requested_.load()) {
+              if (!stop_requested()) {
                 RCLCPP_WARN(node_->get_logger(),
                   "Close on the way in skipped: the finger sensor did not read 'apart' before the arrival — closing after the sensor check.");
               }
@@ -1453,7 +1502,8 @@ public:
       {
         const auto ready_at = open_sent_t_ + std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::duration<double>(gripper_open_time_s_ + open_before_arrival_margin_s_));
-        while (rclcpp::ok() && std::chrono::steady_clock::now() < ready_at && !abort_requested_.load()) {
+        // 2026-09-25: a reset cuts the wait short like a stop.
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < ready_at && !stop_requested()) {
           rclcpp::spin_some(node_);
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
@@ -1490,7 +1540,8 @@ public:
         }
         const auto t_end = std::chrono::steady_clock::now() +
           std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(pause_s));
-        while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
+        // 2026-09-25: a reset ends the calibration pause like a stop.
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !stop_requested()) {
           rclcpp::spin_some(node_);
           std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
@@ -1557,6 +1608,7 @@ public:
           "No-grasp detected after close (grasp pin %d=LOW). Lifting "
           "clear, then asking before going home (empty gripper).",
           grasp_pin_);
+        set_task_phase("no_grasp");   // 2026-09-25: task state before the legacy token
         try {
           std_msgs::msg::String s;
           s.data = "no_grasp";
@@ -1582,12 +1634,11 @@ public:
         // 'home', stop/stay → 'stay' on the resume topic. One-shot
         // compound picks (wait_for_destination=false) keep auto-home.
         bool nog_go_home = true;
+        bool nog_stopped = false;   // 2026-09-25: a stop at this question freezes; reason "stopped by your command"
         if (wait_for_destination_) {
-          {
-            std::lock_guard<std::mutex> lk(resume_mutex_);
-            resume_received_ = false;
-            resume_destination_.clear();
-          }
+          // 2026-09-25: a stop/reset that landed before this pause opened is kept (open_pause_mailbox).
+          open_pause_mailbox();
+          set_task_phase("awaiting_home_confirm", "home");
           try {
             std_msgs::msg::String s;
             s.data = "awaiting_home_confirm";
@@ -1601,7 +1652,8 @@ public:
             rclcpp::spin_some(node_);
             {
               std::lock_guard<std::mutex> lk(resume_mutex_);
-              if (resume_received_) { ng_got = true; break; }
+              // 2026-09-25: the stop/reset flags end the wait even if a later word overwrote the slot.
+              if (resume_received_ || stop_requested()) { ng_got = true; break; }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
           }
@@ -1612,13 +1664,23 @@ public:
             resume_received_ = false;
             resume_destination_.clear();
           }
+          // 2026-09-25: the flags outrank the slot text, then the question is over.
+          { const std::string tok = stop_flag_token(); if (!tok.empty()) { ng = tok; } }
+          close_question();
           for (auto & c : ng) c = std::tolower(c);
+          // 2026-09-25: "abort" joins the stay list — a spoken stop at this
+          // question used to send the arm home (not in the list).
           if (ng_got && (ng == "stay" || ng == "stop" || ng == "wait" ||
-                         ng == "cancel" || ng == "hold")) {
+                         ng == "cancel" || ng == "hold" || ng == "abort")) {
             RCLCPP_INFO(node_->get_logger(),
               "No-grasp recovery: '%s' → staying put above the object.",
               ng.c_str());
             nog_go_home = false;
+            nog_stopped = (ng == "abort");
+          } else if (ng_got && ng == "reset_home") {
+            // 2026-09-25: reset at the no-grasp question = go home now; the
+            // reason becomes "reset by the operator" below.
+            enter_reset("the no-grasp question");
           } else if (!ng_got) {
             RCLCPP_WARN(node_->get_logger(),
               "No-grasp recovery: no answer within %.0fs — going home.",
@@ -1627,6 +1689,12 @@ public:
         }
         bool nog_home_ok = true;
         if (nog_go_home) {
+          // 2026-09-25: the question is answered and the arm is leaving —
+          // report it, so the state never shows the question's phase during the move.
+          // 2026-09-25: a reset still pending here would cancel this very move
+          // on the MoveIt path — it is taken over first (as recover_to_reset_target does).
+          if (reset_requested_.load()) { enter_reset("the no-grasp move home"); }
+          if (!reset_this_cycle_) { set_task_phase("returning_home"); }
           // MUST check the result (Majd 2026-08-28: "when he say 'Going
           // home' he just close the gripper but he doesnt back home").
           // The collision pre-check legitimately REFUSES this move when
@@ -1637,7 +1705,9 @@ public:
           // still down at the table and the operator was told nothing.
           nog_home_ok = execute_arm_named_target(reset_target_name_,
             "No-grasp recovery - PTP home");
-          if (!nog_home_ok) {
+          // 2026-09-25: a move cancelled by an operator stop/reset is not a
+          // blocked path — no scene_obj_* clearing and no retry.
+          if (!nog_home_ok && !stop_requested()) {
             // Majd 2026-08-31: "it should back home whatever is
             // happening when it fail — ignore objects collision". The
             // gripper is EMPTY and OPEN and we already lifted clear, so
@@ -1665,7 +1735,10 @@ public:
             nog_home_ok = execute_arm_named_target(reset_target_name_,
               "No-grasp recovery - PTP home (boxes cleared)");
           }
-          if (nog_home_ok) {
+          if (nog_home_ok && reset_this_cycle_) {
+            // 2026-09-25: a reset leaves the gripper untouched (spec §1.2).
+            RCLCPP_INFO(node_->get_logger(), "No-grasp recovery: reset — gripper left as it is at home.");
+          } else if (nog_home_ok) {
             // Re-close the gripper at home so it returns to the "ready
             // for next pick" posture instead of being left open.
             execute_gripper_named_target(gripper_close_name_,
@@ -1688,12 +1761,27 @@ public:
           : "the gripper closed but nothing was caught, and I could not "
             "get back home - the path was blocked by an object, so I am "
             "still out here with the gripper open";
+        // 2026-09-25: an operator stop / reset at the question is the cycle's
+        // outcome, so the cycle_done reason names it (router + task state).
+        // 2026-09-25: also a stop that cancelled the move home (not a blocked path).
+        if (nog_stopped || abort_requested_.load()) {
+          last_failure_reason_ = "stopped by your command";
+        } else if (reset_this_cycle_) {
+          last_failure_reason_ = "reset by the operator";
+        }
         return false;
       }
     }
 
     // From this point on, the gripper is closed on the object.
     // If any step fails, we attempt a fallback recovery to initgrasp.
+    // 2026-09-25: holding is the executor's own record, set HERE for every
+    // path that reaches this line — the DI verdict above, but also the DI
+    // check off or skipped and vitamin mode, which never set it. The label
+    // is frozen now: the router may move task_object_label to the next
+    // selection while this object is still in the fingers.
+    held_object_.store(true);
+    freeze_task_object_label();
     slip_monitor_armed_.store(check_slip_);
 
     if (stop_after_grasp_) {
@@ -1789,11 +1877,10 @@ public:
       // Reset the wait state BEFORE publishing 'paused' (and before
       // anyone else can publish a resume) so we don't miss a fast
       // reply that lands between publish and wait setup.
-      {
-        std::lock_guard<std::mutex> lk(resume_mutex_);
-        resume_received_ = false;
-        resume_destination_.clear();
-      }
+      // 2026-09-25: ...but never erase a stop/reset that landed before the
+      // pause opened (it used to be wiped here and the arm waited on).
+      open_pause_mailbox();
+      set_task_phase("awaiting_destination", "destination");
       // Broadcast the lifecycle event so intent_router (and through it
       // chat_node) can speak the "Where should I drop it?" prompt at
       // exactly the moment the pause begins.
@@ -1819,7 +1906,8 @@ public:
         rclcpp::spin_some(node_);
         {
           std::lock_guard<std::mutex> lk(resume_mutex_);
-          if (resume_received_) {
+          // 2026-09-25: the stop/reset flags end the wait even if a later word overwrote the slot.
+          if (resume_received_ || stop_requested()) {
             got = true;
             break;
           }
@@ -1831,6 +1919,9 @@ public:
         std::lock_guard<std::mutex> lk(resume_mutex_);
         dest = resume_destination_;
       }
+      // 2026-09-25: the flags outrank the slot text, then the question is over.
+      { const std::string tok = stop_flag_token(); if (!tok.empty()) { dest = tok; } }
+      close_question();
 
       if (!got) {
         RCLCPP_WARN(node_->get_logger(),
@@ -1860,29 +1951,41 @@ public:
       if (_strip("+release_home")) { auto_release = true; auto_home = true; }
       else if (_strip("+release")) { auto_release = true; }
 
+      bool dest_reset = (dest_lc == "reset_home" || dest_lc == "reset");
       if (abort_requested_.load() || dest_lc == "abort") {
-        RCLCPP_WARN(node_->get_logger(),
-          "Interactive drop: operator STOP — freezing at the grasp pose, "
-          "gripper as-is, NO move home.");
-        last_failure_reason_ = "stopped by your command";
-        slip_monitor_armed_.store(false);
-        return false;
+        // 2026-09-25: destination_stop_mode (read live) decides what a stop
+        // at THIS pause means. Default "freeze" (Majd: stop always means
+        // freeze); "home" treats it as a reset — home, object kept.
+        std::string stop_mode = "freeze";
+        try { stop_mode = node_->get_parameter("destination_stop_mode").as_string(); } catch (...) {}
+        if (stop_mode == "home") {
+          RCLCPP_WARN(node_->get_logger(),
+            "Interactive drop: operator STOP with destination_stop_mode=home — "
+            "taking the reset path (home, object kept).");
+          abort_requested_.store(false);
+          dest_reset = true;
+        } else {
+          RCLCPP_WARN(node_->get_logger(),
+            "Interactive drop: operator STOP — freezing at the grasp pose, "
+            "gripper as-is, NO move home.");
+          last_failure_reason_ = "stopped by your command";
+          slip_monitor_armed_.store(false);
+          set_task_phase("stopped");   // 2026-09-25: this freeze published no status at all
+          return false;
+        }
       }
       // The GUI's Reset pick while the robot holds and waits (Majd
       // 2026-09-15: "reset pick doesn't work" — it froze in the air):
       // reset means "go home with the object, be ready again", not
       // "freeze". Distinct from stop/abort so the voice rule stays.
-      if (dest_lc == "reset_home" || dest_lc == "reset") {
+      if (dest_reset) {
         RCLCPP_WARN(node_->get_logger(),
           "Interactive drop: operator RESET — returning home with the "
           "object, gripper as-is; the cycle ends here.");
-        last_failure_reason_ = "reset by the operator";
         slip_monitor_armed_.store(false);
-        try {
-          std_msgs::msg::String s_evt;
-          s_evt.data = "reset_home";
-          interactive_status_pub_->publish(s_evt);
-        } catch (...) {}
+        // 2026-09-25: enter_reset owns the reason, the one reset_home
+        // status of the cycle and the returning_home phase.
+        enter_reset("the destination question");
         recover_to_reset_target("Operator reset while holding");
         return false;
       }
@@ -1891,6 +1994,7 @@ public:
           "Interactive drop: keep-holding stop received. Leaving gripper "
           "as-is and moving to '%s'.", reset_target_name_.c_str());
         // Gripper stays closed/whatever — DO NOT open it on stop.
+        set_task_phase("returning_home");   // 2026-09-25: the legacy keep-holding stop moves home
         execute_arm_named_target(reset_target_name_,
           "Interactive drop - stop: PTP to reset");
         return false;
@@ -1915,11 +2019,19 @@ public:
         "Interactive drop: destination set to '%s'. Continuing with "
         "lift + drop sequence.", drop_target_name_.c_str());
         phase_mark("destination_received");
+      // 2026-09-25: the destination is resolved — carrying, and where to.
+      set_task_destination(drop_target_name_);
+      set_task_phase("carrying");
       try {
         std_msgs::msg::String s;
         s.data = "resumed:" + drop_target_name_;
         interactive_status_pub_->publish(s);
       } catch (...) {}
+    } else {
+      // 2026-09-25: no pause (one-shot "pick and place" or GUI EXECUTE flow):
+      // the configured drop target is the destination from the start.
+      set_task_destination(drop_target_name_);
+      set_task_phase("carrying");
     }
 
     // 3a) Lift object along table +Y using LIN motion.
@@ -2015,6 +2127,12 @@ public:
     // moving through home instead of decelerating to a full stop there.
     // Any failure falls straight through to the proven two-step sequence
     // below, which starts by going to home from wherever the arm is.
+    // 2026-09-25: a stop / reset that came after the destination (or during
+    // a one-shot pick's lift) ends the pick here, before the transport —
+    // freeze, or home with the object.
+    if (aborted_at("before the transport")) {
+      return false;
+    }
     bool blended_ok = false;
     if (sequence_ok && blend_via_home_ && !skip_reset_before_drop_ &&
         !vitamin_mode_active_ && use_fast_replay_for_named_targets_ &&
@@ -2140,7 +2258,11 @@ public:
         "ask-before-home pause and the return move; the arm is already "
         "there.", reset_target_name_.c_str());
     }
-    if (sequence_ok && auto_release && execute_) {
+    // 2026-09-25: a stop/reset pending at the drop pose must never open the
+    // gripper: the pre-authorised open and the no-pause hold-then-open are
+    // skipped, and the release-pause branch below (whose abort / reset
+    // handling takes over at once via open_pause_mailbox) runs instead.
+    if (sequence_ok && auto_release && execute_ && !stop_requested()) {
       RCLCPP_INFO(node_->get_logger(),
         "Interactive release: PRE-AUTHORIZED by the compound command — "
         "opening on arrival%s.", auto_home ? ", then straight home" : "");
@@ -2150,23 +2272,23 @@ public:
       // it was still closed (and even when the open later FAILED).
       // "releasing" narrates the intent; "released" now comes from
       // Step 5 after the hardware reports success.
+      set_task_phase("releasing");   // 2026-09-25: task state before the legacy token
       try {
         std_msgs::msg::String s_evt;
         s_evt.data = "releasing";
         interactive_status_pub_->publish(s_evt);
       } catch (...) {}
-    } else if (sequence_ok && wait_for_release_ && execute_) {
+    } else if (sequence_ok && (wait_for_release_ || stop_requested()) && execute_) {
       RCLCPP_INFO(node_->get_logger(),
         "Interactive release: arrived at '%s' holding the object. "
         "Waiting for release confirmation on '%s' (timeout %.1fs).",
         drop_target_name_.c_str(), resume_topic_.c_str(),
         resume_timeout_s_);
       // Reset before broadcasting so a fast user reply isn't lost.
-      {
-        std::lock_guard<std::mutex> lk(resume_mutex_);
-        resume_received_ = false;
-        resume_destination_.clear();
-      }
+      // 2026-09-25: ...keeping a stop/reset that landed during the transport.
+      open_pause_mailbox();
+      set_task_destination(drop_target_name_);
+      set_task_phase("awaiting_release", "release");
       try {
         std_msgs::msg::String s;
         s.data = "awaiting_release";
@@ -2189,9 +2311,23 @@ public:
             resume_destination_.clear();
           }
         }
+        // 2026-09-25: the stop/reset flags outrank whatever word is in the
+        // slot (a later resume must never start a redirect after a stop), and
+        // they end the wait even when their own word was already consumed.
+        { const std::string tok = stop_flag_token(); if (!tok.empty()) { incoming = tok; } }
         if (!incoming.empty()) {
           std::string inc_lc;
           for (char c : incoming) inc_lc.push_back(std::tolower(c));
+          // 2026-09-25: reset ends the pause BEFORE the carry/redirect scan —
+          // "reset_home" (the reset topic's slot word, the GUI's resume) used
+          // to fall through as "not a release word" (release_skipped, carried
+          // home, cycle "done"). A bare "reset" keeps its legacy meaning
+          // below (redirect home, ask again); nothing sends it today.
+          if (inc_lc == "reset_home") {
+            dest = incoming;
+            got = true;
+            break;
+          }
           // ── RELEASE-PAUSE v2 (2026-08-31, Majd: "it should be more
           // natural") ──────────────────────────────────────────────
           // A *different* destination now REDIRECTS the held object
@@ -2244,6 +2380,9 @@ public:
               "from '%s' to '%s' (via '%s'), opening on arrival.",
               drop_target_name_.c_str(), tgt.c_str(),
               reset_target_name_.c_str());
+            // 2026-09-25: the question is answered; carrying to the new target.
+            set_task_destination(tgt);
+            set_task_phase("carrying");
             try {
               std_msgs::msg::String s_r;
               s_r.data = "redirect:" + tgt;
@@ -2269,11 +2408,25 @@ public:
                 s_p.data = "resumed:" + drop_target_name_;
                 interactive_status_pub_->publish(s_p);
               } catch (...) {}
+              set_task_destination(drop_target_name_);   // 2026-09-25: where the arm froze
+              set_task_phase("stopped");
               try {
                 std_msgs::msg::String s_evt;
                 s_evt.data = "stopped_holding";
                 interactive_status_pub_->publish(s_evt);
               } catch (...) {}
+              return false;
+            }
+            if (carry_ok && reset_requested_.load()) {
+              // 2026-09-25: a reset between the legs ends the pick here — the
+              // arm is home after leg 1 (or never left it), object kept.
+              if (leg1_done) drop_target_name_ = reset_target_name_;
+              RCLCPP_WARN(node_->get_logger(),
+                "Carry+release: RESET between legs — at '%s', object kept; "
+                "the cycle ends here.", drop_target_name_.c_str());
+              slip_monitor_armed_.store(false);
+              set_task_destination(drop_target_name_);
+              enter_reset("between the carry legs");
               return false;
             }
             if (carry_ok && tgt != reset_target_name_) {
@@ -2296,11 +2449,21 @@ public:
                 s_p.data = "resumed:" + drop_target_name_;
                 interactive_status_pub_->publish(s_p);
               } catch (...) {}
+              // 2026-09-25: a leg cancelled by an operator stop/reset is not a
+              // failed carry: no redirect_failed, no re-ask — the loop's next
+              // pass hands the flag to the abort / reset handling.
+              if (stop_requested()) {
+                set_task_destination(drop_target_name_);
+                continue;
+              }
               try {
                 std_msgs::msg::String s_f;
                 s_f.data = "redirect_failed";
                 interactive_status_pub_->publish(s_f);
               } catch (...) {}
+              // 2026-09-25: asked again from where the arm really is — a new question.
+              set_task_destination(drop_target_name_);
+              set_task_phase("awaiting_release", "release");
               try {
                 std_msgs::msg::String s_a;
                 s_a.data = "awaiting_release";
@@ -2343,6 +2506,9 @@ public:
               "the object from '%s' to '%s' (via '%s').",
               drop_target_name_.c_str(), redirect_target.c_str(),
               reset_target_name_.c_str());
+            // 2026-09-25: the question is answered; carrying to the new target.
+            set_task_destination(redirect_target);
+            set_task_phase("carrying");
             try {
               std_msgs::msg::String s_r;
               s_r.data = "redirect:" + redirect_target;
@@ -2368,11 +2534,25 @@ public:
                 s_p.data = "resumed:" + drop_target_name_;
                 interactive_status_pub_->publish(s_p);
               } catch (...) {}
+              set_task_destination(drop_target_name_);   // 2026-09-25: where the arm froze
+              set_task_phase("stopped");
               try {
                 std_msgs::msg::String s_evt;
                 s_evt.data = "stopped_holding";
                 interactive_status_pub_->publish(s_evt);
               } catch (...) {}
+              return false;
+            }
+            if (move_ok && reset_requested_.load()) {
+              // 2026-09-25: a reset between the legs ends the pick here — the
+              // arm is home after leg 1 (or never left it), object kept.
+              if (r_leg1_done) drop_target_name_ = reset_target_name_;
+              RCLCPP_WARN(node_->get_logger(),
+                "Redirect: RESET between legs — at '%s', object kept; "
+                "the cycle ends here.", drop_target_name_.c_str());
+              slip_monitor_armed_.store(false);
+              set_task_destination(drop_target_name_);
+              enter_reset("between the redirect legs");
               return false;
             }
             if (move_ok && redirect_target != reset_target_name_) {
@@ -2390,11 +2570,14 @@ public:
                 "Redirect to '%s' failed/refused — the object stays "
                 "held at '%s'; the question stays open.",
                 redirect_target.c_str(), drop_target_name_.c_str());
-              try {
-                std_msgs::msg::String s_f;
-                s_f.data = "redirect_failed";
-                interactive_status_pub_->publish(s_f);
-              } catch (...) {}
+              // 2026-09-25: not when an operator stop/reset cancelled the leg (see below).
+              if (!stop_requested()) {
+                try {
+                  std_msgs::msg::String s_f;
+                  s_f.data = "redirect_failed";
+                  interactive_status_pub_->publish(s_f);
+                } catch (...) {}
+              }
             }
             // Authoritative pose AFTER the motion settles (F6): the
             // router books _executor_drop_dest from this, so the
@@ -2411,7 +2594,8 @@ public:
             // open. Only exact release synonyms qualify; anything else
             // (another destination, a stray word) keeps the normal
             // re-ask so a stale echo can never open the gripper here.
-            if (move_ok) {
+            // 2026-09-25: never open on a waiting word while a stop/reset is pending.
+            if (move_ok && !stop_requested()) {
               std::string pending;
               {
                 std::lock_guard<std::mutex> lk(resume_mutex_);
@@ -2438,6 +2622,15 @@ public:
                 break;
               }
             }
+            // 2026-09-25: a stop/reset during a leg — no re-ask; the loop's next
+            // pass hands the flag to the abort / reset handling.
+            if (stop_requested()) {
+              set_task_destination(drop_target_name_);
+              continue;
+            }
+            // 2026-09-25: asked again from where the arm really is — a new question.
+            set_task_destination(drop_target_name_);
+            set_task_phase("awaiting_release", "release");
             try {
               std_msgs::msg::String s_a;
               s_a.data = "awaiting_release";
@@ -2473,6 +2666,7 @@ public:
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
+      close_question();   // 2026-09-25: the release question is over (answered, stopped or timed out)
       if (!got) {
         RCLCPP_WARN(node_->get_logger(),
           "Interactive release: timed out after %.1fs. Recovering to "
@@ -2489,6 +2683,7 @@ public:
             "pose, gripper stays closed, NO move home.");
           last_failure_reason_ = "stopped by your command";
           slip_monitor_armed_.store(false);
+          set_task_phase("stopped");   // 2026-09-25: task state before the legacy token
           try {
             std_msgs::msg::String s_evt;
             // v2: distinct from "release_skipped" — the arm FROZE at
@@ -2497,6 +2692,19 @@ public:
             s_evt.data = "stopped_holding";
             interactive_status_pub_->publish(s_evt);
           } catch (...) {}
+          return false;
+        }
+        if (dest_lc == "reset_home") {
+          // 2026-09-25: reset at the release question = the GUI "Reset pick":
+          // home WITH the object (never opened), the cycle ends as
+          // "failed|id|reset by the operator". It used to be a
+          // release_skipped carry home reported as "done".
+          RCLCPP_WARN(node_->get_logger(),
+            "Interactive release: operator RESET — returning home with the "
+            "object, gripper as-is; the cycle ends here.");
+          slip_monitor_armed_.store(false);
+          enter_reset("the release question");
+          recover_to_reset_target("Operator reset while holding at the drop pose");
           return false;
         }
         if (dest_lc == "release_home" ||
@@ -2528,6 +2736,9 @@ public:
           skip_release = true;
         }
       }
+      // 2026-09-25: task state before the legacy token — a skipped release
+      // means the arm now carries the object home.
+      set_task_phase(skip_release ? "returning_home" : "releasing");
       try {
         std_msgs::msg::String s;
         // "releasing" = about to command the open (router narrates
@@ -2555,6 +2766,9 @@ public:
           ensure_fingers_open("Step 5b - Object released?")) {
         released_ok = true;
         released_t = std::chrono::steady_clock::now();
+        // 2026-09-25: the open cleared held_object_ — publish holding:false
+        // before the legacy "released" (the phase stays releasing).
+        publish_task_state();
         // Only now is "The gripper is open." true.
         try {
           std_msgs::msg::String s_ok;
@@ -2567,9 +2781,16 @@ public:
             phase_mark("released");
           const auto t_end = std::chrono::steady_clock::now() +
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(post_release_wait_s_));
-          while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !abort_requested_.load()) {
+          // 2026-09-25: a reset cuts the post-release wait short like a stop.
+          while (rclcpp::ok() && std::chrono::steady_clock::now() < t_end && !stop_requested()) {
             rclcpp::spin_some(node_);
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
+          }
+          // 2026-09-25: a stop / reset during the hand-over wait must not be
+          // followed by Step 6 driving off (into the hand taking the object):
+          // stop freezes here, reset goes home via finish_reset.
+          if (aborted_at("after the release")) {
+            return false;
           }
         }
       } else {
@@ -2596,8 +2817,11 @@ public:
           for (auto & c : early) c = std::tolower(c);
           resume_received_ = false;
           resume_destination_.clear();
-          if (early == "home" || early == "go_home" || early == "yes" ||
-              early == "release_home") {
+          // 2026-09-25: a pending stop/reset outranks an early "home" — the
+          // question then opens and open_pause_mailbox hands it the flag.
+          if (!stop_requested() &&
+              (early == "home" || early == "go_home" || early == "yes" ||
+               early == "release_home")) {
             RCLCPP_INFO(node_->get_logger(),
               "Home-confirm: early '%s' already received — going home "
               "without asking.", early.c_str());
@@ -2608,11 +2832,9 @@ public:
     }
     if (sequence_ok && !skip_release && ask_home_before_reset &&
         !already_at_reset_pose && execute_) {
-      {
-        std::lock_guard<std::mutex> lk(resume_mutex_);
-        resume_received_ = false;
-        resume_destination_.clear();
-      }
+      // 2026-09-25: a stop/reset that landed before this pause opened is kept (open_pause_mailbox).
+      open_pause_mailbox();
+      set_task_phase("awaiting_home_confirm", "home");
       try {
         std_msgs::msg::String s;
         s.data = "awaiting_home_confirm";
@@ -2626,7 +2848,8 @@ public:
         rclcpp::spin_some(node_);
         {
           std::lock_guard<std::mutex> lk(resume_mutex_);
-          if (resume_received_) { hc_got = true; break; }
+          // 2026-09-25: the stop/reset flags end the wait even if a later word overwrote the slot.
+          if (resume_received_ || stop_requested()) { hc_got = true; break; }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
       }
@@ -2635,9 +2858,14 @@ public:
         std::lock_guard<std::mutex> lk(resume_mutex_);
         hc = resume_destination_;
       }
+      // 2026-09-25: the flags outrank the slot text, then the question is over.
+      { const std::string tok = stop_flag_token(); if (!tok.empty()) { hc = tok; } }
+      close_question();
       for (auto & c : hc) c = std::tolower(c);
+      // 2026-09-25: "abort" joins the stay list — a spoken stop at "Should I
+      // go back home?" used to send the arm home (not in the list).
       if (hc_got && (hc == "stay" || hc == "stop" || hc == "wait" ||
-                     hc == "cancel" || hc == "hold")) {
+                     hc == "cancel" || hc == "hold" || hc == "abort")) {
         RCLCPP_INFO(node_->get_logger(),
           "Home-confirm: '%s' → STAYING at '%s' (no reset move).",
           hc.c_str(), drop_target_name_.c_str());
@@ -2648,15 +2876,24 @@ public:
           s.data = std::string("stayed:") + drop_target_name_;
           interactive_status_pub_->publish(s);
         } catch (...) {}
+      } else if (hc_got && hc == "reset_home") {
+        // 2026-09-25: reset here = go home now (Step 6 below). The object is
+        // already released, so the cycle still ends "done".
+        enter_reset("the home question");
       } else if (!hc_got) {
         RCLCPP_WARN(node_->get_logger(),
           "Home-confirm: no answer within %.0fs — going home.",
           resume_timeout_s_);
       }
     }
-    if (sequence_ok && !stay_in_place && !already_at_reset_pose &&
-        !execute_arm_named_target(reset_target_name_, "Step 6 - Move to reset target")) {
-      sequence_ok = false;
+    if (sequence_ok && !stay_in_place && !already_at_reset_pose) {
+      // 2026-09-25: a reset still pending here would cancel Step 6 itself on
+      // the MoveIt path — taken over first (as recover_to_reset_target does).
+      if (reset_requested_.load()) { enter_reset("before the move home"); }
+      set_task_phase("returning_home");   // 2026-09-25: Step 6 — the arm heads home
+      if (!execute_arm_named_target(reset_target_name_, "Step 6 - Move to reset target")) {
+        sequence_ok = false;
+      }
     }
     // Step 7 closes the gripper at home as a "ready for next pick"
     // posture. Skip if we kept the object held — gripper is already
@@ -2673,13 +2910,18 @@ public:
         RCLCPP_INFO(node_->get_logger(),
           "Step 7 - keeping the gripper open %.1f s after the release before closing (the hand taking the object).",
           std::chrono::duration<double>(t_close - std::chrono::steady_clock::now()).count());
-        while (rclcpp::ok() && std::chrono::steady_clock::now() < t_close && !abort_requested_.load()) {
+        // 2026-09-25: a reset cuts this wait short like a stop.
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < t_close && !stop_requested()) {
           rclcpp::spin_some(node_);
           std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
       }
     }
-    if (sequence_ok && !skip_release && !stay_in_place && !execute_gripper_named_target(gripper_close_name_, "Step 7 - Close gripper at reset")) {
+    // 2026-09-25: never close on a pending stop/reset (the wait above ends
+    // early — the hand may still be in the fingers), and a reset leaves the
+    // gripper untouched (spec §1.2).
+    if (sequence_ok && !skip_release && !stay_in_place && !stop_requested() && !reset_this_cycle_ &&
+        !execute_gripper_named_target(gripper_close_name_, "Step 7 - Close gripper at reset")) {
       sequence_ok = false;
     }
 
@@ -2730,6 +2972,10 @@ public:
     RCLCPP_WARN(node_->get_logger(),
       "ABORT requested by operator — stopping the pick cycle.");
     abort_requested_.store(true);
+    // 2026-09-25: of stop and reset the later request wins — a stop that
+    // lands inside a reset freezes the arm. Cleared AFTER the abort is up so
+    // stop_requested() never reads false in between.
+    reset_requested_.store(false);
     // Wake a resume wait so a paused cycle reacts instantly.
     {
       std::lock_guard<std::mutex> lk(resume_mutex_);
@@ -2755,13 +3001,325 @@ public:
   void set_failure_reason(const std::string & reason) { last_failure_reason_ = reason; }
   // A stale abort must not kill the NEXT cycle — main clears it when a
   // fresh candidate set starts processing.
-  void clear_abort() { abort_requested_.store(false); }
+  // 2026-09-25: a stale reset neither — both operator flags are cleared.
+  void clear_abort() { abort_requested_.store(false); reset_requested_.store(false); }
   // 2026-09-08: last_failure_reason_ was only cleared inside execute_grasp(),
   // so a cycle that died in the candidate search re-reported the PREVIOUS
   // cycle's reason — "stopped by your command" was spoken twice for
   // "nothing reachable" failures (Majd: "why does it keep saying that").
   void clear_failure_reason() { last_failure_reason_.clear(); }
   bool abort_pending() const { return abort_requested_.load(); }
+  // 2026-09-25: main()'s idle block handles a pending reset (its reset twin).
+  bool reset_pending() const { return reset_requested_.load(); }
+
+  // ══ Operator reset + the task state (2026-09-25) ══════════════════════
+  // RESET is the GUI "↻ Reset pick" semantics, now its own request on
+  // /grasp_executor_lin_llm/reset instead of a resume word raced by a stop
+  // intent (the GUI's reset froze the arm when the router turned the stop
+  // intent into an abort): end the pick and go home keeping any held
+  // object, the gripper untouched. It rides the stop machinery —
+  // stop_requested() is what every checkpoint and wait now asks — and only
+  // the decision point differs: an abort freezes, a reset calls
+  // enter_reset() and the arm goes home (finish_reset / recover). The TASK
+  // STATE is one latched JSON level owned by this executor (see
+  // publish_task_state); router, chat_node and GUI read it instead of
+  // inferring the pick from spoken lines and volatile tokens.
+
+  // 2026-09-25: operator stop OR reset pending — every checkpoint, wait
+  // and MoveIt execution that used to watch the abort flag watches this.
+  bool stop_requested() const { return abort_requested_.load() || reset_requested_.load(); }
+
+  // 2026-09-25: the cycle_done reason for a stop_requested() exit. An abort
+  // outranks a reset (it is the only one that freezes).
+  const char * stop_reason() const
+  {
+    return (!abort_requested_.load() && reset_requested_.load())
+      ? "reset by the operator" : "stopped by your command";
+  }
+
+  // 2026-09-25: the mailbox word a pending operator flag stands for
+  // ("" = none). The flags outrank whatever text sits in the single slot:
+  // a later resume word must never overwrite a stop or a reset.
+  std::string stop_flag_token() const
+  {
+    if (abort_requested_.load()) { return "abort"; }
+    if (reset_requested_.load()) { return "reset_home"; }
+    return "";
+  }
+
+  // 2026-09-25: JSON string escaping for the hand-built task state: quote,
+  // backslash and every control character (labels and reasons are free text).
+  static std::string json_escape(const std::string & s)
+  {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (const char ch : s) {
+      const unsigned char c = static_cast<unsigned char>(ch);
+      switch (c) {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        default:
+          if (c < 0x20) {
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned int>(c));
+            out += buf;
+          } else {
+            out += ch;
+          }
+      }
+    }
+    return out;
+  }
+
+  // 2026-09-25: one publish of the task state (§1.1 of the overhaul spec),
+  // latched. Locks, bumps seq, builds the JSON by hand in the timing_json
+  // style. Never reads parameters (callers cache them in the task_* fields),
+  // so it is safe from the abort-listener thread too.
+  void publish_task_state()
+  {
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    publish_task_state_locked();
+  }
+
+  // 2026-09-25: the phase of the pick, set immediately BEFORE the legacy
+  // interactive_status token it accompanies. A non-empty question opens a
+  // new question (question_id+1, question_since = now); an empty one closes
+  // any open question. Probing / approaching re-read the object label while
+  // nothing is held (the router may set it only at dispatch). Main thread.
+  void set_task_phase(const std::string & phase, const std::string & question = "")
+  {
+    const bool reread_label =
+      (phase == "probing" || phase == "approaching") && !held_object_.load();
+    const std::string label = reread_label ? read_task_object_label() : std::string();
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    task_phase_ = phase;
+    task_question_ = question;
+    if (!question.empty()) {
+      ++task_question_id_;
+      task_question_since_ = wall_now_s();
+    }
+    if (reread_label) { task_label_ = label; }
+    if (phase == "approaching") {
+      // refresh_runtime_params() just ran: the per-pick values are current.
+      task_asks_destination_ = wait_for_destination_;
+      task_sensor_check_ = check_grasp_sensor_;
+    }
+    publish_task_state_locked();
+  }
+
+  // 2026-09-25: a pause wait loop ended (answer, stop/reset or timeout): no
+  // question is open any more, whatever phase follows.
+  void close_question()
+  {
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    if (task_question_.empty()) { return; }
+    task_question_.clear();
+    publish_task_state_locked();
+  }
+
+  // 2026-09-25: where the held object is going / the arm is (drop target
+  // name); published with the next phase.
+  void set_task_destination(const std::string & destination)
+  {
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    task_destination_ = destination;
+  }
+
+  // 2026-09-25: the grasp verdict: the label of the object now in the
+  // fingers is frozen, so a later selection cannot rename what is held.
+  void freeze_task_object_label()
+  {
+    const std::string label = read_task_object_label();
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    if (!label.empty()) { task_label_ = label; }
+    task_held_label_ = task_label_;
+    publish_task_state_locked();
+  }
+
+  // 2026-09-25: a pipeline cycle starts (main, before the probe): the reset
+  // bookkeeping of the last cycle is dropped (a reset still "active" here
+  // is stale — this main thread ran its home move), the destination is
+  // unknown again, and the router's per-pick params are read directly
+  // because refresh_runtime_params() only runs at the approach.
+  void begin_cycle(int64_t cycle_id)
+  {
+    reset_this_cycle_ = false;
+    reset_status_sent_ = false;
+    reset_active_.store(false);
+    bool asks = wait_for_destination_;
+    bool check = check_grasp_sensor_;
+    try { asks = node_->get_parameter("wait_for_destination").as_bool(); } catch (...) {}
+    try { check = node_->get_parameter("check_grasp_sensor").as_bool(); } catch (...) {}
+    const std::string label = read_task_object_label();
+    {
+      std::lock_guard<std::mutex> lk(task_mutex_);
+      task_cycle_id_ = cycle_id;
+      task_in_cycle_ = true;
+      task_destination_.clear();
+      task_asks_destination_ = asks;
+      task_sensor_check_ = check;
+      task_label_ = label;
+    }
+    set_task_phase("probing");
+  }
+
+  // 2026-09-25: the cycle is over (publish_completion, before cycle_done):
+  // `last` gets the verdict — outcome derived from the cycle_done
+  // reason/note as the spec's §1.1 says — and the phase goes idle. It also
+  // ends any reset of this cycle. at_home comes from the last joint sample
+  // WITHOUT spinning: publish_completion runs once under main's candidate
+  // mutex (spinning there could deadlock in a callback) and a spin here
+  // could run the cycle-id callback, which clears the failure reason
+  // before cycle_done carries it.
+  void end_cycle(bool ok, int64_t cycle_id)
+  {
+    std::vector<double> q;
+    const bool at_home = arm_joints_last(&q) && joints_at_reset_target(q, nullptr);
+    std::string outcome;
+    std::string reason;
+    if (ok) {
+      outcome = (cycle_done_note_.rfind("stayed:", 0) == 0) ? "stayed" : "done";
+    } else {
+      reason = last_failure_reason_;
+      outcome = (reason == "stopped by your command") ? "stopped"
+              : (reason == "reset by the operator") ? "reset" : "failed";
+    }
+    reset_active_.store(false);
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    task_last_cycle_id_ = cycle_id;
+    task_last_outcome_ = outcome;
+    task_last_reason_ = reason;
+    task_last_at_home_ = at_home;
+    task_phase_ = "idle";
+    task_question_.clear();
+    task_in_cycle_ = false;
+    publish_task_state_locked();
+  }
+
+  // 2026-09-25: the pause mailbox opens. It used to be cleared outright,
+  // which erased a stop said just before the pause opened (the arm then
+  // waited for an answer instead of freezing). A pending stop / reset is
+  // posted into the slot instead, so the wait ends at once.
+  void open_pause_mailbox()
+  {
+    std::lock_guard<std::mutex> lk(resume_mutex_);
+    const std::string tok = stop_flag_token();
+    if (!tok.empty()) {
+      resume_destination_ = tok;
+      resume_received_ = true;
+    } else {
+      resume_received_ = false;
+      resume_destination_.clear();
+    }
+  }
+
+  // 2026-09-25: /grasp_executor_lin_llm/reset (abort-listener thread). The
+  // payload names the source (gui / voice) for the log only. A reset while
+  // a reset's own home move runs is ignored; otherwise it replaces any
+  // pending stop (the later request wins), wakes a pause wait with
+  // "reset_home" and halts a MoveIt execution — the checkpoints then take
+  // the arm home.
+  void request_reset(const std::string & source)
+  {
+    {
+      // 2026-09-25: check-and-set under reset_mutex_ (enter_reset takes it
+      // too), so a reset can never slip in between enter_reset's un-flagging
+      // and its "active" mark and then cancel the reset's own move home.
+      std::lock_guard<std::mutex> rk(reset_mutex_);
+      if (reset_active_.load()) {
+        RCLCPP_INFO(node_->get_logger(),
+          "RESET from '%s' ignored: a reset is already taking the arm home.", source.c_str());
+        return;
+      }
+      // Set before the abort is cleared, so stop_requested() never reads false in between.
+      reset_requested_.store(true);
+      abort_requested_.store(false);
+    }
+    RCLCPP_WARN(node_->get_logger(),
+      "RESET requested by operator (%s) — ending the pick, home with the gripper as it is.",
+      source.c_str());
+    {
+      std::lock_guard<std::mutex> lk(resume_mutex_);
+      resume_destination_ = "reset_home";
+      resume_received_ = true;
+    }
+    resume_cv_.notify_all();
+    try {
+      arm_group_.stop();
+    } catch (...) {}
+    // 2026-09-25: NO invalidate_cached_lin_plan() here — this runs on the
+    // listener thread while the main thread may be copying the cached plan.
+    // The main thread drops it where the reset is taken over (aborted_at's
+    // reset branch, recover_to_reset_target).
+    publish_task_state();
+  }
+
+  // 2026-09-25: /gripper_controller/command_event (abort-listener thread):
+  // the adapter's record of every open/close it was given — executor, GUI
+  // and router alike. Any open ends "holding"; the pin (TI0) is never used
+  // for that (it is also HIGH when empty fingers stall on each other).
+  void note_gripper_command(const std::string & payload)
+  {
+    const bool opened = payload.find("\"cmd\": \"open\"") != std::string::npos ||
+                        payload.find("\"cmd\":\"open\"") != std::string::npos;
+    const bool closed = payload.find("\"cmd\": \"close\"") != std::string::npos ||
+                        payload.find("\"cmd\":\"close\"") != std::string::npos;
+    if (!opened && !closed) { return; }
+    if (opened) { held_object_.store(false); }
+    std::lock_guard<std::mutex> lk(task_mutex_);
+    task_gripper_ = opened ? "open" : "closed";
+    publish_task_state_locked();
+  }
+
+  // 2026-09-25: a failed cycle's reset epilogue (main, before cycle_done).
+  // A stop that came inside the reset wins (freeze; reason stopped); a reset
+  // that arrived where no checkpoint saw it is taken now; a reset that has
+  // not reached home yet gets there. Always ends the reset.
+  void finish_reset()
+  {
+    if (abort_requested_.load()) {
+      if (reset_this_cycle_) { last_failure_reason_ = "stopped by your command"; }
+      return;
+    }
+    if (reset_requested_.load()) { enter_reset("the end of the pick"); }
+    if (reset_this_cycle_) {
+      std::string why;
+      if (!arm_at_reset_target(&why)) {
+        recover_to_reset_target("Operator reset: " + why);
+      }
+      // 2026-09-25: both calls above spin the main node, where a new
+      // selection's cycle-id callback may clear the failure reason before
+      // cycle_done carries it — re-assert it. A stop inside the reset's home
+      // move froze the arm: say so.
+      last_failure_reason_ = abort_requested_.load() ? "stopped by your command" : "reset by the operator";
+    }
+    reset_active_.store(false);
+  }
+
+  // 2026-09-25: main()'s idle block, the reset twin of its abort branch:
+  // away from home the arm goes home (object kept, one reset_home status),
+  // then both flags are cleared and the state is idle again.
+  void reset_at_idle()
+  {
+    std::string why;
+    if (!arm_at_reset_target(&why)) {
+      reset_status_sent_ = false;
+      enter_reset("idle");
+      recover_to_reset_target("Operator reset while idle (" + why + ")");
+    } else {
+      RCLCPP_INFO(node_->get_logger(), "RESET while idle: already at '%s' — nothing to move.",
+        reset_target_name_.c_str());
+    }
+    clear_abort();
+    reset_active_.store(false);
+    last_failure_reason_.clear();   // no cycle carries it; a later search must not inherit it
+    set_task_phase("idle");
+  }
 
   // ── Probe-plan cache: the invalidation entry point ────────────────
   // PUBLIC on purpose: main()'s cycle_id watchdog must be able to drop
@@ -2800,6 +3358,12 @@ private:
         "recovery move.", reason.c_str());
       return;
     }
+    // 2026-09-25: a pending reset makes this recovery the reset's own move
+    // home — taken over (reason, one reset_home status) and un-flagged so
+    // the move below is not cancelled by the very flag that asked for it.
+    if (reset_requested_.load()) {
+      enter_reset(reason);
+    }
     // Remember WHY the pick died so publish_completion can attach it and
     // Morty can narrate it (Majd: "when it fails it didn't say the reason").
     if (last_failure_reason_.empty()) {
@@ -2807,6 +3371,7 @@ private:
     }
     RCLCPP_WARN(node_->get_logger(),
       "%s. Attempting recovery to '%s'.", reason.c_str(), reset_target_name_.c_str());
+    set_task_phase("returning_home");   // 2026-09-25: the task state names the move home
 
     // Clear collision objects that might block the recovery move.
     {
@@ -2838,11 +3403,107 @@ private:
 
     // Try PTP first
     if (!execute_arm_named_target(reset_target_name_, "Recovery - PTP to reset target")) {
+      // 2026-09-25: a stop that cancelled this move (e.g. a stop inside a
+      // reset's move home) is a freeze — no OMPL retry that plans for
+      // seconds only to be cancelled again.
+      if (abort_requested_.load()) {
+        RCLCPP_WARN(node_->get_logger(),
+          "Recovery: operator STOP during the move home — freezing, no OMPL retry.");
+        return;
+      }
       RCLCPP_WARN(node_->get_logger(), "PTP recovery failed. Trying OMPL planner.");
       if (!plan_and_execute_ompl(reset_target_name_, "Recovery - OMPL to reset target")) {
         RCLCPP_ERROR(node_->get_logger(),
           "Recovery - OMPL also failed. Robot may need manual recovery.");
       }
+    }
+  }
+
+  // 2026-09-25: the reset takes over at `where` (a checkpoint, a pause, a
+  // recovery, idle). Un-flags the request first so the reset's own move
+  // home is not cancelled by it, marks the reset active (a second reset is
+  // ignored until it ends) and this cycle as reset, owns the cycle_done
+  // reason, and sends the legacy reset_home status once per cycle.
+  void enter_reset(const std::string & where)
+  {
+    {
+      // 2026-09-25: one step under reset_mutex_ (see request_reset).
+      std::lock_guard<std::mutex> rk(reset_mutex_);
+      reset_requested_.store(false);
+      reset_active_.store(true);
+    }
+    reset_this_cycle_ = true;
+    last_failure_reason_ = "reset by the operator";
+    RCLCPP_WARN(node_->get_logger(),
+      "Operator RESET honoured at %s — the pick ends; going home with the gripper as it is.",
+      where.c_str());
+    set_task_phase("returning_home");
+    if (!reset_status_sent_) {
+      reset_status_sent_ = true;
+      try {
+        std_msgs::msg::String s_evt;
+        s_evt.data = "reset_home";
+        interactive_status_pub_->publish(s_evt);
+      } catch (...) {}
+    }
+  }
+
+  // 2026-09-25: the task-state JSON (spec §1.1, field for field). Caller
+  // holds task_mutex_. Publishing under the lock keeps the latched sample
+  // the newest one when two threads publish at once.
+  void publish_task_state_locked()
+  {
+    if (!task_state_pub_) { return; }
+    ++task_seq_;
+    const bool holding = held_object_.load();
+    const std::string object =
+      holding ? task_held_label_ : (task_in_cycle_ ? task_label_ : std::string());
+    char num[64];
+    std::string out = "{\"v\":1";
+    std::snprintf(num, sizeof(num), ",\"boot\":%.3f", task_boot_);
+    out += num;
+    out += ",\"seq\":" + std::to_string(task_seq_);
+    std::snprintf(num, sizeof(num), ",\"stamp\":%.3f", node_->now().seconds());
+    out += num;
+    out += ",\"cycle_id\":" + std::to_string(task_cycle_id_);
+    out += ",\"phase\":\"" + json_escape(task_phase_) + "\"";
+    out += ",\"question\":\"" + json_escape(task_question_) + "\"";
+    out += ",\"question_id\":" + std::to_string(task_question_id_);
+    std::snprintf(num, sizeof(num), ",\"question_since\":%.3f", task_question_since_);
+    out += num;
+    out += std::string(",\"asks_destination\":") + (task_asks_destination_ ? "true" : "false");
+    out += std::string(",\"holding\":") + (holding ? "true" : "false");
+    out += ",\"object\":\"" + json_escape(object) + "\"";
+    out += ",\"gripper\":\"" + json_escape(task_gripper_) + "\"";
+    out += std::string(",\"sensor\":{\"check\":") + (task_sensor_check_ ? "true" : "false") +
+      ",\"ti0\":" + (grasp_detected_.load() ? "true" : "false") + "}";
+    out += ",\"destination\":\"" + json_escape(task_destination_) + "\"";
+    out += ",\"last\":{\"cycle_id\":" + std::to_string(task_last_cycle_id_) +
+      ",\"outcome\":\"" + json_escape(task_last_outcome_) + "\"" +
+      ",\"reason\":\"" + json_escape(task_last_reason_) + "\"" +
+      ",\"at_home\":" + (task_last_at_home_ ? "true" : "false") + "}}";
+    std_msgs::msg::String msg;
+    msg.data = out;
+    try {
+      task_state_pub_->publish(msg);
+    } catch (...) {}
+  }
+
+  // 2026-09-25: wall-clock seconds (boot, question_since): the voice side
+  // compares question_since with its own time.time() speech-end stamps.
+  static double wall_now_s()
+  {
+    return std::chrono::duration<double>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+  }
+
+  // 2026-09-25: the router's task_object_label, read live ("" if unset).
+  std::string read_task_object_label() const
+  {
+    try {
+      return node_->get_parameter("task_object_label").as_string();
+    } catch (...) {
+      return "";
     }
   }
 
@@ -3955,10 +4616,12 @@ private:
     while (rclcpp::ok() && !ready(res_fut)) {
       rclcpp::spin_some(node_);
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
-      if (abort_requested_.load()) {
+      // 2026-09-25: a reset cancels the execution like a stop; the caller's
+      // checkpoint then decides freeze (stop) or home (reset).
+      if (stop_requested()) {
         exec_traj_client_->async_cancel_goal(gh);
         arm_group_.stop();
-        RCLCPP_WARN(node_->get_logger(), "%s: execution cancelled by operator abort.", what);
+        RCLCPP_WARN(node_->get_logger(), "%s: execution cancelled by operator stop/reset.", what);
         return moveit::core::MoveItErrorCode(moveit_msgs::msg::MoveItErrorCodes::PREEMPTED);
       }
       if (elapsed() > budget_s) {
@@ -5047,12 +5710,14 @@ public:
       for (size_t i = batch_start; i < batch_end; ++i) {
         // Let a real selection in, and stop for it between candidates.
         if (precheck_stop_requested()) { return false; }
-        if (abort_requested_.load()) {
-          last_failure_reason_ = "stopped by your command";
+        // 2026-09-25: a reset ends the search like a stop, with its own reason
+        // (main's finish_reset then takes the arm home if it is not there).
+        if (stop_requested()) {
+          last_failure_reason_ = stop_reason();
           // INVALIDATION: abort mid-evaluation.
           invalidate_cached_lin_plan("operator abort during candidate evaluation");
           RCLCPP_WARN(node_->get_logger(),
-            "Operator abort during candidate evaluation — giving up.");
+            "Operator stop/reset during candidate evaluation — giving up.");
           return false;
         }
         if (std::chrono::steady_clock::now() > search_deadline) {
@@ -6618,8 +7283,40 @@ public:
   // Before this existed, "stop" only cancelled router-owned goals — the
   // executor kept planning/moving while Morty said "stopping" (2026-08-11).
   std::atomic<bool> abort_requested_{false};
+  // 2026-09-25: operator RESET (see request_reset). requested = not yet
+  // taken over by a checkpoint; active = its move home is running (a second
+  // reset is ignored); this_cycle / status_sent = per-cycle bookkeeping
+  // (main thread only) so finish_reset knows to get home and reset_home is
+  // published once.
+  std::atomic<bool> reset_requested_{false};
+  std::atomic<bool> reset_active_{false};
+  std::mutex reset_mutex_;   // 2026-09-25: request_reset's check-and-set vs enter_reset
+  bool reset_this_cycle_ = false;
+  bool reset_status_sent_ = false;
+  // 2026-09-25: the task state (publish_task_state_locked builds the JSON
+  // from these). Guarded by task_mutex_: written by the main thread and by
+  // the abort-listener thread (reset, gripper command events).
+  std::mutex task_mutex_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr task_state_pub_;
+  double task_boot_ = 0.0;              // wall time of this executor's start
+  int64_t task_seq_ = 0;                // +1 per publish
+  int64_t task_cycle_id_ = 0;           // 0 before the first cycle
+  bool task_in_cycle_ = false;          // between begin_cycle and end_cycle
+  std::string task_phase_ = "idle";
+  std::string task_question_;           // "", destination, release, home
+  int64_t task_question_id_ = 0;
+  double task_question_since_ = 0.0;
+  bool task_asks_destination_ = false;
+  std::string task_label_;              // task_object_label of this cycle
+  std::string task_held_label_;         // frozen at the grasp verdict
+  std::string task_gripper_ = "unknown";   // last command_event: open / closed
+  bool task_sensor_check_ = false;
+  std::string task_destination_;
+  int64_t task_last_cycle_id_ = 0;
+  std::string task_last_outcome_;
+  std::string task_last_reason_;
+  bool task_last_at_home_ = false;
   bool stop_after_grasp_ = false;
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr abort_sub_;
   bool enable_wrist_twin_rewrite_{false};
   bool prefer_upright_twin_{true};
   double upright_twin_dead_zone_{0.15};
@@ -6709,6 +7406,22 @@ public:
   {
     sensor_msgs::msg::JointState js;
     if (!wait_fresh_arm_joint_state(0.5, js)) { return false; }
+    return arm_joints_of(js, out);
+  }
+
+  // 2026-09-25: the last joint sample the main node received, WITHOUT
+  // waiting or spinning (end_cycle; see there why it must not spin).
+  bool arm_joints_last(std::vector<double> * out)
+  {
+    sensor_msgs::msg::JointState js;
+    { std::lock_guard<std::mutex> lk(joint_state_mutex_); js = last_joint_state_; }
+    return arm_joints_of(js, out);
+  }
+
+  // 2026-09-25: arm joints of a JointState in arm_group_ order (the mapping
+  // arm_joints_now always did, shared with arm_joints_last).
+  bool arm_joints_of(const sensor_msgs::msg::JointState & js, std::vector<double> * out)
+  {
     out->clear();
     for (const auto & name : arm_group_.getJointNames()) {
       bool found = false;
@@ -6793,6 +7506,23 @@ int main(int argc, char ** argv)
       "/grasp_executor_lin_llm/abort", 10,
       [&grasp_executor](const std_msgs::msg::String::SharedPtr) {
         grasp_executor.request_abort();
+      });
+  // 2026-09-25: the operator RESET (GUI "Reset pick", spoken reset) on the
+  // same always-spinning listener as the abort, so it lands mid-probe and
+  // mid-motion within milliseconds. Payload = source, for the log only.
+  auto reset_sub_dedicated =
+    abort_listener->create_subscription<std_msgs::msg::String>(
+      "/grasp_executor_lin_llm/reset", 10,
+      [&grasp_executor](const std_msgs::msg::String::SharedPtr msg) {
+        grasp_executor.request_reset(msg->data);
+      });
+  // 2026-09-25: every gripper open/close the adapter executes (GUI, router,
+  // executor) — the task state's gripper field and the end of "holding".
+  auto gripper_event_sub =
+    abort_listener->create_subscription<std_msgs::msg::String>(
+      "/gripper_controller/command_event", 10,
+      [&grasp_executor](const std_msgs::msg::String::SharedPtr msg) {
+        grasp_executor.note_gripper_command(msg->data);
       });
   // Same node also watches /rosout for MoveIt's own diagnosis lines
   // (exact collision pair, violated joint limit) so rejections can say
@@ -6970,6 +7700,9 @@ int main(int argc, char ** argv)
     "/grasp_executor_lin_llm/timing", rclcpp::QoS(rclcpp::KeepLast(20)).reliable());
   auto publish_completion = [&](bool ok, int64_t cycle_id) {
     grasp_executor.phase_mark(ok ? "cycle_done" : "cycle_failed");
+    // 2026-09-25: the task state goes idle (with `last` filled) BEFORE the
+    // legacy cycle_done — a different topic, so no consumer may rely on the order.
+    grasp_executor.end_cycle(ok, cycle_id);
     try {
       std_msgs::msg::String tm;
       tm.data = grasp_executor.timing_json(cycle_id, ok);
@@ -7135,6 +7868,30 @@ int main(int argc, char ** argv)
       }
       grasp_executor.clear_abort();
     }
+    // 2026-09-25: the RESET twin of the branch above. Between cycles a reset
+    // discards a gated candidate set the same way (reason: reset) and, when
+    // the arm is away from home (frozen by an earlier stop, a GUI jog, a
+    // stayed drop), takes it home keeping any held object. Always consumed
+    // here, so it can never kill the next pick.
+    if (!processing && grasp_executor.reset_pending()) {
+      {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (pending_candidates.has_value()) {
+          const int64_t cid = pending_candidates_cycle_at_arrival;
+          RCLCPP_WARN(node->get_logger(),
+            "Reset while awaiting approval — discarding %zu buffered "
+            "candidates for cycle_id=%ld.",
+            pending_candidates->size(), static_cast<long>(cid));
+          pending_candidates.reset();
+          pending_candidates_cycle_at_arrival = -1;
+          pending_grasp.reset();
+          last_processed_cycle_id = cid;
+          grasp_executor.set_failure_reason("reset by the operator");
+          publish_completion(false, cid);
+        }
+      }
+      grasp_executor.reset_at_idle();   // outside the lock: it may move the arm (and spins)
+    }
 
     std::optional<geometry_msgs::msg::PoseStamped> grasp;
     std::optional<std::vector<geometry_msgs::msg::PoseStamped>> grasp_candidates;
@@ -7217,6 +7974,7 @@ int main(int argc, char ** argv)
       // coming; the probe (~1.3 s) and the approach (~1 s) cover the
       // 1.2 s + 0.5 s the fingers need. Never while an object is held.
       grasp_executor.clear_abort();
+      grasp_executor.begin_cycle(cycle_id);   // 2026-09-25: task state: this cycle, probing
       if (grasp_executor.holding_object()) {
         // The previous pick was stopped while holding (Reset during the
         // "where do I drop it?" wait). Probing would open the gripper early
@@ -7285,6 +8043,9 @@ int main(int argc, char ** argv)
         ok = grasp_executor.execute_grasp(selected);
       }
       last_processed_cycle_id = cycle_id;
+      // 2026-09-25: a failed cycle (no-feasible path included) finishes a
+      // reset — home if it is not there yet — before cycle_done goes out.
+      if (!ok) { grasp_executor.finish_reset(); }
       publish_completion(ok, cycle_id);
       if (!ok) {
         RCLCPP_ERROR(node->get_logger(), "Grasp execution failed.");
@@ -7311,8 +8072,10 @@ int main(int argc, char ** argv)
         continue;
       }
       RCLCPP_INFO(node->get_logger(), "Grasp pose received, will process.");
+      grasp_executor.begin_cycle(cycle_id);   // 2026-09-25: task state: this cycle (single-pose path)
       bool ok = grasp_executor.execute_grasp(*grasp);
       last_processed_cycle_id = cycle_id;
+      if (!ok) { grasp_executor.finish_reset(); }   // 2026-09-25: as on the candidate path
       publish_completion(ok, cycle_id);
       if (!ok) {
         RCLCPP_ERROR(node->get_logger(), "Grasp execution failed.");
