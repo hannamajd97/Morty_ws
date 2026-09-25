@@ -618,6 +618,11 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._rec_header = {"tid": tid, "layout": self.layout_edit.currentText().strip(),
                             "scenario": self.scenario.currentText(), "level": self.level.currentText()}
         self._stop_pressed = self._saved = self._cancelled = False
+        # Locked while it records: the record keeps these values, and a
+        # combo box changed by a stray mouse wheel no longer disagrees with
+        # the folder name (5 saved trials did, 2026-09-25).
+        for w in (self.trial_id, self.layout_edit, self.scenario, self.level):
+            w.setEnabled(False)
         # Wall-clock video pacer (10 Hz): duplicates the newest frame so
         # camera.mp4 duration always equals real time (audio sync).
         if getattr(self, "_video_timer", None) is None:
@@ -840,6 +845,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.trial_id.setText(self._next_trial_id())
 
     def _reset_buttons(self) -> None:
+        for w in (self.trial_id, self.layout_edit, self.scenario, self.level):
+            w.setEnabled(True)
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.discard_btn.setEnabled(False)

@@ -31,14 +31,18 @@ from datetime import datetime
 
 from PyQt5 import QtWidgets
 
+# Renumbered 2026-09-25 (Majd): "Moving without grasping" is the last one,
+# S7 (was S3); the old S4–S7 moved up to S3–S6. Every saved trial (folder
+# suffix, trial.json, mmhri_meta.csv) was renumbered with it — undo manifest
+# in ~/morty_ws/backups/renumber_scenarios_*.json.
 SCENARIOS = [
     ("S1", "Available objects — no physical action"),
     ("S2", "Object NOT in scene ('give me the book')"),
-    ("S3", "Moving without grasping"),
-    ("S4", "One of a kind among others — ask for it"),
-    ("S5", "Two same kind — clarify by words (left/right/colour)"),
-    ("S6", "Two same kind — clarify by pointing"),
-    ("S7", "Pointing only (with confirmation)"),
+    ("S3", "One of a kind among others — ask for it"),
+    ("S4", "Two same kind — clarify by words (left/right/colour)"),
+    ("S5", "Two same kind — clarify by pointing"),
+    ("S6", "Pointing only (with confirmation)"),
+    ("S7", "Moving without grasping"),
 ]
 # Interaction MODIFIERS (2026-09-03, Majd): the former S8-S10 are not
 # scenarios of their own — they are optional behaviours that may or may
