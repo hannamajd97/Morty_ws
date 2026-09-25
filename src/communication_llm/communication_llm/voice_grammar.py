@@ -50,8 +50,12 @@ from __future__ import annotations
 import re
 
 # ── building blocks (SPEC C5, verbatim) ────────────────────────────────────
-FILL = r"(?:please|now|okay|ok|just|so|and|then|alright|uh|um|uhm|äh|hey|morty)"
-AFF = r"(?:yes|yeah|yep|yup|sure|ok|okay|alright|all right|of course|go ahead|do it|ja|klar)"
+# 2026-09-25 (Majd's live test: "Oh, definitely." at "Should I go back home?"
+# was no yes): fillers oh / ah / well; consents definitely, absolutely,
+# please do, sure thing, yes please, let's do it.
+FILL = r"(?:please|now|okay|ok|just|so|and|then|alright|uh|um|uhm|äh|hey|morty|oh|ah|well)"
+AFF = (r"(?:yes please|yes|yeah|yep|yup|sure thing|sure|ok|okay|alright|all right|of course"
+       r"|go ahead|do it|let's do it|please do|definitely|absolutely|ja|klar)")
 NEG = r"(?:no|nope|nah|nein|not yet|no thanks|no thank you)"
 HOME = r"(?:go )?(?:back )?(?:(?:to|at|on) )?(?:the )?(?:home(?: position)?|nach hause)"
 STOPW = r"(?:stop|stopp|halt|freeze|abort|cancel|abbrechen)"
@@ -114,7 +118,8 @@ NO_HOME = _whole(
     r"|(?:don't|dont|do not) go(?: back)?(?: home)?|not now)")
 OPEN = _whole(
     r"(?:" + AFF + r" )*(?:you can |can you |could you )?"
-    r"(?:open(?: it| up| the gripper| the hand| your hand)?|release(?: it| the object)?"
+    # 2026-09-25: "opens" too (live transcript "opens the gripper.")
+    r"(?:opens?(?: it| up| the gripper| the hand| your hand)?|release(?: it| the object)?"
     r"|let (?:it )?go|greifer öffnen|öffne(?:n)?(?: den)? greifer|auf)")
 CLOSE = _whole(
     r"(?:" + NEG + r" )*(?:you can |can you |could you )?"
@@ -147,6 +152,24 @@ NO_DEST = _whole(
     r"(?:" + NEG + r" )*(?:" + NEG + r"|wait|hold on|hold it|keep it|keep holding(?: it)?|not now"
     r"|(?:don't|dont|do not) (?:drop|release|open|put down)(?: it)?(?: yet)?"
     r"|(?:don't|dont|do not) put it down(?: yet)?)")
+
+# 2026-09-25 (Majd's live test: "Yes, open the gripper with this option."
+# and "opens the gripper." at "Should I open the gripper?" went to the LLM,
+# which asked "Left or right?" twice): at a fresh RELEASE question a short
+# utterance that CONTAINS a consent phrase is the yes — unless it carries a
+# negation, a side / home word or another action verb (then the LLM reads
+# it: "No, open the gripper.", "Drop it on the right side.", "Open the
+# gripper, then go back home."). Negations anywhere count, not only right
+# before the phrase ("I don't want you to open it" must never open).
+_CONSENT_PHRASE = re.compile(
+    r"(?<![\w'-])(?:(?:open|opens|opened)(?: (?:it|the gripper|the hand))?|release(?: it)?"
+    r"|let (?:it )?go|give (?:it|me)(?: (?:it|the object))?(?: to me)?|hand it (?:over|to me))"
+    r"(?![\w'-])")
+_CONSENT_BLOCK = re.compile(
+    r"(?<![\w'-])(?:no|not|never|don't|dont|do|won't|wont|nein|nicht|kein\w*|wait|hold|keep|stay"
+    r"|left|right|links|rechts|home|hause"
+    r"|pick|grasp|grab|take|close|drop|put|move|carry|bring|go|look|place)(?![\w'-])")
+_CONSENT_MAX_WORDS = 10
 
 _SIDE = {"left": "left", "right": "right", "links": "left", "rechts": "right"}
 
@@ -213,6 +236,19 @@ def _clauses(text: str) -> str:
     return " ".join(t.split())
 
 
+def _release_consent(t: str) -> bool:
+    """2026-09-25 (Majd's live test): ``t`` (normalised) is a consent to
+    "Should I open the gripper?" — at most _CONSENT_MAX_WORDS words, a
+    consent phrase inside, and outside that phrase no negation, no side or
+    home word and no other action verb."""
+    if len(t.split()) > _CONSENT_MAX_WORDS:
+        return False
+    m = _CONSENT_PHRASE.search(t)
+    if not m:
+        return False
+    return not _CONSENT_BLOCK.search(t[:m.start()] + " " + t[m.end():])
+
+
 def match_pick(text: str) -> tuple[str, str | None] | None:
     """2026-09-25 (Majd's B1: "picks via the LLM took 1.3-2.8 s"): (label,
     colour|None) when the WHOLE utterance is a plain pick of a known object —
@@ -247,7 +283,9 @@ def classify(text: str, question: str = "", fresh: bool = False,
     2. A whole reset phrase → reset.
     3. Only while ``question`` is open AND ``fresh`` (it opened before the
        operator started speaking — a "yes" said to something else must not
-       answer it): release yes/open → open_gripper, no/close → close_gripper;
+       answer it): release yes/open, or a short sentence with a consent
+       phrase and nothing against it (_release_consent) → open_gripper,
+       no/close → close_gripper;
        home yes/"go back home" → go_home, no/stay → stay; destination: a
        whole NO → keep (nothing is sent, I1); only with ``ext_dest``
        (Majd's EXT-DEST) a bare side/home → drop_<side> / go_home, and a
@@ -273,6 +311,8 @@ def classify(text: str, question: str = "", fresh: bool = False,
                 return ("answer", "open_gripper")
             if NO_REL.match(t) or CLOSE.match(t):
                 return ("negative", "close_gripper")
+            if _release_consent(t):              # 2026-09-25: see _CONSENT_PHRASE
+                return ("answer", "open_gripper")
         elif question == "home":
             if YES.match(t) or YES_HOME.match(t):
                 return ("answer", "go_home")

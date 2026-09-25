@@ -851,6 +851,33 @@ class IntentRouterNode(Node):
         # 2026-09-25: question from the task state when known (legacy flag
         # otherwise), see _question_open.
         if self._question_open("home"):
+            # 2026-09-25 (Majd, live test ~1790347093): "Don't go back home,
+            # go to the left side." at "Should I go back home?" was sent as
+            # drop_left through the pick-in-flight branch; the executor went
+            # HOME and "Going to drop left." was said anyway. A side here is
+            # the plain token drop_<side> — the executor moves to its
+            # configured drop pose instead of home and ends
+            # done|id|stayed:<target> — and "Going to drop <side>." waits for
+            # its resumed:<target> (_dest_answer_pending). Already at that
+            # side: "stay". Only with a live task state (the executor that
+            # knows this answer); legacy runs the paths below unchanged.
+            _hside = (self._home_question_side(action, intent)
+                      if self._live_task() is not None else "")
+            if _hside:
+                if self._arm_at_side(_hside):
+                    if not self._claim_executor_resume(
+                        "stay", f"home-confirm pause: {action!r} names the side "
+                        "the arm is already at — staying"):
+                        self._narrate_ignored_resume(action, "stay")
+                    else:
+                        self._narrate("Okay, I'll stay here.")
+                    return
+                self._dest_answer_pending = True
+                if not self._claim_executor_resume(
+                    _hside, f"home-confirm pause: {action!r} -> {_hside} "
+                    "(configured drop pose instead of home)"):
+                    self._narrate_ignored_resume(action, _hside)
+                return
             if action in ("go_home", "confirm_drop", "yes"):
                 if not self._claim_executor_resume(
                     "home", f"home-confirm pause: {action}"
@@ -1249,7 +1276,14 @@ class IntentRouterNode(Node):
                 self._mark_busy_done("named_pose")
                 return
             self._busy_kind = "named_pose"
-            self._send_named_pose(DROP_INTENTS[action], "", velocity_scaling)
+            # 2026-09-25: left / right go to the executor's configured drop
+            # poses when the live task state names them (drop_targets);
+            # otherwise today's table.
+            _pose = DROP_INTENTS[action]
+            _side = {"drop_left_side": "left", "drop_right_side": "right"}.get(_pose, "")
+            if _side:
+                _pose = self._configured_drop_pose(_side) or _pose
+            self._send_named_pose(_pose, "", velocity_scaling)
             return
 
         # "place" intent: when the user says "place it on the right" or
@@ -1261,10 +1295,11 @@ class IntentRouterNode(Node):
                 self._mark_busy_done("named_pose")
                 return
             # Pick the drop pose by position attribute.
+            # 2026-09-25: the configured drop poses when known (as above).
             if position in ("right", "rightmost"):
-                pose = "drop_right_side"
+                pose = self._configured_drop_pose("right") or "drop_right_side"
             elif position in ("left", "leftmost"):
-                pose = "drop_left_side"
+                pose = self._configured_drop_pose("left") or "drop_left_side"
             else:
                 pose = "drop"
             self._busy_kind = "named_pose"
@@ -1303,6 +1338,11 @@ class IntentRouterNode(Node):
                 "home": "home",
             }
             chosen_drop = drop_map.get(destination) or ""
+            # 2026-09-25: the executor's configured drop pose for that side
+            # when the live task state names it (drop_targets).
+            _cside = {"drop_right_side": "right", "drop_left_side": "left"}.get(chosen_drop, "")
+            if _cside:
+                chosen_drop = self._configured_drop_pose(_cside) or chosen_drop
             if not chosen_drop:
                 self.get_logger().info(
                     f"pick_and_place has no/unknown destination "
@@ -2138,6 +2178,50 @@ class IntentRouterNode(Node):
                 or then_s in ("release", "release_home")):
             return side + "+release"
         return side
+
+    @staticmethod
+    def _home_question_side(action: str, intent: dict) -> str:
+        """2026-09-25: "drop_left" / "drop_right" when an answer to "Should I
+        go back home?" names a side — drop_left / drop_right and their
+        DROP_INTENTS aliases (go_to_drop_left, …), or confirm_drop with a
+        side — else "" (go_home, yes, a sideless confirm_drop: home)."""
+        pose = DROP_INTENTS.get(action, "")
+        if pose == "drop_left_side":
+            return "drop_left"
+        if pose == "drop_right_side":
+            return "drop_right"
+        if action == "confirm_drop":
+            attrs = intent.get("object_attributes")
+            attrs = attrs if isinstance(attrs, dict) else {}
+            side = _DESTINATION_WORDS.get(
+                str(attrs.get("destination") or "").strip().lower(), "")
+            return side if side in ("drop_left", "drop_right") else ""
+        return ""
+
+    def _configured_drop_pose(self, side: str) -> str:
+        """2026-09-25: the executor's configured drop pose for ``side``
+        ("left" / "right") from the live task state's drop_targets (Majd's
+        vla_drop_left / vla_drop_right), or "" — the caller then keeps its
+        hard-coded drop_*_side name, exactly as before."""
+        task = self._live_task() or {}
+        targets = task.get("drop_targets")
+        if isinstance(targets, dict):
+            return str(targets.get(side) or "").strip()
+        return ""
+
+    @staticmethod
+    def _spoken_pose(name: str, default: str) -> str:
+        """2026-09-25: how a drop pose is said — by "left" / "right" in its
+        name, so the configured vla_drop_* poses are named too (the lookup
+        knew only drop_*_side: "I'm at the drop position, …" live)."""
+        n = (name or "").lower()
+        if n == "home":
+            return "home"
+        if "left" in n:
+            return "drop left"
+        if "right" in n:
+            return "drop right"
+        return default
 
     def _arm_at_side(self, side: str) -> bool:
         """2026-09-25: is the arm already at ``side`` ("drop_left" /
@@ -3223,11 +3307,8 @@ class IntentRouterNode(Node):
             # user to say "release" / "open it" / "give it to me".
             self._pick_awaiting_release = True
             _dest = getattr(self, "_executor_drop_dest", "")
-            _spoken = {
-                "drop_left_side": "drop left",
-                "drop_right_side": "drop right",
-                "home": "home",
-            }.get(_dest, "drop")
+            # 2026-09-25: named by left/right in the pose name (vla_drop_*).
+            _spoken = self._spoken_pose(_dest, "drop")
             self._stayed_pose = ""
             if self._followup_plan:
                 # The operator already said what comes next (2026-09-23):
@@ -3521,14 +3602,16 @@ class IntentRouterNode(Node):
                 if not stayed:
                     stayed = getattr(self, "_stayed_pose", "")
                 if stayed:
-                    _sp = {
-                        "drop_left_side": "drop left",
-                        "drop_right_side": "drop right",
-                        "home": "home",
-                    }.get(stayed, stayed.replace("_", " "))
-                    self._narrate(
-                        f"Okay — staying at {_sp}. What should I do next?"
-                    )
+                    _sp = self._spoken_pose(stayed, stayed.replace("_", " "))
+                    # 2026-09-25 (Majd): at a drop pose (left / right in its
+                    # name, configured vla_drop_* included) say where the arm
+                    # is; other stayed poses keep today's line.
+                    if _sp in ("drop left", "drop right"):
+                        self._narrate(f"I'm at the {_sp} position. What's next?")
+                    else:
+                        self._narrate(
+                            f"Okay — staying at {_sp}. What should I do next?"
+                        )
                     self._stayed_pose = ""
                 elif self._release_skipped_this_cycle:
                     self._narrate(
@@ -3599,12 +3682,21 @@ class IntentRouterNode(Node):
             _reason = data.split("|", 2)[2].strip().lower() if data.count("|") >= 2 else ""
         except Exception:
             _reason = ""
+        # 2026-09-25: the stayed pose from the PAYLOAD first — the narration
+        # above clears _stayed_pose, so a stayed end (the arm left at a drop
+        # pose, e.g. a side named at "Should I go back home?") used to be
+        # booked as "home" here.
+        _payload_stayed = ""
+        for _f in data.split("|")[2:]:
+            if _f.startswith("stayed:"):
+                _payload_stayed = _f.split(":", 1)[1].strip()
+                break
         if _refused_holding:
             pass   # 2026-09-25: the refused pick never moved the arm
         elif "stopped by your command" in _reason:
             self._publish_current_pose("")
-        elif getattr(self, "_stayed_pose", ""):
-            self._publish_current_pose(self._stayed_pose)
+        elif _payload_stayed or getattr(self, "_stayed_pose", ""):
+            self._publish_current_pose(_payload_stayed or self._stayed_pose)
             self._stayed_pose = ""
         else:
             self._publish_current_pose("home")

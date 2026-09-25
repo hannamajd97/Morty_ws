@@ -815,8 +815,44 @@ public:
       std::lock_guard<std::mutex> lk(task_mutex_);
       task_boot_ = wall_now_s();
       task_sensor_check_ = check_grasp_sensor_;
+      task_drop_left_ = configured_drop_target(true);
+      task_drop_right_ = configured_drop_target(false);
       publish_task_state_locked();
     }
+    // 2026-09-25: the task state's drop_targets follow the GUI's "Drop poses"
+    // selector live, also between picks (refresh_runtime_params only runs at
+    // a pick's approach). Humble has no post-set hook, so the new values are
+    // taken from the request itself; this callback never refuses a set.
+    drop_targets_param_cb_ = node_->add_on_set_parameters_callback(
+      [this](const std::vector<rclcpp::Parameter> & params) {
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
+        bool changed = false;
+        std::string left, right;
+        {
+          std::lock_guard<std::mutex> lk(task_mutex_);
+          left = task_drop_left_;
+          right = task_drop_right_;
+        }
+        for (const auto & p : params) {
+          try {
+            if (p.get_name() == "drop_left_target") {
+              left = p.as_string().empty() ? std::string("drop_left_side") : p.as_string();
+              changed = true;
+            } else if (p.get_name() == "drop_right_target") {
+              right = p.as_string().empty() ? std::string("drop_right_side") : p.as_string();
+              changed = true;
+            }
+          } catch (...) {}
+        }
+        if (changed) {
+          std::lock_guard<std::mutex> lk(task_mutex_);
+          task_drop_left_ = left;
+          task_drop_right_ = right;
+          publish_task_state_locked();
+        }
+        return result;
+      });
   }
 
   bool is_one_shot() const { return one_shot_; }
@@ -2506,10 +2542,10 @@ public:
               redirect_target = reset_target_name_;
             } else if (t == "left" ||
                        (droppy && t.find("left") != std::string::npos)) {
-              redirect_target = drop_left_target_.empty() ? std::string("drop_left_side") : drop_left_target_;
+              redirect_target = configured_drop_target(true);
             } else if (t == "right" ||
                        (droppy && t.find("right") != std::string::npos)) {
-              redirect_target = drop_right_target_.empty() ? std::string("drop_right_side") : drop_right_target_;
+              redirect_target = configured_drop_target(false);
             }
           }
           if (!redirect_target.empty()) {
@@ -2881,10 +2917,27 @@ public:
       { const std::string tok = stop_flag_token(); if (!tok.empty()) { hc = tok; } }
       close_question();
       for (auto & c : hc) c = std::tolower(c);
+      // 2026-09-25 (Majd, live: "Don't go back home, go to the left side."
+      // arrived as drop_left, matched nothing and the arm went HOME): a side
+      // answer means the CONFIGURED drop pose of that side (the destination
+      // answer's and the release redirect's mapping). At that pose already =
+      // exactly a stay; elsewhere = go there (below) and stay.
+      std::string side_target;
+      {
+        std::string left_lc = drop_left_target_, right_lc = drop_right_target_;
+        for (auto & c : left_lc) c = std::tolower(c);
+        for (auto & c : right_lc) c = std::tolower(c);
+        if (hc == "left" || hc.rfind("drop_left", 0) == 0 || (!left_lc.empty() && hc == left_lc)) {
+          side_target = configured_drop_target(true);
+        } else if (hc == "right" || hc.rfind("drop_right", 0) == 0 || (!right_lc.empty() && hc == right_lc)) {
+          side_target = configured_drop_target(false);
+        }
+      }
+      const bool side_here = !side_target.empty() && side_target == drop_target_name_;
       // 2026-09-25: "abort" joins the stay list — a spoken stop at "Should I
       // go back home?" used to send the arm home (not in the list).
       if (hc_got && (hc == "stay" || hc == "stop" || hc == "wait" ||
-                     hc == "cancel" || hc == "hold" || hc == "abort")) {
+                     hc == "cancel" || hc == "hold" || hc == "abort" || side_here)) {
         RCLCPP_INFO(node_->get_logger(),
           "Home-confirm: '%s' → STAYING at '%s' (no reset move).",
           hc.c_str(), drop_target_name_.c_str());
@@ -2899,6 +2952,50 @@ public:
         // 2026-09-25: reset here = go home now (Step 6 below). The object is
         // already released, so the cycle still ends "done".
         enter_reset("the home question");
+      } else if (hc_got && !side_target.empty()) {
+        // 2026-09-25: go to the other side and STAY there, gripper as it is
+        // (open — the object is released): the release redirect's legs (the
+        // fast named-pose channel, via home), then a stay — cycle_done
+        // "done|id|stayed:<pose>", no Step 6, no Step 7 close. A stop / reset
+        // during the move is handled as everywhere (freeze / home via
+        // finish_reset); a failed leg is a failed step (sequence_ok).
+        RCLCPP_INFO(node_->get_logger(),
+          "Home-confirm: '%s' → going to '%s' (via '%s') and staying there, gripper as it is.",
+          hc.c_str(), side_target.c_str(), reset_target_name_.c_str());
+        set_task_destination(side_target);
+        set_task_phase("carrying");
+        try {
+          std_msgs::msg::String s_p;
+          s_p.data = "resumed:" + side_target;   // the router narrates "Going to drop left." on it
+          interactive_status_pub_->publish(s_p);
+        } catch (...) {}
+        bool side_ok = true;
+        if (drop_target_name_ != reset_target_name_) {
+          side_ok = execute_arm_named_target(reset_target_name_, "Home-confirm - via home (to the side)");
+          if (side_ok) { drop_target_name_ = reset_target_name_; }   // the books follow the arm
+        }
+        if (side_ok && aborted_at("between the legs to the side")) {
+          return false;
+        }
+        if (side_ok) {
+          side_ok = execute_arm_named_target(side_target, "Home-confirm - to the side");
+        }
+        if (!side_ok) {
+          RCLCPP_ERROR(node_->get_logger(),
+            "Home-confirm: the move to '%s' failed/refused.", side_target.c_str());
+          sequence_ok = false;
+        } else if (aborted_at("the move to the side")) {
+          return false;
+        } else {
+          drop_target_name_ = side_target;
+          stay_in_place = true;
+          cycle_done_note_ = std::string("stayed:") + side_target;
+          try {
+            std_msgs::msg::String s;
+            s.data = std::string("stayed:") + side_target;
+            interactive_status_pub_->publish(s);
+          } catch (...) {}
+        }
       } else if (!hc_got) {
         RCLCPP_WARN(node_->get_logger(),
           "Home-confirm: no answer within %.0fs — going home.",
@@ -3497,6 +3594,10 @@ private:
     out += std::string(",\"sensor\":{\"check\":") + (task_sensor_check_ ? "true" : "false") +
       ",\"ti0\":" + (grasp_detected_.load() ? "true" : "false") + "}";
     out += ",\"destination\":\"" + json_escape(task_destination_) + "\"";
+    // 2026-09-25: the configured drop poses, so an idle "go to drop left" in
+    // the router goes to the same pose as a pick's destination answer.
+    out += ",\"drop_targets\":{\"left\":\"" + json_escape(task_drop_left_) +
+      "\",\"right\":\"" + json_escape(task_drop_right_) + "\"}";
     out += ",\"last\":{\"cycle_id\":" + std::to_string(task_last_cycle_id_) +
       ",\"outcome\":\"" + json_escape(task_last_outcome_) + "\"" +
       ",\"reason\":\"" + json_escape(task_last_reason_) + "\"" +
@@ -3514,6 +3615,17 @@ private:
   {
     return std::chrono::duration<double>(
       std::chrono::system_clock::now().time_since_epoch()).count();
+  }
+
+  // 2026-09-25: the configured drop pose of a side (the GUI's "Drop poses"
+  // selector: drop_*_side or vla_drop_*), with the standard pose when the
+  // parameter is empty. One rule for the release redirect and the home
+  // question (the destination answer maps to the same parameters).
+  std::string configured_drop_target(bool left) const
+  {
+    const std::string & t = left ? drop_left_target_ : drop_right_target_;
+    if (!t.empty()) { return t; }
+    return left ? "drop_left_side" : "drop_right_side";
   }
 
   // 2026-09-25: the router's task_object_label, read live ("" if unset).
@@ -7331,6 +7443,11 @@ public:
   std::string task_gripper_ = "unknown";   // last command_event: open / closed
   bool task_sensor_check_ = false;
   std::string task_destination_;
+  // 2026-09-25: drop_left_target / drop_right_target as last set (ctor, then
+  // drop_targets_param_cb_ on every live set).
+  std::string task_drop_left_;
+  std::string task_drop_right_;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr drop_targets_param_cb_;
   int64_t task_last_cycle_id_ = 0;
   std::string task_last_outcome_;
   std::string task_last_reason_;

@@ -637,6 +637,10 @@ def _latched_qos() -> QoSProfile:
 # rightmost, or point"); the model asked itself, naming brands and cap
 # colours ("Which vitamin tube—the Vitamin B12 (purple cap) or …?"). The
 # scene rule no longer invites colours for disambiguation.
+# 2026-09-25 (Majd's live test): RELEASE QUESTION — "Should I open the
+# gripper?" is yes/no, never "Left or right?" (the model asked it twice after
+# "Yes, open the gripper with this option."); at "Should I go back home?"
+# definitely/absolutely = go_home and a named side = drop_left/drop_right.
 SYSTEM_PROMPT = """You are Morty, a robot assistant at Hochschule Reutlingen.
 Reply in the language the user spoke: German questions get German answers,
 everything else gets English. Never mix languages in one reply. Keep replies
@@ -791,7 +795,8 @@ asking.
 DROP DESTINATION - if the user names a drop side ("drop right", "on the
 left", "home"), put it in object_attributes.destination as drop_right,
 drop_left, or home. If they say "drop" with no side, ask "Left or right?"
-and do NOT emit an intent.
+and do NOT emit an intent — never at "Should I open the gripper?" (see
+RELEASE QUESTION).
 
 PAUSE DESTINATION COMPOUND - if the destination answer ALSO says to open/
 release/give/hand it over (and possibly go home) in the same sentence, in
@@ -823,9 +828,17 @@ home" — emit exactly ONE intent: release_home. NEVER emit release
 followed by go_home as two intents; that makes the robot ask again.
 Emit action_intent release_home (opens, then goes home with NO extra
 question). A plain "open"/"release" answer opens and then the robot will
-ask "Should I go back home?" — when THAT question is open, "yes" / "go
-home" means emit go_home, and "no" / "stay" / "wait" means emit stay
-(the robot then stays where it is).
+ask "Should I go back home?" — when THAT question is open, "yes" /
+"definitely" / "absolutely" / "go home" means emit go_home, "no" / "stay" /
+"wait" means emit stay (the robot then stays where it is), and "go to the
+left / right (side)" means drop_left / drop_right (it moves there instead
+of home). Only a phrase naming BOTH sides ("the right, left side") may ask
+which one.
+
+RELEASE QUESTION - "Should I open the gripper?" is a YES/NO question: ANY
+consent phrasing ("yes", "open", "opens the gripper", "give it to me",
+"yes, open the gripper with this option") = open_gripper; a named side =
+drop_left / drop_right; NEVER answer it with "Left or right?".
 
 PAUSE CONSENT - when the robot is holding an object and waiting ("Where
 should I drop it?" / "Should I open the gripper?"), ANY consent phrasing
@@ -3266,12 +3279,15 @@ class ChatIntentNode(Node):
     _QUESTION_WORDS = {
         "destination": ('OPEN QUESTION: "Where should I drop it? Left, right, or home?" — '
                         "answer with confirm_drop (destination drop_left / drop_right / home)"),
-        "release": ('OPEN QUESTION: "Should I open the gripper?" — yes = release, '
-                    "no = close_gripper, another side = drop_left / drop_right"),
+        # 2026-09-25 (Majd's live test): any consent = open_gripper; never "Left or right?"
+        "release": ('OPEN QUESTION: "Should I open the gripper?" (yes/no) — any consent '
+                    "(yes / open / give it to me) = open_gripper, no = close_gripper, a named "
+                    'side = drop_left / drop_right; never ask "Left or right?"'),
         # 2026-09-25 (review Y2): stay, not stop — a NO keeps the arm where
         # it is with "Okay, I'll stay here." instead of "Stopping." + abort.
-        "home": ('OPEN QUESTION: "Should I go back home?" — yes = go_home, '
-                 "no / stay = stay"),
+        "home": ('OPEN QUESTION: "Should I go back home?" — yes / definitely = go_home, '
+                 "no / stay = stay, go to the left / right = drop_left / drop_right "
+                 "(it moves there instead of home)"),
     }
     # 2026-09-25 (review X3): the no-grasp confirm is the home question with
     # no destination and nothing held — the arm is lifted above the grasp
@@ -3878,7 +3894,7 @@ class ChatIntentNode(Node):
             pass
         return t
 
-    def _router_narrates(self, action: str) -> bool:
+    def _router_narrates(self, action: str, dest: str = "") -> bool:
         """2026-09-25 (SPEC C7, Majd: "never announce what was not accepted").
         True when intent_router speaks this action's line after the robot
         confirmed it, so this node must stay silent: the gripper actions
@@ -3886,8 +3902,11 @@ class ChatIntentNode(Node):
         / go_home) with a live task state (review M2: in every state except
         these two, nobody has accepted it yet and the router narrates on
         acceptance):
-          * the home question is open → False, chat says "Going home." as
-            before;
+          * the home question is open → False for go_home, chat says
+            "Going home." as before; True for a SIDE (drop_left /
+            drop_right, confirm_drop whose ``dest`` names a side) —
+            2026-09-25 (Majd's live test): the executor now moves to that
+            side instead of home and the router narrates it on acceptance;
           * idle, no question → False ("Going home." as before), unless a
             plain pick of ours is pending (_plain_pick_pending, review X2):
             the router latches the destination and announces it;
@@ -3903,7 +3922,9 @@ class ChatIntentNode(Node):
             return False
         q = str(t.get("question") or "")
         if q == "home":
-            return False
+            d = str(dest or "").lower()
+            return (action in ("drop_left", "drop_right")
+                    or (action == "confirm_drop" and ("left" in d or "right" in d)))
         if q:
             return True
         phase = str(t.get("phase") or "")
@@ -3996,7 +4017,7 @@ class ChatIntentNode(Node):
             self._pending_quick_narrations.append((action, line))
             if not line:
                 self._withheld_this_turn.add(action)
-        elif self._router_narrates(action):
+        elif self._router_narrates(action, str(args.get("destination") or "")):
             # Silent placeholder: keeps this intent in the per-turn
             # accounting (so a mixed turn still narrates its OTHER actions)
             # while saying nothing about the gripper here. _speak("") is a
