@@ -51,7 +51,8 @@ LIVE = dict(min_hold_ms=400, steady_px=10.0, pointer_pref_inside=False, snap_px=
             vote_tau_s=0.8, vote_commit_s=0.45, vote_margin=2.0, sigma_deg=7.0)
 VARIANTS = {
     "dwell": dict(decision="dwell", ray_source="depth"),        # before 2026-09-24
-    "vote": dict(decision="vote", ray_source="depth"),          # live default since 2026-09-24
+    "vote": dict(decision="vote", ray_source="depth"),          # live default: votes where the arrow is (09-25)
+    "vote_angle": dict(decision="vote", ray_source="depth", evidence="angle"),   # 09-24: spread by angle
     "vote_model": dict(decision="vote", ray_source="model"),    # MediaPipe 3-D hand + palm depth
     "dwell_model": dict(decision="dwell", ray_source="model"),
 }
@@ -246,7 +247,7 @@ def _messages(bag_dir: str):
 def eval_main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Score pointing methods on a pointing_bench recording.")
     ap.add_argument("folder")
-    ap.add_argument("--variants", default="dwell,vote,vote_model")
+    ap.add_argument("--variants", default="dwell,vote,vote_angle,vote_model")
     ap.add_argument("--hz", type=float, default=15.0, help="frames per second fed to the selectors (live ≈ 15)")
     ap.add_argument("--grace", type=float, default=2.0, help="seconds after a window a late choice still counts")
     a = ap.parse_args(argv)

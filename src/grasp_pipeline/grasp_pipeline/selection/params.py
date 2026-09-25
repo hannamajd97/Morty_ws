@@ -518,6 +518,9 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("pointing_vote_commit_s", 0.45)
     node.declare_parameter("pointing_vote_margin", 2.0)
     node.declare_parameter("pointing_sigma_deg", 7.0)
+    # "arrow" (2026-09-25): each 3-D frame votes for the object the drawn
+    # arrow ends on; "angle": spread by the angle off the ray (sigma above).
+    node.declare_parameter("pointing_evidence", "arrow")
     node.declare_parameter("pointing_ray_source", "depth")
     # Default changed True -> False (2026-08-06): with True, YOLO stops the
     # moment the selection prompt starts, so the detection boxes in the debug

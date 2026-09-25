@@ -276,7 +276,8 @@ class PointOrVoiceSelector:
                  vote_commit_s: float = 0.45,
                  vote_margin: float = 2.0,
                  sigma_deg: float = 7.0,
-                 ray_source: str = "depth") -> None:
+                 ray_source: str = "depth",
+                 evidence: str = "arrow") -> None:
         self.vosk = None  # intentionally ignored in the new architecture
         self.min_hold_ms = int(min_hold_ms)
         self.steady_px = float(steady_px)
@@ -304,6 +305,16 @@ class PointOrVoiceSelector:
         self.vote_tau_s, self.vote_commit_s = float(vote_tau_s), float(vote_commit_s)
         self.vote_margin, self.sigma = float(vote_margin), math.radians(float(sigma_deg))
         self.ray_source = "model" if str(ray_source).lower() == "model" else "depth"
+        # What a 3-D frame votes for (2026-09-25, Majd: "great when my finger
+        # is next to the object, but from far away it doesn't get the object
+        # my arrow is already on"). The arrow ends on _choose_by_ray's object
+        # — (1 − cos θ)·distance, hysteresis — while the vote spread the
+        # frame over the objects by angle alone; near the objects both agree,
+        # from far away they part: the arrow sat on X while the evidence went
+        # to a better-aligned object behind it, or split and never reached the
+        # margin. "arrow": the frame's vote goes to the object the arrow is on,
+        # so the choice is where the arrow has been. "angle": the 09-24 rule.
+        self.evidence_mode = "angle" if str(evidence).lower() == "angle" else "arrow"
         self._decision = None
 
         self.tracker = None
@@ -618,7 +629,10 @@ class PointOrVoiceSelector:
                     origin, direction = ray
                     centres = self._centres_3d(dets, depth_m, K)
                     idx = self._choose_by_ray(origin, direction, centres)
-                    evidence = self._ray_evidence(origin, direction, centres)
+                    if self.evidence_mode == "arrow":
+                        evidence = {idx: 1.0} if idx is not None else {}
+                    else:
+                        evidence = self._ray_evidence(origin, direction, centres)
                     if idx is None and any(c is None for c in centres):
                         # objects with no depth (glass, chrome) still get the 2d test
                         px2d = self._pointer_2d(lm)
