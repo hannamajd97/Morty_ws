@@ -63,6 +63,7 @@ from rcl_interfaces.msg import SetParametersResult
 from . import llm_service as _llm_service
 from . import voice_grammar
 from .llm_service import INTENT_TOOL, LLMService, StopStream, extract_intent, intent_to_json
+from .llm_service import _AdaptedFunctionCall
 
 
 PICK_INTENTS = {"pick", "pickup", "pick_up", "pick up", "grasp", "take", "grab"}
@@ -1284,6 +1285,7 @@ class ChatIntentNode(Node):
         # _note_instant / _flush_instant_notes.
         self._instant_notes: list = []
         self._instant_notes_lock = threading.Lock()
+        self._instant_seq = 0
         self._hush_why = ""
         # 2026-09-25: the four voice switches (SPEC C1), live-settable.
         self.declare_parameter("voice_fast_layers", "minimal")      # minimal | legacy
@@ -2622,10 +2624,11 @@ class ChatIntentNode(Node):
             if kind == "stop":
                 self._fire_stop()
                 self._speak(QUICK_NARRATION["stop"], interrupt=True)
+                _ij = json.dumps({"action_intent": "stop"})
             else:
-                self._fire_reset()
+                _ij = self._fire_reset()
                 self._speak(QUICK_NARRATION["reset"], interrupt=True)
-            self._note_instant(text, kind)   # 2026-09-25: into the LLM history
+            self._note_instant(text, kind, _ij)   # 2026-09-25: into the LLM history
             self.get_logger().info(
                 f"[timing] handled in {time.monotonic() - _t_handle0:.2f}s "
                 f"(route=GRAMMAR {kind}): {text!r}")
@@ -2815,40 +2818,93 @@ class ChatIntentNode(Node):
         except Exception as exc:
             self.get_logger().error(f"LLM chat failed (voice path): {exc}")
 
-    def _note_instant(self, text: str, what: str) -> None:
+    def _note_instant(self, text: str, what: str, intent_json: str | None = None) -> None:
         """2026-09-25 (Majd, live: at drop LEFT the model said "I'm already
         at the drop right position"; carrying the tape dispenser it said "I'm
         already home and my gripper is empty"). Utterances handled by the
         instant paths never reached the model's conversation history, so its
-        memory jumped from the previous LLM turn ("give me the object and go
-        back home") to the new question — and it believed that, above the
-        live state blocks. Reproduced offline 2/2; with these turns in the
-        history it sent release_home 2/2. Each instant turn is queued here
-        (sub-commands of one utterance merge) and written into the history
-        at the start of the next LLM turn (_flush_instant_notes) — not now,
-        because an LLM turn may be running and its tool call / tool result
-        pair must stay together."""
+        memory jumped from the previous LLM turn to the new question — and it
+        believed that, above the live state blocks (reproduced offline 2/2,
+        fixed 2/2). Each instant turn is queued here (sub-commands of one
+        utterance merge) and written into the history at the start of the
+        next LLM turn (_flush_instant_notes) — not now, because an LLM turn
+        may be running and its tool call / tool result pair must stay
+        together. ``intent_json`` is what the fast path published (None =
+        nothing was sent, ``what`` is then the line Morty said)."""
         if not text:
             return
         with self._instant_notes_lock:
             if self._instant_notes and self._instant_notes[-1][0] == text:
-                self._instant_notes[-1][1].append(what)
+                self._instant_notes[-1][1].append((what, intent_json))
             else:
-                self._instant_notes.append((text, [what]))
+                self._instant_notes.append((text, [(what, intent_json)]))
             del self._instant_notes[:-12]
+
+    @staticmethod
+    def _instant_tool_args(intent_json: str | None) -> dict | None:
+        """2026-09-25: a published fast-path intent as the model's own tool
+        input (the flat INTENT_TOOL fields; legacy compounds such as
+        drop_right_release_home become confirm_drop + destination + then).
+        None when it has no tool form."""
+        try:
+            d = json.loads(intent_json or "")
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(d, dict):
+            return None
+        action = str(d.get("action_intent") or "")
+        attrs = d.get("object_attributes") if isinstance(d.get("object_attributes"), dict) else {}
+        m = re.fullmatch(r"drop_(left|right)_release(_home)?", action)
+        if m:
+            return {"action_intent": "confirm_drop", "destination": f"drop_{m.group(1)}",
+                    "then": "release_home" if m.group(2) else "release"}
+        if action == "go_home_open":
+            return {"action_intent": "go_home", "then": "release"}
+        allowed = INTENT_TOOL["parameters"]["properties"]["action_intent"].get("enum") or []
+        if action not in allowed:
+            return None
+        args: dict = {"action_intent": action}
+        if d.get("object_intent"):
+            args["object_intent"] = d["object_intent"]
+        for k in ("colour", "shape", "position", "ordinal", "ordinal_from", "speed", "destination", "then"):
+            v = attrs.get(k)
+            if v not in (None, "", [], {}):
+                args[k] = v
+        return args
 
     def _flush_instant_notes(self) -> None:
         """2026-09-25: write the queued instant turns into the LLM history
         (called under _chat_lock at the start of an LLM turn, before the
-        prune): the operator's words, then what the robot did."""
+        prune) in the SAME form as the model's own turns: the operator's
+        words, then the tool call(s) the fast path made with their results.
+        2026-09-25 (Majd, live): the first version wrote a text note
+        ("[done instantly by the fast path: release_home]") and the model
+        COPIED it — it answered "Now give me the object, then go back home."
+        with that text and sent nothing. A real tool call in the history is
+        what the model imitates correctly. A turn that sent nothing keeps
+        the line Morty said."""
         with self._instant_notes_lock:
             notes, self._instant_notes = self._instant_notes, []
-        for text, whats in notes:
+        for text, items in notes:
             self.chat_agent.add_user_message(text)
-            self.chat_agent.messages.append({
-                "role": "assistant",
-                "content": "[done instantly by the robot's fast path, not by you: "
-                           + ", ".join(whats) + "]"})
+            calls, lines = [], []
+            for what, intent_json in items:
+                args = self._instant_tool_args(intent_json)
+                if args is None:
+                    if not intent_json and what:
+                        lines.append(what)
+                    continue
+                self._instant_seq += 1
+                calls.append(_AdaptedFunctionCall(
+                    name=INTENT_TOOL["name"], arguments=json.dumps(args),
+                    call_id=f"fastpath{self._instant_seq}"))
+            if lines:
+                self.chat_agent.messages.append({"role": "assistant", "content": " ".join(lines)})
+            for c in calls:
+                self.chat_agent.messages.append(c)
+            for c in calls:
+                self.chat_agent.messages.append({"type": "function_call_output", "call_id": c.call_id,
+                                                 "output": json.dumps({"status": "dispatched"})})
 
     def _fire_fast_pick(self, label: str, colour: str | None, text: str) -> None:
         """The FAST-PICK publish (2026-08-26), factored out 2026-09-25 so the
@@ -2863,7 +2919,7 @@ class ChatIntentNode(Node):
         self.intent_pub.publish(String(data=intent_json))
         self._last_intent_json = intent_json
         self._note_intent_sent("pick")     # 2026-09-25: bookkeeping for _router_narrates
-        self._note_instant(text, f"pick {label}")   # 2026-09-25: into the LLM history
+        self._note_instant(text, f"pick {label}", intent_json)   # 2026-09-25: into the LLM history
         self.get_logger().info(
             f"FAST-PICK: {text!r} -> {label}"
             f"{f' ({colour})' if colour else ''}; published {intent_json}"
@@ -2878,7 +2934,7 @@ class ChatIntentNode(Node):
                     "object_attributes": None}
         _intent_json = json.dumps(_payload, separators=(",", ":"))
         self.intent_pub.publish(String(data=_intent_json))
-        self._note_instant(text, neg)       # 2026-09-25: into the LLM history
+        self._note_instant(text, neg, _intent_json)   # 2026-09-25: into the LLM history
         self.get_logger().info(
             f"FAST-NEGATIVE: {text!r} at pause "
             f"({getattr(self, '_cycle_state', '')!r}) -> {neg}; "
@@ -2943,7 +2999,7 @@ class ChatIntentNode(Node):
             # 2026-09-25 (Majd's I1): a NO to "Where should I drop it?" — the
             # executor keeps waiting for a destination, so nothing is sent.
             self._speak(_KEEP_HOLDING_LINE)
-            self._note_instant(text, "nothing sent — kept holding, asked where to take it")
+            self._note_instant(text, _KEEP_HOLDING_LINE)   # nothing sent: the line said
         elif kind == "negative":
             self._fire_pause_negative(action, text)
         elif kind in ("answer", "gripper"):
@@ -3009,7 +3065,7 @@ class ChatIntentNode(Node):
                               "object_attributes": {"then": "release", **({"speed": speed} if speed else {})}}
             intent_json = json.dumps(intent_payload, separators=(",", ":"))
             self.intent_pub.publish(String(data=intent_json))
-            self._note_instant(text, "go_home then release")   # 2026-09-25: into the LLM history
+            self._note_instant(text, "go_home then release", intent_json)   # 2026-09-25: into the LLM history
             self.get_logger().info(f"FAST: matched {text!r} -> go_home then release (holding); published {intent_json}")
             self._last_intent_json = intent_json
             if self._router_narrates("go_home"):
@@ -3037,7 +3093,7 @@ class ChatIntentNode(Node):
         msg = String()
         msg.data = intent_json
         self.intent_pub.publish(msg)
-        self._note_instant(text, action)    # 2026-09-25: into the LLM history
+        self._note_instant(text, action, intent_json)    # 2026-09-25: into the LLM history
         self.get_logger().info(
             f"FAST: matched {text!r} -> {action} (speed={speed or 'default'}); "
             f"published {intent_json}"
