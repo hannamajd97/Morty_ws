@@ -168,6 +168,15 @@ class MortyGuiBridge(Node):
         self.exec_interactive_state = ""
         self.create_subscription(
             String, "/grasp_executor_lin_llm/interactive_status", self._on_exec_interactive, 10)
+        # 2026-09-25: the executor's latched task state (SPEC §1.1, JSON):
+        # whether it holds an object, whatever status token came last. None
+        # until the first message — an older executor never sends one.
+        self.exec_task: Optional[Dict[str, Any]] = None
+        self.create_subscription(
+            String, "/grasp_executor_lin_llm/task_state", self._on_exec_task,
+            QoSProfile(depth=10,
+                       reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.create_subscription(PointCloud2, "/graspgen/final_cloud", self._on_cloud, 2)
         self.create_subscription(
             PointCloud2, "/yolo/selected_cloud_rgb", self._on_frame_cloud, 2
@@ -301,6 +310,13 @@ class MortyGuiBridge(Node):
         # ignored every Reset press.
         self._pub_pipeline_abort = self.create_publisher(
             String, "/grasp_pipeline/abort", 10
+        )
+        # 2026-09-25 (SPEC §1.2): "↻ Reset pick" goes straight to the
+        # executor — end the pick, go home keeping any held object, gripper
+        # untouched. No abort is involved, so nothing can freeze the arm,
+        # and it needs no voice stack. See reset_cycle.
+        self._pub_exec_reset = self.create_publisher(
+            String, "/grasp_executor_lin_llm/reset", 10
         )
         self._dets_t = 0.0
         self.create_subscription(
@@ -582,8 +598,36 @@ class MortyGuiBridge(Node):
             self._exec_interactive_pending = str(msg.data)
             self.exec_interactive_state = str(msg.data)
 
+    def _on_exec_task(self, msg: String) -> None:
+        """2026-09-25: keep the executor's task state as a level (SPEC
+        §1.1): a message whose seq is not newer than the last is dropped
+        unless boot changed (the executor restarted); the latched first
+        sample is adopted silently."""
+        try:
+            st = json.loads(msg.data)
+            seq = int(st.get("seq", 0))
+        except (ValueError, TypeError, AttributeError):
+            return
+        with self._lock:
+            old = self.exec_task
+            if (old is not None and st.get("boot") == old.get("boot")
+                    and seq <= int(old.get("seq", 0))):
+                return
+            self.exec_task = st
+
     def executor_waiting_with_object(self) -> bool:
-        """True while the executor holds an object and waits for a drop side."""
+        """True while the executor holds an object and waits for a drop side.
+
+        2026-09-25: with the task state known, True whenever the executor
+        holds an object (its ``holding``: closed on something, not opened
+        since) — at any pause or while carrying — so a Reset says the arm
+        goes home with the object. The latched sample is trusted only while
+        its publisher is alive: a dead executor's last state must not steer
+        the fallback in reset_cycle. Otherwise today's rule."""
+        task = self.exec_task
+        if (task is not None
+                and self.count_publishers("/grasp_executor_lin_llm/task_state") > 0):
+            return bool(task.get("holding"))
         return self.exec_interactive_state == "paused"
 
     def _on_cloud(self, msg: PointCloud2) -> None:
@@ -910,14 +954,21 @@ class MortyGuiBridge(Node):
     def _on_robot_intent(self, msg: String) -> None:
         self.trial_mark("intent", str(msg.data))
         try:
-            action = str(json.loads(msg.data).get("action_intent") or "").lower()
+            _intent = json.loads(msg.data)
+            action = str(_intent.get("action_intent") or "").lower()
         except Exception:
             return
+        # 2026-09-25 (review R8): a spoken "reset" used to arrive here as
+        # "stop" and so also halted a button-launched executor; it is now
+        # its own "reset" intent. Any reset NOT from this GUI (source "gui"
+        # = our own ↻ Reset pick) therefore counts as a stop below too.
+        _attrs = _intent.get("object_attributes") if isinstance(_intent, dict) else None
+        _src = str(_attrs.get("source") or "") if isinstance(_attrs, dict) else ""
         if action in ("start_driver", "stop_driver", "start_pipeline",
                       "stop_pipeline", "start_all", "stop_all"):
             with self._lock:
                 self._system_intents.append(action)
-        elif action == "stop":
+        elif action == "stop" or (action == "reset" and _src != "gui"):
             # Voice "stop" must also halt a BUTTON-launched executor —
             # that process doesn't listen on the voice abort topic, so
             # until now voice stop only froze the LLM executor while a
@@ -1331,7 +1382,43 @@ class MortyGuiBridge(Node):
         motion controller, or the pendant program (that is the E-Stop's
         job). After this the pipeline returns to "Waiting for selection"
         as if no detection had been chosen yet.
+
+        2026-09-25: an executor that listens on /grasp_executor_lin_llm/reset
+        (SPEC §1.2) gets the reset itself and does the rest: it stops a
+        running motion, resolves an open pause and goes home, keeping any
+        held object, gripper untouched. Nothing else here touches the arm —
+        no executor abort, no motion stop, no "stop" intent. Those were the
+        race: the router turned the stop intent into resume "stop" + abort,
+        the abort won over reset_home, and the arm froze at the grasp or
+        drop pose while Morty announced the reset. The pipeline abort and
+        the auto-select clear stay (the pipeline's cycle must end too); the
+        reset intent (source gui) tells a running router to drop its queue
+        and latches without publishing anything itself. Works with the voice
+        stack off. An older executor without that subscription gets today's
+        body below, unchanged.
         """
+        # 2026-09-25: an executor with the reset topic -> reset there only
+        # (see above); otherwise today's body, verbatim.
+        if self.count_subscribers("/grasp_executor_lin_llm/reset") > 0:
+            self._pub_exec_reset.publish(String(data="gui"))
+            self._pub_pipeline_abort.publish(String(data="abort"))
+            try:
+                self._pub_intent.publish(String(
+                    data='{"action_intent":"reset","object_intent":null,'
+                         '"object_attributes":{"source":"gui"}}'))
+            except Exception:
+                pass
+            try:
+                self.set_pipeline_params({"auto_select_label": ""})
+            except Exception as exc:
+                self.get_logger().warn(f"reset: auto_select clear failed: {exc}")
+            self.exec_interactive_state = ""
+            self.llm_cycle_active = False
+            self.get_logger().info(
+                "CYCLE RESET: reset sent to the executor (home, any held "
+                "object kept), selections cleared — detection restarts fresh."
+            )
+            return
         if self.executor_waiting_with_object():
             # Holding an object and waiting for Left / Right (2026-09-15):
             # "abort" would freeze the arm in the air (the voice rule for
@@ -1380,9 +1467,13 @@ class MortyGuiBridge(Node):
             self.set_pipeline_params({"auto_select_label": ""})
         except Exception as exc:
             self.get_logger().warn(f"E-stop: auto_select clear failed: {exc}")
+        # 2026-09-25 (review R7): tagged source "gui" — this press already
+        # sent the executor abort above (publish_llm_abort); the router then
+        # clears its queue / plans and stops trajectories and the pipeline
+        # but does not send a second /abort.
         try:
             self._pub_intent.publish(String(
-                data='{"action_intent":"stop"}'
+                data='{"action_intent":"stop","object_attributes":{"source":"gui"}}'
             ))
         except Exception:
             pass

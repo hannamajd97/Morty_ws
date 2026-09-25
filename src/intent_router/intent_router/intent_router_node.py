@@ -19,7 +19,6 @@ from typing import Optional
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from rclpy.qos import (
     DurabilityPolicy,
     HistoryPolicy,
@@ -56,6 +55,23 @@ READY_INTENTS = {
     "go to ready",
 }
 CLEAR_INTENTS = {"stop", "cancel", "abort"}
+# 2026-09-25: "reset" is the GUI's "↻ Reset pick" said aloud — end the pick
+# and go home keeping any held object, gripper untouched. It is NOT a stop
+# (a stop freezes the arm), so it has its own set and its own handler
+# (_handle_reset) instead of riding on CLEAR_INTENTS.
+RESET_INTENTS = {"reset"}
+
+# 2026-09-25: resume tokens a destination intent maps to, for the early
+# destination latch (_destination_token). Values are what the executor's
+# destination pause accepts; the keys are every spelling the chat node and
+# the LLM tool use for the three answers to "Left, right, or home?".
+_DESTINATION_WORDS = {
+    "drop_right": "drop_right", "right": "drop_right",
+    "drop right": "drop_right", "drop_right_side": "drop_right",
+    "drop_left": "drop_left", "left": "drop_left",
+    "drop left": "drop_left", "drop_left_side": "drop_left",
+    "home": "home", "go_home": "home",
+}
 
 # Intents whose ONLY job, while the executor is paused, is to answer that
 # pause (they are handled by the bypass branches in _on_intent). Outside a
@@ -278,6 +294,51 @@ class IntentRouterNode(Node):
         # or ends the cycle. _pick_awaiting_destination stays set through the
         # release pause too, so it cannot tell the two questions apart.
         self._destination_open: bool = False
+        # 2026-09-25: the executor's latched task state
+        # (/grasp_executor_lin_llm/task_state, JSON, see _on_task_state).
+        # None until the first message: while it is None every read below
+        # falls back to the legacy flags, so an old executor that never
+        # publishes it sees exactly the router of 3f512258.
+        self._task: Optional[dict] = None
+        self._task_boot: float = -1.0
+        self._task_seq: int = -1
+        # 2026-09-25: EARLY DESTINATION LATCH (same pattern as
+        # _followup_plan). "Put it on the right" said while the grasp is
+        # still approaching used to be published at once — and the
+        # executor clears its resume slot when the destination pause OPENS,
+        # so the answer was lost and Morty asked again after saying "Going
+        # to drop right.". The token is kept here instead and answers the
+        # pause the moment it opens. Dict {token, cycle, seen, t}; cycle is
+        # None until the pick's cycle starts (see _on_task_state).
+        self._early_dest: Optional[dict] = None
+        # 2026-09-25: True from a destination answer the ROUTER put on the
+        # resume topic until the executor's resumed:<t> — that event (not
+        # the intent) is what makes the router say "Going to drop right.",
+        # so the line is only spoken for an answer the executor accepted.
+        self._dest_answer_pending: bool = False
+        # 2026-09-25: the newest cycle id that ended (cycle_done), and the
+        # cycle id current at the last stop/reset: a "Starting grasp on …"
+        # scheduled 0.6 s after a cycle start must not be spoken for a
+        # cycle that already ended or was stopped inside that grace.
+        self._last_done_cycle_id: int = -1
+        self._start_suppressed_upto: int = -1
+        # 2026-09-25: True while the router's own plain voice pick (it set
+        # wait_for_destination=True) is dispatched — lets a destination said
+        # before the executor's cycle has even started (phase still idle)
+        # be latched. pick_and_place sets it False: its destination is fixed.
+        self._pick_waits_for_destination: bool = False
+        # 2026-09-25 (review R1): the side a dispatched pick_and_place was
+        # given ("drop_right" / "drop_left" / "home"; "" for a plain pick or
+        # an unknown / executor-default destination). A destination said
+        # during its approach is never published into no open pause; this
+        # tells "the same side again" (nothing changes) from a change the
+        # executor can no longer take (see _destination_without_pause).
+        self._pick_fixed_side: str = ""
+        # 2026-09-25 (review R6): the line the next 'releasing' speaks when
+        # a follow-up plan answered the release pause ("Opening the gripper
+        # and going home."); "" = the usual "Opening the gripper.". Spoken
+        # once, on 'releasing' (the claim used to say it too).
+        self._releasing_line: str = ""
         # Periodic watchdog so a hung pick doesn't block the queue forever.
         self._pick_timeout_s = float(self.get_parameter("queue_pick_timeout_s").value)
         self.create_timer(1.0, self._queue_watchdog)
@@ -350,6 +411,21 @@ class IntentRouterNode(Node):
         )
         self._pipeline_abort_pub = self.create_publisher(
             String, "/grasp_pipeline/abort", 10
+        )
+        # 2026-09-25: the executor's reset request (payload = source,
+        # "voice" here; the GUI publishes "gui" itself). A reset ends the
+        # pick and takes the arm home keeping any held object; the abort
+        # above freezes it. See _handle_reset.
+        self._executor_reset_topic = "/grasp_executor_lin_llm/reset"
+        self._executor_reset_pub = self.create_publisher(
+            String, self._executor_reset_topic, 10
+        )
+        # 2026-09-25: ONE cached client for task_object_label (see
+        # _set_task_object_label). _set_executor_param builds a client per
+        # call and waits up to 0.5 s for it, which is fine at dispatch but
+        # not on every selected detection or cycle_done.
+        self._task_label_cli = self.create_client(
+            SetParameters, "/grasp_executor_lin_llm/set_parameters"
         )
         # True between "pick dispatched in wait-mode" and "cycle_done
         # received", so we know whether a confirm_drop should be routed
@@ -529,6 +605,24 @@ class IntentRouterNode(Node):
             self._on_interactive_status,
             10,
         )
+        # 2026-09-25: the executor's task state — the one owner of "which
+        # question is open, what is held, which cycle, how it ended". Latched
+        # (the executor publishes it reliable + transient_local), read as a
+        # level; see _on_task_state.
+        # 2026-09-25 (review R4): kept by name — _live_task() trusts the
+        # latched sample only while this topic still has a publisher.
+        self._task_state_topic = "/grasp_executor_lin_llm/task_state"
+        self.create_subscription(
+            String,
+            self._task_state_topic,
+            self._on_task_state,
+            QoSProfile(
+                history=HistoryPolicy.KEEP_LAST,
+                depth=10,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            ),
+        )
         # Pipeline publishes the selected object's class on this topic
         # whenever any selection method commits — voice, mouse click,
         # or mediapipe pointing. We use it to keep _last_target_label
@@ -574,40 +668,26 @@ class IntentRouterNode(Node):
 
         action = str(intent.get("action_intent") or "").strip().lower()
 
+        # 2026-09-25: reset (voice, the LLM, or the GUI's "↻ Reset pick"
+        # with the new executor) goes home keeping the object — checked
+        # BEFORE CLEAR_INTENTS because it must never become a stop (the GUI
+        # used to send "stop" after its reset; the router turned that into
+        # an abort and the arm froze instead of going home).
+        if action in RESET_INTENTS:
+            _rattrs = intent.get("object_attributes")
+            _src = str(_rattrs.get("source") or "") if isinstance(_rattrs, dict) else ""
+            self._handle_reset(_src or "voice")
+            return
+
         # Stop is special: it must execute immediately and clear the queue,
         # not wait behind whatever's currently running.
         if action in CLEAR_INTENTS:
-            # If a pick is paused at the grasp pose OR the release
-            # pose, tell the executor to unblock with 'stop' — gripper
-            # stays as-is and arm goes home.
-            if self._pick_awaiting_destination or self._pick_awaiting_release:
-                self.get_logger().info(
-                    "Stop received while pick is paused → publishing "
-                    "'stop' on executor resume topic."
-                )
-                self._claim_executor_resume(
-                    "stop", "stop received while pick is paused")
-            elif getattr(self, "_pick_awaiting_home", False):
-                # Home-confirm pause. 'stop' reaches CLEAR_INTENTS before
-                # the _pick_awaiting_home block further down, so that
-                # block's stop branch never ran and the pause stayed
-                # UNANSWERED until the executor's 1800 s timeout — then
-                # it went home anyway. Answer it with 'stay'.
-                # NOTE: the flag is cleared by _claim_executor_resume
-                # (which closes the pause atomically), not here.
-                self._claim_executor_resume(
-                    "stay",
-                    "stop received at the home-confirm pause; arm stays put",
-                )
-            with self._queue_lock:
-                cleared = len(self._intent_queue)
-                self._intent_queue.clear()
-            if cleared:
-                self.get_logger().info(f"Stop received: cleared {cleared} queued intent(s).")
-            self._handle_stop()
-            self._busy = False
-            self._busy_kind = ""
-            self._try_dispatch_next()
+            # 2026-09-25 (review R7): the GUI's E-stop publishes its own
+            # executor /abort and tags its stop intent source "gui"; this
+            # path then sends no second abort (see _handle_stop).
+            _sattrs = intent.get("object_attributes")
+            _ssrc = str(_sattrs.get("source") or "") if isinstance(_sattrs, dict) else ""
+            self._stop_path(_ssrc)
             return
 
         # ── ONE RESUME PER PAUSE: swallow the loser ──────────────────
@@ -646,7 +726,32 @@ class IntentRouterNode(Node):
         # route open_gripper (and the safety-net affirmation phrases
         # that map to it) directly to the executor's resume topic. Same
         # deadlock-avoidance reason as the destination pause below.
-        if self._pick_awaiting_release:
+        # 2026-09-25: the question comes from the executor's task state
+        # when it has reported (_question_open), else from the legacy flag.
+        if self._question_open("release"):
+            # 2026-09-25: at "Should I open the gripper?", "drop it on the
+            # right" means put it there AND let go — a redirect re-asked the
+            # same question at the other side. drop_<side>+release is the
+            # executor's existing compound token: it becomes
+            # carry_release:<configured target>, which opens IN PLACE when
+            # the arm is already there. Only with the new executor (task
+            # state known); the old one keeps today's redirect.
+            # (review R4: a live task state only.)
+            _side = self._release_side(action, intent) if self._live_task() is not None else ""
+            if _side:
+                # 2026-09-25 (review R5): the router answered, so the router
+                # narrates what the executor does with it (chat_node no
+                # longer speaks it): "Going to drop <side>." on its
+                # redirect:<target>, or just "Opening the gripper." on
+                # 'releasing' when the arm is already at that side (it opens
+                # in place). See _on_interactive_status.
+                self._dest_answer_pending = True
+                if not self._claim_executor_resume(
+                    _side + "+release",
+                    f"release pause: {action!r} names a side -> carry and release",
+                ):
+                    self._narrate_ignored_resume(action, _side + "+release")
+                return
             if action == "carry_release":
                 # v2 (2026-08-31): ATOMIC "take it to <dest> and give it
                 # to me". One token, because the executor's resume
@@ -718,7 +823,9 @@ class IntentRouterNode(Node):
         # Home-confirm pause (2026-08-25): the executor released the
         # object and asked "Should I go back home?" — the answer must go
         # to the resume topic, never spawn a named-pose move mid-cycle.
-        if getattr(self, "_pick_awaiting_home", False):
+        # 2026-09-25: question from the task state when known (legacy flag
+        # otherwise), see _question_open.
+        if self._question_open("home"):
             if action in ("go_home", "confirm_drop", "yes"):
                 if not self._claim_executor_resume(
                     "home", f"home-confirm pause: {action}"
@@ -747,10 +854,47 @@ class IntentRouterNode(Node):
             "drop_right_release_home": ("drop_right", "+release_home"),
             "drop_left_release_home": ("drop_left", "+release_home"),
         }
-        pick_in_flight = self._pick_awaiting_destination or self._busy_kind == "pick"
+        # 2026-09-25: _pick_in_flight() also counts pointing / GUI picks once
+        # the task state is known (phase != idle) — those used to turn a
+        # "put it on the left" into a real MoveToNamedPose goal while the
+        # executor was driving the arm.
+        pick_in_flight = self._pick_in_flight()
+        # 2026-09-25: EARLY DESTINATION LATCH. A destination said while the
+        # grasp is still on its way (no destination question open yet) is
+        # kept, not published — the executor clears its resume slot when
+        # the pause opens, so a token sent now was lost. It answers the
+        # pause from _on_interactive_status('paused'). See _latch_allowed
+        # for exactly when; everything else takes the paths below.
+        if pick_in_flight and self._latch_allowed():
+            _tok = self._destination_token(action, intent.get("object_attributes"))
+            if _tok:
+                self._latch_destination(_tok, action)
+                return
+        # 2026-09-25 (review R1): a destination that was NOT latched above —
+        # a pick_and_place (its side is fixed, no destination question), a
+        # cycle that will not ask (asks_destination false), or confirm_drop
+        # without a side — used to be published as a resume while NO pause
+        # was open; the executor's open_pause_mailbox then erased it and,
+        # chat_node having withheld its line for these phases, the operator
+        # heard nothing at all. With a live task state, no question open and
+        # the pick still before its grasp (idle-but-dispatched, probing,
+        # approaching — the phases chat_node withholds in), nothing is
+        # published: see _destination_without_pause. Legacy (no task state)
+        # and every other phase keep the paths below unchanged (the
+        # releasing phase must keep its early "home": the executor consumes
+        # a home that lands during its post-release wait).
+        if (pick_in_flight
+                and action in ("confirm_drop", "drop_right", "drop_left", "go_home")
+                and self._live_task() is not None
+                and self._task_q() == ""
+                and str((self._live_task() or {}).get("phase") or "idle")
+                in ("idle", "probing", "approaching")):
+            self._destination_without_pause(action, intent.get("object_attributes"))
+            return
         if action in _compound:
             base, suffix = _compound[action]
             if pick_in_flight:
+                self._note_dest_answer()
                 if not self._claim_executor_resume(
                     base + suffix, f"compound {action!r}"
                 ):
@@ -769,8 +913,10 @@ class IntentRouterNode(Node):
             # release_home WITH the side instead of confirm_drop + then
             # (1 of 10 phrasings, 2026-09-24). Same meaning — the side is the
             # answer, the release is the plan.
+            # 2026-09-25: the destination question from the task state when
+            # known, else the legacy _destination_open.
             if (action in ("release_home", "release", "open_gripper") and dest
-                    and self._destination_open):
+                    and self._question_open("destination")):
                 _plan = "release_home" if action == "release_home" else "release"
                 self.get_logger().info(
                     f"{action!r} with destination {dest!r} at the destination question "
@@ -791,6 +937,7 @@ class IntentRouterNode(Node):
                     dest += "+release_home"
                 elif then_s == "release":
                     dest += "+release"
+                self._note_dest_answer()
                 if not self._claim_executor_resume(
                     dest, "bypass queue (pick in flight): confirm_drop"
                 ):
@@ -811,6 +958,7 @@ class IntentRouterNode(Node):
                     redirect += "+release_home"
                 elif then_s == "release":
                     redirect += "+release"
+                self._note_dest_answer()
                 if not self._claim_executor_resume(
                     redirect,
                     f"bypass queue (pick paused): plain {action!r}"
@@ -946,7 +1094,9 @@ class IntentRouterNode(Node):
             # if it isn't actually paused — that's a safe no-op — but
             # an over-cautious refusal here strands the user with the
             # executor paused forever.
-            if not (self._pick_awaiting_destination or self._busy_kind == "pick"):
+            # 2026-09-25: _pick_in_flight() — the same test, plus the task
+            # state's phase once the executor reports one.
+            if not self._pick_in_flight():
                 self.get_logger().info(
                     "confirm_drop received but no pick is busy AND no "
                     "pause flag set; ignoring."
@@ -970,7 +1120,9 @@ class IntentRouterNode(Node):
 
         # Safety-net fallback for plain drop_*/go_home that slipped past
         # the bypass in _on_intent. Should be rare.
-        if self._pick_awaiting_destination and action in (
+        # 2026-09-25: _pick_in_flight() (in _dispatch _busy_kind is always
+        # "" here, so without a task state this is the old flag test).
+        if self._pick_in_flight() and action in (
             "drop_right", "drop_left", "go_home"
         ):
             redirect_map = {
@@ -990,7 +1142,9 @@ class IntentRouterNode(Node):
         # the gripper LEFT as-is and the arm to go home. Send 'stop' on
         # the resume topic so the executor unblocks and runs the PTP-home
         # path. We still honour normal stop semantics afterwards.
-        if action == "stop" and self._pick_awaiting_destination:
+        # 2026-09-25: only without a task state — with the new executor a
+        # stop is ONE abort (_handle_stop), which resolves every pause.
+        if action == "stop" and self._task is None and self._pick_awaiting_destination:
             # Was a RAW publish that bypassed every guard — routed
             # through the claim helper so it closes the pause like any
             # other resume token (2026-08-28).
@@ -1208,9 +1362,19 @@ class IntentRouterNode(Node):
             self._set_executor_drop_target(chosen_drop)
         if is_pick_and_place:
             self._set_executor_wait_for_destination(False)
+            # 2026-09-25: pick_and_place carries its destination; nothing to latch.
+            self._pick_waits_for_destination = False
+            # 2026-09-25 (review R1): the side it goes to, when known
+            # (drop_center / the executor default -> "").
+            self._pick_fixed_side = (_DESTINATION_WORDS.get(destination or "", "")
+                                     if chosen_drop else "")
         else:
             self._set_executor_wait_for_destination(True)
             self._pick_awaiting_destination = True
+            # 2026-09-25: this pick will ask "Where should I drop it?", so a
+            # destination said before its cycle starts may be latched.
+            self._pick_waits_for_destination = True
+            self._pick_fixed_side = ""   # 2026-09-25 (review R1)
 
         # Toggle the executor's vitamin-tube special mode. Only enabled
         # for vitamin_c picks AND only if the operator has opted in via
@@ -1225,6 +1389,14 @@ class IntentRouterNode(Node):
         self._set_executor_param(
             "vitamin_mode_active", is_vitamin, kind="bool"
         )
+        # 2026-09-25: the executor knows no object names; it reads this at
+        # the cycle start and freezes it at the grasp verdict, so the task
+        # state (held object, reset line, the LLM's context) can name it.
+        # The display label, as _set_target_label stores it.
+        self._set_task_object_label(self._to_display_label(label))
+        # 2026-09-25: a destination latched for an earlier pick must never
+        # answer this one.
+        self._drop_early_dest("new pick dispatched")
 
         self._busy_kind = "pick"
         self._pick_deadline = time.monotonic() + self._pick_timeout_s
@@ -1663,12 +1835,357 @@ class IntentRouterNode(Node):
         """True while the executor is parked at one of its three
         interactive pauses: destination ('paused'), release
         ('awaiting_release') or home-confirm ('awaiting_home_confirm').
-        These flags are already maintained by _on_interactive_status."""
+        These flags are already maintained by _on_interactive_status.
+
+        2026-09-25: once the executor's task state has arrived, its
+        ``question`` decides (non-empty exactly while a pause waits); the
+        flags below are the legacy fallback for an old executor (and, since
+        review R4, for a dead one: _live_task)."""
+        if self._live_task() is not None:
+            return self._task_q() != ""
         return bool(
             self._pick_awaiting_destination
             or self._pick_awaiting_release
             or getattr(self, "_pick_awaiting_home", False)
         )
+
+    # ── executor task state (2026-09-25) ─────────────────────────────────
+    # Every helper below reads /grasp_executor_lin_llm/task_state and falls
+    # back to the legacy flags ONLY until the first task state arrives:
+    # with an old executor that never publishes it, the router behaves
+    # exactly as at 3f512258.
+
+    def _on_task_state(self, msg: String) -> None:
+        """2026-09-25: store the executor's latched task state.
+
+        Read as a LEVEL, not as events (SPEC §1.1): a message whose seq is
+        not newer than the last one is dropped unless ``boot`` changed (the
+        executor restarted); the latched first sample is adopted silently —
+        nothing is narrated from task state, the held-object topic is only
+        brought in line with it. Then the early destination latch is bound
+        to the cycle it was said in, or dropped when that cycle is gone.
+        """
+        try:
+            task = json.loads(msg.data or "")
+        except (json.JSONDecodeError, TypeError) as exc:
+            self.get_logger().warn(f"task_state: unparsable ({exc}); ignored.")
+            return
+        if not isinstance(task, dict):
+            return
+        try:
+            boot = float(task.get("boot") or 0.0)
+            seq = int(task.get("seq") or 0)
+        except (TypeError, ValueError):
+            return
+        if boot == self._task_boot and seq <= self._task_seq:
+            return
+        first = self._task is None
+        prev = self._task or {}
+        self._task, self._task_boot, self._task_seq = task, boot, seq
+        if first or boot != float(prev.get("boot") or -1.0) \
+                or task.get("phase") != prev.get("phase") \
+                or task.get("question") != prev.get("question"):
+            self.get_logger().info(
+                f"task_state{' (first)' if first else ''}: cycle "
+                f"{task.get('cycle_id')} phase={task.get('phase')!r} "
+                f"question={task.get('question')!r} "
+                f"holding={task.get('holding')} object={task.get('object')!r}")
+        self._sync_held_object()
+        latch = self._early_dest
+        if latch is not None:
+            phase = str(task.get("phase") or "")
+            try:
+                cid = int(task.get("cycle_id") or 0)
+            except (TypeError, ValueError):
+                cid = 0
+            if latch["cycle"] is None:
+                # Said before the pick's cycle began: bind to the first NEW
+                # cycle that starts (not the one that was idle at the time).
+                if phase in ("probing", "approaching") and cid != latch["seen"]:
+                    latch["cycle"] = cid
+                    self.get_logger().info(
+                        f"Early destination {latch['token']!r} bound to cycle {cid}.")
+            elif latch["cycle"] != cid:
+                self._drop_early_dest(
+                    f"cycle {latch['cycle']} is over (task at cycle {cid})")
+
+    def _live_task(self) -> Optional[dict]:
+        """2026-09-25 (review R4): the task state, but only while the
+        executor that published it is alive — None when no publisher is left
+        on the task-state topic. The sample is latched (transient_local), so
+        a crashed or stopped executor's last state (a question it will never
+        ask again, a phase it left) would otherwise keep steering routing;
+        with None every reader falls back to the legacy flags, exactly as
+        before the first task state. A restarted executor publishes its idle
+        state at start (new boot), which is adopted by _on_task_state."""
+        task = self._task
+        if task is None:
+            return None
+        try:
+            if self.count_publishers(self._task_state_topic) == 0:
+                return None
+        except Exception:
+            pass   # graph query failed: keep trusting the last level
+        return task
+
+    def _task_q(self) -> str:
+        """2026-09-25: the question the executor has open — "",
+        "destination", "release" or "home". From the task state when it has
+        arrived (and its publisher lives, review R4: _live_task), else
+        inferred from the legacy flags."""
+        task = self._live_task()
+        if task is not None:
+            return str(task.get("question") or "")
+        if self._destination_open:
+            return "destination"
+        if self._pick_awaiting_release:
+            return "release"
+        if getattr(self, "_pick_awaiting_home", False):
+            return "home"
+        return ""
+
+    def _question_open(self, question: str) -> bool:
+        """2026-09-25: is THIS question open? The task state's answer when
+        known; without it, exactly the flag each call site tested before
+        (_destination_open / _pick_awaiting_release / _pick_awaiting_home),
+        so an old executor keeps today's routing bit for bit. Review R4: a
+        dead executor's latched state counts as unknown (_live_task)."""
+        if self._live_task() is not None:
+            return self._task_q() == question
+        if question == "destination":
+            return bool(self._destination_open)
+        if question == "release":
+            return bool(self._pick_awaiting_release)
+        if question == "home":
+            return bool(getattr(self, "_pick_awaiting_home", False))
+        return False
+
+    def _pick_in_flight(self) -> bool:
+        """2026-09-25: is a pick cycle running? The router's own pick, or —
+        once the task state is known — ANY executor cycle (pointing and GUI
+        picks included: phase != idle). Legacy: today's flag test — also
+        when the executor is gone (review R4: _live_task)."""
+        task = self._live_task()
+        if task is not None:
+            return (self._busy_kind == "pick"
+                    or str(task.get("phase") or "idle") != "idle")
+        return bool(self._pick_awaiting_destination or self._busy_kind == "pick")
+
+    def _sync_held_object(self) -> None:
+        """2026-09-25: /robot/held_object derived from the task state (the
+        executor's own "closed on something, not opened since"), published
+        only when it changes. The legacy writes in _on_interactive_status
+        and _on_cycle_done run only while no task state has arrived.
+        Review R4: nothing is taken from a dead executor's latched state."""
+        task = self._live_task()
+        if task is None:
+            return
+        if task.get("holding"):
+            label = (str(task.get("object") or "") or self._last_target_label
+                     or self._held_object_label or "object")
+        else:
+            label = ""
+        if label != self._held_object_label:
+            self._set_held_object(label)
+
+    def _latch_allowed(self) -> bool:
+        """2026-09-25: may a destination intent be LATCHED right now?
+
+        Only with the task state known, no destination question open, and
+        either the executor is probing / approaching a pick that will ask
+        (asks_destination), or it is still idle while the router's own plain
+        voice pick (which will ask) is dispatched. Any other time the
+        existing paths run unchanged. Review R4: only a LIVE task state
+        (_live_task) — a dead executor's last phase allows no latch."""
+        task = self._live_task()
+        if task is None or self._task_q() == "destination":
+            return False
+        phase = str(task.get("phase") or "")
+        if phase in ("probing", "approaching"):
+            return bool(task.get("asks_destination"))
+        if phase == "idle":
+            return self._busy_kind == "pick" and self._pick_waits_for_destination
+        return False
+
+    @staticmethod
+    def _destination_token(action: str, attrs) -> Optional[str]:
+        """2026-09-25: the resume token a destination intent stands for, or
+        None. Pure. confirm_drop (with a destination), drop_right /
+        drop_left / go_home, and the compounds drop_*_release[_home] map to
+        drop_right / drop_left / home plus +release / +release_home from
+        ``then``; confirm_drop WITHOUT a destination is None (today's path
+        defaults it to the right side only at the question itself)."""
+        compound = {
+            "drop_right_release": "drop_right+release",
+            "drop_left_release": "drop_left+release",
+            "drop_right_release_home": "drop_right+release_home",
+            "drop_left_release_home": "drop_left+release_home",
+        }
+        if action in compound:
+            return compound[action]
+        attrs = attrs if isinstance(attrs, dict) else {}
+        if action == "confirm_drop":
+            base = _DESTINATION_WORDS.get(
+                str(attrs.get("destination") or "").strip().lower())
+        elif action in ("drop_right", "drop_left", "go_home"):
+            base = {"drop_right": "drop_right", "drop_left": "drop_left",
+                    "go_home": "home"}[action]
+        else:
+            return None
+        if not base:
+            return None
+        then_s = str(attrs.get("then") or "").strip().lower()
+        if then_s == "release_home":
+            return base + "+release_home"
+        if then_s == "release":
+            return base + "+release"
+        return base
+
+    @staticmethod
+    def _release_side(action: str, intent: dict) -> str:
+        """2026-09-25: "drop_right" / "drop_left" when an intent answering
+        the release question names a SIDE — confirm_drop / drop_right /
+        drop_left, or open_gripper / release carrying a destination side —
+        else "". Home is not a side (go_home keeps today's redirect)."""
+        attrs = intent.get("object_attributes")
+        attrs = attrs if isinstance(attrs, dict) else {}
+        if action in ("drop_right", "drop_left"):
+            return action
+        if action in ("confirm_drop", "open_gripper", "release"):
+            side = _DESTINATION_WORDS.get(
+                str(attrs.get("destination") or "").strip().lower(), "")
+            return side if side in ("drop_right", "drop_left") else ""
+        return ""
+
+    def _latch_destination(self, token: str, action: str) -> None:
+        """2026-09-25: keep ``token`` for the destination pause of this pick
+        (a newer one replaces it) and say what will happen — a stated plan,
+        not "Going to drop right.", which waits for the executor's
+        resumed:. Nothing is published now."""
+        task = self._task or {}
+        phase = str(task.get("phase") or "")
+        try:
+            cid = int(task.get("cycle_id") or 0)
+        except (TypeError, ValueError):
+            cid = 0
+        old = self._early_dest
+        self._early_dest = {
+            "token": token,
+            "cycle": cid if phase in ("probing", "approaching") else None,
+            "seen": cid,
+            "t": time.monotonic(),
+        }
+        self.get_logger().info(
+            f"Early destination LATCHED: {action!r} -> {token!r} (phase={phase!r}, "
+            f"cycle={self._early_dest['cycle']}, seen={cid})"
+            + (f", replacing {old['token']!r}" if old else "")
+            + " — it answers the destination pause when it opens.")
+        where = {"drop_right": "the right side", "drop_left": "the left side",
+                 "home": "the home position"}.get(token.split("+", 1)[0], "")
+        if where:
+            self._narrate(f"Okay — {where} once I have it.")
+
+    def _destination_without_pause(self, action: str, attrs) -> None:
+        """2026-09-25 (review R1): a destination said before the grasp while
+        no pause is open and it could not be latched (_latch_allowed).
+        Publishes NOTHING — a resume now would land in no open pause and be
+        erased when the next one opens. Instead:
+
+        * confirm_drop without a side: nothing to change; the destination
+          question (if this cycle asks one) is still to come. Log only.
+        * the side a pick_and_place is already going to (_pick_fixed_side):
+          nothing changes — say the latch line (true: it goes there once
+          held); a "then release [home]" becomes the follow-up plan, which
+          answers the release pause when it opens, exactly as an
+          open_gripper said during the approach does.
+        * any other side: the executor cannot take it now (its drop target
+          is read at the cycle start, and this cycle asks no destination),
+          so say so honestly. At the release question a side is still
+          taken (drop_<side>+release)."""
+        tok = self._destination_token(action, attrs)
+        task = self._live_task() or {}
+        if not tok:
+            self.get_logger().info(
+                f"{action!r} without a destination while no pause is open "
+                f"(phase={task.get('phase')!r}): nothing published — a resume "
+                "now would be erased when the next pause opens.")
+            return
+        side, _, plan = tok.partition("+")
+        if self._pick_fixed_side and side == self._pick_fixed_side:
+            if plan in ("release", "release_home"):
+                if not (plan == "release" and self._followup_plan == "release_home"):
+                    self._followup_plan = plan   # never downgrade "then home"
+            self.get_logger().info(
+                f"{action!r} -> {tok!r} during the approach: the pick already "
+                f"goes to {side!r} — nothing published"
+                + (f", follow-up plan={self._followup_plan!r}." if plan else "."))
+            where = {"drop_right": "the right side", "drop_left": "the left side",
+                     "home": "the home position"}.get(side, "")
+            if where:
+                self._narrate(f"Okay — {where} once I have it.")
+            return
+        self.get_logger().warn(
+            f"{action!r} -> {tok!r} while no pause is open and this cycle asks "
+            f"no destination (phase={task.get('phase')!r}, "
+            f"asks_destination={task.get('asks_destination')}, "
+            f"pick_and_place side={self._pick_fixed_side!r}): NOT published "
+            "(it would be erased when the next pause opens); said so.")
+        self._narrate(
+            "I can't change the drop side now — I'll put it where you said first.")
+
+    def _drop_early_dest(self, why: str) -> None:
+        """2026-09-25: forget the latched destination (log only)."""
+        if self._early_dest is not None:
+            self.get_logger().info(
+                f"Early destination {self._early_dest['token']!r} dropped: {why}.")
+            self._early_dest = None
+
+    def _note_dest_answer(self) -> None:
+        """2026-09-25: the router is about to put a destination on the
+        resume topic. When that answers the destination question of a known
+        task, the executor's resumed:<t> will say "Going to drop …" (see
+        _on_interactive_status) — chat_node no longer says it at intent
+        time, before anything accepted it."""
+        if self._live_task() is not None and self._task_q() == "destination":
+            self._dest_answer_pending = True
+
+    def _set_task_object_label(self, label: str) -> None:
+        """2026-09-25: set the executor's task_object_label parameter.
+
+        Only once the task state is known (an old executor has no such
+        parameter), through one cached client that never blocks this node's
+        only thread: when the service is not ready the value is skipped with
+        a log line (the executor re-reads the parameter at every cycle
+        start, so the next set catches up)."""
+        if self._task is None:
+            return
+        cli = self._task_label_cli
+        if not cli.service_is_ready():
+            self.get_logger().info(
+                f"task_object_label={label!r} not set: executor parameter "
+                "service not ready.")
+            return
+        request = SetParameters.Request()
+        param = ParameterMsg()
+        param.name = "task_object_label"
+        param.value = ParameterValue()
+        param.value.type = ParameterType.PARAMETER_STRING
+        param.value.string_value = str(label or "")
+        request.parameters = [param]
+
+        def _done(fut, v=label):
+            try:
+                resp = fut.result()
+            except Exception as exc:
+                self.get_logger().warn(f"task_object_label set failed: {exc}")
+                return
+            if resp and resp.results and resp.results[0].successful:
+                self.get_logger().info(f"Set task_object_label={v!r} on grasp_executor_lin_llm.")
+            else:
+                reason = resp.results[0].reason if resp and resp.results else "?"
+                self.get_logger().warn(f"task_object_label refused by executor: {reason}")
+
+        cli.call_async(request).add_done_callback(_done)
 
     def _claim_executor_resume(
         self, dest: str, why: str, *, force: bool = False
@@ -2018,11 +2535,142 @@ class IntentRouterNode(Node):
 
     # ── stop / cancel ────────────────────────────────────────────────────
 
-    def _handle_stop(self) -> None:
+    def _stop_path(self, src: str = "") -> None:
+        """Stop is special: it must execute immediately and clear the queue,
+        not wait behind whatever's currently running.
+
+        2026-09-25 (review R7): ``src`` is the stop intent's
+        object_attributes.source; "gui" (the E-stop, which already sent its
+        own executor abort) makes _handle_stop skip the executor /abort.
+
+        2026-09-25: moved out of _on_intent unchanged so that a reset can
+        fall back to it against an old executor (_handle_reset). With the
+        task state known no resume 'stop' / 'stay' is claimed first: the
+        new executor resolves every pause from the ONE abort _handle_stop
+        sends (a resume 'stop' used to send the arm home holding, and a
+        second answer for the same pause is exactly what froze the GUI
+        reset)."""
+        if self._task is None:
+            # If a pick is paused at the grasp pose OR the release
+            # pose, tell the executor to unblock with 'stop' — gripper
+            # stays as-is and arm goes home.
+            if self._pick_awaiting_destination or self._pick_awaiting_release:
+                self.get_logger().info(
+                    "Stop received while pick is paused → publishing "
+                    "'stop' on executor resume topic."
+                )
+                self._claim_executor_resume(
+                    "stop", "stop received while pick is paused")
+            elif getattr(self, "_pick_awaiting_home", False):
+                # Home-confirm pause. 'stop' reaches CLEAR_INTENTS before
+                # the _pick_awaiting_home block further down, so that
+                # block's stop branch never ran and the pause stayed
+                # UNANSWERED until the executor's 1800 s timeout — then
+                # it went home anyway. Answer it with 'stay'.
+                # NOTE: the flag is cleared by _claim_executor_resume
+                # (which closes the pause atomically), not here.
+                self._claim_executor_resume(
+                    "stay",
+                    "stop received at the home-confirm pause; arm stays put",
+                )
+        with self._queue_lock:
+            cleared = len(self._intent_queue)
+            self._intent_queue.clear()
+        if cleared:
+            self.get_logger().info(f"Stop received: cleared {cleared} queued intent(s).")
+        self._handle_stop(src)
+        self._busy = False
+        self._busy_kind = ""
+        self._try_dispatch_next()
+
+    def _handle_reset(self, src: str) -> None:
+        """2026-09-25: RESET — what the GUI's "↻ Reset pick" means: end the
+        pick and go home keeping any held object, gripper untouched; clear
+        the queue, the plan, the latch and the selection. NOT a freeze.
+
+        The executor does the motion itself on /grasp_executor_lin_llm/reset
+        (at a pause, the pause resolves; during motion it stops, then goes
+        home; idle away from home it goes home). This node therefore sends
+        NO abort and no resume — an abort next to the reset is what made
+        the arm freeze at the grasp pose (the GUI race). The GUI publishes
+        its own reset and pipeline abort (src == "gui"); for voice this
+        node publishes both. Says nothing: chat_node already said
+        "Resetting." and the cycle end says where the arm is.
+
+        Old executor (nobody subscribes to the reset topic): today's stop
+        path, which was the only thing a spoken "reset" ever did — for a
+        VOICE reset only (2026-09-25, review R2): the GUI decided its own
+        path from its own subscriber count and already sent /reset; an
+        abort from here after it (a discovery lag can show this node 0
+        subscribers) would freeze the arm the reset is taking home."""
+        if src != "gui" and self.count_subscribers(self._executor_reset_topic) == 0:
+            self.get_logger().info(
+                f"Reset ({src}): no executor listens on "
+                f"{self._executor_reset_topic} — old executor, running the stop path.")
+            self._stop_path()
+            return
+        # 2026-09-25 (review R3): the executor reset and the pipeline abort
+        # go out FIRST — _set_target_label below can block up to 1 s in
+        # wait_for_service, and the arm must not wait for that.
+        if src != "gui":
+            try:
+                self._executor_reset_pub.publish(String(data="voice"))
+                self._pipeline_abort_pub.publish(String(data="stop"))
+                self.get_logger().info(
+                    "Reset: published executor reset 'voice' + pipeline abort.")
+            except Exception as exc:
+                self.get_logger().warn(f"Reset publish failed: {exc}")
+        with self._queue_lock:
+            cleared = len(self._intent_queue)
+            self._intent_queue.clear()
+        self._followup_plan = ""
+        self._drop_early_dest(f"reset ({src})")
+        self._dest_answer_pending = False
+        self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
+        self._start_suppressed_upto = self._last_cycle_id
+        self.get_logger().info(
+            f"Reset ({src}): cleared {cleared} queued intent(s), the follow-up "
+            "plan and the destination latch.")
+        # The router's own goals: cancel, log only (no "Cancelled the motion.").
+        for _name, _handle in (("gripper", self._active_gripper_handle),
+                               ("named-pose", self._active_named_pose_handle)):
+            if _handle is not None:
+                try:
+                    _handle.cancel_goal_async()
+                    self.get_logger().info(f"Reset: cancelled the in-flight {_name} goal.")
+                except Exception as exc:
+                    self.get_logger().warn(f"Reset: {_name} cancel failed: {exc}")
+        self._set_target_label("")
+        self._busy = False
+        self._busy_kind = ""
+        self._try_dispatch_next()
+
+    def _handle_stop(self, src: str = "") -> None:
         """Cancel everything intent_router currently owns AND abort the
-        executor's pick cycle (candidate evaluation, approach, pauses)."""
+        executor's pick cycle (candidate evaluation, approach, pauses).
+
+        2026-09-25: also forgets what the stopped pick was going to do —
+        the follow-up plan, the latched destination, a pending "Going to
+        drop …" — and suppresses a "Starting grasp on …" still waiting in
+        its 0.6 s grace for the cycle that was just stopped. Still exactly
+        one abort.
+
+        2026-09-25 (review R7): with ``src == "gui"`` (the E-stop's stop
+        intent) the executor /abort is NOT sent here — the GUI already sent
+        it (publish_llm_abort), and two aborts per press was one too many.
+        Everything else stays: the trajectory stop (harmless), the pipeline
+        abort, the cancels and the clears."""
+        self._followup_plan = ""
+        self._drop_early_dest("stop")
+        self._dest_answer_pending = False
+        self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
+        self._start_suppressed_upto = self._last_cycle_id
         try:
-            self._executor_abort_pub.publish(String(data="stop"))
+            if src == "gui":
+                self.get_logger().info(
+                    "Stop (gui): the GUI sent the executor abort itself — not repeated.")
+            else:
+                self._executor_abort_pub.publish(String(data="stop"))
             self._traj_stop_pub.publish(String(data="stop"))
             # Kill an in-flight PIPELINE cycle too (segmentation/GraspGen
             # phase) — the executor abort alone let those finish and the
@@ -2119,10 +2767,18 @@ class IntentRouterNode(Node):
         elif cmd == OperateGripper.Goal.OPEN:
             self._narrate("The gripper is open.")
         elif cmd == OperateGripper.Goal.CLOSE:
-            if getattr(result, "object_detected", False):
-                self._narrate("The gripper is closed on the object.")
+            # 2026-09-25: say only what is known. object_detected is the
+            # shim's "stalled", and the adapter hard-codes stalled=False, so
+            # "There was nothing in it." was said while holding the object
+            # (and "closed on the object" could never be measured). What IS
+            # known is whether the robot was already holding something —
+            # the held-object memory, derived from the executor's task state
+            # when it reports one.
+            _held = (self._held_object_label or "").replace("_", " ")
+            if _held:
+                self._narrate(f"The gripper is closed. I'm still holding the {_held}.")
             else:
-                self._narrate("The gripper is closed. There was nothing in it.")
+                self._narrate("The gripper is closed.")
         self._mark_busy_done("gripper")
 
     # ── named pose ───────────────────────────────────────────────────────
@@ -2253,6 +2909,10 @@ class IntentRouterNode(Node):
                 "pipeline restarted — clearing the stale target-label lock"
             )
             self._last_target_label_lock_cycle = -1
+            # 2026-09-25: the same for the start-line suppression marks —
+            # against the new numbering they would silence every start.
+            self._last_done_cycle_id = -1
+            self._start_suppressed_upto = -1
         self._last_cycle_id = cycle
         if not self._narrate_lifecycle:
             return
@@ -2267,6 +2927,15 @@ class IntentRouterNode(Node):
             # "ready" forever and hot-loop the spin — this leaked one
             # core-burning timer PER GRASP CYCLE.
             self.destroy_timer(timer)
+            # 2026-09-25: a cycle that already ended (cycle_done inside the
+            # 0.6 s grace — e.g. no candidate, or a stop) or that a stop /
+            # reset cut off gets no "Starting grasp" after the fact.
+            if cycle <= self._last_done_cycle_id or cycle <= self._start_suppressed_upto:
+                self.get_logger().info(
+                    f"cycle_id={cycle}: start narration suppressed (ended "
+                    f"{self._last_done_cycle_id}, stopped/reset at "
+                    f"{self._start_suppressed_upto}).")
+                return
             target = (
                 self._last_target_label.replace("_", " ")
                 if self._last_target_label else ""
@@ -2319,6 +2988,10 @@ class IntentRouterNode(Node):
                 f"_last_target_label for narration)."
             )
             self._last_target_label = cls
+            # 2026-09-25: pointing / GUI selections name the object for the
+            # executor's task state too (it re-reads the label while probing
+            # and approaching, and freezes it at the grasp verdict).
+            self._set_task_object_label(cls)
         except Exception as exc:
             self.get_logger().debug(f"_on_selected_detection: {exc}")
 
@@ -2360,8 +3033,29 @@ class IntentRouterNode(Node):
             # holding the object NOW. Publishing held_object only at
             # cycle end left the LLM claiming "I'm not holding anything"
             # mid-pause and refusing the drop command (Majd, 2026-08-12).
-            if label:
+            # 2026-09-25: legacy only — with the task state known the held
+            # object follows the executor's own holding (_sync_held_object).
+            if label and self._task is None:
                 self._set_held_object(label)
+            # 2026-09-25: a destination said during the approach (latched)
+            # answers this pause now, and the question is not asked. Only
+            # for the cycle it was said in (a latch bound to another cycle
+            # is dropped and the question is asked as usual).
+            latch, self._early_dest = self._early_dest, None
+            if latch is not None:
+                try:
+                    _cid = int((self._task or {}).get("cycle_id") or 0)
+                except (TypeError, ValueError):
+                    _cid = 0
+                if latch["cycle"] is None or self._task is None or latch["cycle"] == _cid:
+                    self._dest_answer_pending = True
+                    self._claim_executor_resume(latch["token"], "early destination")
+                    self._narrate(
+                        f"Got the {label.replace('_', ' ')}." if label else "Got it.")
+                    return
+                self.get_logger().info(
+                    f"Early destination {latch['token']!r} dropped at the pause: "
+                    f"latched for cycle {latch['cycle']}, pause of cycle {_cid}.")
             if label:
                 human = label.replace("_", " ")
                 prompt = (
@@ -2382,7 +3076,8 @@ class IntentRouterNode(Node):
             self._resume_claimed = False
             # A NEW release pause: the keep-holding verdict is not in yet.
             self._release_skipped_this_cycle = False
-            if self._last_target_label:
+            # 2026-09-25: legacy only (task state owns the held object).
+            if self._last_target_label and self._task is None:
                 self._set_held_object(self._last_target_label)
             # The arm has ARRIVED at the drop pose (executor-driven move)
             # — record it so "which position are you?" answers truthfully.
@@ -2404,8 +3099,10 @@ class IntentRouterNode(Node):
                 plan, self._followup_plan = self._followup_plan, ""
                 token = "release_home" if plan == "release_home" else "release"
                 if self._claim_executor_resume(token, f"follow-up said earlier: {plan}"):
-                    self._narrate("Opening the gripper and going home."
-                                  if plan == "release_home" else "Opening the gripper.")
+                    # 2026-09-25 (review R6): said ONCE, on the executor's
+                    # 'releasing' (it used to be said here AND there).
+                    self._releasing_line = ("Opening the gripper and going home."
+                                            if plan == "release_home" else "")
                     return
             # Name what we are holding (Majd 2026-08-31: "should i open
             # the gripper, I'm still holding the object? ... more
@@ -2427,7 +3124,13 @@ class IntentRouterNode(Node):
             # The executor is ABOUT to command the open (v2 ordering,
             # 2026-08-31): progressive tense only — "The gripper is
             # open." waits for the hardware to actually report success.
-            self._narrate("Opening the gripper.")
+            # 2026-09-25 (review R6): a follow-up plan's line replaces it
+            # (spoken once, here). Review R5: a side claimed at the release
+            # question that opens IN PLACE ends here too — the arm was
+            # already there, so no "Going to drop …".
+            line, self._releasing_line = (self._releasing_line or "Opening the gripper."), ""
+            self._dest_answer_pending = False
+            self._narrate(line)
         elif data == "release_failed":
             # The open was commanded and FAILED — the object is still
             # held. Without this line the operator heard "Opening the
@@ -2449,6 +3152,13 @@ class IntentRouterNode(Node):
             # reached (finding 6). The executor publishes an
             # authoritative resumed:<pose> after the motion settles.
             self.get_logger().info(f"Executor redirect in progress: {data!r}")
+            # 2026-09-25 (review R5): except for a side the ROUTER claimed at
+            # the release question (drop_<side>+release): chat_node no
+            # longer acknowledges it, and this redirect is the executor
+            # accepting it — the carry+release has no resumed: on success.
+            if self._dest_answer_pending:
+                self._dest_answer_pending = False
+                self._say_going_to(data.split(":", 1)[1].strip())
         elif data == "redirect_failed":
             self._narrate(
                 "I couldn't reach that spot — I'm staying here, still "
@@ -2459,14 +3169,16 @@ class IntentRouterNode(Node):
             # question open. chat_node already spoke the acknowledgement
             # at intent time, so this is bookkeeping only.
             _kept2 = self._last_target_label or self._held_object_label
-            if _kept2:
+            # 2026-09-25: legacy only (task state owns the held object).
+            if _kept2 and self._task is None:
                 self._set_held_object(_kept2)
         elif data == "stopped_holding":
             # Abort-freeze at the release pause: arm parked at the drop
             # pose, gripper closed on the object. Do NOT claim "home".
             self._pick_awaiting_release = False
             _kept3 = self._last_target_label or self._held_object_label
-            if _kept3:
+            # 2026-09-25: legacy only (task state owns the held object).
+            if _kept3 and self._task is None:
                 self._set_held_object(_kept3)
             # Adversarial review 2026-08-31 (finding 4): the cycle ends
             # as failed|stopped by your command, and _on_cycle_done's
@@ -2491,7 +3203,9 @@ class IntentRouterNode(Node):
             # (2026-08-25: without this the LLM kept believing it was
             # holding the tube after dropping it). The executor now
             # returns to home (reset target).
-            self._set_held_object("")
+            # 2026-09-25: legacy only (task state owns the held object).
+            if self._task is None:
+                self._set_held_object("")
             # NOTE: do NOT publish "home" here — the arm is still AT the
             # drop pose when the gripper opens, and may even stay there
             # (2026-08-25: the LLM claimed "you're already home" while
@@ -2506,7 +3220,8 @@ class IntentRouterNode(Node):
             self._pick_awaiting_release = False
             self._release_skipped_this_cycle = True
             _kept = self._last_target_label or self._held_object_label
-            if _kept:
+            # 2026-09-25: legacy only (task state owns the held object).
+            if _kept and self._task is None:
                 self._set_held_object(_kept)
             self._narrate(
                 "I'll keep holding it and take it back home."
@@ -2548,7 +3263,35 @@ class IntentRouterNode(Node):
             # is" — it claimed 'home' while standing at drop-left because
             # only router-commanded moves updated the pose).
             self._executor_drop_dest = data.split(":", 1)[1].strip()
+            # 2026-09-25: the executor ACCEPTED a destination the router
+            # itself answered (the latch, or a claim at the question) — only
+            # now is "Going to drop right." true. chat_node withholds that
+            # line at intent time once the task state is known; a GUI
+            # button's resumed: finds the flag clear and stays silent.
+            if self._dest_answer_pending:
+                self._dest_answer_pending = False
+                self._say_going_to(self._executor_drop_dest)
+        elif data == "reset_home":
+            # 2026-09-25: the executor is resetting (going home, keeping any
+            # held object): whatever question was open is gone. Bookkeeping
+            # only — the cycle end says where the arm ended up.
+            self._destination_open = False
+            self._pick_awaiting_release = False
+            self._pick_awaiting_home = False
         # The LLM's confirm_drop reply already narrates the destination.
+
+    def _say_going_to(self, target: str) -> None:
+        """2026-09-25: the line for a destination the executor accepted from
+        the router — on resumed:<t> (destination question) and, since review
+        R5, on redirect:<t> (a side claimed at the release question)."""
+        if "right" in target:
+            self._narrate("Going to drop right.")
+        elif "left" in target:
+            self._narrate("Going to drop left.")
+        elif target in ("home", self._home_pose):
+            self._narrate("Going home.")
+        else:
+            self._narrate(f"Going to the {target.replace('_', ' ')}.")
 
     def _on_cycle_done(self, msg: String) -> None:
         data = (msg.data or "").strip()
@@ -2558,6 +3301,23 @@ class IntentRouterNode(Node):
         self.get_logger().info(f"cycle_done received: {data!r} (outcome={outcome})")
         self._followup_plan = ""
         self._destination_open = False
+        # 2026-09-25: the cycle is over — remember its id (a late "Starting
+        # grasp" for it is suppressed in _say_start), drop a destination
+        # latched for it and a pending "Going to drop …", and clear the
+        # executor's object label so the next cycle cannot inherit it.
+        # Also runs for /grasp_pipeline/selection_result (same grammar).
+        try:
+            _done_id = int(data.split("|")[1])
+        except (IndexError, ValueError):
+            _done_id = 0
+        if _done_id > 0:
+            self._last_done_cycle_id = _done_id
+        self._drop_early_dest(f"cycle_done {data!r}")
+        self._dest_answer_pending = False
+        # 2026-09-25 (reviews R1, R6): per-pick memory ends with the cycle.
+        self._releasing_line = ""
+        self._pick_fixed_side = ""
+        self._set_task_object_label("")
         if self._narrate_lifecycle:
             # Silent on success — same reasoning as MoveToNamedPose: avoid
             # extra TTS that the mic loops back. Failure still narrates,
@@ -2571,6 +3331,14 @@ class IntentRouterNode(Node):
                     # nothing resets — saying "Resetting." here was a
                     # lie (2026-08-31 narration audit).
                     self._narrate("Stopped. I'm holding position.")
+                elif reason == "reset by the operator" and self._task is not None:
+                    # 2026-09-25: a reset is not a failed grasp ("The grasp
+                    # failed: reset by the operator. Resetting." was said
+                    # while the arm stood still). Say where the arm ended
+                    # and what it holds — from the task state's `last`,
+                    # which is published before cycle_done but on another
+                    # topic, hence the short grace (see _say_reset_outcome).
+                    self._say_reset_outcome(_done_id)
                 elif fields[1].strip() == "0" and reason:
                     # No cycle ever ran (pipeline gave the label up): the
                     # reason is already a sentence; nothing is resetting.
@@ -2646,7 +3414,13 @@ class IntentRouterNode(Node):
         # holding the small bottle"). The only cycle that really ends
         # holding is the KEEP-HOLDING path, where the executor published
         # 'release_skipped' and carried the object home.
-        if outcome == "done" and self._release_skipped_this_cycle:
+        # 2026-09-25: with the task state known the executor's own holding
+        # decides (_sync_held_object) — a stop or reset that ends the cycle
+        # still holding no longer wipes the memory. The chain below is the
+        # legacy fallback — also for a dead executor (review R4: _live_task).
+        if self._live_task() is not None:
+            self._sync_held_object()
+        elif outcome == "done" and self._release_skipped_this_cycle:
             _kept = self._last_target_label or self._held_object_label
             if _kept:
                 self._set_held_object(_kept)
@@ -2701,6 +3475,41 @@ class IntentRouterNode(Node):
         # Pick completed (success or fail) — release the queue so the
         # next queued intent can proceed.
         self._mark_busy_done("pick")
+
+    def _say_reset_outcome(self, cycle_id: int) -> None:
+        """2026-09-25: the spoken end of a reset, from the task state.
+
+        The executor publishes its idle task state (with ``last`` filled)
+        BEFORE cycle_done, but on another topic, so the order of arrival is
+        not guaranteed: wait 0.3 s (a one-shot timer, destroyed in its own
+        callback like _say_start — cancelled Humble timers hot-loop the
+        spin), then say where the arm is and what it still holds. When
+        ``last`` does not describe this cycle: "Pick reset."."""
+        def _say() -> None:
+            self.destroy_timer(timer)
+            task = self._task or {}
+            last = task.get("last") if isinstance(task.get("last"), dict) else {}
+            try:
+                last_id = int(last.get("cycle_id"))
+            except (TypeError, ValueError):
+                last_id = None
+            if last_id is None or last_id != cycle_id:
+                self.get_logger().info(
+                    f"Reset of cycle {cycle_id}: task state's last cycle is "
+                    f"{last_id} — saying the fallback line.")
+                self._narrate("Pick reset.")
+                return
+            tail = ""
+            if task.get("holding"):
+                what = (str(task.get("object") or "") or self._held_object_label
+                        or "object").replace("_", " ")
+                tail = f", still holding the {what}"
+            if last.get("at_home"):
+                self._narrate(f"Reset — I'm back home{tail}.")
+            else:
+                self._narrate(f"Reset — but I couldn't get back home{tail}.")
+
+        timer = self.create_timer(0.3, _say)
 
     def _open_execution_gate(self) -> None:
         """Voice picks are autonomous by definition (2026-08-26: with the
@@ -2849,6 +3658,11 @@ class IntentRouterNode(Node):
     def _queue_watchdog(self) -> None:
         """Time-out picks that never receive a cycle_done so the queue
         cannot wedge if the executor is offline."""
+        # 2026-09-25: a latched destination older than a whole pick may be
+        # (queue_pick_timeout_s) belongs to nothing any more.
+        if (self._early_dest is not None
+                and time.monotonic() - self._early_dest["t"] > self._pick_timeout_s):
+            self._drop_early_dest(f"older than {self._pick_timeout_s:.0f} s")
         if (
             self._busy
             and self._busy_kind == "pick"

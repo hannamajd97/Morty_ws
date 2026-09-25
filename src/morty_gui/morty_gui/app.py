@@ -182,7 +182,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.vf_silence.setRange(100, 3000); self.vf_silence.setSingleStep(50)
         # Mirror of speech_input_node's declared default: 500 ms since
         # 2026-09-24 (300 split hesitant commands in two; costs 0.2 s a turn).
-        self.vf_silence.setValue(500); self.vf_silence.setSuffix(" ms")
+        # 2026-09-25: 800 ms (500 split "The Vitamin C to" / "…too."); short
+        # answers still end after 500 ms (the node's whisper_short_silence_ms).
+        self.vf_silence.setValue(800); self.vf_silence.setSuffix(" ms")
         self.vf_silence.setToolTip("Silence that ends an utterance. Lower = snappier, higher = tolerates pauses.")
         vf.addRow("Silence to finalise:", self.vf_silence)
         self.vf_max_utt = QtWidgets.QDoubleSpinBox()
