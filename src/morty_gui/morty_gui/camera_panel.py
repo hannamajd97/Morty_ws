@@ -61,6 +61,12 @@ class CameraPanel(QtWidgets.QLabel):
                 self.hovered_px.emit(fx * self._img_w, fy * self._img_h)
         super().mouseMoveEvent(ev)
 
+    def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent) -> None:
+        # Qt's default handler calls mousePressEvent again, so a double-click
+        # sent two object clicks (2026-09-25: "Queued window-click selection"
+        # twice in 0.2 s). The first press already selected; this one is ignored.
+        ev.accept()
+
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.LeftButton and self._img_w and self._draw_rect.width():
             if self._draw_rect.contains(ev.pos()):
