@@ -69,7 +69,9 @@ RESETW = r"(?:reset|start over|zurücksetzen)"
 # stop test (_clauses); a negation never reaches across it, so "Don't. Stop!"
 # and "No, don't! Stop!" are stops while "Don't stop, keep going." is not.
 _BOUNDARY = r"\|"
-VERB = r"(?:(?:drop|put|take|bring|place|move)(?: it)?(?: position)? )"
+# 2026-09-25 (Majd, live: "Go to the left." was not matched): "go" joins the
+# verbs, with an optional "back" ("go back to the left side").
+VERB = r"(?:(?:go|drop|put|take|bring|place|move)(?: it)?(?: back)?(?: position)? )"
 
 
 def _word(w: str) -> str:
@@ -129,6 +131,10 @@ DEST_SIDE = _whole(
     r"(?:" + AFF + r" )?" + VERB + r"?(?:(?:on|to|at|in|onto|over) )?(?:the )?"
     r"(left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?")
 DEST_HOME = _whole(r"(?:" + AFF + r" )?" + VERB + r"?" + HOME)
+# 2026-09-25 (Majd, live: "Now back home." / "Go back home." went to the model,
+# which answered "Going home." without sending anything): with NO question
+# open, a whole go-home sentence is instant, like the other exact commands.
+GO_HOME = _whole(r"(?:(?:come|head|return|move) )?" + HOME)
 
 # 2026-09-25 (Majd's B2): destination + release [+ back home] in ONE whole
 # utterance at the destination question ("Drop it on the right side, give me
@@ -318,6 +324,14 @@ def classify(text: str, question: str = "", fresh: bool = False,
                 return ("answer", "go_home")
             if NO_HOME.match(t):
                 return ("negative", "stay")
+            if ext_dest:
+                # 2026-09-25 (Majd, live: "Go to the left." at "Should I go
+                # back home?" went to the model, which asked "Left or
+                # right?"): a whole side answer here is instant too — the
+                # executor then moves to that drop pose instead of home.
+                m = DEST_SIDE.match(t)
+                if m:
+                    return ("answer", "drop_" + _SIDE[m.group(1)])
         elif question == "destination":
             if NO_DEST.match(t):
                 return ("negative", "keep")          # 2026-09-25 (I1): nothing is sent
@@ -333,6 +347,8 @@ def classify(text: str, question: str = "", fresh: bool = False,
                     return ("answer", "drop_" + _SIDE[m.group(1)])
                 if DEST_HOME.match(t):
                     return ("answer", "go_home")
+    if not question and GO_HOME.match(t):
+        return ("answer", "go_home")        # 2026-09-25: see GO_HOME
     if OPEN.match(t):
         return ("gripper", "open_gripper")
     if CLOSE.match(t):

@@ -3537,6 +3537,20 @@ class ChatIntentNode(Node):
         # 2026-09-25: a model sentence saying "I didn't catch that" next to a
         # real command is dropped — never glued to a real answer.
         assistant_text = self._drop_marker_sentences(assistant_text)
+        if not self._real_intent and assistant_text:
+            # 2026-09-25 (Majd, live: "Now back home." → the model wrote
+            # "Going home." WITHOUT a tool call; it was not spoken, but it
+            # stayed in the conversation, so the next "Go back home." got
+            # "You're already heading home" and again no command). A turn
+            # that sent nothing keeps no action claim: not in the GUI text,
+            # and not in the history the model reads next turn (the history
+            # holds these very text items, so they are rewritten in place).
+            stripped = self._drop_claim_sentences(assistant_text)
+            if stripped != assistant_text:
+                for item in (getattr(response, "output", None) or []):
+                    if getattr(item, "type", None) == "message":
+                        item.content = stripped or "(No command was sent — nothing moved.)"
+                assistant_text = stripped
         if assistant_text:
             print(f"Assistant: {assistant_text}")
             msg = String()

@@ -339,6 +339,13 @@ class IntentRouterNode(Node):
         # and going home."); "" = the usual "Opening the gripper.". Spoken
         # once, on 'releasing' (the claim used to say it too).
         self._releasing_line: str = ""
+        # 2026-09-25 (Majd, live: "Now back home." while the arm was still on
+        # its way to the drop-left pose after "Should I go back home?"): a
+        # go-home / drop-side move said while the cycle's LAST move runs (all
+        # questions answered, gripper empty) is kept here and carried out
+        # when that cycle ends — it used to be published to a pause that
+        # never opened again and was lost. See _defer_after_cycle.
+        self._after_cycle_intent: Optional[dict] = None
         # 2026-09-25: when "I'm still holding the X — where should I put it
         # first?" was last said (monotonic); the executor's refusals of
         # pointing / GUI picks repeat it at most every 15 s.
@@ -935,6 +942,8 @@ class IntentRouterNode(Node):
         # and every other phase keep the paths below unchanged (the
         # releasing phase must keep its early "home": the executor consumes
         # a home that lands during its post-release wait).
+        if pick_in_flight and self._defer_after_cycle(action, intent):
+            return
         if (pick_in_flight
                 and action in ("confirm_drop", "drop_right", "drop_left", "go_home")
                 and self._live_task() is not None
@@ -1494,6 +1503,7 @@ class IntentRouterNode(Node):
         # 2026-09-25: a destination latched for an earlier pick must never
         # answer this one.
         self._drop_early_dest("new pick dispatched")
+        self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
 
         self._busy_kind = "pick"
         self._pick_deadline = time.monotonic() + self._pick_timeout_s
@@ -2834,6 +2844,7 @@ class IntentRouterNode(Node):
             cleared = len(self._intent_queue)
             self._intent_queue.clear()
         self._followup_plan = ""
+        self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
         self._drop_early_dest(f"reset ({src})")
         self._dest_answer_pending = False
         self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
@@ -2871,6 +2882,7 @@ class IntentRouterNode(Node):
         Everything else stays: the trajectory stop (harmless), the pipeline
         abort, the cancels and the clears."""
         self._followup_plan = ""
+        self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
         self._drop_early_dest("stop")
         self._dest_answer_pending = False
         self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
@@ -3510,12 +3522,74 @@ class IntentRouterNode(Node):
         else:
             self._narrate(f"Going to the {target.replace('_', ' ')}.")
 
+    def _defer_after_cycle(self, action: str, intent: dict) -> bool:
+        """2026-09-25 (Majd, live): a go-home / drop-side move said while the
+        cycle's LAST move runs — live task state, no question open, gripper
+        empty, phase carrying (the home question's move to a drop side) or
+        returning_home — is kept and carried out when the cycle ends
+        (_on_cycle_done). It used to go out as a resume into a pause that
+        never opened again, so "Now back home." was lost and the model later
+        claimed it was "already heading home". True when handled here."""
+        task = self._live_task()
+        if task is None or self._task_q() != "" or task.get("holding"):
+            return False
+        phase = str(task.get("phase") or "")
+        if phase not in ("carrying", "returning_home"):
+            return False
+        attrs = intent.get("object_attributes")
+        attrs = attrs if isinstance(attrs, dict) else {}
+        move = action
+        if action == "confirm_drop":
+            move = _DESTINATION_WORDS.get(str(attrs.get("destination") or "").strip().lower(), "")
+            move = "go_home" if move == "home" else move
+        if move not in ("go_home", "drop_left", "drop_right"):
+            return False
+        if move == "go_home" and phase == "returning_home":
+            self._narrate("I'm already on my way home.")
+            return True
+        self._after_cycle_intent = {"action_intent": move, "object_intent": None,
+                                    "object_attributes": None}
+        where = {"go_home": "go home", "drop_left": "go to the drop left position",
+                 "drop_right": "go to the drop right position"}[move]
+        self.get_logger().info(
+            f"after-cycle move kept: {move!r} (phase={phase!r}, said as {action!r})")
+        self._narrate(f"Okay — I'll {where} when this move ends.")
+        return True
+
+    def _run_after_cycle_intent(self) -> None:
+        """2026-09-25: carry out the move kept by _defer_after_cycle once the
+        cycle has ended — 0.6 s later (the executor's idle task state and
+        cycle_done travel on different topics), through the normal intent
+        path, announced here (no chat line was spoken for it)."""
+        intent = self._after_cycle_intent
+        self._after_cycle_intent = None
+        if not intent:
+            return
+
+        def _go() -> None:
+            self.destroy_timer(timer)   # destroy, not cancel (see _say_start)
+            move = intent["action_intent"]
+            self._narrate({"go_home": "Going home.", "drop_left": "Going to drop left.",
+                           "drop_right": "Going to drop right."}[move])
+            self._on_intent(String(data=json.dumps(intent)))
+
+        timer = self.create_timer(0.6, _go)
+
     def _on_cycle_done(self, msg: String) -> None:
         data = (msg.data or "").strip()
         if not data:
             return
         outcome = data.split("|", 1)[0].lower()
         self.get_logger().info(f"cycle_done received: {data!r} (outcome={outcome})")
+        # 2026-09-25: a move kept for after this cycle (_defer_after_cycle)
+        # runs only after a normal end; a failed / stopped / reset cycle
+        # drops it (stop means freeze). While it is pending the usual
+        # "…What's next?" line is not said — the move announces itself.
+        _after_pending = outcome == "done" and self._after_cycle_intent is not None
+        if _after_pending:
+            self._run_after_cycle_intent()    # fires 0.6 s later, see there
+        else:
+            self._after_cycle_intent = None
         self._followup_plan = ""
         self._destination_open = False
         # 2026-09-25: the cycle is over — remember its id (a late "Starting
@@ -3583,6 +3657,10 @@ class IntentRouterNode(Node):
                     self._narrate(f"The grasp failed: {reason}. Resetting.")
                 else:
                     self._narrate("The grasp failed. Resetting.")
+            elif outcome == "done" and _after_pending:
+                self.get_logger().info("Grasp cycle completed successfully "
+                                       "(a kept move follows — end line skipped).")
+                self._stayed_pose = ""
             elif outcome == "done":
                 self.get_logger().info("Grasp cycle completed successfully.")
                 # END-OF-TASK narration (Majd 2026-08-31: "when he go
