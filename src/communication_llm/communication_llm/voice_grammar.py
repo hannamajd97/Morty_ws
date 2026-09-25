@@ -24,9 +24,23 @@ Verdicts ``(kind, action)``:
     ("answer", <action>)      a positive answer to the open, fresh question:
                               open_gripper | go_home | drop_right | drop_left
     ("negative", <action>)    a negative answer: close_gripper (release question,
-                              keep holding) | stay (home question)
+                              keep holding) | stay (home question) | keep
+                              (destination question: NOTHING is sent — the
+                              question stays open; chat_node only says it keeps
+                              holding, 2026-09-25 Majd's I1)
     ("gripper", <action>)     a standalone open_gripper / close_gripper
     ("llm", "")               everything else
+
+2026-09-25 (Majd's B2): at the destination question a whole "<side|home>,
+<give it to me / open / release …>[, and go back home]" is an answer too —
+the legacy compound actions drop_<side>_release[_home] and go_home_open.
+
+2026-09-25 (Majd's B1): ``match_pick`` — a WHOLE plain pick of a known
+object ("Grasp for me the vitamin tube.", "Give me the small bottle.") for
+chat_node's instant pick (only when no question is open and nothing is
+held; chat_node decides that). Its verb and object tables are the legacy
+FAST-PICK tables, which live here now (one owner; chat_node's legacy layer
+reads the same objects).
 
 Accepted false positives (by design, stop must never be missed): "bus stop",
 "why did you stop".
@@ -111,7 +125,68 @@ DEST_SIDE = _whole(
     r"(left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?")
 DEST_HOME = _whole(r"(?:" + AFF + r" )?" + VERB + r"?" + HOME)
 
+# 2026-09-25 (Majd's B2): destination + release [+ back home] in ONE whole
+# utterance at the destination question ("Drop it on the right side, give me
+# the object and go back home.", "Drop it home, give me the object.") — the
+# LLM answered the last one "I'm already heading home" with no tool call.
+# Punctuation is gone after normalise, so ", " / ". " / " and " / " then "
+# all join the parts.
+RELEASE = (r"(?:give (?:me )?(?:it|the object|the objects)(?: to me)?|hand (?:it )?(?:over|to me)"
+           r"|open(?: the gripper)?|release(?: it)?|let (?:it )?go)")
+_CONN = r"(?:and )?(?:then )?"
+DEST_COMPOUND = _whole(
+    r"(?:" + AFF + r" )?(?:" + VERB + r"?(?:(?:on|to|at|in|onto|over) )?(?:the )?"
+    r"(?P<side>left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?"
+    r"|(?P<home>" + VERB + r"?" + HOME + r"))"
+    r" " + _CONN + RELEASE
+    + r"(?P<back> " + _CONN + r"(?:go )?(?:back )?(?:to )?(?:the )?home(?: position)?)?")
+# 2026-09-25 (Majd's I1): a whole NO to "Where should I drop it?" — the
+# executor keeps waiting for a destination, so nothing is sent; the LLM
+# used to answer "Don't drop it." with "Sorry, I'll pick it up instead."
+NO_DEST = _whole(
+    r"(?:" + NEG + r" )*(?:" + NEG + r"|wait|hold on|hold it|keep it|keep holding(?: it)?|not now"
+    r"|(?:don't|dont|do not) (?:drop|release|open|put down)(?: it)?(?: yet)?"
+    r"|(?:don't|dont|do not) put it down(?: yet)?)")
+
 _SIDE = {"left": "left", "right": "right", "links": "left", "rechts": "right"}
+
+# ── instant picks (2026-09-25, Majd's B1) ──────────────────────────────────
+# The legacy FAST-PICK tables (chat_node, 2026-08-26 / 08-31), moved here
+# unchanged so the minimal layer and the legacy layer share ONE table.
+# Deterministic PICKS (2026-08-26): Haiku kept refusing plain pick commands
+# with fabrications ("I'm already grasping it — it should arrive in a
+# moment") and inventing alias features for ASR garbles ("craftsform/class/
+# trust for me is..."). Qualified picks (left/right/middle/ordinal) still go
+# to the LLM — the router's disambiguation needs them.
+PICK_VERB = (
+    # "glass"/"gras" joined 2026-08-31: Majd's habitual "Grasp for me
+    # the X" comes back from Whisper as "Glass for me, the vitamin
+    # tube" / "Glass for me is a small bottle" — measured 15.9 s and
+    # 18.8 s to first reply via the LLM, vs ~0.02 s on this fast path.
+    r"(?:grasp|grass|gras\b|glass|class|cross|crass|craft\w*|trust|"
+    r"gas\b|drus\b|"  # 2026-08-31: "Gas for me is a vitamin C." / "Drus for me..."
+    r"pick(?:\s*up)?|grab|fetch)"
+)
+PICK_OBJECTS: list[tuple[str, str, str | None]] = [
+    (r"vitamin\s*c\b", "vitamin_tube", "yellow"),
+    (r"vitamin\s*b(?:\s*12)?\b", "vitamin_tube", "red"),
+    (r"multi\s*-?\s*(?:vitamin|mineral)\b", "vitamin_tube", "blue"),
+    (r"vitamin\s+(?:tube|2)\b", "vitamin_tube", None),
+    (r"tape\s+dispenser\b", "tape_dispenser", None),
+    (r"small\s+bottle\b", "small_bottle", None),
+    (r"nutmeg(?:\s+jar)?\b", "nutmeg_jar", None),
+    (r"retail\s+box\b", "retail_box", None),
+    (r"cd\s+case\b", "cd_case", None),
+    (r"kitchen\s+towel\b", "kitchen_towel", None),
+    (r"(?:wooden\s+)?maze(?:\s+puzzle)?\b", "wooden_maze_puzzle", None),
+    (r"(?:toy\s+)?faucet\b", "toy_faucet", None),
+]
+# "give me / bring me / hand me / pass me X" is the same plain pick (B1).
+_PICK_GIVE = r"(?:give|bring|hand|pass)"
+_PICK_HEAD = re.compile(
+    r"^(?:" + FILL + r" )*(?:(?:can|could) you )?(?:" + PICK_VERB + r"|" + _PICK_GIVE + r")"
+    r"(?: for me| me)?(?: is)?(?: (?:the|a|an))?(?= )")
+_FILL_WORD = re.compile(FILL)
 
 LLM = ("llm", "")
 
@@ -138,6 +213,29 @@ def _clauses(text: str) -> str:
     return " ".join(t.split())
 
 
+def match_pick(text: str) -> tuple[str, str | None] | None:
+    """2026-09-25 (Majd's B1: "picks via the LLM took 1.3-2.8 s"): (label,
+    colour|None) when the WHOLE utterance is a plain pick of a known object —
+    [fillers] VERB [for me|me] [is] [the|a|an] OBJECT [fillers/please] —
+    else None. Anything more ("… and tell me a story", "… and go home"), a
+    qualifier ("the leftmost …"), a prefix that is not a filler ("No, grasp
+    …", "Yes, a crust for me …") or an object outside PICK_OBJECTS ("the
+    phone") is the LLM's. A trailing "tube" is allowed ("the Vitamin C
+    tube")."""
+    t = normalise(text)
+    m = _PICK_HEAD.match(t)
+    if not m:
+        return None
+    words = t[m.end():].split()
+    while words and _FILL_WORD.fullmatch(words[-1]):
+        words.pop()
+    obj = " ".join(words)
+    for pat, label, colour in PICK_OBJECTS:
+        if re.fullmatch(r"(?:" + pat + r")(?: tube)?", obj):
+            return (label, colour)
+    return None
+
+
 def classify(text: str, question: str = "", fresh: bool = False,
              ext_dest: bool = False) -> tuple[str, str]:
     """2026-09-25: the verdict for one utterance, in SPEC C5 order.
@@ -150,9 +248,11 @@ def classify(text: str, question: str = "", fresh: bool = False,
     3. Only while ``question`` is open AND ``fresh`` (it opened before the
        operator started speaking — a "yes" said to something else must not
        answer it): release yes/open → open_gripper, no/close → close_gripper;
-       home yes/"go back home" → go_home, no/stay → stay; destination (only
-       with ``ext_dest``, Majd's EXT-DEST) a bare side/home → drop_<side> /
-       go_home.
+       home yes/"go back home" → go_home, no/stay → stay; destination: a
+       whole NO → keep (nothing is sent, I1); only with ``ext_dest``
+       (Majd's EXT-DEST) a bare side/home → drop_<side> / go_home, and a
+       side/home + release [+ home] → drop_<side>_release[_home] /
+       go_home_open (B2).
     4. A whole open/close phrase → the standalone gripper command.
     5. Everything else → the LLM.
     """
@@ -178,12 +278,21 @@ def classify(text: str, question: str = "", fresh: bool = False,
                 return ("answer", "go_home")
             if NO_HOME.match(t):
                 return ("negative", "stay")
-        elif question == "destination" and ext_dest:
-            m = DEST_SIDE.match(t)
-            if m:
-                return ("answer", "drop_" + _SIDE[m.group(1)])
-            if DEST_HOME.match(t):
-                return ("answer", "go_home")
+        elif question == "destination":
+            if NO_DEST.match(t):
+                return ("negative", "keep")          # 2026-09-25 (I1): nothing is sent
+            if ext_dest:
+                m = DEST_COMPOUND.match(t)           # 2026-09-25 (B2)
+                if m:
+                    if m.group("home"):
+                        return ("answer", "go_home_open")
+                    side = _SIDE[m.group("side")]
+                    return ("answer", f"drop_{side}_release" + ("_home" if m.group("back") else ""))
+                m = DEST_SIDE.match(t)
+                if m:
+                    return ("answer", "drop_" + _SIDE[m.group(1)])
+                if DEST_HOME.match(t):
+                    return ("answer", "go_home")
     if OPEN.match(t):
         return ("gripper", "open_gripper")
     if CLOSE.match(t):

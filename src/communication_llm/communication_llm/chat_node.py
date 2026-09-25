@@ -157,6 +157,30 @@ _REASK_LINES = {
 _KEEP_HOLDING_LINE = "Okay, I'll keep holding it. Where should I take it?"
 _STAY_LINE = "Okay, I'll stay here."
 _TASK_STATE_TOPIC = "/grasp_executor_lin_llm/task_state"
+# 2026-09-25 (Majd's G1): a transcript that follows the previous one within
+# this many seconds, while that one has neither spoken nor dispatched, is
+# its continuation — "Drop it on home position. Give me the object uh" was
+# cut by the fragment "Andrew said." 0.4 s later: the first turn was dropped
+# as interrupted and only the fragment reached the LLM ("didn't catch that").
+_MERGE_WINDOW_S = 2.0
+_HUSH_BY_MERGE = "the operator's sentence went on"
+
+
+class _ActCountingPublisher:
+    """2026-09-25 (Majd's G1): /robot/intent publisher that counts every
+    intent this node dispatches (every publish site at once), for
+    ChatIntentNode._hush_and_merge's "has the previous input acted yet?"."""
+
+    def __init__(self, pub, on_publish) -> None:
+        self._pub = pub
+        self._on_publish = on_publish
+
+    def publish(self, msg) -> None:
+        self._on_publish()
+        self._pub.publish(msg)
+
+    def __getattr__(self, name: str):
+        return getattr(self._pub, name)
 
 # 2026-09-25: the four live-settable voice switches (SPEC C1). Their
 # defaults are Majd's decisions of 2026-09-25: the minimal grammar, bare
@@ -256,29 +280,11 @@ def _is_redo_command(text: str) -> bool:
 # ("craftsform/class/trust for me is..."). Plain single-object picks now
 # bypass the LLM entirely. Qualified picks (left/right/middle/ordinal)
 # still go to the LLM — the router's disambiguation needs them.
-_FAST_PICK_VERB = (
-    # "glass"/"gras" joined 2026-08-31: Majd's habitual "Grasp for me
-    # the X" comes back from Whisper as "Glass for me, the vitamin
-    # tube" / "Glass for me is a small bottle" — measured 15.9 s and
-    # 18.8 s to first reply via the LLM, vs ~0.02 s on this fast path.
-    r"(?:grasp|grass|gras\b|glass|class|cross|crass|craft\w*|trust|"
-    r"gas\b|drus\b|"  # 2026-08-31: "Gas for me is a vitamin C." / "Drus for me..."
-    r"pick(?:\s*up)?|grab|fetch)"
-)
-_FAST_PICK_OBJECTS: list[tuple[str, str, str | None]] = [
-    (r"vitamin\s*c\b", "vitamin_tube", "yellow"),
-    (r"vitamin\s*b(?:\s*12)?\b", "vitamin_tube", "red"),
-    (r"multi\s*-?\s*(?:vitamin|mineral)\b", "vitamin_tube", "blue"),
-    (r"vitamin\s+(?:tube|2)\b", "vitamin_tube", None),
-    (r"tape\s+dispenser\b", "tape_dispenser", None),
-    (r"small\s+bottle\b", "small_bottle", None),
-    (r"nutmeg(?:\s+jar)?\b", "nutmeg_jar", None),
-    (r"retail\s+box\b", "retail_box", None),
-    (r"cd\s+case\b", "cd_case", None),
-    (r"kitchen\s+towel\b", "kitchen_towel", None),
-    (r"(?:wooden\s+)?maze(?:\s+puzzle)?\b", "wooden_maze_puzzle", None),
-    (r"(?:toy\s+)?faucet\b", "toy_faucet", None),
-]
+# 2026-09-25 (Majd's B1): the verb and object tables moved to voice_grammar
+# (PICK_VERB / PICK_OBJECTS, unchanged, with their history) — the minimal
+# layer's instant whole-sentence pick reads the same table; one owner.
+_FAST_PICK_VERB = voice_grammar.PICK_VERB
+_FAST_PICK_OBJECTS: list[tuple[str, str, str | None]] = voice_grammar.PICK_OBJECTS
 _FAST_PICK_BLOCKERS = (
     r"\b(?:don'?t|do not|never|stop|cancel|left|right|middle|center|"
     r"closest|nearest|first|second|third|last|leftmost|rightmost)\b"
@@ -626,6 +632,11 @@ def _latched_qos() -> QoSProfile:
 # 'unclear' with no text (this node speaks the line alone); new rules TALK
 # WHILE ACTING (story only when asked in the same utterance) and RELEASE SIDE
 # (a side at the release question is a drop, never an open).
+# 2026-09-25 (Majd's F1): SAME-KIND OBJECTS — two of the same kind and no
+# choice named: emit the pick without a position (the robot asks "leftmost or
+# rightmost, or point"); the model asked itself, naming brands and cap
+# colours ("Which vitamin tube—the Vitamin B12 (purple cap) or …?"). The
+# scene rule no longer invites colours for disambiguation.
 SYSTEM_PROMPT = """You are Morty, a robot assistant at Hochschule Reutlingen.
 Reply in the language the user spoke: German questions get German answers,
 everything else gets English. Never mix languages in one reply. Keep replies
@@ -708,8 +719,13 @@ DESCRIBING THE SCENE - name objects by their PRODUCT NAME ONLY:
 "a Vitamin C, a Vitamin B12, a small bottle, a tape dispenser". Do NOT
 volunteer cap colours or long attribute lists (Majd 2026-08-26: "it
 doesn't need to say all this information"). Mention a cap colour or a
-position ONLY when the user asks for it, or when you must distinguish
-two objects of the SAME product name in a disambiguation question.
+position ONLY when the user asks for it.
+
+SAME-KIND OBJECTS - when the scene shows MULTIPLE INSTANCES of the kind
+the user asked for (e.g. two vitamin tubes) and the user did not say
+which one, do NOT ask yourself and do NOT tell them apart by product name
+or cap colour: emit the pick WITHOUT position or colour. The robot itself
+asks "leftmost or rightmost, or point at it".
 
 AFTER EMITTING AN ACTION INTENT - reply with NOTHING (empty text). The
 status announcements narrate everything; a verbal acknowledgment on top
@@ -954,11 +970,17 @@ class ChatIntentNode(Node):
         )
 
         self.model = str(self.get_parameter("model").value)
-        self.intent_pub = self.create_publisher(
+        # 2026-09-25 (Majd's G1): +1 per intent this node publishes and per
+        # line it speaks (_note_act); _hush_and_merge compares it.
+        self._act_serial = 0
+        self._prev_input: dict | None = None
+        self._turn_text = ""
+        self._merged_text = ""
+        self.intent_pub = _ActCountingPublisher(self.create_publisher(
             String,
             str(self.get_parameter("intent_topic").value),
             10,
-        )
+        ), self._note_act)
         # Growing reply while sentences stream to speech (2026-09-23): the
         # GUI extends the current "Morty:" line from this and never shows a
         # reply sentence as a "(status)" line; /robot/assistant_text still
@@ -2107,7 +2129,18 @@ class ChatIntentNode(Node):
                     item, early if early is not None else json.dumps(
                         {"status": "not executed: the operator interrupted this answer"}))
         heard = " ".join(getattr(self, "_streamed", []) or []).strip()
-        if self._hush_why == _HUSH_BY_QUESTION:
+        if self._hush_why == _HUSH_BY_MERGE:
+            # 2026-09-25 (Majd's G1): nothing of it was said or done; the
+            # operator's sentence continued and comes next as one message.
+            # The whole sentence may have been handled without you (an
+            # instant answer), so the note names it instead of promising a
+            # next message.
+            self._interrupt_note = (
+                "Your previous answer was cut before anything was said or done: the "
+                "operator's sentence went on. Their whole sentence was: "
+                f"\"{getattr(self, '_merged_text', '')}\" — it was handled as ONE message; "
+                "do not answer the cut part separately.")
+        elif self._hush_why == _HUSH_BY_QUESTION:
             # 2026-09-25: a story told while a pick ran yields to the robot's
             # question (story_yields_to_question); the model must know the
             # operator did not interrupt it.
@@ -2538,7 +2571,11 @@ class ChatIntentNode(Node):
         # Real input ends whatever answer is still being spoken — also when
         # the barge-in detector did not fire (the operator spoke between
         # two sentences, or only briefly). Junk ("Uh.") above does not.
-        self._hush_answer("the operator said something new")
+        # 2026-09-25 (Majd's G1): a fragment continuing the previous input
+        # (≤ 2 s, nothing said or done yet) runs as ONE input with it; the
+        # grammar below (stop anywhere, …) reads the merged text. The hush
+        # happens inside, with the reason the hushed turn must report.
+        text, meta_key = self._hush_and_merge(text, heard_at)
         print(f"User (voice): {text}")
         # [timing] wall-clock decomposition of "why is Morty slow to
         # answer" (Majd 2026-08-31). One line per accepted transcript,
@@ -2580,9 +2617,53 @@ class ChatIntentNode(Node):
         # every pause answer went to the LLM and "No." at the release
         # question ended in silence.
         if self._voice_fast_layers != "legacy" and self._live_task() is not None:
-            self._route_minimal(text, typed_at, _t_handle0, _superseded, heard_at, epoch)
+            self._route_minimal(text, typed_at, _t_handle0, _superseded, heard_at, epoch,
+                                meta_key=meta_key)
             return
         self._route_legacy(text, _t_handle0, _superseded, epoch)
+
+    def _note_act(self) -> None:
+        """2026-09-25 (Majd's G1): this node spoke a line or dispatched an
+        intent (see _hush_and_merge)."""
+        self._act_serial += 1
+
+    def _hush_and_merge(self, text: str, heard_at: float | None) -> tuple[str, tuple | None]:
+        """Hush the answer in progress ("the operator said something new")
+        and — 2026-09-25, Majd's G1 — join a voice transcript to the previous
+        one when it arrived ≤ _MERGE_WINDOW_S after it and that input has
+        neither spoken nor dispatched anything since it was accepted
+        (_act_serial). The previous input's turn is then hushed with
+        _HUSH_BY_MERGE (decided BEFORE the hush: the hushed stream may end
+        its turn at once) or, still waiting for the chat lock, is dropped as
+        superseded; if it acted between the check and the hush, this input
+        stands alone. Returns the text to act on and, when merged, the
+        (text, heard_at) of the FIRST fragment — its utterance meta carries
+        the speech start of the whole sentence. Typed input ends a chain."""
+        with self._voice_gen_lock:
+            prev = self._prev_input
+            cand = (heard_at is not None and prev is not None
+                    and 0.0 <= heard_at - prev["heard_at"] <= _MERGE_WINDOW_S
+                    and self._act_serial == prev["act"])
+        own_turn = bool(cand and self._answer_running and self._turn_text == prev["text"])
+        if own_turn:
+            self._merged_text = prev["text"] + " " + text
+        self._hush_answer(_HUSH_BY_MERGE if own_turn else "the operator said something new")
+        with self._voice_gen_lock:
+            if heard_at is None:
+                self._prev_input = None
+                return text, None
+            if cand and self._act_serial != prev["act"]:
+                cand = False            # it acted meanwhile: this input stands alone
+            if cand:
+                text = prev["text"] + " " + text
+            self._prev_input = {"text": text, "heard_at": heard_at, "act": self._act_serial,
+                                "key": prev["key"] if cand else (text, heard_at)}
+        if not cand:
+            return text, None
+        self.get_logger().info(
+            f"fragment {heard_at - prev['heard_at']:.1f}s after {prev['text']!r}, which had "
+            f"not answered yet — one input: {text!r}")
+        return text, prev["key"]
 
     def _route_legacy(self, text: str, _t_handle0: float, _superseded, epoch: int) -> None:
         """The pre-2026-09-25 layers (voice_fast_layers=legacy, or no live
@@ -2701,21 +2782,7 @@ class ChatIntentNode(Node):
                 return
         pick = _match_fast_pick(text)
         if pick is not None:
-            label, colour = pick
-            payload = {
-                "action_intent": "pick",
-                "object_intent": label,
-                "object_attributes": {"colour": colour} if colour else None,
-            }
-            intent_json = json.dumps(payload, separators=(",", ":"))
-            self.intent_pub.publish(String(data=intent_json))
-            self._last_intent_json = intent_json
-            self._note_intent_sent("pick")     # 2026-09-25: bookkeeping for _router_narrates
-            self.get_logger().info(
-                f"FAST-PICK: {text!r} -> {label}"
-                f"{f' ({colour})' if colour else ''}; published {intent_json}"
-            )
-            # SILENCE — the router narrates "Picking ..." itself.
+            self._fire_fast_pick(pick[0], pick[1], text)
             return
         if _superseded():
             self.get_logger().info(
@@ -2727,6 +2794,24 @@ class ChatIntentNode(Node):
             self.handle_user_text(text, superseded=_superseded, epoch=epoch)
         except Exception as exc:
             self.get_logger().error(f"LLM chat failed (voice path): {exc}")
+
+    def _fire_fast_pick(self, label: str, colour: str | None, text: str) -> None:
+        """The FAST-PICK publish (2026-08-26), factored out 2026-09-25 so the
+        minimal layer's instant whole-sentence pick (Majd's B1) sends the
+        byte-identical payload. SILENCE — the router narrates the start."""
+        payload = {
+            "action_intent": "pick",
+            "object_intent": label,
+            "object_attributes": {"colour": colour} if colour else None,
+        }
+        intent_json = json.dumps(payload, separators=(",", ":"))
+        self.intent_pub.publish(String(data=intent_json))
+        self._last_intent_json = intent_json
+        self._note_intent_sent("pick")     # 2026-09-25: bookkeeping for _router_narrates
+        self.get_logger().info(
+            f"FAST-PICK: {text!r} -> {label}"
+            f"{f' ({colour})' if colour else ''}; published {intent_json}"
+        )
 
     def _fire_pause_negative(self, neg: str, text: str) -> None:
         """A NO to the executor's open question (2026-08-28's FAST-NEGATIVE
@@ -2756,7 +2841,7 @@ class ChatIntentNode(Node):
 
     def _route_minimal(self, text: str, typed_at: float | None, t0: float,
                        superseded, heard_at: float | None = None,
-                       epoch: int | None = None) -> None:
+                       epoch: int | None = None, meta_key: tuple | None = None) -> None:
         """2026-09-25 (voice_fast_layers=minimal, Majd's item 3): after stop
         and reset, only three things skip the LLM, and only when the WHOLE
         utterance is that thing — a yes/no (or, with EXT-DEST, a bare side)
@@ -2775,7 +2860,11 @@ class ChatIntentNode(Node):
         fresh = False
         start = None
         if question:
-            start = self._speech_start_for(text, typed_at, heard_at)
+            if meta_key is not None:
+                # 2026-09-25 (G1): a merged input began with its first fragment
+                start = self._speech_start_for(meta_key[0], typed_at, meta_key[1], allow_used=True)
+            else:
+                start = self._speech_start_for(text, typed_at, heard_at)
             if start is None and not self._utt_meta_seen:
                 # No utterance meta has EVER arrived: the speech node does not
                 # send them (an old build, Vosk). Freshness cannot be judged,
@@ -2793,7 +2882,11 @@ class ChatIntentNode(Node):
                 since = 0.0
             fresh = start is not None and 0.0 < since <= start
         kind, action = voice_grammar.classify(text, question, fresh, self._voice_ext_dest)
-        if kind == "negative":
+        if kind == "negative" and action == "keep":
+            # 2026-09-25 (Majd's I1): a NO to "Where should I drop it?" — the
+            # executor keeps waiting for a destination, so nothing is sent.
+            self._speak(_KEEP_HOLDING_LINE)
+        elif kind == "negative":
             self._fire_pause_negative(action, text)
         elif kind in ("answer", "gripper"):
             self._fire_fast_command(action, "", text)
@@ -2802,6 +2895,18 @@ class ChatIntentNode(Node):
                 f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR "
                 f"{kind} {action}, question={question!r}, fresh={fresh})")
             return
+        if not question and not task.get("holding"):
+            # 2026-09-25 (Majd's B1: "picks via the LLM took 1.3-2.8 s"): a
+            # WHOLE plain pick of a known object, with no question open and
+            # nothing held, is published at once — the legacy FAST-PICK
+            # payload, from the same tables (voice_grammar.match_pick).
+            pick = voice_grammar.match_pick(text)
+            if pick is not None:
+                self._fire_fast_pick(pick[0], pick[1], text)
+                self.get_logger().info(
+                    f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR pick "
+                    f"{pick[0]}{f' ({pick[1]})' if pick[1] else ''})")
+                return
         if (question and not fresh and voice_grammar.classify(
                 text, question, True, self._voice_ext_dest)[0] in ("answer", "negative")):
             # 2026-09-25 (review H3): a bare answer begun before the question
@@ -2848,7 +2953,14 @@ class ChatIntentNode(Node):
             self.intent_pub.publish(String(data=intent_json))
             self.get_logger().info(f"FAST: matched {text!r} -> go_home then release (holding); published {intent_json}")
             self._last_intent_json = intent_json
-            self._speak("Going home and opening the gripper there.")
+            if self._router_narrates("go_home"):
+                # 2026-09-25 (Majd's B2): "Drop it home, give me the object."
+                # at the destination question — the router announces it once
+                # the executor accepted it (see _router_narrates).
+                self.get_logger().info("Withholding 'Going home and opening the gripper there.' "
+                                       "— intent_router narrates it on acceptance.")
+            else:
+                self._speak("Going home and opening the gripper there.")
             return
         if action in self._FAST_MULTI:
             for sub in self._FAST_MULTI[action]:
@@ -2913,6 +3025,7 @@ class ChatIntentNode(Node):
         if self._voice_fast_layers == "legacy" and _is_redo_command(user_text):
             self._fire_redo()
         with self._chat_lock:
+            self._turn_text = user_text      # 2026-09-25 (G1): see _hush_and_merge
             # 2026-09-25 (review H1): this turn may have waited here while
             # another ran; a stop / reset sent since the input arrived, or a
             # newer transcript, makes it stale — "grasp the bottle" then
@@ -3502,6 +3615,8 @@ class ChatIntentNode(Node):
         explicit cancel/stop narrations or when the user clearly
         wants to barge in.
         """
+        if text:
+            self._note_act()        # 2026-09-25 (Majd's G1): this input has now answered
         if not self._tts_enabled or self._speak_client is None or not text:
             return
         if not self._speak_client.server_is_ready():
@@ -4262,7 +4377,8 @@ class ChatIntentNode(Node):
             del self._utt_meta[:-8]
 
     def _speech_start_for(self, text: str, typed_at: float | None,
-                          heard_at: float | None = None) -> float | None:
+                          heard_at: float | None = None,
+                          allow_used: bool = False) -> float | None:
         """2026-09-25 (SPEC C6, review M1): when the operator STARTED saying
         ``text``: typed input → its arrival; voice → the speech_start of the
         exact-text match among the last 8 utterance metas (≤ 10 s old; the
@@ -4274,7 +4390,10 @@ class ChatIntentNode(Node):
         A meta answers one transcript only (it is marked used), and with the
         transcript's arrival known it must have arrived with it (≤ 2 s
         before): the harness caught a second "Yes." paired with the FIRST
-        "Yes."'s meta when its own meta was a few ms late."""
+        "Yes."'s meta when its own meta was a few ms late.
+
+        ``allow_used`` (2026-09-25, G1): the first fragment of a merged
+        input may already have been matched by its own turn."""
         if typed_at is not None:
             return typed_at
         want = (text or "").strip()
@@ -4284,7 +4403,7 @@ class ChatIntentNode(Node):
             with self._utt_meta_lock:
                 for entry in reversed(self._utt_meta):
                     rx, t, _end, start, used = entry
-                    if (t == want and not used and now - rx <= 10.0
+                    if (t == want and (allow_used or not used) and now - rx <= 10.0
                             and (heard_at is None or rx >= heard_at - 2.0)):
                         entry[4] = True
                         return start
