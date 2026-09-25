@@ -1278,6 +1278,12 @@ class ChatIntentNode(Node):
         self._withheld_this_turn: set[str] = set()
         self._interrupt_line_turn = False
         self._stream_mark = 0
+        # 2026-09-25 (Majd, live: "why does it still not know the position
+        # it is in?"): utterances the instant paths handled, with what they
+        # did, waiting to enter the LLM's history at its next turn — see
+        # _note_instant / _flush_instant_notes.
+        self._instant_notes: list = []
+        self._instant_notes_lock = threading.Lock()
         self._hush_why = ""
         # 2026-09-25: the four voice switches (SPEC C1), live-settable.
         self.declare_parameter("voice_fast_layers", "minimal")      # minimal | legacy
@@ -2619,6 +2625,7 @@ class ChatIntentNode(Node):
             else:
                 self._fire_reset()
                 self._speak(QUICK_NARRATION["reset"], interrupt=True)
+            self._note_instant(text, kind)   # 2026-09-25: into the LLM history
             self.get_logger().info(
                 f"[timing] handled in {time.monotonic() - _t_handle0:.2f}s "
                 f"(route=GRAMMAR {kind}): {text!r}")
@@ -2808,6 +2815,41 @@ class ChatIntentNode(Node):
         except Exception as exc:
             self.get_logger().error(f"LLM chat failed (voice path): {exc}")
 
+    def _note_instant(self, text: str, what: str) -> None:
+        """2026-09-25 (Majd, live: at drop LEFT the model said "I'm already
+        at the drop right position"; carrying the tape dispenser it said "I'm
+        already home and my gripper is empty"). Utterances handled by the
+        instant paths never reached the model's conversation history, so its
+        memory jumped from the previous LLM turn ("give me the object and go
+        back home") to the new question — and it believed that, above the
+        live state blocks. Reproduced offline 2/2; with these turns in the
+        history it sent release_home 2/2. Each instant turn is queued here
+        (sub-commands of one utterance merge) and written into the history
+        at the start of the next LLM turn (_flush_instant_notes) — not now,
+        because an LLM turn may be running and its tool call / tool result
+        pair must stay together."""
+        if not text:
+            return
+        with self._instant_notes_lock:
+            if self._instant_notes and self._instant_notes[-1][0] == text:
+                self._instant_notes[-1][1].append(what)
+            else:
+                self._instant_notes.append((text, [what]))
+            del self._instant_notes[:-12]
+
+    def _flush_instant_notes(self) -> None:
+        """2026-09-25: write the queued instant turns into the LLM history
+        (called under _chat_lock at the start of an LLM turn, before the
+        prune): the operator's words, then what the robot did."""
+        with self._instant_notes_lock:
+            notes, self._instant_notes = self._instant_notes, []
+        for text, whats in notes:
+            self.chat_agent.add_user_message(text)
+            self.chat_agent.messages.append({
+                "role": "assistant",
+                "content": "[done instantly by the robot's fast path, not by you: "
+                           + ", ".join(whats) + "]"})
+
     def _fire_fast_pick(self, label: str, colour: str | None, text: str) -> None:
         """The FAST-PICK publish (2026-08-26), factored out 2026-09-25 so the
         minimal layer's instant whole-sentence pick (Majd's B1) sends the
@@ -2821,6 +2863,7 @@ class ChatIntentNode(Node):
         self.intent_pub.publish(String(data=intent_json))
         self._last_intent_json = intent_json
         self._note_intent_sent("pick")     # 2026-09-25: bookkeeping for _router_narrates
+        self._note_instant(text, f"pick {label}")   # 2026-09-25: into the LLM history
         self.get_logger().info(
             f"FAST-PICK: {text!r} -> {label}"
             f"{f' ({colour})' if colour else ''}; published {intent_json}"
@@ -2835,6 +2878,7 @@ class ChatIntentNode(Node):
                     "object_attributes": None}
         _intent_json = json.dumps(_payload, separators=(",", ":"))
         self.intent_pub.publish(String(data=_intent_json))
+        self._note_instant(text, neg)       # 2026-09-25: into the LLM history
         self.get_logger().info(
             f"FAST-NEGATIVE: {text!r} at pause "
             f"({getattr(self, '_cycle_state', '')!r}) -> {neg}; "
@@ -2899,6 +2943,7 @@ class ChatIntentNode(Node):
             # 2026-09-25 (Majd's I1): a NO to "Where should I drop it?" — the
             # executor keeps waiting for a destination, so nothing is sent.
             self._speak(_KEEP_HOLDING_LINE)
+            self._note_instant(text, "nothing sent — kept holding, asked where to take it")
         elif kind == "negative":
             self._fire_pause_negative(action, text)
         elif kind in ("answer", "gripper"):
@@ -2964,6 +3009,7 @@ class ChatIntentNode(Node):
                               "object_attributes": {"then": "release", **({"speed": speed} if speed else {})}}
             intent_json = json.dumps(intent_payload, separators=(",", ":"))
             self.intent_pub.publish(String(data=intent_json))
+            self._note_instant(text, "go_home then release")   # 2026-09-25: into the LLM history
             self.get_logger().info(f"FAST: matched {text!r} -> go_home then release (holding); published {intent_json}")
             self._last_intent_json = intent_json
             if self._router_narrates("go_home"):
@@ -2991,6 +3037,7 @@ class ChatIntentNode(Node):
         msg = String()
         msg.data = intent_json
         self.intent_pub.publish(msg)
+        self._note_instant(text, action)    # 2026-09-25: into the LLM history
         self.get_logger().info(
             f"FAST: matched {text!r} -> {action} (speed={speed or 'default'}); "
             f"published {intent_json}"
@@ -3375,6 +3422,9 @@ class ChatIntentNode(Node):
         # can switch to zoneinfo and a configurable param.
         # Shed last turn's state blocks and the stale conversation tail
         # BEFORE injecting this turn's fresh state (see the docstring).
+        # 2026-09-25: the turns the instant paths handled since the last LLM
+        # turn go into the history first (see _note_instant).
+        self._flush_instant_notes()
         self._prune_llm_context()
         now_local = _dt.datetime.now()
         self.chat_agent.add_developer_message(
