@@ -148,6 +148,16 @@ def _normalise_label(name: str) -> str:
     return "_".join(name.strip().lower().split())
 
 
+def _then_home(action: str, attrs) -> bool:
+    """2026-09-28: the intent means "open, then go home" — release_home, or
+    an open_gripper / release whose ``then`` is release_home (how the model
+    sends "Give me the object and go back home.")."""
+    if action == "release_home":
+        return True
+    then = str(attrs.get("then") or "").strip().lower() if isinstance(attrs, dict) else ""
+    return action in ("open_gripper", "release") and then == "release_home"
+
+
 class IntentRouterNode(Node):
     def __init__(self) -> None:
         super().__init__("intent_router_node")
@@ -821,9 +831,13 @@ class IntentRouterNode(Node):
                         f"carry_release with unknown destination "
                         f"{_d!r} — ignoring.")
                 return
-            if action == "release_home":
+            if action == "release_home" or (
+                    action in ("open_gripper", "release")
+                    and _then_home(action, intent.get("object_attributes"))):
                 # Compound "open the gripper and go back home" — the
                 # executor opens and goes straight home, no question.
+                # 2026-09-28: also open_gripper / release with
+                # then=release_home (the model's form of the same sentence).
                 if not self._claim_executor_resume(
                     "release_home", "release pause: compound release_home"
                 ):
@@ -1041,7 +1055,11 @@ class IntentRouterNode(Node):
                     self._narrate_ignored_resume(action, redirect)
                 return
             if action in ("release_home", "open_gripper", "release"):
-                plan = "release_home" if action == "release_home" else "release"
+                # 2026-09-28 (Majd's trial 084: "Give me the object and go back
+                # home." while carrying — the model sent open_gripper with
+                # then=release_home, the plan became "release" and the
+                # executor asked "Should I go back home?" after opening).
+                plan = "release_home" if _then_home(action, attrs) else "release"
                 if plan == "release" and self._followup_plan == "release_home":
                     plan = "release_home"   # never downgrade an earlier "then home"
                 self._followup_plan = plan

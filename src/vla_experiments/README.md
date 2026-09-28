@@ -62,6 +62,9 @@ What the v2 recorder guarantees (see `raw_dataset.py` for the exact keys):
   stores the events (`events.gripper_cmd`), the last command per step
   (`gripper_cmd`) and its age, separately from the finger joint (`gripper`) and
   the grasp pin (`grasp_detected`). The quality report measures the state lag.
+  **Do not use `grasp_detected`** as an input feature or a success label: the pin
+  is HIGH whenever the fingers stall, on an object or on each other, so an empty
+  closed gripper reads 1 (2026-09-28). It is recorded as raw data only.
 * **Instructions with stamps.** Every accepted transcript and every intent is an
   event; each motion intent becomes an instruction (transcript + canonical text
   from the resolved intent, e.g. "pick up the bottle", "drop it on the right side",

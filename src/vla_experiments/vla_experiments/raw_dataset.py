@@ -62,7 +62,11 @@ STEP_KEYS = [
     "tool0_quat",         # (N,4)
     "gripper",            # (N,)   0 = closed .. 1 = open, from the gripper joint
     "gripper_cmd",        # (N,)   last commanded gripper target (0/1) from the adapter's command event, NaN if none yet
-    "grasp_detected",     # (N,)   UR tool digital input (pin 16), -1 if unknown
+    "grasp_detected",     # (N,)   UR tool digital input (pin 16), -1 if unknown.
+                          #        DO NOT USE as a feature or label (2026-09-28): the pin is
+                          #        HIGH whenever the fingers stall — on an object OR on each
+                          #        other — so it reads 1 on every empty closed gripper (1.00 over
+                          #        all of trial 085, which grasped nothing). Kept as a raw record only.
     "img_age_exterior",   # (N,)   seconds between tick and last exterior frame (receive time)
     "img_age_wrist",      # (N,)
     "joint_age",          # (N,)
