@@ -159,8 +159,17 @@ _REASK_LINES = {
     "release": "Should I open the gripper?",
     "destination": "Where should I drop it? Left, right, or home?",
     "home": "Should I go back home?",
-    "point": "Should I grasp the object you pointed at?",
+    # "point": none — the router asks its pointing question while the
+    # operator is still talking (pointing and speaking at once), so an answer
+    # begun before it would only repeat what is being said right then.
 }
+# 2026-09-28 (Majd, live: "Give me that object." at home, gripper empty —
+# the model answered "The gripper is empty now—there's nothing to give you."
+# three times): a pick naming no object (voice_grammar.DEICTIC_PICK) asks.
+_WHICH_OBJECT_LINE = "Which object do you mean? Say its name or point at it."
+# pointing while saying it: the pipeline's vote proposes the object and the
+# router asks; the line is said only if no pointing question opens by then
+_WHICH_OBJECT_WAIT_S = 4.0
 # The FAST-NEGATIVE lines (2026-08-28), shared since 2026-09-25 with the LLM
 # path (review Y2): a NO the LLM turned into close_gripper / stay says them too.
 _KEEP_HOLDING_LINE = "Okay, I'll keep holding it. Where should I take it?"
@@ -906,6 +915,12 @@ is.
 
 RELEASE SIDE - at "Should I open the gripper?", "drop it on the
 right/left" -> drop_right / drop_left, never open_gripper / release.
+
+GIVE ME WITHOUT A NAME - with NO object held and no question open, "give me
+that / this / it / the object" is a PICK request that names no object. Never
+answer that the gripper is empty or that there is nothing to give. If the
+operator is pointing (User pointing context), pick that object; otherwise ask
+"Which object do you mean? Say its name or point at it."
 
 POINTING QUESTION - when the operator points at an object, the robot asks
 "You pointed at the X. Should I grasp it?" (or "Do you mean this X?") and
@@ -3118,6 +3133,13 @@ class ChatIntentNode(Node):
                 f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR "
                 f"{kind} {action}, question={question!r}, fresh={fresh})")
             return
+        if (not question and not task.get("holding") and not self._held_object_label
+                and voice_grammar.match_deictic_pick(text)):
+            self._ask_which_object(text)
+            self.get_logger().info(
+                f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR which-object, "
+                f"pointing at {self._pointed_object_label or 'nothing'!r})")
+            return
         if (not question or question == "point") and not task.get("holding"):
             # 2026-09-28: also at the pointing question — the router takes a
             # plain pick of the pointed kind as its yes, any other as a new pick.
@@ -4590,6 +4612,35 @@ class ChatIntentNode(Node):
         "release": "HOLDING at the drop pose — waiting for release confirmation",
         "home": "at the drop pose, gripper open — asked about going home",
     }
+
+    def _ask_which_object(self, text: str) -> None:
+        """2026-09-28 (Majd: "at home waiting for a command, 'give me that
+        object' should not say the gripper is empty — ask what object
+        exactly, or ask for pointing"): a pick naming no object, nothing held,
+        no question open. Not pointing: _WHICH_OBJECT_LINE at once. Pointing
+        at something right now: the pipeline's vote proposes it and the router
+        asks "You pointed at the X. Should I grasp it?" — the line is said
+        only if no pointing question opened within _WHICH_OBJECT_WAIT_S."""
+        pointed = self._pointed_object_label
+        if not pointed:
+            self._speak(_WHICH_OBJECT_LINE)
+            self._note_instant(text, _WHICH_OBJECT_LINE)
+            return
+        seen = self._router_q.get("id")
+
+        def _check() -> None:
+            rq = self._router_q
+            if rq.get("question") == "point" or rq.get("id") != seen:
+                return          # the pointing question came (or already ended)
+            self.get_logger().info(
+                f"no pointing question {_WHICH_OBJECT_WAIT_S:.0f} s after {text!r} "
+                f"(was pointing at {pointed!r}) — asking which object")
+            self._speak(_WHICH_OBJECT_LINE)
+            self._note_instant(text, _WHICH_OBJECT_LINE)
+
+        t = threading.Timer(_WHICH_OBJECT_WAIT_S, _check)
+        t.daemon = True
+        t.start()
 
     def _on_router_question(self, msg: String) -> None:
         """2026-09-28: intent_router's pointing question opened / closed."""

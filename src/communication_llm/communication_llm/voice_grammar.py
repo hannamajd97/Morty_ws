@@ -296,6 +296,25 @@ def _release_consent(t: str) -> bool:
     return not _CONSENT_BLOCK.search(t[:m.start()] + " " + t[m.end():])
 
 
+# 2026-09-28 (Majd, live: "Give me that object." at home with an empty
+# gripper got the model's "The gripper is empty now—there's nothing to give
+# you." three times): a pick whose object is only a pointer word — "give me
+# that object", "grab this one", "can you hand me it", "I want that one".
+# With nothing held and no question open chat_node asks which object (or
+# lets the pointing question come); at the pointing question it is the yes.
+_DEICTIC_OBJ = (r"(?:(?:that|this)(?: (?:object|one|thing|item))?|(?:the) (?:object|one|thing|item)"
+                r"|it|them)(?: (?:there|here|over there))?")
+DEICTIC_PICK = _whole(
+    r"(?:(?:can|could|would) you )?"
+    r"(?:(?:" + PICK_VERB + r"|" + _PICK_GIVE + r"|take|get)(?: (?:for )?me)?|i (?:want|need|would like)|i'd like)"
+    r" " + _DEICTIC_OBJ + r"(?: up)?(?: (?:for|to) me)?")
+
+
+def match_deictic_pick(text: str) -> bool:
+    """2026-09-28: the WHOLE utterance is a pick naming no object (DEICTIC_PICK)."""
+    return bool(DEICTIC_PICK.match(normalise(text)))
+
+
 def match_pick(text: str) -> tuple[str, str | None] | None:
     """2026-09-25 (Majd's B1: "picks via the LLM took 1.3-2.8 s"): (label,
     colour|None) when the WHOLE utterance is a plain pick of a known object —
@@ -395,7 +414,7 @@ def classify(text: str, question: str = "", fresh: bool = False,
             # I grasp it?" — yes / a short consent to grasp = confirm_point, a
             # whole no = reject_point; anything else (another object, a
             # position) is the LLM's.
-            if YES.match(t) or _grasp_consent(t):
+            if YES.match(t) or _grasp_consent(t) or DEICTIC_PICK.match(t):
                 return ("answer", "confirm_point")
             if NO_POINT.match(t):
                 return ("answer", "reject_point")
