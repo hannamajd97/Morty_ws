@@ -575,6 +575,15 @@ def _bedrock_runtime_client():
         if bearer and not os.environ.get("AWS_ACCESS_KEY_ID"):
             kwargs["aws_access_key_id"] = "bedrock-api-key"
             kwargs["aws_secret_access_key"] = bearer
+        # 2026-09-28 (Majd, live: "thinking" 36 s, then the answer came from
+        # the global profile): botocore's default retries (legacy mode, 5
+        # attempts with backoff) spent ~34 s on the eu profile's
+        # ServiceUnavailable before LLMService.chat saw it. One attempt only:
+        # a capacity error goes straight to the global-profile fallback
+        # (~1 s). read_timeout bounds a silent stream between two chunks.
+        from botocore.config import Config  # noqa: WPS433
+        kwargs["config"] = Config(retries={"total_max_attempts": 1, "mode": "standard"},
+                                  connect_timeout=5, read_timeout=20)
         _BEDROCK_CLIENT = boto3.client("bedrock-runtime", **kwargs)
     return _BEDROCK_CLIENT
 
@@ -1027,7 +1036,10 @@ def _call_restart(on_restart) -> None:
 def _is_capacity_error(exc: Exception) -> bool:
     text = f"{type(exc).__name__}: {exc}"
     return any(k in text for k in ("ServiceUnavailable", "Throttling", "ModelNotReady",
-                                    "InternalServer", "unable to process", "TooManyRequests"))
+                                    "InternalServer", "unable to process", "TooManyRequests",
+                                    # 2026-09-28: a stalled or unreachable profile (read_timeout
+                                    # of _bedrock_runtime_client) takes the fallback too
+                                    "ReadTimeout", "ConnectTimeout", "EndpointConnectionError"))
 
 
 class LLMService:
