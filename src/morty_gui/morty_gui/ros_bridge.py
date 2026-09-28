@@ -604,6 +604,9 @@ class MortyGuiBridge(Node):
         with self._lock:
             self._exec_interactive_pending = str(msg.data)
             self.exec_interactive_state = str(msg.data)
+        # 2026-09-28: the robot's questions and hand-over in the trial record
+        # (waiting for the operator, "object handed over" in the stage times)
+        self.trial_mark("robot_status", str(msg.data))
 
     def _on_exec_task(self, msg: String) -> None:
         """2026-09-25: keep the executor's task state as a level (SPEC

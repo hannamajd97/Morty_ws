@@ -1086,9 +1086,10 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             except OSError:
                 pass
         names = [
+            ("interaction_s", "command → arm moves"),
             ("intent_s", "understanding"),
-            ("yolo_s", "find object"),
-            ("graspgen_s", "grasp gen"),
+            ("choice_s", "object chosen"),
+            ("yolo_s", "candidates"),
             ("execution_s", "execution"),
         ]
         parts = [
@@ -1102,8 +1103,10 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # The doc's two time columns, measured (not typed).
         if times.get("total_s") is not None:
             self.t_total.setText(str(times["total_s"]))
-        if times.get("intent_s") is not None:
-            self.t_interact.setText(str(times["intent_s"]))
+        # 2026-09-28 (Majd): Interaction Time = command given -> arm starts
+        # moving (the doc's definition); the understanding time is intent_s.
+        if times.get("interaction_s") is not None:
+            self.t_interact.setText(str(times["interaction_s"]))
         return times
 
     def _on_stop_clicked(self) -> None:

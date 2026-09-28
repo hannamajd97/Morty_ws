@@ -43,6 +43,7 @@ _BAG_TOPICS = {
     "/grasp_executor_lin_llm/cycle_done": "cycle_done",
     "/speech/ai_said": "morty_said",
     "/speech/utterance_meta": "utterance",
+    "/grasp_executor_lin_llm/interactive_status": "robot_status",
 }
 
 
@@ -118,7 +119,34 @@ def vla_events(trial: Path) -> dict:
     for e in ev.get("cycle_done", []):
         out.setdefault("cycle_done", []).append(
             (float(e["stamp"]), ("done" if e.get("ok") else "failed") + "|" + str(e.get("cycle_id", ""))))
+    for e in ev.get("interactive_status", []):
+        out.setdefault("robot_status", []).append((float(e["stamp"]), str(e.get("status", ""))))
     return out
+
+
+def arm_motion_starts(trial: Path, start_wall: float, speed_rad_s: float = 0.02, still_s: float = 0.5) -> list:
+    """Wall times at which the arm STARTS moving (joint speed rises above
+    speed_rad_s after at least still_s at rest) — from joints_full.npz (the
+    bag, ~500 Hz) else steps.npz (10 Hz). For moves the executor does not
+    stamp (look / drop poses), this is the only 'arm starts moving' time."""
+    import numpy as np
+    t = v = None
+    if (trial / "joints_full.npz").exists():
+        with np.load(trial / "joints_full.npz") as z:
+            t, v = z["stamp"], z["vel"]
+    elif (trial / "steps.npz").exists():
+        with np.load(trial / "steps.npz") as z:
+            if "joint_stamp" in z.files:
+                t, v = z["joint_stamp"], z["joint_vel"]
+    if t is None or len(t) < 3:
+        return []
+    moving = np.linalg.norm(np.nan_to_num(v), axis=1) > speed_rad_s
+    out, last_move = [], -1e18
+    for i in np.where(moving)[0]:
+        if t[i] - last_move > still_s:
+            out.append(float(t[i]))
+        last_move = t[i]
+    return [x for x in out if x >= start_wall - 1.0]
 
 
 def exact_events(events: list, start_wall: float, sources: list) -> tuple:
@@ -247,6 +275,20 @@ def finalize(trial_dir) -> dict:
     except Exception as exc:  # noqa: BLE001 - a broken bag must not block the VLA fallback
         print(json.dumps({"bag_events": f"unreadable: {type(exc).__name__}: {exc}"}), flush=True)
     fixed, report = exact_events(events, start, sources)
+    # the arm's own motion starts (joint data) — Interaction Time for moves the
+    # executor does not stamp (look / drop poses)
+    fixed = [e for e in fixed if e[1] != "arm_motion"]
+    for tw in arm_motion_starts(trial, start):
+        fixed.append((tw - start, "arm_motion", "starts"))
+    # robot status messages the window did not record (trials before
+    # 2026-09-28): from the VLA recorder, else the bag
+    if not any(s == "robot_status" for _t, s, _x in fixed):
+        for name, acc in sources:
+            if acc.get("robot_status"):
+                for t, x in acc["robot_status"]:
+                    fixed.append((t - start, "robot_status", x))
+                break
+    fixed.sort(key=lambda e: e[0])
     # the utterance payloads carry speech_end; add them from the bag when the
     # window did not record them (trials before 2026-09-28)
     if not any(s == "utterance" for _t, s, _x in fixed):
@@ -278,8 +320,11 @@ def finalize(trial_dir) -> dict:
         old_intent = tj.get("Interaction Time (s)")
         old_total = tj.get("Total Time (s)")
         tj["Stage Times"] = {**stage_out, "event_times": data["event_times"]}
-        if _same(old_intent, old.get("intent_s")) or old_intent in ("", None):
-            tj["Interaction Time (s)"] = _fmt(stage.get("intent_s"))
+        # 2026-09-28 (Majd): Interaction Time = command given -> arm moves
+        # (interaction_s); earlier versions wrote the understanding time here
+        if (_same(old_intent, old.get("interaction_s")) or _same(old_intent, old.get("intent_s"))
+                or old_intent in ("", None)):
+            tj["Interaction Time (s)"] = _fmt(stage.get("interaction_s"))
         if _same(old_total, old.get("total_s")) or old_total in ("", None):
             tj["Total Time (s)"] = _fmt(stage.get("total_s"))
         tj_p.write_text(json.dumps(tj, indent=2, ensure_ascii=False))
@@ -295,7 +340,7 @@ def finalize(trial_dir) -> dict:
                                     {k: (old.get(k), stage.get(k)) for k in
                                      ("intent_s", "yolo_s", "graspgen_s", "execution_s", "total_s")})
     return {"trial": trial.name, "event_times": data["event_times"], "csv_values_updated": csv_rows,
-            "stage": {k: stage.get(k) for k in ("speech_end_to_intent_s", "intent_s", "choice_s", "yolo_s",
+            "stage": {k: stage.get(k) for k in ("interaction_s", "speech_end_to_intent_s", "intent_s", "choice_s", "yolo_s",
                                                 "graspgen_compute_s", "graspgen_wait_s", "graspgen_lead_s",
                                                 "verify_compute_s", "command_to_motion_s", "total_s", "started_by")}}
 

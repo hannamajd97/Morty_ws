@@ -51,64 +51,91 @@ EXP_COLUMNS = [
     ("Level", "level", None, 18), ("Modifiers", "modifiers", None, 12), ("Command Used", "command", None, 36),
     ("Intended Target", "target", None, 16), ("Intended Destination", "destination", None, 14),
 ] + [(v, "v:" + v, None, 12) for v in VERDICTS] + [
-    ("Interaction Time (s)", "interaction_s", "0.00", 11), ("Total Time (s)", "total_time_s", "0.00", 10),
+    ("Interaction Time (s)", "interaction_col_s", "0.00", 11), ("Total Time (s)", "total_time_s", "0.00", 10),
     ("Failure Category / Notes", "notes", None, 30),
     ("Started by", "started_by", None, 11),
-    ("You stopped speaking → command (s)", "speech_end_to_intent_s", "0.00", 13),
-    ("Command → arm moves (s)", "command_to_motion_s", "0.00", 11),
-    ("GraspGen compute (s)", "graspgen_compute_s", "0.00", 10),
+    ("Understood by", "understood_by", None, 13),
+    ("GraspGen in background?", "graspgen_background", None, 11),
+    ("Execution plan", "planner", None, 10),
+    ("Plan checked in background?", "plan_background", None, 11),
+    ("Grasp executed", "grasp_used", None, 10),
+    ("Command → object handed over (s)", "release_s", "0.00", 12),
+    ("Waiting for your answers (s)", "human_wait_s", "0.00", 11),
+    ("Robot time (s)", "robot_time_s", "0.00", 10),
     ("Times", "times_state", None, 10),
     ("VLA task", "vla_task", None, 30), ("VLA outcome", "vla_outcome", None, 10),
     ("Folder", "link_folder", None, 26), ("Viewer", "link_viewer", None, 10), ("Video", "link_video", None, 10),
 ]
 
+# (group, header, key) — the Stage times sheet, in the order things happen
 STAGE_COLUMNS = [
-    ("You stopped speaking → command (s)", "speech_end_to_intent_s"),
-    ("Sentence → command (s)", "intent_s"),
-    ("Command → object chosen, incl. clarification (s)", "choice_s"),
-    ("Object chosen → grasp candidates (s)", "yolo_s"),
-    ("GraspGen compute (s)", "graspgen_compute_s"),
-    ("GraspGen waited for after the choice (s)", "graspgen_wait_s"),
-    ("GraspGen ready before the choice (s)", "graspgen_lead_s"),
-    ("Reachability check, background (s)", "verify_compute_s"),
-    ("Candidates → motion start (s)", "planning_s"),
-    ("Command → arm moves (s)", "command_to_motion_s"),
-    ("Approach (s)", "approach_s"),
-    ("Arrival → grasp verdict (s)", "grasp_s"),
-    ("Waiting for the drop side (s)", "wait_destination_s"),
-    ("Transport to the drop (s)", "transport_s"),
-    ("Motion start → home (s)", "execution_s"),
-    ("Total (s)", "total_s"),
+    ("Interaction", "Interaction Time: command given → arm starts moving (s)", "interaction_s"),
+    ("Voice", "End of your voice → transcript (s)", "voice_to_transcript_s"),
+    ("Voice", "You stopped speaking → command (s)", "speech_end_to_intent_s"),
+    ("Voice", "Understanding: transcript → command (s)", "intent_s"),
+    ("Voice", "Understood by", "understood_by"),
+    ("Choice", "Command → object chosen, incl. clarification (s)", "choice_s"),
+    ("Perception", "Object chosen → grasp candidates (s)", "yolo_s"),
+    ("GraspGen", "GraspGen in background?", "graspgen_background"),
+    ("GraspGen", "GraspGen compute (s)", "graspgen_compute_s"),
+    ("GraspGen", "GraspGen waited for after the choice (s)", "graspgen_wait_s"),
+    ("GraspGen", "GraspGen ready before the choice (s)", "graspgen_lead_s"),
+    ("Execution plan", "Execution plan", "planner"),
+    ("Execution plan", "Plan checked in background?", "plan_background"),
+    ("Execution plan", "Plan compute (s)", "plan_compute_s"),
+    ("Execution plan", "Candidates → motion start (s)", "planning_s"),
+    ("Execution plan", "Grasp executed", "grasp_used"),
+    ("Execution plan", "Grasps checked", "grasp_probes"),
+    ("Motion", "Approach (s)", "approach_s"),
+    ("Motion", "Arrival → grasp verdict (s)", "grasp_s"),
+    ("Motion", "Waiting for the drop side (s)", "wait_destination_s"),
+    ("Motion", "Transport to the drop (s)", "transport_s"),
+    ("Motion", "Motion start → home (s)", "execution_s"),
+    ("Totals", "Command → object handed over (s)", "release_s"),
+    ("Totals", "Waiting for your answers (s)", "human_wait_s"),
+    ("Totals", "Robot time (s)", "robot_time_s"),
+    ("Totals", "Total (s)", "total_s"),
+    ("Dialogue", "Morty's questions", "morty_questions"),
+    ("Dialogue", "Your sentences", "your_utterances"),
 ]
+STAGE_TEXT = {"understood_by", "graspgen_background", "plan_background", "grasp_used", "planner", "path"}
 
 DEFINITIONS = [
     ("Where the data comes from", "Every sheet is rebuilt from the trial folders (trial.json, timeline.json, meta.json) each time "
      "the window sends. Edit a trial in the MMHRI window (or its trial.json), not in these sheets — your edits here would be "
      "replaced. Sheets you add yourself are kept."),
-    ("Interaction Time (s)", "As recorded by the MMHRI window: the sentence that caused the robot command → that command "
-     "(understanding time). NOTE: the experiment doc defines Interaction Time as 'from the first intent to the time until "
-     "start' — that is the column 'Command → arm moves (s)'."),
-    ("Total Time (s)", "The first command (or, for a pick started by pointing, the moment the object was chosen) → the end of "
-     "the robot's cycle (back home)."),
+    ("Interaction Time (s)", "The experiment doc's definition: from the moment the command was GIVEN (you stopped saying it; for "
+     "a pick started by pointing, the moment the object was chosen) until the arm STARTS MOVING. Includes speech recognition, "
+     "understanding, any clarification ('which one?'), choosing the object and planning."),
+    ("Total Time (s)", "From the first command (or the pointing choice) to the end of the robot's cycle (back home)."),
     ("Started by", "voice = the task began with a spoken command; pointing/click = the object was chosen by pointing or a "
      "click before anything was said."),
-    ("You stopped speaking → command (s)", "The end of the operator's voice (the speech node's own time) → the robot command. "
-     "What a person perceives. Recorded from 2026-09-28 on."),
-    ("Sentence → command (s)", "The accepted transcript that caused the command → the command (0 s for instant commands, about "
-     "1 s through the language model)."),
+    ("End of your voice → transcript (s)", "The end-of-speech wait (0.5-0.8 s, to be sure you finished) plus speech recognition."),
+    ("You stopped speaking → command (s)", "The end of the operator's voice → the robot command for that sentence."),
+    ("Understanding: transcript → command (s)", "The accepted transcript that caused the command → the command."),
+    ("Understood by", "instant rule = the fixed phrase layer (about 0.01 s); language model = Claude (about 1 s)."),
     ("Command → object chosen, incl. clarification (s)", "The first command → the pipeline committing the object. Includes a "
-     "clarification dialogue ('which one?') or the pointing."),
+     "clarification dialogue ('which one?') or the pointing, and handing the object's name to the pipeline."),
     ("Object chosen → grasp candidates (s)", "The committed choice → grasp candidates published (capture, segmentation, the "
      "stored-grasp lookup, or GraspGen when nothing was stored)."),
-    ("GraspGen compute (s)", "Duration of the GraspGen run whose grasps the robot executed — usually run in the background "
-     "before the command."),
-    ("GraspGen waited for after the choice (s)", "How much of that run the operator actually waited for (0 = it was ready "
-     "before the object was chosen)."),
+    ("GraspGen in background?", "yes = GraspGen had already computed this object's grasps before the command (precompute); "
+     "no = it ran after the command, and the operator waited for it."),
+    ("GraspGen compute (s)", "Duration of the GraspGen run whose grasps the robot executed."),
+    ("GraspGen waited for after the choice (s)", "How much of that run the operator actually waited for (0 = ready before)."),
     ("GraspGen ready before the choice (s)", "How long before the choice the grasps were ready."),
-    ("Reachability check, background (s)", "The executor's feasibility probe of the stored grasps, done in the background."),
-    ("Candidates → motion start (s)", "The executor from receiving the candidates to moving."),
-    ("Command → arm moves (s)", "The first command → the arm starts moving (includes clarification). Matches the doc's "
-     "'Interaction Time' definition."),
+    ("Execution plan", "How the approach was planned: curve = the smooth approach path (bend + straight slide); lines = "
+     "blended straight-line segments, the fallback."),
+    ("Plan checked in background?", "yes = the executor had already verified this grasp could be reached (precheck hit), so "
+     "it moved at once; no = it checked after the candidates arrived (precheck miss) and the operator waited for it."),
+    ("Plan compute (s)", "Time to verify the plan: the background probe (when checked in the background) or the probe after "
+     "the candidates arrived."),
+    ("Candidates → motion start (s)", "What the operator actually waited in the executor, from the candidates to moving."),
+    ("Grasp executed", "Which of the GraspGen candidates was executed ('1 of 26' = the best-ranked one)."),
+    ("Grasps checked", "How many candidates the executor probed before executing one."),
+    ("Command → object handed over (s)", "The command given → the gripper opened at the destination."),
+    ("Waiting for your answers (s)", "Time Morty waited for the operator: at 'Where should I drop it?', 'Should I open the "
+     "gripper?' and 'Should I go back home?'."),
+    ("Robot time (s)", "Total time minus the time Morty waited for the operator."),
     ("Times", "final = rebuilt from exact event times after the trial (the messages' own stamps, else the earliest recorder); "
      "preliminary = the window's own times at ⏹ (can be late under load)."),
     ("Summary: success rate", "Full Task Success = yes divided by (yes + no); trials without a verdict are not counted."),
@@ -171,18 +198,18 @@ def trial_record(d: Path) -> Optional[dict]:
         "scenario_id": scen.split(":")[0].strip() or None, "scenario": scen or None, "level": tj.get("Level") or None,
         "modifiers": tj.get("Modifiers") or None, "command": tj.get("Command Used") or None,
         "target": tj.get("Intended Target") or None, "destination": tj.get("Intended Destination") or None,
-        "interaction_s": _num(tj.get("Interaction Time (s)")), "total_time_s": _num(tj.get("Total Time (s)")),
+        "interaction_col_s": _num(tj.get("Interaction Time (s)")), "total_time_s": _num(tj.get("Total Time (s)")),
         "notes": tj.get("Failure Category / Notes") or None,
         "started_by": {"voice": "voice", "choice": "pointing/click"}.get(st.get("started_by"), None),
         "times_state": "final" if st.get("event_times") else ("preliminary" if st else None),
         "gui_late_max_s": _num(((st.get("event_times") or {}).get("gui_late_by_s") or {}).get("max")),
-        "planner": st.get("planner"), "path": st.get("path"),
+        "path": st.get("path"),
     }
     for v in VERDICTS:
         val = str(tj.get(v) or "").strip()
         rec["v:" + v] = val or None
-    for _h, k in STAGE_COLUMNS:
-        rec[k] = _num(st.get(k))
+    for _g, _h, k in STAGE_COLUMNS:
+        rec[k] = (st.get(k) or None) if k in STAGE_TEXT else _num(st.get(k))
     meta = _load_json(d / "meta.json") if (d / "meta.json").exists() else None
     rec["vla_task"] = (meta or {}).get("task") if meta else None
     rec["vla_outcome"] = (meta or {}).get("outcome") if meta else None
@@ -333,20 +360,30 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
         ws.conditional_formatting.add(rng, CellIsRule(operator="equal", formula=['"no"'], fill=red))
     # ── Stage times ─────────────────────────────────────────────────────
     ws2 = wb.create_sheet("Stage times", 1)
-    heads = ["Trial ID", "Date", "Scenario ID", "Started by"] + [h for h, _k in STAGE_COLUMNS] + \
-            ["Planner", "Path", "Times", "Window was late by, max (s)"]
-    header(ws2, 1, heads, [8, 11, 9, 12] + [12] * len(STAGE_COLUMNS) + [10, 12, 10, 12], defs)
-    for r, rec in enumerate(recs, 2):
+    heads = ["Trial ID", "Date", "Scenario ID", "Started by"] + [h for _g, h, _k in STAGE_COLUMNS] + \
+            ["Path", "Times", "Window was late by, max (s)"]
+    groups = ["", "", "", ""] + [g for g, _h, _k in STAGE_COLUMNS] + ["", "", ""]
+    prev = None
+    for c, g in enumerate(groups, 1):          # a group row above the headers
+        if g and g != prev:
+            gc = ws2.cell(row=1, column=c, value=g)
+            gc.font = BOLD
+            gc.fill = PatternFill("solid", fgColor="B8CCE4")
+        elif g:
+            ws2.cell(row=1, column=c).fill = PatternFill("solid", fgColor="B8CCE4")
+        prev = g
+    header(ws2, 2, heads, [8, 11, 9, 12] + [12] * len(STAGE_COLUMNS) + [12, 10, 12], defs)
+    for r, rec in enumerate(recs, 3):
         vals = [rec["trial_id"], rec["date"], rec["scenario_id"], rec["started_by"]] + \
-               [rec.get(k) for _h, k in STAGE_COLUMNS] + [rec.get("planner"), rec.get("path"), rec.get("times_state"), rec.get("gui_late_max_s")]
+               [rec.get(k) for _g, _h, k in STAGE_COLUMNS] + [rec.get("path"), rec.get("times_state"), rec.get("gui_late_max_s")]
         for c, v in enumerate(vals, 1):
             cell = ws2.cell(row=r, column=c, value=v)
             cell.font = FONT
             if isinstance(v, float):
                 cell.number_format = "0.00"
-    ws2.freeze_panes = "E2"
+    ws2.freeze_panes = "E3"
     if n:
-        ws2.auto_filter.ref = f"A1:{get_column_letter(len(heads))}{last}"
+        ws2.auto_filter.ref = f"A2:{get_column_letter(len(heads))}{last + 1}"
     # ── Conversation ────────────────────────────────────────────────────
     ws3 = wb.create_sheet("Conversation", 2)
     header(ws3, 1, ["Trial ID", "Date", "t in trial (s)", "Who", "Text"], [8, 11, 11, 14, 90])
@@ -393,8 +430,8 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
         return f"Experiments!${col[h]}$2:${col[h]}${max(last, 2)}"
 
     sheads = ["Scenario ID", "Scenario", "Trials", "Full task success: yes", "Full task success: no", "Success rate",
-              "Grasp success: yes", "Avg total time (s)", "Avg command → arm moves (s)",
-              "Avg you stopped speaking → command (s)", "Avg GraspGen compute (s)"]
+              "Grasp success: yes", "Avg Interaction Time (s)", "Avg total time (s)", "Avg robot time (s)",
+              "Avg waiting for your answers (s)"]
     header(ws5, 4, sheads, [10, 44, 8, 12, 12, 10, 12, 12, 14, 16, 13], defs)
     from .scenario_experiments import SCENARIOS
     first = 5
@@ -407,8 +444,8 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
         ws5.cell(row=rr, column=5, value=f'=COUNTIFS({rng("Scenario ID")},$A{rr},{rng("Full Task Success?")},"no")')
         ws5.cell(row=rr, column=6, value=f'=IF(D{rr}+E{rr}=0,"",D{rr}/(D{rr}+E{rr}))')
         ws5.cell(row=rr, column=7, value=f'=COUNTIFS({rng("Scenario ID")},$A{rr},{rng("Grasp Success?")},"yes")')
-        for c, h in ((8, "Total Time (s)"), (9, "Command → arm moves (s)"), (10, "You stopped speaking → command (s)"),
-                     (11, "GraspGen compute (s)")):
+        for c, h in ((8, "Interaction Time (s)"), (9, "Total Time (s)"), (10, "Robot time (s)"),
+                     (11, "Waiting for your answers (s)")):
             ws5.cell(row=rr, column=c, value=f'=IF(COUNTIFS({rng("Scenario ID")},$A{rr},{rng(h)},"<>")=0,"",'
                                                 f'AVERAGEIFS({rng(h)},{rng("Scenario ID")},$A{rr}))')
     tr = first + len(SCENARIOS)
@@ -417,8 +454,8 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
         L = get_column_letter(c)
         ws5.cell(row=tr, column=c, value=f"=SUM({L}{first}:{L}{tr - 1})")
     ws5.cell(row=tr, column=6, value=f'=IF(D{tr}+E{tr}=0,"",D{tr}/(D{tr}+E{tr}))')
-    for c, h in ((8, "Total Time (s)"), (9, "Command → arm moves (s)"), (10, "You stopped speaking → command (s)"),
-                 (11, "GraspGen compute (s)")):
+    for c, h in ((8, "Interaction Time (s)"), (9, "Total Time (s)"), (10, "Robot time (s)"),
+                 (11, "Waiting for your answers (s)")):
         ws5.cell(row=tr, column=c, value=f'=IF(COUNT({rng(h)})=0,"",AVERAGE({rng(h)}))')
     for rr in range(first, tr + 1):
         for c in range(1, len(sheads) + 1):
@@ -470,7 +507,7 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
             "instructions": sum(len(r["instructions"]) for r in recs)}
 
 
-def recalc(path: str, timeout: int = 90) -> dict:
+def recalc(path: str, timeout: int = 60) -> dict:
     """Store computed values for every formula (LibreOffice, private profile),
     so viewers that read cached values show numbers, then count errors."""
     import shutil
@@ -492,15 +529,24 @@ def recalc(path: str, timeout: int = 90) -> dict:
             '<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" script:language="StarBasic">\n'
             "Sub RecalculateAndSave()\n  ThisComponent.calculateAll()\n  ThisComponent.store()\n  ThisComponent.close(True)\nEnd Sub\n"
             "</script:module>")
-    before = os.stat(path).st_mtime_ns
+    # 2026-09-28: recalculate a COPY and swap it in — with the workbook open
+    # in LibreOffice (its lock file present) the headless instance waited on
+    # the "document in use" question until the timeout.
+    work = os.path.join(os.path.dirname(os.path.abspath(path)), ".recalc_" + os.path.basename(path))
+    shutil.copy2(path, work)
+    before = os.stat(work).st_mtime_ns
     try:
         res = subprocess.run([soffice, "--headless", "--norestore", f"-env:UserInstallation={profile.as_uri()}",
                               "vnd.sun.star.script:Standard.Module1.RecalculateAndSave?language=Basic&location=application",
-                              os.path.abspath(path)], capture_output=True, text=True, timeout=timeout, env=env)
+                              work], capture_output=True, text=True, timeout=timeout, env=env)
     except subprocess.TimeoutExpired:
+        subprocess.run(["pkill", "-f", "[U]serInstallation=" + profile.as_uri()], capture_output=True)
+        os.path.exists(work) and os.remove(work)
         return {"recalculated": False, "why": f"LibreOffice timed out after {timeout} s"}
-    if res.returncode != 0 or os.stat(path).st_mtime_ns == before:
+    if res.returncode != 0 or os.stat(work).st_mtime_ns == before:
+        os.path.exists(work) and os.remove(work)
         return {"recalculated": False, "why": (res.stderr or "").strip()[:200] or "LibreOffice did not rewrite the file"}
+    os.replace(work, path)
     from openpyxl import load_workbook
     wb = load_workbook(path, data_only=True)
     errors = []

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import os
 import time
 from datetime import datetime
@@ -196,6 +197,10 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
                 items.append((t, f"intent: {txt[:80]}"))
         elif src == "morty_said":
             items.append((t, f'Morty said: "{txt[:80]}"'))
+        elif src == "robot_status":
+            items.append((t, f"robot: {str(txt).replace('_', ' ')[:80]}"))
+        elif src == "arm_motion":
+            items.append((t, "arm starts moving (joint data)"))
         elif src == "utterance":
             # 2026-09-28: placed at the payload's own speech_end (exact)
             try:
@@ -339,7 +344,67 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
             graspgen = d(float(sel.get("graspgen_start") or 0.0), float(sel.get("graspgen_done") or 0.0)) if sel.get("graspgen_done") else None
             gg_compute = gg_wait = graspgen
     end_t = phases.get("cycle_done") or phases.get("home_done") or phases.get("cycle_failed")
+    # ── 2026-09-28 (Majd): the doc's Interaction Time = from the moment the
+    # command was GIVEN (the operator stopped saying it; for a pick started
+    # by pointing, the committed choice) until the arm STARTS MOVING (the
+    # executor's motion_start, else — look/drop moves — the first joint
+    # motion, an 'arm_motion' event trial_times adds from the joint data).
+    def _speech_end_of(text):
+        for _t, _s, _x in ev:
+            if _s != "utterance":
+                continue
+            try:
+                _u = json.loads(_x)
+            except Exception:
+                continue
+            if str(_u.get("text", "")).strip() == str(text).strip() and _u.get("speech_end"):
+                return float(_u["speech_end"])
+        return None
+    _first_text = next((x for t, s_, x in ev if s_ == "transcript" and t == t_cmd_w), None) if t_cmd_w is not None else None
+    t_first_end = _speech_end_of(_first_text) if (voice_started and _first_text is not None) else None
+    t_given = (t_first_end or t_cmd_w) if voice_started else t_choice_w
+    t_motion = phases.get("motion_start")
+    if t_motion is None and t_given is not None:
+        t_motion = next((t for t, s_, x in ev if s_ == "arm_motion" and t >= t_given - 0.2), None)
+    # Morty waiting for the operator: each question status (destination,
+    # release, home) until the next status or command.
+    _status = [(t, str(x)) for t, s_, x in ev if s_ == "robot_status"]
+    _intents = [t for t, s_, x in ev if s_ == "intent"]
+    _waits = []
+    for _i, (_t, _st) in enumerate(_status):
+        if _st.split(":")[0] in ("paused", "awaiting_release", "awaiting_home_confirm"):
+            _nxt = [t2 for t2, _x in _status[_i + 1:]] + [ti for ti in _intents if ti > _t]
+            if _nxt:
+                _waits.append(min(_nxt) - _t)
+    human_wait = round(sum(_waits), 3) if _waits else None
+    t_released = next((t for t, st in _status if st.startswith("released") and (t_given is None or t > t_given)), None)
+    # the grasp that was executed ("grasp 1/26: FEASIBLE … executing this one")
+    grasp_used, probes = None, 0
+    for _t, _s, _x in ev:
+        if _s == "cand_status":
+            _m = re.search(r"grasp (\d+)/(\d+)", str(_x))
+            if _m:
+                probes += 1
+                if "executing" in str(_x):
+                    grasp_used = f"{_m.group(1)} of {_m.group(2)}"
+    plan_bg = "yes" if "precheck_hit" in phases else ("no" if "precheck_miss" in phases else None)
+    plan_compute = (d(phases.get("precheck_miss"), phases.get("probe_feasible") or phases.get("motion_start"))
+                    if plan_bg == "no" else verify_compute)
+    _total = d(t_task0, end_t)
     stage = {
+        "interaction_s": d(t_given, t_motion),
+        "voice_to_transcript_s": d(t_first_end, t_cmd_w) if t_first_end is not None else None,
+        "understood_by": (("instant rule" if intent_s < 0.15 else "language model") if intent_s is not None else None),
+        "graspgen_background": ("yes" if (sel or {}).get("path") == "precomputed" else "no") if sel else None,
+        "plan_background": plan_bg,
+        "plan_compute_s": plan_compute,
+        "grasp_used": grasp_used,
+        "grasp_probes": probes or None,
+        "release_s": d(t_given, t_released),
+        "human_wait_s": human_wait,
+        "robot_time_s": round(_total - human_wait, 3) if (_total is not None and human_wait is not None) else None,
+        "morty_questions": sum(1 for t, s_, x in ev if s_ == "morty_said" and "?" in str(x)),
+        "your_utterances": sum(1 for t, s_, x in ev if s_ == "transcript"),
         "speech_end_to_intent_s": d(t_speech_end, t_int_w) if t_speech_end is not None else None,
         "intent_s": intent_s,
         "choice_s": d(t_int_w, t_choice_w) if voice_started else None,
@@ -350,7 +415,7 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         "graspgen_lead_s": gg_lead,
         "verify_compute_s": verify_compute,
         "planning_s": d(phases.get("candidates_received"), phases.get("motion_start")),
-        "command_to_motion_s": d(t_task0, phases.get("motion_start")),
+        "command_to_motion_s": d(t_task0, t_motion),
         "approach_s": d(phases.get("motion_start"), phases.get("arrival")),
         "grasp_s": d(phases.get("arrival"), phases.get("grasp_verdict")),
         "wait_destination_s": d(phases.get("wait_destination_start"), phases.get("destination_received")),
@@ -364,7 +429,9 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         "started_by": ("voice" if voice_started else "choice") if (t_cmd_w is not None or t_choice_w is not None) else None,
     }
     lines += ["", "SUMMARY  (the choice = the moment the pipeline committed the object)"]
-    for k, lab in (("speech_end_to_intent_s", "you stopped speaking -> command"),
+    for k, lab in (("interaction_s", "INTERACTION: command given -> arm moves"),
+                   ("voice_to_transcript_s", "end of your voice -> transcript"),
+                   ("speech_end_to_intent_s", "you stopped speaking -> command"),
                    ("intent_s", "transcript -> command (understanding)"),
                    ("choice_s", "command -> object chosen (incl. clarification)"),
                    ("yolo_s", "object chosen -> grasp candidates"),
@@ -375,10 +442,18 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
                    ("planning_s", "executor: candidates -> motion start"),
                    ("command_to_motion_s", "command -> arm moves"),
                    ("approach_s", "approach"), ("grasp_s", "arrival -> grasp verdict"), ("wait_destination_s", "waiting for the drop side"),
-                   ("transport_s", "transport to the drop"), ("execution_s", "motion start -> home"), ("total_s", "total")):
+                   ("transport_s", "transport to the drop"), ("execution_s", "motion start -> home"),
+                   ("release_s", "command given -> object handed over"), ("human_wait_s", "Morty waited for your answers"),
+                   ("robot_time_s", "robot's own time (total - waiting)"), ("total_s", "total")):
         v = stage.get(k)
         if v is not None:
             lines.append(f"  {lab:42s} {v:7.2f} s")
+    for k, lab in (("understood_by", "understood by"), ("graspgen_background", "GraspGen in the background"),
+                   ("plan_background", "execution plan checked in the background"), ("grasp_used", "grasp executed")):
+        if stage.get(k):
+            lines.append(f"  {lab:42s} {stage[k]}")
+    if stage.get("plan_compute_s") is not None:
+        lines.append(f"  {'execution plan compute':42s} {stage['plan_compute_s']:7.2f} s")
     if stage.get("planner"):
         lines.append(f"  {'approach planned by':42s} {stage['planner']} ({stage.get('path')})")
     data = {"start_wall": t_start_wall, "stop_wall": t_stop_wall, "stage_times": stage,
