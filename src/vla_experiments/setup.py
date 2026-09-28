@@ -28,6 +28,7 @@ setup(
             "episode_recorder = vla_experiments.episode_recorder:main",
             "vla_episode = vla_experiments.episode_cli:main",
             "vla_dataset_info = vla_experiments.raw_dataset:main",
+            "vla_view = vla_experiments.episode_viewer:main",
             "convert_to_lerobot = vla_experiments.convert_to_lerobot:main",
             "convert_to_rlds = vla_experiments.convert_to_rlds:main",
             "astra_cloud_local = vla_experiments.astra_cloud_local:main",
