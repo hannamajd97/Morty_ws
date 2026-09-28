@@ -581,16 +581,18 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                             self._bag_go_text + "  (bag start not confirmed after 10 s — check bag_record.log)")
 
     def _start_postprocess(self, trial_root: str) -> None:
-        """2026-09-28: after a saved trial, full-rate joints (joints_full.npz/
-        .csv, joint_acc + joint_current in steps.npz) and viewer.html are made
-        in a DETACHED process (vla_experiments.postprocess): it waits for the
-        bag to close and the episode to be written, needs no GUI, and a GUI
-        closed meanwhile does not stop it. Output: postprocess.log."""
+        """2026-09-28: after a saved trial, a DETACHED process
+        (morty_gui.trial_postprocess) makes the full-rate joints
+        (joints_full.npz/.csv, joint_acc + joint_current in steps.npz) and
+        viewer.html, then rebuilds the stage times from exact event times
+        (trial_times) into the trial files and this trial's CSV rows. It waits
+        for the bag and the episode, needs no GUI, and a GUI closed meanwhile
+        does not stop it. Output: postprocess.log."""
         if not trial_root or not os.path.isdir(trial_root):
             return
         try:
             log = open(os.path.join(trial_root, "postprocess.log"), "ab")
-            subprocess.Popen([sys.executable, "-m", "vla_experiments.postprocess", trial_root],
+            subprocess.Popen([sys.executable, "-m", "morty_gui.trial_postprocess", trial_root],
                              stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                              start_new_session=True, env=os.environ.copy())
             log.close()
@@ -869,17 +871,19 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         bdir = os.path.expanduser("~/morty_ws/backups")
         os.makedirs(bdir, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        from .trial_times import csv_lock    # 2026-09-28: shared with trial_times
         for name, n in rec["rows"].items():
             if not n:
                 continue
             path = os.path.join(MMHRI_DIR, name)
-            shutil.copy2(path, os.path.join(bdir, f"{name}.{stamp}.pre_delete_{tid}"))
-            with open(path, newline="") as f:
-                rows = list(csv.reader(f))
-            with open(path, "w", newline="") as f:
-                w = csv.writer(f)
-                w.writerow(rows[0])
-                w.writerows(r for r in rows[1:] if not (r and r[0].strip() == tid))
+            with csv_lock():
+                shutil.copy2(path, os.path.join(bdir, f"{name}.{stamp}.pre_delete_{tid}"))
+                with open(path, newline="") as f:
+                    rows = list(csv.reader(f))
+                with open(path, "w", newline="") as f:
+                    w = csv.writer(f)
+                    w.writerow(rows[0])
+                    w.writerows(r for r in rows[1:] if not (r and r[0].strip() == tid))
         self.status.setText(
             f"🗑 trial {tid} erased: {len(rec['folders'])} folder(s), {n_rows} CSV row(s)"
             + (f"; {len(rec['episodes'])} VLA episode(s) still reference it" if rec["episodes"] else ""))
@@ -1228,6 +1232,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
 
     @staticmethod
     def _append_csv(path: str, header: List[str], row: List[str]) -> None:
+        # 2026-09-28: under the lock trial_times takes when it corrects a row.
+        from .trial_times import csv_lock
+        with csv_lock():
+            MMHRIWindow._append_csv_locked(path, header, row)
+
+    @staticmethod
+    def _append_csv_locked(path: str, header: List[str], row: List[str]) -> None:
         # Header migration (2026-09-03, Modifiers column): a file written
         # with an OLDER header is rewritten once with the new one and its
         # rows padded — otherwise every new row misaligns against the old

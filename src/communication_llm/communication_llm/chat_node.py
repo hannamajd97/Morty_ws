@@ -185,6 +185,18 @@ class _ActCountingPublisher:
 
     def publish(self, msg) -> None:
         self._on_publish()
+        # 2026-09-28: every intent carries the wall time it was published
+        # ("stamp"). Recorders stamp a message when their callback runs — the
+        # GUI and the rosbag were measured up to 3 s late during a trial's
+        # start-up load (trial 085: published +5.52 s, recorded +8.5 s) — so
+        # trial timing reads this field. Additive: readers use named keys.
+        try:
+            d = json.loads(msg.data)
+            if isinstance(d, dict) and "stamp" not in d:
+                d["stamp"] = round(time.time(), 3)
+                msg = String(data=json.dumps(d, separators=(",", ":")))
+        except (TypeError, ValueError, AttributeError):
+            pass
         self._pub.publish(msg)
 
     def __getattr__(self, name: str):

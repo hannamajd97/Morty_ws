@@ -90,8 +90,10 @@ def _clean_intent_s(v):
     """Within 0.5 s below zero is stamping jitter around an instant command
     (true value ~0.01 s): 0.0. Further below zero, the GUI stamped the
     transcript late: unknown (None), never a made-up number."""
-    if v is None or v >= 0:
+    if v is None:
         return v
+    if v >= 0:
+        return v + 0.0          # never "-0.0"
     return 0.0 if v >= -0.5 else None
 
 
@@ -99,6 +101,43 @@ def _first_intent_for(events, t_cmd):
     if t_cmd is None:
         return _first(events, "intent")
     return _first(events, "intent", after=t_cmd - _PAIR_TOL_S)
+
+
+def _source_times(ev):
+    """2026-09-28: the time an event HAPPENED, where the message says it.
+    Every recorder (this window, the rosbag) stamps a message when its own
+    callback runs — measured up to 3 s late under the trial's start-up load
+    (085: an intent published at +5.52 s was recorded at +8.54 s by the bag
+    and +8.69 s here). Since 2026-09-28 chat_node puts "stamp" into every
+    /robot/intent and the speech node puts "published" into the utterance
+    meta that immediately precedes each transcript; those replace the
+    receipt times (an intent by its own stamp, a transcript by the meta of
+    the same text within 10 s). Older events keep their receipt times."""
+    metas = []
+    for t, src, txt in ev:
+        if src == "utterance":
+            try:
+                u = json.loads(txt)
+                if u.get("published"):
+                    metas.append((float(u["published"]), str(u.get("text", "")).strip()))
+            except Exception:
+                pass
+    out = []
+    for t, src, txt in ev:
+        if src == "intent":
+            try:
+                st = json.loads(txt).get("stamp")
+                if st and abs(float(st) - t) < 30.0:
+                    t = float(st)
+            except Exception:
+                pass
+        elif src == "transcript" and metas:
+            cands = [(abs(p - t), p) for p, x in metas if x == str(txt).strip() and abs(p - t) < 10.0]
+            if cands:
+                t = min(cands)[1]
+        out.append((t, src, txt))
+    out.sort(key=lambda e: e[0])
+    return out
 
 
 def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
@@ -115,7 +154,7 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
     def rel(t):
         return t - t_start_wall
 
-    ev = [(mono_to_wall + t, src, txt) for t, src, txt in events]
+    ev = _source_times([(mono_to_wall + t, src, txt) for t, src, txt in events])
     recs = [r for _w, r in records]
     lo, hi = t_start_wall - 2.0, t_stop_wall + 2.0
 
@@ -144,6 +183,14 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
                 items.append((t, f"intent: {txt[:80]}"))
         elif src == "morty_said":
             items.append((t, f'Morty said: "{txt[:80]}"'))
+        elif src == "utterance":
+            # 2026-09-28: placed at the payload's own speech_end (exact)
+            try:
+                _u = json.loads(txt)
+                if _u.get("speech_end"):
+                    items.append((float(_u["speech_end"]), f'you stopped speaking ("{str(_u.get("text", ""))[:60]}")'))
+            except Exception:
+                pass
         elif src == "selection_cycle_id":
             items.append((t, f"selection cycle {txt} started"))
         elif src == "cand_status":
@@ -203,9 +250,8 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         lines.append(f"t={rel(t):+8.2f}  {txt}")
 
     # stage times, from the records where they exist, else from the events
-    t_cmd = _first(events, "transcript"); t_int = _first_intent_for(events, t_cmd)
-    t_cmd_w = mono_to_wall + t_cmd if t_cmd is not None else None
-    t_int_w = mono_to_wall + t_int if t_int is not None else None
+    # 2026-09-28: from ev (wall times, source stamps applied — _source_times)
+    t_cmd_w = _first(ev, "transcript"); t_int_w = _first_intent_for(ev, t_cmd_w)
     sel = sel_cycles[-1] if sel_cycles else None
     ex = exec_cycles[-1] if exec_cycles else None
     phases = {ph["name"]: float(ph["t"]) for ph in (ex.get("phases") if ex else [])}
@@ -214,46 +260,107 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         return round(b - a, 3) if (a is not None and b is not None) else None
 
     t_sel = float(sel["select"]) if sel and sel.get("select") else None
-    # 2026-09-28 (trial 084): a pick started by POINTING has its first
-    # transcript after the selection ("Drop it on the right side."): total
-    # starts at whichever came first, and speech -> intent is not this
-    # pick's (None). A negative speech -> intent means the GUI stamped the
-    # transcript late (seen +3.1 s in trial 083): unknown, not a number.
-    voice_started = t_cmd_w is not None and (t_sel is None or t_cmd_w <= t_sel)
-    t_task0 = t_cmd_w if voice_started else t_sel
-    intent_s = d(t_cmd_w, t_int_w) if voice_started else None
+    # 2026-09-28: the pipeline's "select" is when its selection loop STARTED
+    # WAITING, not when the object was chosen (trial 082: it waited 3.4 s for
+    # the spoken "rightmost"; 083: 2.9 s of pointing vote). The choice is
+    # committed when the pipeline publishes the cycle id — the GUI's
+    # 'selection_cycle_id' event (corrected to the bag's time afterwards by
+    # trial_times). Stages after the choice start there.
+    t_choice_w = None
+    if sel and sel.get("cycle_id") not in (None, -1):
+        for t, src, txt in ev:
+            if src == "selection_cycle_id" and str(txt).strip() == str(sel.get("cycle_id")):
+                t_choice_w = t
+                break
+    if t_choice_w is None:
+        t_choice_w = t_sel
+    # A pick started by POINTING (trial 084) has its first transcript after
+    # the choice: total starts at whichever came first, and speech -> intent
+    # is not this pick's (None). A negative speech -> intent means the GUI
+    # stamped the transcript late (seen +3.1 s in trial 083): unknown.
+    voice_started = t_cmd_w is not None and (t_choice_w is None or t_cmd_w <= t_choice_w)
+    t_task0 = t_cmd_w if voice_started else t_choice_w
+    # 2026-09-28 (trial 068: "Give me the vitamin tube." got "Which vitamin
+    # tube?" back, the command came from "Vitamin C." 7.6 s later): the
+    # understanding time is measured from the sentence that CAUSED the
+    # command — the last transcript before it — not from the first one; the
+    # clarification is in choice_s / command_to_motion_s / total_s.
+    t_cause_w = t_cmd_w
+    if t_int_w is not None:
+        _prior = [t for t, s_, x in ev if s_ == "transcript" and t <= t_int_w + 0.5]
+        if _prior:
+            t_cause_w = _prior[-1]
+    intent_s = d(t_cause_w, t_int_w) if voice_started else None
     intent_s = _clean_intent_s(intent_s)
+    # The operator stopped speaking: speech_end travels in the utterance's
+    # own payload (wall clock of the voice node), so it is exact even when
+    # the GUI receives it late.
+    t_speech_end = None
+    if voice_started:
+        first_text = next((x for t, s_, x in ev if s_ == "transcript" and t == t_cause_w), None)
+        for t, s_, x in ev:
+            if s_ != "utterance":
+                continue
+            try:
+                u = json.loads(x)
+            except Exception:
+                continue
+            if first_text is not None and str(u.get("text", "")).strip() == str(first_text).strip() and u.get("speech_end"):
+                t_speech_end = float(u["speech_end"])
+                break
     t_pub = float(sel["published"]) if sel and sel.get("published") else None
-    perception = None; graspgen = None; bg_lead = None
+    graspgen = None; bg_lead = None
+    gg_compute = gg_wait = gg_lead = verify_compute = None
     if sel:
         if sel.get("path") == "precomputed":
-            perception = d(t_sel, t_pub); graspgen = 0.0
+            graspgen = 0.0
             pc = sel.get("precompute") or {}
-            bg_lead = d(float(pc.get("job_done") or 0.0), t_sel) if pc.get("job_done") and t_sel else None
+            done = float(pc["job_done"]) if pc.get("job_done") else None
+            gg_compute = round(float(pc["job_s"]), 3) if pc.get("job_s") is not None else None
+            if done is not None and t_choice_w is not None:
+                gg_wait = round(max(0.0, done - t_choice_w), 3)
+                gg_lead = round(max(0.0, t_choice_w - done), 3)
+            bg_lead = gg_lead
+            verify_compute = round(float(pc["probe_s"]), 3) if pc.get("probe_s") is not None else None
         else:
-            perception = d(t_sel, float(sel.get("cloud_done") or 0.0)) if sel.get("cloud_done") else None
             graspgen = d(float(sel.get("graspgen_start") or 0.0), float(sel.get("graspgen_done") or 0.0)) if sel.get("graspgen_done") else None
+            gg_compute = gg_wait = graspgen
     end_t = phases.get("cycle_done") or phases.get("home_done") or phases.get("cycle_failed")
     stage = {
+        "speech_end_to_intent_s": d(t_speech_end, t_int_w) if t_speech_end is not None else None,
         "intent_s": intent_s,
-        "yolo_s": perception,
+        "choice_s": d(t_int_w, t_choice_w) if voice_started else None,
+        "yolo_s": d(t_choice_w, t_pub),
         "graspgen_s": graspgen,
+        "graspgen_compute_s": gg_compute,
+        "graspgen_wait_s": gg_wait,
+        "graspgen_lead_s": gg_lead,
+        "verify_compute_s": verify_compute,
         "planning_s": d(phases.get("candidates_received"), phases.get("motion_start")),
+        "command_to_motion_s": d(t_task0, phases.get("motion_start")),
         "approach_s": d(phases.get("motion_start"), phases.get("arrival")),
         "grasp_s": d(phases.get("arrival"), phases.get("grasp_verdict")),
         "wait_destination_s": d(phases.get("wait_destination_start"), phases.get("destination_received")),
         "transport_s": d(phases.get("transport_start"), phases.get("transport_done")),
         "execution_s": d(phases.get("motion_start"), end_t),
-        "click_to_motion_s": d(t_sel, phases.get("motion_start")),
+        "click_to_motion_s": d(t_choice_w, phases.get("motion_start")),
         "background_lead_s": bg_lead,
         "total_s": d(t_task0, end_t),
         "planner": (ex or {}).get("planner"),
         "path": (sel or {}).get("path"),
+        "started_by": ("voice" if voice_started else "choice") if (t_cmd_w is not None or t_choice_w is not None) else None,
     }
-    lines += ["", "SUMMARY"]
-    for k, lab in (("intent_s", "speech -> intent"), ("yolo_s", "click -> perception done"),
-                   ("graspgen_s", "GraspGen at the click (0 = precomputed)"), ("background_lead_s", "precomputed this long before the click"),
-                   ("planning_s", "executor: candidates -> motion start"), ("click_to_motion_s", "click -> motion start"),
+    lines += ["", "SUMMARY  (the choice = the moment the pipeline committed the object)"]
+    for k, lab in (("speech_end_to_intent_s", "you stopped speaking -> command"),
+                   ("intent_s", "transcript -> command (understanding)"),
+                   ("choice_s", "command -> object chosen (incl. clarification)"),
+                   ("yolo_s", "object chosen -> grasp candidates"),
+                   ("graspgen_compute_s", "GraspGen compute (the run that was used)"),
+                   ("graspgen_wait_s", "  of it waited for after the choice"),
+                   ("graspgen_lead_s", "  ready this long before the choice"),
+                   ("verify_compute_s", "reachability check (background probe)"),
+                   ("planning_s", "executor: candidates -> motion start"),
+                   ("command_to_motion_s", "command -> arm moves"),
                    ("approach_s", "approach"), ("grasp_s", "arrival -> grasp verdict"), ("wait_destination_s", "waiting for the drop side"),
                    ("transport_s", "transport to the drop"), ("execution_s", "motion start -> home"), ("total_s", "total")):
         v = stage.get(k)

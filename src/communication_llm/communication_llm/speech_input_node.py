@@ -32,6 +32,7 @@ from __future__ import annotations
 import os
 
 import json
+import time
 import rclpy
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
@@ -520,7 +521,12 @@ class SpeechInputNode(Node):
                 "voiced_ms": int(meta.get("voiced_ms", 0)),
                 # 2026-09-25 (review M1): additive — wall s of the
                 # utterance's first audio sample; chat_node's fresh rule.
-                "speech_start": round(float(meta.get("speech_start", 0.0)), 3)})))
+                "speech_start": round(float(meta.get("speech_start", 0.0)), 3),
+                # 2026-09-28: wall s of THIS publish = the transcript's own
+                # time (it follows immediately). Recorders stamp messages when
+                # their callback runs — the GUI and the rosbag were measured up
+                # to 3 s late under load — so trial timing reads this instead.
+                "published": round(time.time(), 3)})))
         msg = String()
         msg.data = forwarded
         self._pub.publish(msg)

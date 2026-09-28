@@ -276,6 +276,13 @@ class MortyGuiBridge(Node):
             String, "/speech/accepted_transcript",
             lambda m: self.trial_mark("transcript", str(m.data)), 10,
         )
+        # 2026-09-28: the utterance's own speech_end (wall clock of the voice
+        # node) — "you stopped speaking -> command" in the stage times, exact
+        # even when this callback runs late.
+        self.create_subscription(
+            String, "/speech/utterance_meta",
+            lambda m: self.trial_mark("utterance", str(m.data)), 10,
+        )
         # The pick cycle id comes from the pipeline's own topic, published
         # BEFORE its candidates and viewer poses. It used to be scraped from
         # /rosout text ("cycle_id=N" in any pipeline log line), which broke

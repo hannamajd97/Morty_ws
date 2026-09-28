@@ -657,7 +657,11 @@ BAG_TOPICS = [
     "/speed_scaling_state_broadcaster/speed_scaling",
     "/io_and_status_controller/robot_program_running",
     "/speech/accepted_transcript",                        # what the human said
+    "/speech/utterance_meta",                             # 2026-09-28: when they stopped speaking (speech_end)
+    "/speech/ai_said",                                    # 2026-09-28: when Morty started each line
     "/robot/intent",                                      # what the LLM decided
+    "/graspgen/timing",                                   # 2026-09-28: selection / background records
+    "/grasp_executor_lin_llm/timing",                     # 2026-09-28: executor phase marks
     "/yolo/all_detections",
     "/graspgen/selection_cycle_id",
     "/grasp_executor_lin_llm/selected_pose",

@@ -443,6 +443,14 @@ class EpisodeRecorder(Node):
             return
         self.intent = action
         stamp = self._ros_now()
+        # 2026-09-28: chat_node stamps every intent it publishes ("stamp",
+        # wall s) — the time it happened, not the time this callback ran.
+        try:
+            st = float(payload.get("stamp")) if payload.get("stamp") else None
+            if st is not None and abs(st - stamp) < 30.0:
+                stamp = st
+        except (TypeError, ValueError):
+            pass
         self._event("intent", {"action_intent": action, "object_intent": payload.get("object_intent"),
                                "object_attributes": payload.get("object_attributes")}, stamp)
         if action in self.motion_intents:
