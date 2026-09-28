@@ -345,9 +345,10 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         rec_lay.addStretch(1)
         rec_box.setToolTip("What ⏺ Start records. Both on by default.")
         # Target/destination only make sense for some scenarios:
-        # S1 (scene question) and S3 (move only) have neither; S2 has a
+        # S1 (scene question) and S7 (move only) have neither; S2 has a
         # target (the absent object!) but nothing to drop. Grey out what
-        # doesn't apply so the form can't confuse (Majd, 2026-08-20).
+        # doesn't apply so the form can't confuse (Majd, 2026-08-20;
+        # the table is scenario_experiments.SCENARIO_FIELDS).
         self.scenario.currentIndexChanged.connect(self._on_scenario_changed)
         # Command field removed from the form (Majd, 2026-08-20: the
         # whole conversation is recorded anyway) — the hidden widget
@@ -513,13 +514,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._refresh_progress()
 
     def _on_scenario_changed(self, idx: int) -> None:
-        """Enable target/destination only where the scenario has them.
-        S1 = scene question (neither), S2 = absent object (target only,
-        e.g. 'book'), S3 = movement only (neither), S4-S7 = real picks
-        (both)."""
+        """Enable target/destination only where the scenario has them —
+        scenario_experiments.SCENARIO_FIELDS, kept next to SCENARIOS (since
+        the 2026-09-25 renumbering: S1 neither, S2 target only, S3-S6 both,
+        S7 moving only = neither)."""
+        from .scenario_experiments import SCENARIO_FIELDS
         sid = SCENARIOS[idx].split(":")[0]
-        has_target = sid not in ("S1", "S3")            # S2, S4..S7
-        has_dest = sid in ("S4", "S5", "S6", "S7")      # real picks
+        has_target, has_dest = SCENARIO_FIELDS.get(sid, (True, True))
         self.target.setEnabled(has_target)
         self.destination.setEnabled(has_dest)
         if not has_target:

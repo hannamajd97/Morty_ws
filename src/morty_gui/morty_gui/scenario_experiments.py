@@ -44,6 +44,19 @@ SCENARIOS = [
     ("S6", "Pointing only (with confirmation)"),
     ("S7", "Moving without grasping"),
 ]
+# Which trial-form fields a scenario has: (Intended Target, Intended Destination).
+# Kept HERE, next to SCENARIOS, so a renumbering changes both together
+# (2026-09-28, Majd: selecting S3 greyed out both fields — the window still
+# used the pre-09-25 numbering where S3 was "moving without grasping").
+SCENARIO_FIELDS = {
+    "S1": (False, False),   # scene question: nothing to pick, nothing to drop
+    "S2": (True, False),    # the absent object is the target ('book'); nothing to drop
+    "S3": (True, True),     # real picks
+    "S4": (True, True),
+    "S5": (True, True),
+    "S6": (True, True),
+    "S7": (False, False),   # moving only
+}
 # Interaction MODIFIERS (2026-09-03, Majd): the former S8-S10 are not
 # scenarios of their own — they are optional behaviours that may or may
 # not happen DURING any S1-S7 trial ("I told the robot to grasp, then I
