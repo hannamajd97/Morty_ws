@@ -214,7 +214,9 @@ def declare_all_parameters(node: "Node") -> None:
     # ── NEIGHBOUR OBSTACLES (2026-08-27): one padded collision BOX per
     # detected object EXCEPT the grasp target, so MoveIt stops routing the
     # gripper through the other items standing on the table.
-    node.declare_parameter("neighbour_obstacles_enabled", True)
+    # 2026-09-28 (Majd): OFF by default — the planner sees only the static
+    # furniture unless the Motion tab's "Avoid other objects" turns it on.
+    node.declare_parameter("neighbour_obstacles_enabled", False)
     node.declare_parameter("neighbour_obstacle_padding_m", 0.001)
     node.declare_parameter("neighbour_obstacle_min_px", 60)
     node.declare_parameter("neighbour_obstacle_frame", "base_link")

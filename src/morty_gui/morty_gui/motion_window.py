@@ -120,7 +120,9 @@ class MotionWindow(QtWidgets.QMainWindow):
         # space) and Apply now sits directly under the last field.
         self.neighbour_cb = QtWidgets.QCheckBox("Avoid other objects")
         self.neighbour_cb.setToolTip(NEIGH_HELP)
-        self.neighbour_cb.setChecked(True)
+        # 2026-09-28 (Majd): off by default, like the pipeline's
+        # neighbour_obstacles_enabled — tick it to route around neighbours.
+        self.neighbour_cb.setChecked(False)
         neigh_form.addRow(self.neighbour_cb)
         self.neighbour_pad_spin = QtWidgets.QDoubleSpinBox()
         self.neighbour_pad_spin.setRange(0.000, 0.100)
