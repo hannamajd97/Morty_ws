@@ -1480,7 +1480,8 @@ class IntentRouterNode(Node):
         label = self._resolve_label(obj, colour, shape)
         if label is None:
             self.get_logger().warn(f"Could not match object {obj!r} to a known label.")
-            self._narrate(f"I don't recognise {obj} as something I can pick.")
+            # 2026-09-28 (Majd: say what you can SEE, not what you can grasp)
+            self._narrate(self._not_seen_line(obj))
             self._mark_busy_done("")
             return
 
@@ -2454,6 +2455,48 @@ class IntentRouterNode(Node):
             "object": label, "line": line})))
         self.get_logger().info(f"Point proposal {pid} ({label}): asking {line!r}")
         self._narrate(line)
+
+    def _not_seen_line(self, obj: str) -> str:
+        """2026-09-28 (Majd: "not telling what kind of object we can grasp —
+        let him only say what object he can see"): "I don't see a mouse. I
+        can see a tape dispenser, a small bottle and two vitamin tubes." —
+        the second sentence from the live detections, left out when the
+        scene is stale or empty."""
+        name = re.sub(r"^(?:the|a|an) ", "", str(obj or "").strip().lower()) or "that"
+        art = "" if name == "that" else ("an " if name[:1] in "aeiou" else "a ")
+        seen = self._visible_objects_phrase()
+        return f"I don't see {art}{name}." + (f" I can see {seen}." if seen else "")
+
+    def _visible_objects_phrase(self) -> str:
+        """'a tape dispenser, a small bottle and two vitamin tubes' from the
+        live detections, left to right; '' when the scene is stale or empty."""
+        now = self.get_clock().now().nanoseconds / 1e9
+        if not self._detections_at or now - self._detections_at > max(self._scene_max_age_s * 3.0, 10.0):
+            return ""
+
+        def _x(det) -> float:
+            try:
+                b = det.get("bbox")
+                return 0.5 * (float(b[0]) + float(b[2]))
+            except (TypeError, ValueError, IndexError):
+                return 0.0
+
+        counts: dict = {}
+        for det in sorted(self._detections, key=_x):
+            name = str(det.get("label") or det.get("display") or "").replace("_", " ").strip()
+            if name:
+                counts[name] = counts.get(name, 0) + 1
+        words = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+        parts = []
+        for name, n in counts.items():
+            if n == 1:
+                parts.append(("an " if name[:1] in "aeiou" else "a ") + name)
+            else:
+                plural = name + ("es" if name.endswith(("s", "x", "z", "ch", "sh")) else "s")
+                parts.append(f"{words.get(n, str(n))} {plural}")
+        if len(parts) <= 1:
+            return parts[0] if parts else ""
+        return ", ".join(parts[:-1]) + " and " + parts[-1]
 
     def _point_question_line(self, label: str, bbox) -> str:
         """The question for a pointed ``label`` (see _on_point_proposal)."""

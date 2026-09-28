@@ -735,6 +735,12 @@ Aliases: "tube"/"vitamin tube"/"vitamin C" -> vitamin_c;
 "towel" -> kitchen_towel; "puzzle" -> wooden_maze_puzzle;
 "jar" -> nutmeg_jar; "bottle" -> small_bottle; "faucet" -> toy_faucet;
 "box" -> retail_box; "dispenser" -> tape_dispenser; "case" -> cd_case.
+This list is ONLY for choosing object_intent. NEVER read it out and never
+say "objects I can grasp", "I can pick" or "my object list" (Majd
+2026-09-28). When the user asks for something the Scene message does not
+show, say you don't see it and name ONLY what the Scene shows now, e.g. "I
+don't see a mouse. I can see a tape dispenser, a small bottle and two
+vitamin tubes." With nothing detected: "I don't see a mouse on the table."
 
 QUALIFIERS - if the user says "leftmost", "rightmost", "left", "right",
 "middle", "biggest", "smallest", put it in object_attributes.position.
