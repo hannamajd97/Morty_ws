@@ -173,6 +173,11 @@ def build(ep_dir: Path) -> Path:
         "t": _r(s["t"], 3),
         "wall": _r(s["stamp_ros"], 3),
         "q": [_r(np.degrees(row), 1) for row in s["joint_pos"]],
+        "qd": [_r(np.degrees(row), 1) for row in s["joint_vel"]],
+        # 2026-09-28: joint_acc / joint_current come from the bag (vla_joints);
+        # absent for a trial without a bag.
+        "qdd": [_r(np.degrees(row), 0) for row in s["joint_acc"]] if "joint_acc" in s else None,
+        "cur": [_r(row, 2) for row in s["joint_current"]] if "joint_current" in s else None,
         "grip": _r(s["gripper"], 2),
         "gcmd": _r(s["gripper_cmd"], 0) if "gripper_cmd" in s else [None] * n,
         "gcmd_age": _r(s["gripper_cmd_age"], 1) if "gripper_cmd_age" in s else [None] * n,
@@ -227,6 +232,7 @@ canvas{width:100%;height:190px;display:block;background:var(--card);border:1px s
 .legend{display:flex;gap:14px;color:var(--mut);font-size:13px;margin:6px 0 0;flex-wrap:wrap}
 .sw{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:5px}
 .ok{color:var(--acc3)}.warn{color:var(--acc2)}
+.jt td{text-align:right}.jt td:first-child{text-align:left}.jt tr:first-child td{color:var(--mut);font-size:12px}
 .list tr{cursor:pointer}.list tr:hover td{background:var(--task)}
 .list tr.cur td{background:var(--hl)}.list tr.future td{color:var(--mut)}
 .list td.t{white-space:nowrap;color:var(--mut);width:1%}.list td.k{white-space:nowrap;width:1%;font-size:12px;color:var(--mut)}
@@ -251,7 +257,7 @@ canvas{width:100%;height:190px;display:block;background:var(--card);border:1px s
 </div>
 <div class="grid" style="margin-top:12px">
  <div class="card"><h2>Step</h2><table class="kv" id="tStep"></table></div>
- <div class="card"><h2>Joints (deg)</h2><table class="kv" id="tJoints"></table></div>
+ <div class="card" style="grid-column:span 2"><h2>Joints — velocity from the robot, acceleration and current from the full-rate bag</h2><table class="kv jt" id="tJoints"></table></div>
  <div class="card"><h2>Gripper and TCP</h2><table class="kv" id="tGrip"></table></div>
 </div>
 </main>
@@ -292,7 +298,7 @@ function show(k){i=Math.max(0,Math.min(D.n-1,k));sl.value=i;const tt=D.t[i];
   (nxt?" <span class='mut'>· next: “"+esc(nxt.text)+"” at "+fmt(nxt.t,2," s")+" (in "+fmt(nxt.t-tt,1," s")+")</span>":" <span class='mut'>· no later instruction</span>");
  $("tStep").innerHTML=row("t",fmt(tt,2," s"))+row("wall clock",wall(D.wall[i]))+row("segment",SEG[D.seg[i]]||"—")+
   row("instruction",ins?(ii+1)+" — "+esc(ins.text):"—")+row("said",ins&&ins.said?"“"+esc(ins.said)+"”":(ins&&ins.source?"("+esc(ins.source)+")":"—"))+row("executor phase",(ph!=null&&ph>=0&&D.phase_names[ph])?D.phase_names[ph].replace(/_/g," "):"—");
- $("tJoints").innerHTML=D.q[i].map((v,j)=>row(JN[j],fmt(v,1,"°"))).join("");
+ $("tJoints").innerHTML="<tr><td></td><td>angle</td><td>velocity</td><td>accel.</td><td>current</td></tr>"+D.q[i].map((v,j)=>"<tr><td>"+JN[j]+"</td><td>"+fmt(v,1,"°")+"</td><td>"+fmt(D.qd[i][j],1,"°/s")+"</td><td>"+(D.qdd?fmt(D.qdd[i][j],0,"°/s²"):"—")+"</td><td>"+(D.cur?fmt(D.cur[i][j],2," A"):"—")+"</td></tr>").join("");
  const p=D.tcp[i]||[],g=D.grip[i],gc=D.gcmd[i];
  $("tGrip").innerHTML=row("gripper state (adapter report)",g==null?"—":(g>=0.5?"open":"closed")+" ("+fmt(g,2)+")")+
   row("last gripper command",gc==null?"—":(gc>=0.5?"open":"close")+(D.gcmd_age[i]!=null?" · "+fmt(D.gcmd_age[i],1," s ago"):""))+

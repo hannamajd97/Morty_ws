@@ -52,7 +52,13 @@ folder (both frames per step with the step's time, joints, gripper, TCP, instruc
 speed vs image change, the instruction list and every recorded event with its time; `viewer.html#<step>`
 opens at a step). `ros2 run vla_experiments vla_relabel [--apply] <trial dir> ...` rebuilds instructions
 and step labels from the saved events with the current rules (dry run without --apply; originals kept
-as *.orig_<date>; v1 episodes are skipped).
+as *.orig_<date>; v1 episodes are skipped). `ros2 run vla_experiments vla_joints <trial dir> ...` reads the
+trial's bag and writes `joints_full.npz` / `joints_full.csv` (arm joints at ~500 Hz: position, velocity,
+acceleration = d(velocity)/dt with a 20 ms centred average, motor current; plus the trajectory controller's
+commanded position/velocity/acceleration, the latter only partly filled) and adds `joint_acc` /
+`joint_current` to steps.npz. The MMHRI window runs both (vla_experiments.postprocess) after every saved
+trial; output in postprocess.log. The window also waits for the bag to be subscribed before it says
+"speak now" (the bag needs 2-6 s; earlier trials miss their first seconds in the bag).
 
 What the v2 recorder guarantees (see `raw_dataset.py` for the exact keys):
 

@@ -36,6 +36,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from typing import Dict, List, Optional
 
@@ -554,6 +555,48 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._vla.shutdown()
         self._bag.shutdown()
 
+    def _poll_bag_ready(self) -> None:
+        """2026-09-28: switch the status to "speak now" once the bag has
+        subscribed to every topic (see _on_start); marks the moment in the
+        trial's events ("trial bag ready") so the timeline shows it."""
+        if not self._active or self._bag_ended:
+            self._bag_ready_timer.stop()
+            return
+        ready = False
+        try:
+            with open(self._bag_log, "rb") as f:
+                ready = b"All requested topics are subscribed" in f.read()
+        except OSError:
+            pass
+        waited = time.monotonic() - self._bag_wait_t0
+        if not ready and waited < 10.0:
+            return
+        self._bag_ready_timer.stop()
+        if self._bridge is not None:
+            try:
+                self._bridge.trial_mark("trial", "bag ready" if ready else "bag NOT confirmed after 10 s")
+            except Exception:
+                pass
+        self.status.setText(self._bag_go_text if ready else
+                            self._bag_go_text + "  (bag start not confirmed after 10 s — check bag_record.log)")
+
+    def _start_postprocess(self, trial_root: str) -> None:
+        """2026-09-28: after a saved trial, full-rate joints (joints_full.npz/
+        .csv, joint_acc + joint_current in steps.npz) and viewer.html are made
+        in a DETACHED process (vla_experiments.postprocess): it waits for the
+        bag to close and the episode to be written, needs no GUI, and a GUI
+        closed meanwhile does not stop it. Output: postprocess.log."""
+        if not trial_root or not os.path.isdir(trial_root):
+            return
+        try:
+            log = open(os.path.join(trial_root, "postprocess.log"), "ab")
+            subprocess.Popen([sys.executable, "-m", "vla_experiments.postprocess", trial_root],
+                             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                             start_new_session=True, env=os.environ.copy())
+            log.close()
+        except Exception as exc:  # never let bookkeeping break the trial window
+            print(f"[mmhri] post-processing not started for {trial_root}: {exc}")
+
     def close_active_trial(self) -> None:
         """2026-09-28 (trial 081: the GUI was closed with "Keep running"
         while the trial recorded; its parecord and ros2 bag ran on for 32
@@ -700,9 +743,25 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             if bag_dir:
                 self._bag_ended = False
                 bag_note = " + bag"
-        self.status.setText(
-            f"⏺ RECORDING trial {tid}{'' if want_mmhri else ' (VLA only)'}"
-            f"{vla_note}{bag_note} — speak/click your command now.")
+        go = (f"⏺ RECORDING trial {tid}{'' if want_mmhri else ' (VLA only)'}"
+              f"{vla_note}{bag_note} — speak/click your command now.")
+        if self._bag_ended:
+            self.status.setText(go)
+        else:
+            # 2026-09-28: the bag needs 2-6 s to subscribe to its topics; the
+            # operator spoke before it was ready in 5 of 28 trials and trial
+            # 085's first arm motion is missing from its bag. "Speak now"
+            # waits for the recorder's own "All requested topics are
+            # subscribed" line (at most 10 s) — the start-up load spike (late
+            # joints, GUI stamps up to 3 s late) is over by then too.
+            self.status.setText(f"⏳ trial {tid}: starting the ROS bag — wait for “speak now”…")
+            self._bag_go_text = go
+            self._bag_wait_t0 = time.monotonic()
+            self._bag_log = os.path.join(self._trial_root, "bag_record.log")
+            if getattr(self, "_bag_ready_timer", None) is None:
+                self._bag_ready_timer = QtCore.QTimer(self)
+                self._bag_ready_timer.timeout.connect(self._poll_bag_ready)
+            self._bag_ready_timer.start(200)
 
     def _finish_recorders(self) -> None:
         self._active = False
@@ -1108,6 +1167,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self.status.setText(
                 f"✔ trial {tid} ended (no MMHRI evidence) → {self._trial_root}\n"
                 "the VLA episode and the bag are in that folder (the vla-rec LED shows whether the episode was kept)")
+            self._start_postprocess(self._trial_root)
             self._reset_buttons()
             return
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as f:
@@ -1132,6 +1192,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             f"✔ trial {tid} saved → {self._trial_dir}\n"
             "row appended to mmhri_experiments.csv"
         )
+        self._start_postprocess(self._trial_root)
         self._reset_buttons()
         self._refresh_progress()
 
