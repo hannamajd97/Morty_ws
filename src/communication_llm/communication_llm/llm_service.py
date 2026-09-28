@@ -984,6 +984,12 @@ def _gwdg_chat_call(model: str, messages: list[Any], tools: list[dict[str, Any]]
                                      "stopped": stopped})
 
 
+# 2026-09-28: primary Bedrock profile -> monotonic time until which its
+# fallback is used directly (see LLMService.chat).
+_BEDROCK_PRIMARY_DOWN_UNTIL: dict = {}
+_BEDROCK_FALLBACK_HOLD_S = float(os.environ.get("MORTY_BEDROCK_FALLBACK_HOLD_S", "600"))
+
+
 def _fallback_model_for(model: str) -> str:
     """The route to try when ``model`` is unavailable: the env override, else
     the same model id under the global inference profile (eu./us./apac. →
@@ -1067,6 +1073,14 @@ class LLMService:
                     _call_restart(on_restart)
             return self.chat(fb, timeout, on_tool_call, on_text, on_restart)
         if _use_bedrock_converse(model):
+            # 2026-09-28 (Majd, live: every turn "thinking" for 31-37 s): the
+            # eu profile answered ServiceUnavailable after ~30 s on EVERY call
+            # and each turn then retried on the global profile (~1.5 s). After
+            # one capacity failure the fallback is used directly for
+            # _BEDROCK_FALLBACK_HOLD_S, then the primary is tried again.
+            _fb_direct = _fallback_model_for(model)
+            if _fb_direct and time.monotonic() < _BEDROCK_PRIMARY_DOWN_UNTIL.get(model, 0.0):
+                model = _fb_direct
             # 2026-09-25 (review L2): see _StreamProgress — no capacity retry
             # once the failed stream dispatched a command or spoke.
             prog = _StreamProgress(on_tool_call, on_text)
@@ -1084,7 +1098,9 @@ class LLMService:
                 if prog.progressed:
                     raise
                 if fb and _is_capacity_error(exc):
-                    print(f"[llm] {model} unavailable ({type(exc).__name__}); retrying once on {fb}",
+                    _BEDROCK_PRIMARY_DOWN_UNTIL[model] = time.monotonic() + _BEDROCK_FALLBACK_HOLD_S
+                    print(f"[llm] {model} unavailable ({type(exc).__name__}); retrying once on {fb}, "
+                          f"and using {fb} directly for the next {_BEDROCK_FALLBACK_HOLD_S:.0f} s",
                           file=sys.stderr, flush=True)
                     _call_restart(on_restart)
                     return _bedrock_converse_call(fb, self.messages, self.tools, timeout, on_tool_call, on_text)
