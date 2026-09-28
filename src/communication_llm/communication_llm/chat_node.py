@@ -1320,11 +1320,15 @@ class ChatIntentNode(Node):
         # 2026-09-25: the four voice switches (SPEC C1), live-settable.
         self.declare_parameter("voice_fast_layers", "minimal")      # minimal | legacy
         self.declare_parameter("voice_ext_dest", True)
-        self.declare_parameter("story_yields_to_question", True)
+        # 2026-09-28 (Majd, live: "tell me a story because I'm sick" — one
+        # sentence, then the grasp's question cut the other four): off by
+        # default; a talk the operator asked for is finished and the robot's
+        # question is spoken after it (the speak server queues it).
+        self.declare_parameter("story_yields_to_question", False)
         self.declare_parameter("gwdg_stall_s", 3.0)
         self._voice_fast_layers = "minimal"
         self._voice_ext_dest = True
-        self._story_yields = True
+        self._story_yields = False
         for _name in _VOICE_PARAMS:
             self._apply_voice_param(_name, self.get_parameter(_name).value)
         self.add_on_set_parameters_callback(self._on_set_voice_params)
