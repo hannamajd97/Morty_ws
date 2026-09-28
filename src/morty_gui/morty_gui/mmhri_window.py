@@ -420,6 +420,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.delete_btn = QtWidgets.QPushButton("🗑 delete")
         self.delete_btn.clicked.connect(self._on_delete)
         btn_row.addWidget(self.delete_btn)
+        # 2026-09-28 (Majd): pick trials and send them to the Excel workbook
+        # (excel_window.ExcelExportWindow; refreshed after every trial).
+        self.excel_btn = QtWidgets.QPushButton("📊 Excel export")
+        self.excel_btn.setToolTip("Choose trials and send everything recorded about them to\n"
+                                  "experiments/mmhri/MMHRI_experiments.xlsx")
+        self.excel_btn.clicked.connect(self._open_excel_window)
+        btn_row.addWidget(self.excel_btn)
         lay.addLayout(btn_row)
 
         self.status = QtWidgets.QLabel("idle — fill the header, then ⏺ Start")
@@ -579,6 +586,24 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                 pass
         self.status.setText(self._bag_go_text if ready else
                             self._bag_go_text + "  (bag start not confirmed after 10 s — check bag_record.log)")
+
+    def _open_excel_window(self) -> None:
+        if getattr(self, "_excel_win", None) is None:
+            from .excel_window import ExcelExportWindow
+            self._excel_win = ExcelExportWindow(self, is_busy=lambda: bool(getattr(self, "_active", False)))
+        self._excel_win.refresh()
+        self._excel_win.show()
+        self._excel_win.raise_()
+        self._excel_win.activateWindow()
+
+    def _refresh_excel_window(self) -> None:
+        """After a saved or deleted trial: the export list shows it."""
+        w = getattr(self, "_excel_win", None)
+        if w is not None:
+            try:
+                w.refresh()
+            except Exception:
+                pass
 
     def _start_postprocess(self, trial_root: str) -> None:
         """2026-09-28: after a saved trial, a DETACHED process
@@ -888,6 +913,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             f"🗑 trial {tid} erased: {len(rec['folders'])} folder(s), {n_rows} CSV row(s)"
             + (f"; {len(rec['episodes'])} VLA episode(s) still reference it" if rec["episodes"] else ""))
         self._refresh_progress()
+        self._refresh_excel_window()
         self.trial_id.setText(self._next_trial_id())
 
     def _delete_running_trial(self) -> None:
@@ -1199,6 +1225,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._start_postprocess(self._trial_root)
         self._reset_buttons()
         self._refresh_progress()
+        self._refresh_excel_window()
 
     def _refresh_progress(self) -> None:
         """Count saved trials per scenario × layout from trial.json files."""
