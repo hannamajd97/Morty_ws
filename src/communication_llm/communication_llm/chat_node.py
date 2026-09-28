@@ -236,6 +236,7 @@ CONFIRMED_NARRATION_ACTIONS = {
     "release_home",
     "drop_held",
     "let_go",
+    "not_holding",   # 2026-09-28: the router says what it does with it
 }
 
 # Words that should trigger an instant cancel before any LLM round-trip.
@@ -870,6 +871,15 @@ still holding the X — where should I put it first?"). Never say a pick or a
 move is running, finished or "already" happening unless the ROBOT TASK STATE
 says so this turn; when it says idle, nothing is running — send the command
 again or ask.
+
+OPERATOR SAYS EMPTY - the gripper sensor can read "holding" when the
+fingers closed on nothing. When the ROBOT TASK STATE says holding and the
+user says the gripper is empty ("you're not holding anything", "you missed
+it", "there's nothing in your hand"): send NO command, never argue and never
+cite sensors — ask exactly once: "Are you sure? Then I'll open the gripper
+and forget the <object>." If the user confirms (yes / sure / I'm sure),
+send not_holding and write no text. If they say no, keep everything as it
+is.
 
 RELEASE SIDE - at "Should I open the gripper?", "drop it on the
 right/left" -> drop_right / drop_left, never open_gripper / release.

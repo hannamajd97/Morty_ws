@@ -120,6 +120,12 @@ INTENT_TOOL = {
                     # the same 'stay' token chat_node's deterministic NO
                     # sends ("Okay, I'll stay here."), not a stop/abort.
                     "stay",
+                    # 2026-09-28 (Majd, live: an empty tight close set the
+                    # grasp pin, and Morty refused every pick "still holding
+                    # the small bottle"): 'not_holding' = the operator
+                    # CONFIRMED the gripper is empty; the router opens it,
+                    # which clears the executor's holding record.
+                    "not_holding",
                 ],
                 "description": (
                     "Single action keyword. There is NO generic 'drop' or "
@@ -163,7 +169,11 @@ INTENT_TOOL = {
                     "Use 'reset' for 'reset' / 'reset the pick' / 'start "
                     "over': the robot ends the pick and goes home, keeping "
                     "any held object. Use 'unclear' when the transcript is "
-                    "garbled or nonsensical — then write NO text."
+                    "garbled or nonsensical — then write NO text.\n"
+                    "Use 'not_holding' ONLY after the user CONFIRMED (answered "
+                    "yes to your 'Are you sure?') that the gripper is empty "
+                    "while the robot state says holding: the robot opens the "
+                    "gripper and forgets the object."
                 ),
             },
             "talk": {

@@ -704,6 +704,16 @@ class IntentRouterNode(Node):
             self._stop_path(_ssrc)
             return
 
+        # 2026-09-28: the operator confirmed the gripper is empty although
+        # the executor's record says holding (an empty tight close sets the
+        # grasp pin too). _not_holding_action says what that means now; an
+        # open_gripper continues down the normal path.
+        if action == "not_holding":
+            action = self._not_holding_action()
+            if not action:
+                return
+            intent = {"action_intent": action, "object_intent": None, "object_attributes": None}
+
         # ── ONE RESUME PER PAUSE: swallow the loser ──────────────────
         # A resume-style intent that arrives just after the pause it was
         # meant to answer has already been answered must NOT fall through
@@ -2043,6 +2053,46 @@ class IntentRouterNode(Node):
         except Exception:
             pass   # graph query failed: keep trusting the last level
         return task
+
+    def _not_holding_action(self) -> str:
+        """2026-09-28 (Majd, live: the grasp missed, the empty fingers closed
+        tight and set the grasp pin, and every pick was refused "still
+        holding the small bottle"): the operator confirmed the gripper is
+        empty. Any open clears the executor's holding record
+        (note_gripper_command), so the answer is an open, where the robot is
+        allowed to open now:
+
+          * release question — "release_home": open here, then home;
+          * destination question — "home+release": home, open there;
+          * idle — "open_gripper", returned for the normal intent path;
+          * record already empty — nothing to do, said so;
+          * any other phase (the arm moves) — nothing, asked to repeat.
+
+        Returns the action to continue with, or "" when handled here."""
+        task = self._live_task()
+        if task is not None and not task.get("holding"):
+            self._narrate("Okay — my gripper is already marked empty.")
+            return ""
+        q = self._task_q()
+        if q in ("release", "destination"):
+            tok = "release_home" if q == "release" else "home+release"
+            self.get_logger().info(
+                f"not_holding at the {q} question -> resume {tok!r} (open, forget the object)")
+            if q == "destination":
+                self._note_dest_answer()
+            if self._claim_executor_resume(tok, f"not_holding at the {q} question"):
+                self._narrate("Okay — I'll open the gripper and forget the object.")
+            else:
+                self._narrate_ignored_resume("not_holding", tok)
+            return ""
+        phase = str((task or {}).get("phase") or "idle")
+        if task is None or phase == "idle":
+            self.get_logger().info("not_holding while idle -> open_gripper (clears the record)")
+            self._narrate("Okay — I'm not holding anything.")   # the open result says the rest
+            return "open_gripper"
+        self.get_logger().info(f"not_holding ignored: the arm is busy (phase={phase!r})")
+        self._narrate("Let me finish this move first — then tell me again.")
+        return ""
 
     def _task_q(self) -> str:
         """2026-09-25: the question the executor has open — "",
