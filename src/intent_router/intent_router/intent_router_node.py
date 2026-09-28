@@ -617,6 +617,26 @@ class IntentRouterNode(Node):
         # same grammar as cycle_done, so the same handler frees the pick.
         self.create_subscription(
             String, "/grasp_pipeline/selection_result", self._on_cycle_done, 10)
+        # 2026-09-28 (Majd): pointing confirmation. The pipeline holds a
+        # POINTED choice and proposes it here; this node asks about it
+        # (_on_point_proposal) and forwards the answer (confirm_point /
+        # reject_point, or a plain pick of the same kind). The open question
+        # is published latched on /robot/open_question, so chat_node answers
+        # a yes / no instantly, as it does the executor's own questions.
+        self._point_q: Optional[dict] = None
+        # (display label, monotonic) of this node's last which-one question
+        # (_two_of_line) — a pointed answer to it is worded against it.
+        self._clarify: Optional[tuple] = None
+        self._point_answer_pub = self.create_publisher(
+            String, "/grasp_pipeline/point_answer", 10)
+        self._open_q_pub = self.create_publisher(
+            String, "/robot/open_question",
+            QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
+                       reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        self._open_q_pub.publish(String(data=json.dumps({"question": ""})))
+        self.create_subscription(
+            String, "/grasp_pipeline/point_proposal", self._on_point_proposal, 10)
         # Lifecycle status for the interactive drop: 'paused' fires when
         # the executor has finished Step 3 (close gripper) and is now
         # blocking on the resume topic; 'resumed:<dest>' fires when we
@@ -723,6 +743,34 @@ class IntentRouterNode(Node):
             if not action:
                 return
             intent = {"action_intent": action, "object_intent": None, "object_attributes": None}
+
+        # 2026-09-28 (Majd): the answer to a pointing question (see
+        # _on_point_proposal). A plain pick of the proposed kind answers it
+        # too; any other pick goes the normal way and the pipeline drops the
+        # proposal for it (superseded).
+        if action in ("confirm_point", "reject_point"):
+            if not self._answer_point(action == "confirm_point", "answer"):
+                self.get_logger().info(f"{action}: no pointing question is open — ignored.")
+            return
+        if (self._point_q is not None and action in PICK_INTENTS
+                and self._pick_confirms_point(intent)):
+            self._answer_point(True, f"a pick of the {self._point_q['label']}")
+            return
+        if (self._point_q is not None and action == "pick_and_place"
+                and self._pick_confirms_point(intent, with_destination=True)):
+            # "Yes, grab it and put it on the left." — the pick carries a
+            # destination, so it goes the normal way (the pipeline drops the
+            # proposal for its label); the pointed instance's position is
+            # added so the label does not take the first of its kind.
+            _pa = dict(intent.get("object_attributes") or {})
+            _where = self._rank_word(self._point_q["label"], self._point_q.get("bbox"))
+            if _where:
+                _pa["position"] = _where
+            intent = {**intent, "object_attributes": _pa,
+                      "object_intent": intent.get("object_intent") or self._point_q["label"]}
+            self.get_logger().info(
+                f"pick_and_place at the pointing question: the pointed "
+                f"{self._point_q['label']} ({_where or 'only one'}).")
 
         # ── ONE RESUME PER PAUSE: swallow the loser ──────────────────
         # A resume-style intent that arrives just after the pause it was
@@ -1476,6 +1524,7 @@ class IntentRouterNode(Node):
                 )
                 # 2026-09-25: the real count and its positions (_two_of_line).
                 self._narrate(self._two_of_line(label, n_vit))
+                self._clarify = (self._to_display_label(label).lower(), time.monotonic())
                 self._mark_busy_done("")
                 return
 
@@ -1493,6 +1542,7 @@ class IntentRouterNode(Node):
                 f"Refusing {position!r} with exactly two {label!r} visible: "
                 "neither is in the middle. Asking user to clarify.")
             self._narrate(self._two_of_line(label))
+            self._clarify = (self._to_display_label(label).lower(), time.monotonic())
             self._mark_busy_done("")
             return
 
@@ -2362,6 +2412,133 @@ class IntentRouterNode(Node):
         return (f"I see {count} {plural}. Could you say {choice}, "
                 "or point at the one you want?")
 
+    def _on_point_proposal(self, msg: String) -> None:
+        """2026-09-28 (Majd: "ask like 'you pointed to this object, should I
+        grasp it?' … and when the object selected is wrong he should say 'you
+        selected the tape dispenser, do you want this object?'"): the pipeline
+        holds a POINTED choice until it is confirmed. The question:
+
+          * after this node's which-one question for the same kind
+            (_two_of_line): "Do you mean this vitamin tube, the leftmost one?";
+          * after it for ANOTHER kind: "You pointed at the tape dispenser, not
+            a vitamin tube. Do you want the tape dispenser?";
+          * otherwise: "You pointed at the small bottle. Should I grasp it?".
+
+        While the gripper still holds an object nothing is asked: the
+        still-holding line (rate-limited, as for the executor's refusal of a
+        pointed pick) and a no. The pipeline's closing state (yes, no,
+        superseded, abort, timeout) closes the question."""
+        try:
+            d = json.loads(msg.data or "{}")
+            pid = int(d.get("id"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return
+        state = str(d.get("state") or "")
+        label = str(d.get("label") or "")
+        if state != "open":
+            if self._point_q is not None and self._point_q["id"] == pid:
+                self._close_point_question(state)
+            return
+        task = self._live_task()
+        if task is not None and task.get("holding"):
+            self.get_logger().info(
+                f"Point proposal {pid} ({label}): still holding "
+                f"{task.get('object')!r} — not asked, answered no.")
+            self._point_answer_pub.publish(String(data=f"no|{pid}"))
+            self._say_still_holding(rate_limited=True)
+            return
+        line = self._point_question_line(label, d.get("bbox"))
+        self._point_q = {"id": pid, "label": label, "since": time.time(), "bbox": d.get("bbox")}
+        self._open_q_pub.publish(String(data=json.dumps({
+            "question": "point", "id": pid, "since": round(self._point_q["since"], 3),
+            "object": label, "line": line})))
+        self.get_logger().info(f"Point proposal {pid} ({label}): asking {line!r}")
+        self._narrate(line)
+
+    def _point_question_line(self, label: str, bbox) -> str:
+        """The question for a pointed ``label`` (see _on_point_proposal)."""
+        name = label.replace("_", " ").strip() or "object"
+        ctx = self._clarify
+        if ctx is None or time.monotonic() - ctx[1] > 120.0:
+            return f"You pointed at the {name}. Should I grasp it?"
+        if ctx[0] == label.lower():
+            where = self._rank_word(label, bbox)
+            return f"Do you mean this {name}" + (f", the {where} one" if where else "") + "?"
+        want = ctx[0].replace("_", " ")
+        art = "an" if want[:1] in "aeiou" else "a"
+        return f"You pointed at the {name}, not {art} {want}. Do you want the {name}?"
+
+    def _rank_word(self, label: str, bbox) -> str:
+        """leftmost / middle / rightmost for the detection of ``label`` at
+        ``bbox`` among the visible ones of its kind — the order
+        _resolve_index_by_position reads those words in (ascending image x);
+        "" with one, or more than three, of the kind or no fresh scene."""
+        try:
+            cx = 0.5 * (float(bbox[0]) + float(bbox[2]))
+        except (TypeError, ValueError, IndexError):
+            return ""
+        now = self.get_clock().now().nanoseconds / 1e9
+        if not self._detections_at or now - self._detections_at > max(self._scene_max_age_s * 3.0, 10.0):
+            return ""
+        xs = []
+        for det in self._detections:
+            if str(det.get("label") or det.get("display") or "").lower() != label.lower():
+                continue
+            try:
+                b = det.get("bbox")
+                xs.append(0.5 * (float(b[0]) + float(b[2])))
+            except (TypeError, ValueError, IndexError):
+                continue
+        if not 2 <= len(xs) <= 3:
+            return ""
+        xs.sort()
+        rank = min(range(len(xs)), key=lambda i: abs(xs[i] - cx))
+        return ["leftmost", "middle", "rightmost"][rank] if len(xs) == 3 else ["leftmost", "rightmost"][rank]
+
+    def _pick_confirms_point(self, intent: dict, with_destination: bool = False) -> bool:
+        """A plain pick of the proposed kind while its question is open ("Yes,
+        grasp the vitamin tube.", or a pick without an object) confirms THAT
+        object — sent as a label it would take the first of its kind, not
+        necessarily the one pointed at. A qualifier or another object is a
+        new pick; a destination too, unless ``with_destination``."""
+        attrs = intent.get("object_attributes") or {}
+        if not isinstance(attrs, dict):
+            attrs = {}
+        keys = ("position", "ordinal", "colour") + (() if with_destination else ("destination",))
+        if any(attrs.get(k) for k in keys):
+            return False
+        obj = str(intent.get("object_intent") or "").strip()
+        if not obj:
+            return True
+        label = self._resolve_label(obj, "", str(attrs.get("shape") or ""))
+        return (label is not None and self._point_q is not None
+                and self._to_display_label(label).lower() == self._point_q["label"].lower())
+
+    def _answer_point(self, yes: bool, how: str) -> bool:
+        """Send the operator's answer to the open pointing question; False
+        when none is open. A yes opens the execution gate as a spoken pick
+        does (the operator approved it by voice) and ends the which-one
+        context; a no invites the next choice."""
+        q = self._point_q
+        if q is None:
+            return False
+        self._point_answer_pub.publish(String(data=f"{'yes' if yes else 'no'}|{q['id']}"))
+        self.get_logger().info(
+            f"Point proposal {q['id']} ({q['label']}): {'YES' if yes else 'NO'} ({how}).")
+        self._close_point_question("yes" if yes else "no")
+        if yes:
+            self._clarify = None
+            self._open_execution_gate()
+        else:
+            self._narrate("Okay. Point at the one you want, or tell me which one.")
+        return True
+
+    def _close_point_question(self, state: str) -> None:
+        q, self._point_q = self._point_q, None
+        self._open_q_pub.publish(String(data=json.dumps({
+            "question": "", "id": q["id"] if q else 0, "closed": state})))
+        self.get_logger().info(f"Point question {q['id'] if q else '-'} closed: {state}.")
+
     def _latch_destination(self, token: str, action: str) -> None:
         """2026-09-25: keep ``token`` for the destination pause of this pick
         (a newer one replaces it) and say what will happen — a stated plan,
@@ -2767,6 +2944,7 @@ class IntentRouterNode(Node):
     def _set_target_label(self, label: str) -> None:
         if label:
             self._open_execution_gate()
+            self._clarify = None    # 2026-09-28: a spoken pick answered any which-one question
         # Service may not be up yet (grasp_pipeline still starting). Don't block forever.
         if not self._set_params_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn(

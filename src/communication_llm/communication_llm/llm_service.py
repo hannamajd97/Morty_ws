@@ -126,6 +126,14 @@ INTENT_TOOL = {
                     # CONFIRMED the gripper is empty; the router opens it,
                     # which clears the executor's holding record.
                     "not_holding",
+                    # 2026-09-28 (Majd): the answers to "You pointed at the
+                    # X. Should I grasp it?" (a pointed pick waits for them;
+                    # the task-state message names the open question).
+                    # 'confirm_point' = yes, grasp the pointed object;
+                    # 'reject_point' = no / not that one (Morty asks to point
+                    # again). Naming another object is a normal 'pick'.
+                    "confirm_point",
+                    "reject_point",
                 ],
                 "description": (
                     "Single action keyword. There is NO generic 'drop' or "
@@ -173,7 +181,12 @@ INTENT_TOOL = {
                     "Use 'not_holding' ONLY after the user CONFIRMED (answered "
                     "yes to your 'Are you sure?') that the gripper is empty "
                     "while the robot state says holding: the robot opens the "
-                    "gripper and forgets the object."
+                    "gripper and forgets the object.\n"
+                    "Use 'confirm_point' / 'reject_point' ONLY while the "
+                    "robot state has the pointing question open ('You "
+                    "pointed at the X. Should I grasp it?'): yes / grab it "
+                    "= confirm_point, no / not that one = reject_point; the "
+                    "robot speaks the next line itself, so write no text."
                 ),
             },
             "talk": {

@@ -185,6 +185,41 @@ _CONSENT_MAX_WORDS = 10
 
 _SIDE = {"left": "left", "right": "right", "links": "left", "rechts": "right"}
 
+# 2026-09-28 (Majd): answers to the pointing question ("You pointed at the
+# small bottle. Should I grasp it?" / "Do you mean this vitamin tube?"). A NO
+# is a whole negation, "wrong one", "not that one" …; a consent is a short
+# sentence with a grasp phrase ("Yes, grab it.", "That one.", "Take it.") and
+# only fillers / consent words beside it (_GRASP_OK_WORD).
+NO_POINT = _whole(
+    r"(?:" + NEG + r" )*(?:" + NEG + r"|wait|not (?:that|this)(?: one)?|(?:the )?wrong (?:one|object)"
+    r"|(?:don't|dont|do not)(?: (?:grasp|grab|take|pick)(?: it| that| this)?)?|not now)"
+    r"(?: (?:" + NEG + r"|not (?:that|this)(?: one)?|(?:the )?wrong (?:one|object)))*")
+_GRASP_PHRASE = re.compile(
+    r"(?<![\w'-])(?:(?:grasp|grab|take|pick(?: up)?|get|give me)(?: (?:it|that|this|that one|this one))?"
+    # "right" only inside "that's right" — alone it may be "the right one"
+    r"|(?:that|this)(?: one)?|(?:that's|this is|it's)(?: (?:it|the one|that one|right|correct))?"
+    r"|exactly|correct)"
+    r"(?![\w'-])")
+# The only words allowed beside the grasp phrase: fillers and consents ("Yes
+# please, grab it."). An object name ("Give me the tape dispenser.") is a
+# pick, which the router compares with the pointed object.
+_GRASP_OK_WORD = re.compile(
+    r"(?:" + FILL + r"|yes|yeah|yep|yup|sure|alright|go|ahead|do|it|that|this|one|the"
+    r"|exactly|correct|ja|klar)")
+
+
+def _grasp_consent(t: str) -> bool:
+    """2026-09-28: ``t`` (normalised) consents to the pointing question — at
+    most _CONSENT_MAX_WORDS words, a grasp phrase inside, and beside it only
+    fillers and consent words (no negation, position, object or verb)."""
+    if len(t.split()) > _CONSENT_MAX_WORDS:
+        return False
+    m = _GRASP_PHRASE.search(t)
+    if not m:
+        return False
+    return all(_GRASP_OK_WORD.fullmatch(w) for w in (t[:m.start()] + " " + t[m.end():]).split())
+
+
 # ── instant picks (2026-09-25, Majd's B1) ──────────────────────────────────
 # The legacy FAST-PICK tables (chat_node, 2026-08-26 / 08-31), moved here
 # unchanged so the minimal layer and the legacy layer share ONE table.
@@ -355,6 +390,15 @@ def classify(text: str, question: str = "", fresh: bool = False,
                 m = DEST_SIDE.match(t)
                 if m:
                     return ("answer", "drop_" + _SIDE[m.group(1)])
+        elif question == "point":
+            # 2026-09-28 (Majd): intent_router's "You pointed at the X. Should
+            # I grasp it?" — yes / a short consent to grasp = confirm_point, a
+            # whole no = reject_point; anything else (another object, a
+            # position) is the LLM's.
+            if YES.match(t) or _grasp_consent(t):
+                return ("answer", "confirm_point")
+            if NO_POINT.match(t):
+                return ("answer", "reject_point")
         elif question == "destination":
             if NO_DEST.match(t):
                 return ("negative", "keep")          # 2026-09-25 (I1): nothing is sent

@@ -159,6 +159,7 @@ _REASK_LINES = {
     "release": "Should I open the gripper?",
     "destination": "Where should I drop it? Left, right, or home?",
     "home": "Should I go back home?",
+    "point": "Should I grasp the object you pointed at?",
 }
 # The FAST-NEGATIVE lines (2026-08-28), shared since 2026-09-25 with the LLM
 # path (review Y2): a NO the LLM turned into close_gripper / stay says them too.
@@ -249,6 +250,8 @@ CONFIRMED_NARRATION_ACTIONS = {
     "drop_held",
     "let_go",
     "not_holding",   # 2026-09-28: the router says what it does with it
+    "confirm_point",  # 2026-09-28: the answer to a pointing question — the
+    "reject_point",   # router speaks what follows (start line / "Okay. Point …")
 }
 
 # Words that should trigger an instant cancel before any LLM round-trip.
@@ -904,6 +907,13 @@ is.
 RELEASE SIDE - at "Should I open the gripper?", "drop it on the
 right/left" -> drop_right / drop_left, never open_gripper / release.
 
+POINTING QUESTION - when the operator points at an object, the robot asks
+"You pointed at the X. Should I grasp it?" (or "Do you mean this X?") and
+nothing moves until the answer. Yes -> confirm_point, no / not that one ->
+reject_point, and write no text for either. If they name another object or
+a position instead ("no, the left one", "the tape dispenser"), send that
+pick.
+
 COMPOUND PICK-AND-PLACE - "pick the X and put it on the right" -> ONE
 pick_and_place intent with destination set. Don't split it into pick+place.
 
@@ -1282,6 +1292,18 @@ class ChatIntentNode(Node):
         self.create_subscription(
             String, "/grasp_executor_lin_llm/task_state", self._on_task_state,
             QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10,
+                       reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        # 2026-09-28 (Majd): intent_router's own question — "You pointed at
+        # the X. Should I grasp it?" — asked before a pointed pick starts, so
+        # outside any executor cycle. Latched; {"question": "point", "id",
+        # "since", "object", "line"} while open, {"question": ""} after.
+        # _route_minimal answers it like an executor question when none of
+        # those is open.
+        self._router_q: dict = {}
+        self.create_subscription(
+            String, "/robot/open_question", self._on_router_question,
+            QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
                        reliability=ReliabilityPolicy.RELIABLE,
                        durability=DurabilityPolicy.TRANSIENT_LOCAL))
         # 2026-09-25: when the operator started speaking (review M1: it was
@@ -3046,6 +3068,12 @@ class ChatIntentNode(Node):
         the gripper anyway) — Morty asks the question again."""
         task = self._live_task() or {}   # one snapshot: the executor thread replaces it
         question = str(task.get("question") or "")
+        since_raw = task.get("question_since")
+        if not question:
+            # 2026-09-28: the router's pointing question (see _on_router_question)
+            rq = self._router_q
+            if rq.get("question") == "point":
+                question, since_raw = "point", rq.get("since")
         fresh = False
         start = None
         if question:
@@ -3066,7 +3094,7 @@ class ChatIntentNode(Node):
                                    self._stop_epoch if epoch is None else epoch)
                 return
             try:
-                since = float(task.get("question_since") or 0.0)
+                since = float(since_raw or 0.0)
             except (TypeError, ValueError):
                 since = 0.0
             # 2026-09-25 (Majd, live: "Now give it." began 38 ms before the
@@ -3090,7 +3118,9 @@ class ChatIntentNode(Node):
                 f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR "
                 f"{kind} {action}, question={question!r}, fresh={fresh})")
             return
-        if not question and not task.get("holding"):
+        if (not question or question == "point") and not task.get("holding"):
+            # 2026-09-28: also at the pointing question — the router takes a
+            # plain pick of the pointed kind as its yes, any other as a new pick.
             # 2026-09-25 (Majd's B1: "picks via the LLM took 1.3-2.8 s"): a
             # WHOLE plain pick of a known object, with no question open and
             # nothing held, is published at once — the legacy FAST-PICK
@@ -3543,6 +3573,14 @@ class ChatIntentNode(Node):
             head = f"Pick #{cid} " + words.format(obj=obj, dest=dest)
         q = str(t.get("question") or "")
         qtext = self._QUESTION_WORDS.get(q, "No question is open")
+        rq = self._router_q
+        if not q and rq.get("question") == "point":
+            # 2026-09-28: the router's pointing question (no cycle runs yet)
+            obj_p = str(rq.get("object") or "object").replace("_", " ")
+            qtext = (f'OPEN QUESTION: "{rq.get("line") or f"You pointed at the {obj_p}. Should I grasp it?"}" '
+                     f"(the operator POINTED at the {obj_p}; nothing moves until answered) — "
+                     "yes / grab it = confirm_point, no / not that one = reject_point; naming "
+                     "another object = a pick of that object")
         if t.get("holding"):
             grip = f"Gripper: closed on the {obj} (not opened since; no sensor confirms contents)"
         else:
@@ -4552,6 +4590,19 @@ class ChatIntentNode(Node):
         "release": "HOLDING at the drop pose — waiting for release confirmation",
         "home": "at the drop pose, gripper open — asked about going home",
     }
+
+    def _on_router_question(self, msg: String) -> None:
+        """2026-09-28: intent_router's pointing question opened / closed."""
+        try:
+            d = json.loads(msg.data or "{}")
+        except (TypeError, ValueError):
+            return
+        if isinstance(d, dict):
+            if d.get("question") != self._router_q.get("question"):
+                self.get_logger().info(
+                    f"Router question: {d.get('question') or 'closed'!r}"
+                    + (f" ({d.get('object')!r})" if d.get("object") else ""))
+            self._router_q = d
 
     def _on_task_state(self, msg: String) -> None:
         """2026-09-25 (SPEC §1.1, C2): the executor's latched task state, read

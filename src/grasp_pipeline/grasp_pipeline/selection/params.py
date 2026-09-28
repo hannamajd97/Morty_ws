@@ -345,6 +345,16 @@ def declare_all_parameters(node: "Node") -> None:
     # to reach the small bottle" the pipeline tried again on its own (cycle 8);
     # a failed pick now ends there and is retried only when he asks.
     node.declare_parameter("auto_retry_once", False)
+    # 2026-09-28 (Majd): a POINTED choice is confirmed before the pick starts
+    # — intent_router asks "You pointed at the X. Should I grasp it?" (or
+    # "Do you mean this vitamin tube?" after its which-one question) and the
+    # cycle begins on a yes. Clicks and spoken picks are not asked. See
+    # _confirm_pointed_choice. Timeout 0 = wait for the answer forever; a NO
+    # (or a timeout) ignores the same object for point_reject_hold_s, so the
+    # hand still over it does not propose it again at once.
+    node.declare_parameter("confirm_pointing", True)
+    node.declare_parameter("point_confirm_timeout_s", 30.0)
+    node.declare_parameter("point_reject_hold_s", 6.0)
     node.declare_parameter("self_filter_enabled", True)
     node.declare_parameter("self_filter_links",
                            ["gripper_base", "gripper_finger_left", "gripper_finger_right"])

@@ -667,6 +667,7 @@ BAG_TOPICS = [
     "/grasp_executor_lin_llm/selected_pose",
     "/grasp_executor_lin_llm/interactive_status",
     "/grasp_executor_lin_llm/cycle_done",
+    "/grasp_pipeline/point_proposal",                     # 2026-09-28: pointing question open / answered
     "/tf",
     "/tf_static",
 ]

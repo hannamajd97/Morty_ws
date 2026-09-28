@@ -138,7 +138,7 @@ def _source_times(ev):
                 pass
     out = []
     for t, src, txt in ev:
-        if src == "intent":
+        if src in ("intent", "point_question"):   # 2026-09-28: the pointing proposal too
             try:
                 st = json.loads(txt).get("stamp")
                 if st and abs(float(st) - t) < 30.0:
@@ -201,6 +201,14 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
             items.append((t, f"robot: {str(txt).replace('_', ' ')[:80]}"))
         elif src == "arm_motion":
             items.append((t, "arm starts moving (joint data)"))
+        elif src == "point_question":
+            try:
+                _pq = json.loads(txt)
+                _pl = str(_pq.get("label") or "object").replace("_", " ")
+                items.append((t, f"pointed at the {_pl} — waiting for your yes" if _pq.get("state") == "open"
+                              else f"pointing question: {_pq.get('state')}"))
+            except Exception:
+                pass
         elif src == "utterance":
             # 2026-09-28: placed at the payload's own speech_end (exact)
             try:
@@ -376,6 +384,20 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
             _nxt = [t2 for t2, _x in _status[_i + 1:]] + [ti for ti in _intents if ti > _t]
             if _nxt:
                 _waits.append(min(_nxt) - _t)
+    # 2026-09-28: the pointing question (a pointed pick waits for the yes):
+    # each proposal from its "open" until its closing state.
+    _pq_open = {}
+    for _t, _s, _x in ev:
+        if _s != "point_question":
+            continue
+        try:
+            _pq = json.loads(_x)
+        except Exception:
+            continue
+        if _pq.get("state") == "open":
+            _pq_open[_pq.get("id")] = _t
+        elif _pq.get("id") in _pq_open:
+            _waits.append(_t - _pq_open.pop(_pq.get("id")))
     human_wait = round(sum(_waits), 3) if _waits else None
     t_released = next((t for t, st in _status if st.startswith("released") and (t_given is None or t > t_given)), None)
     # the grasp that was executed ("grasp 1/26: FEASIBLE … executing this one")

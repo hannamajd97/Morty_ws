@@ -168,6 +168,11 @@ class MortyGuiBridge(Node):
         self.exec_interactive_state = ""
         self.create_subscription(
             String, "/grasp_executor_lin_llm/interactive_status", self._on_exec_interactive, 10)
+        # 2026-09-28: the pointing question (a pointed pick waits for the
+        # operator's yes) — opened / answered, in the trial record.
+        self.create_subscription(
+            String, "/grasp_pipeline/point_proposal",
+            lambda m: self.trial_mark("point_question", str(m.data)), 10)
         # 2026-09-25: the executor's latched task state (SPEC §1.1, JSON):
         # whether it holds an object, whatever status token came last. None
         # until the first message — an older executor never sends one.

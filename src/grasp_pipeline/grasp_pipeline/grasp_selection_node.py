@@ -685,6 +685,20 @@ class YoloLiveSelectGrasp(Node):
             self._on_pick_abort,
             10,
         )
+        # 2026-09-28 (Majd): pointing confirmation — see _confirm_pointed_choice.
+        # The answer has its own callback group so a busy default group
+        # cannot hold a "yes" back.
+        self._point_prop_id = 0
+        self._point_answer = None       # (proposal id, "yes" | "no") from intent_router
+        self._point_rejected = None     # {"label", "bbox", "t"} after a NO / timeout
+        self._point_prop_pub = self.create_publisher(String, "/grasp_pipeline/point_proposal", 10)
+        self.create_subscription(
+            String,
+            "/grasp_pipeline/point_answer",
+            self._on_point_answer,
+            10,
+            callback_group=MutuallyExclusiveCallbackGroup(),
+        )
         self.create_subscription(
             String,
             str(self.get_parameter("executor_cycle_done_topic").value),
@@ -2012,6 +2026,90 @@ class YoloLiveSelectGrasp(Node):
             "at the next phase boundary."
         )
 
+    def _on_point_answer(self, msg: String) -> None:
+        """intent_router's answer to a pointing proposal: "yes|<id>" / "no|<id>"."""
+        word, _, pid = str(msg.data or "").strip().lower().partition("|")
+        try:
+            pid_i = int(pid)
+        except ValueError:
+            self.get_logger().warn(f"Bad point answer {msg.data!r}")
+            return
+        if word in ("yes", "no"):
+            self._point_answer = (pid_i, word)
+            self._selection_wake.set()
+
+    def _confirm_pointed_choice(self, dets, idx: int, header) -> str:
+        """2026-09-28 (Majd: "the pointing just starts the grasp immediately —
+        ask 'you pointed at this object, should I grasp it?'"): hold a
+        POINTED choice until the operator confirms it.
+
+        The proposal goes out on /grasp_pipeline/point_proposal (JSON: id,
+        state "open", label, display, index, bbox, stamp) and the object is
+        highlighted in the debug image; intent_router asks the question —
+        worded for its which-one clarification and for an object other than
+        the one asked for — and answers on /grasp_pipeline/point_answer. The
+        verdict: "yes"; "no"; "superseded" (a spoken pick or a click arrived
+        and is taken next); "abort" (stop / reset); "timeout"
+        (point_confirm_timeout_s); "ignored" (the object was just rejected —
+        nothing is asked). Every verdict but "ignored" is published as the
+        proposal's closing state, so the router closes its question.
+
+        GraspGen's background job keeps running meanwhile, so a yes usually
+        finds the grasps ready."""
+        det = dets[idx]
+        label = str(det.get("simplified_label", det["label"]))
+        bbox = [int(v) for v in det["bbox"]]
+        cx, cy = 0.5 * (bbox[0] + bbox[2]), 0.5 * (bbox[1] + bbox[3])
+        rej = self._point_rejected
+        if rej is not None:
+            hold = float(self.get_parameter("point_reject_hold_s").value)
+            rx, ry = 0.5 * (rej["bbox"][0] + rej["bbox"][2]), 0.5 * (rej["bbox"][1] + rej["bbox"][3])
+            if (rej["label"] == label and time.time() - rej["t"] < hold
+                    and ((cx - rx) ** 2 + (cy - ry) ** 2) ** 0.5 < 80.0):
+                self.get_logger().info(
+                    f"[point] {label} was just rejected — not asking again for "
+                    f"{hold - (time.time() - rej['t']):.1f} s.")
+                return "ignored"
+        self._point_prop_id += 1
+        pid = self._point_prop_id
+        self._point_answer = None
+        self._point_prop_pub.publish(String(data=json.dumps({
+            "id": pid, "state": "open", "label": label,
+            "display": str(det.get("display", det["label"])), "index": int(idx),
+            "bbox": bbox, "stamp": round(time.time(), 3)})))
+        self.get_logger().info(f"[point] proposal {pid}: {label} — waiting for the operator's yes/no.")
+        try:
+            if bool(self.get_parameter("publish_debug_image").value) and self.fb.rgb_frame is not None:
+                self.debug_pub.publish(header, self.fb.rgb_frame, dets, selected_idx=int(idx),
+                                       pointer_px=self._pointer_px,
+                                       hand_landmarks_px=self._hand_landmarks_px,
+                                       hand_connections=self._hand_connections,
+                                       render_window=False)
+        except Exception as exc:
+            self.get_logger().debug(f"proposal highlight failed: {exc}")
+        timeout_s = float(self.get_parameter("point_confirm_timeout_s").value)
+        t0 = time.time()
+        verdict = ""
+        while rclpy.ok() and not verdict:
+            ans = self._point_answer
+            if ans is not None and ans[0] == pid:
+                verdict = ans[1]
+            elif self._pick_abort:
+                verdict = "abort"
+            elif self._pending_manual_choice is not None or self._voice_label_pending():
+                verdict = "superseded"
+            elif timeout_s > 0.0 and time.time() - t0 >= timeout_s:
+                verdict = "timeout"
+            else:
+                self._selection_nap(0.05)
+        verdict = verdict or "abort"
+        self._point_prop_pub.publish(String(data=json.dumps({
+            "id": pid, "state": verdict, "label": label, "stamp": round(time.time(), 3)})))
+        self.get_logger().info(f"[point] proposal {pid} ({label}): {verdict} after {time.time() - t0:.1f} s.")
+        if verdict in ("no", "timeout"):
+            self._point_rejected = {"label": label, "bbox": bbox, "t": time.time()}
+        return verdict
+
     def _on_manual_select_det(self, msg: String) -> None:
         """Queue a selection carrying label+bbox (from intent_router spatial
         picks). Stored like a window click so _resolve_clicked_choice maps it
@@ -2384,6 +2482,10 @@ class YoloLiveSelectGrasp(Node):
                             self._auto_label_starts = getattr(self, "_auto_label_starts", 0) + 1
                             self._auto_label_missing = 0
                             choice = found
+                            # 2026-09-28: a spoken pick — it was logged "(by
+                            # pointing)" (the default below), and a pointed
+                            # choice is now asked to be confirmed.
+                            self._choice_source_this = "voice"
 
                     if choice is None and auto_idx >= 0 and auto_idx < len(names):
                         choice = auto_idx
@@ -2500,6 +2602,18 @@ class YoloLiveSelectGrasp(Node):
                             self.detections_cache = []
                             self._selection_in_progress = False
                             self._selection_nap(1.0)
+                            continue
+                    # 2026-09-28 (Majd): a POINTED choice (no voice / click
+                    # source) waits for the operator's yes before the cycle
+                    # starts — see _confirm_pointed_choice.
+                    if (getattr(self, "_choice_source_this", None) is None
+                            and bool(self.get_parameter("confirm_pointing").value)
+                            and 0 <= int(choice) < len(dets)):
+                        verdict = self._confirm_pointed_choice(dets, int(choice), header)
+                        if verdict != "yes":
+                            self._selection_in_progress = False
+                            if verdict in ("no", "timeout", "ignored"):
+                                self._selection_nap(0.3)
                             continue
                     self.selection_made = True
                     self.selected_idx = int(choice)

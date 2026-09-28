@@ -44,6 +44,7 @@ _BAG_TOPICS = {
     "/speech/ai_said": "morty_said",
     "/speech/utterance_meta": "utterance",
     "/grasp_executor_lin_llm/interactive_status": "robot_status",
+    "/grasp_pipeline/point_proposal": "point_question",   # 2026-09-28
 }
 
 

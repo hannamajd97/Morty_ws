@@ -114,6 +114,10 @@ MOTION_INTENTS = ["pick_and_place", "pick", "place", "drop_held", "drop_left", "
                   # compound names chat_node's instant layer publishes.
                   "drop_right_release", "drop_left_release", "drop_right_release_home",
                   "drop_left_release_home", "go_home_open"]
+# 2026-09-28: the answers to the pointing question ("You pointed at the X.
+# Should I grasp it?") — no motion of their own and no verdict: the pick
+# they confirm arrives as the pipeline's selection record right after.
+ANSWER_INTENTS = ("confirm_point", "reject_point")
 OUTCOMES = ("success", "failure", "unknown")
 
 
@@ -458,7 +462,7 @@ class EpisodeRecorder(Node):
         if self.provisional:
             if action in self.motion_intents:
                 self._confirm("intent", action)
-            elif not self.bound_to_trial:
+            elif not self.bound_to_trial and action not in ANSWER_INTENTS:
                 self.get_logger().info(f"episode {self.ep_id} discarded: intent '{action or 'none'}' is not a motion command")
                 self.discard_episode()
             # bound: a question mid-trial is no verdict — the arm may still
