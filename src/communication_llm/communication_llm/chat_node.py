@@ -740,6 +740,14 @@ which one, do NOT ask yourself and do NOT tell them apart by product name
 or cap colour: emit the pick WITHOUT position or colour. The robot itself
 asks "leftmost or rightmost, or point at it".
 
+WHICH-ONE ANSWER - when the robot asked which one ("I see two vitamin
+tubes. Could you say leftmost or rightmost ..."), that pick was REFUSED and
+nothing runs. The user's next words naming a place ("Right most.", "The
+rightmost vitamin.", "the left one", "the middle one") ARE the answer: emit
+the pick of that object again WITH position (right -> rightmost, left ->
+leftmost, middle -> middle) and no text. Never answer "Left or right?", never
+ask them to confirm, never say it is grasping before you sent the pick.
+
 AFTER EMITTING AN ACTION INTENT - reply with NOTHING (empty text). The
 status announcements narrate everything; a verbal acknowledgment on top
 is noise ("On it. On it. On it." — Majd, 2026-08-26). Speak after an
@@ -3468,6 +3476,37 @@ class ChatIntentNode(Node):
                 and str(t.get("phase") or "") in ("awaiting_home_confirm", "no_grasp")
                 and not str(t.get("destination") or "") and not t.get("holding"))
 
+    def _log_llm_context(self, user_text: str) -> None:
+        """2026-09-28 (Majd, live: "The rightmost vitamin." after the robot's
+        which-one question got "Left or right?" and no pick — not
+        reproducible offline): append the model's exact input for this turn
+        to ~/morty_ws/logs/llm_context.jsonl, the static system prompt
+        replaced by a marker, so a wrong answer can be replayed. Off with
+        MORTY_LLM_CONTEXT_LOG=0; a failure here never costs the turn."""
+        if os.environ.get("MORTY_LLM_CONTEXT_LOG", "1") == "0":
+            return
+        try:
+            msgs = []
+            for m in self.chat_agent.messages:
+                if isinstance(m, dict):
+                    m = dict(m)
+                    if m.get("content") == SYSTEM_PROMPT:
+                        m["content"] = "<SYSTEM_PROMPT>"
+                    msgs.append(m)
+                else:
+                    msgs.append({"type": getattr(m, "type", "?"), "name": getattr(m, "name", None),
+                                 "arguments": getattr(m, "arguments", None),
+                                 "call_id": getattr(m, "call_id", None),
+                                 "text": getattr(m, "text", None),
+                                 "content": (lambda c: c if isinstance(c, str) else
+                                             [getattr(x, "text", str(x)) for x in (c or [])])(
+                                     getattr(m, "content", None))})
+            rec = {"t": time.time(), "model": self.model, "user": user_text, "messages": msgs}
+            with open(os.path.expanduser("~/morty_ws/logs/llm_context.jsonl"), "a") as f:
+                f.write(json.dumps(rec, default=str) + "\n")
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().debug(f"llm context log failed: {exc}")
+
     def _task_state_block(self) -> str:
         """2026-09-25 (SPEC C3): the one developer message that tells the LLM
         the pick's state, built from the executor's task state — the only
@@ -3589,6 +3628,7 @@ class ChatIntentNode(Node):
             self.chat_agent.add_developer_message(self._interrupt_note)
             self._interrupt_note = ""
         self.chat_agent.add_user_message(user_text)
+        self._log_llm_context(user_text)
         try:
             _t_llm0 = time.monotonic()
             self._t_llm0 = _t_llm0

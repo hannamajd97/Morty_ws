@@ -315,6 +315,7 @@ BEDROCK_PROVIDER_PREFIXES = (
     "anthropic.", "meta.", "mistral.", "cohere.", "ai21.", "amazon.",
     # Cross-region inference profile prefixes used by Bedrock
     "us.anthropic.", "eu.anthropic.", "apac.anthropic.",
+    "global.anthropic.",   # 2026-09-28: the capacity fallback's profile, also selectable directly
 )
 
 
@@ -1072,6 +1073,24 @@ class LLMService:
         self.tools = tools or []
         self.messages = messages if messages is not None else []
 
+    def _bedrock_fallback_call(self, fb: str, timeout: float, on_tool_call, on_text) -> Any:
+        """2026-09-28: the fallback profile, with ONE retry after 0.5 s on a
+        capacity error before anything was spoken or dispatched. The client
+        makes a single attempt (see _bedrock_runtime_client), and the global
+        profile also answers ServiceUnavailable now and then; botocore's own
+        retries used to hide that."""
+        for attempt in (0, 1):
+            prog = _StreamProgress(on_tool_call, on_text)
+            try:
+                return _bedrock_converse_call(fb, self.messages, self.tools, timeout,
+                                              prog.on_tool_call, prog.on_text)
+            except Exception as exc:  # noqa: BLE001
+                if attempt or prog.progressed or not _is_capacity_error(exc):
+                    raise
+                print(f"[llm] {fb} unavailable ({type(exc).__name__}); one retry in 0.5 s",
+                      file=sys.stderr, flush=True)
+                time.sleep(0.5)
+
     def chat(self, model: str = DEFAULT_MODEL, timeout: float = 20.0, on_tool_call=None, on_text=None,
              on_restart=None) -> Any:
         # 20s ceiling — without this the openai client's default is 600s, so
@@ -1102,7 +1121,7 @@ class LLMService:
             # _BEDROCK_FALLBACK_HOLD_S, then the primary is tried again.
             _fb_direct = _fallback_model_for(model)
             if _fb_direct and time.monotonic() < _BEDROCK_PRIMARY_DOWN_UNTIL.get(model, 0.0):
-                model = _fb_direct
+                return self._bedrock_fallback_call(_fb_direct, timeout, on_tool_call, on_text)
             # 2026-09-25 (review L2): see _StreamProgress — no capacity retry
             # once the failed stream dispatched a command or spoke.
             prog = _StreamProgress(on_tool_call, on_text)
@@ -1125,7 +1144,7 @@ class LLMService:
                           f"and using {fb} directly for the next {_BEDROCK_FALLBACK_HOLD_S:.0f} s",
                           file=sys.stderr, flush=True)
                     _call_restart(on_restart)
-                    return _bedrock_converse_call(fb, self.messages, self.tools, timeout, on_tool_call, on_text)
+                    return self._bedrock_fallback_call(fb, timeout, on_tool_call, on_text)
                 raise
         extra_body = _extra_body_for_model(model)
         if USE_CHAT_COMPLETIONS:
