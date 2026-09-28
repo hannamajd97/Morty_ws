@@ -45,6 +45,7 @@ from PyQt5 import QtCore, QtWidgets
 from .html_viewer import write_view3d_html
 from .vla_link import VlaLink
 from .bag_link import BagLink
+from .managed_launch import die_with_parent_preexec
 
 MMHRI_DIR = os.path.expanduser("~/morty_ws/experiments/mmhri")      # campaign CSVs + the trials before 2026-09-18
 EXPERIMENTS_DIR = os.path.expanduser("~/morty_ws/experiments")      # day folders live directly here
@@ -553,6 +554,31 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._vla.shutdown()
         self._bag.shutdown()
 
+    def close_active_trial(self) -> None:
+        """2026-09-28 (trial 081: the GUI was closed with "Keep running"
+        while the trial recorded; its parecord and ros2 bag ran on for 32
+        minutes, unowned, and wrote 3.9 GB into 081 while trials 082-085
+        were recorded): "Keep running" keeps the robot infrastructure, never
+        a trial's own recorders. The VLA episode, the bag and the audio end
+        here; no trial.json is written (the trial was not stopped by ⏹), so
+        the folder stays marked incomplete. A GUI crash is covered by
+        die_with_parent_preexec on both recorders."""
+        if not getattr(self, "_active", False):
+            return
+        self._cancelled = True           # a ⏹ chain still waiting must not save it
+        if not getattr(self, "_vla_ended", True):
+            self._vla_ended = True
+            self._vla.end(None)
+        if not getattr(self, "_bag_ended", True):
+            self._bag_ended = True
+            self._bag.end()
+        self._finish_recorders()
+        if self._bridge is not None:
+            try:
+                self._bridge.trial_stop()
+            except Exception:
+                pass
+
     def _fallback_task(self) -> str:
         """The episode's instruction if nothing was said (clicked trials)."""
         sid, _, text = self.scenario.currentText().partition(": ")
@@ -648,6 +674,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                     ["parecord", "--file-format=wav",
                      os.path.join(self._trial_dir, "audio.wav")],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    preexec_fn=die_with_parent_preexec,   # 2026-09-28: see close_active_trial
                 )
             except OSError:
                 self._audio_proc = None

@@ -18,6 +18,18 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .config import *  # noqa: F401,F403
 
+def die_with_parent_preexec() -> None:
+    """2026-09-28: Popen preexec_fn — ask the kernel to send this child
+    SIGINT when its parent (the GUI) dies, so a trial recorder (rosbag2,
+    parecord) finalises its file instead of running on unowned. SIGINT, not
+    SIGKILL: both recorders flush and close on it."""
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, int(signal.SIGINT))   # PR_SET_PDEATHSIG
+    except Exception:
+        pass
+
+
 class ManagedLaunch(QtCore.QObject):
     """A ros2 launch subprocess with escalating stop.
 
@@ -63,7 +75,12 @@ class ManagedLaunch(QtCore.QObject):
             self._adopted_pid = int(pid)
             self._stop_stage = 0
 
-    def start(self, cmd, env=None, log_path=None) -> None:
+    def start(self, cmd, env=None, log_path=None, die_with_parent: bool = False) -> None:
+        # die_with_parent (2026-09-28): the child gets SIGINT when the GUI
+        # process dies — for a trial's own recorders only (trial 081's bag
+        # ran on for 32 min after the GUI restarted). Infrastructure never
+        # sets it: it survives the GUI by design.
+        preexec = die_with_parent_preexec if die_with_parent else None
         if not self.running():
             # A stale escalation timer from the PREVIOUS stop would SIGKILL
             # the process we are about to start (killed the fresh executor
@@ -90,7 +107,7 @@ class ManagedLaunch(QtCore.QObject):
                 self._log_f.flush()
                 self.proc = subprocess.Popen(
                     cmd, start_new_session=True, env=env,
-                    stdout=self._log_f, stderr=subprocess.STDOUT,
+                    stdout=self._log_f, stderr=subprocess.STDOUT, preexec_fn=preexec,
                 )
                 threading.Thread(
                     target=self._tail_to_console,
@@ -99,7 +116,7 @@ class ManagedLaunch(QtCore.QObject):
                 ).start()
             else:
                 self.proc = subprocess.Popen(
-                    cmd, start_new_session=True, env=env,
+                    cmd, start_new_session=True, env=env, preexec_fn=preexec,
                 )
             self._adopted_pid = None
             self._stop_stage = 0

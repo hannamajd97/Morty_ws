@@ -93,6 +93,20 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
     dest = str(attrs.get("destination") or "").strip().lower()
     side = {"right": "the right side", "left": "the left side", "home": "home"}.get(dest, dest)
     name = (f"{colour} {obj}" if colour and obj else str(obj or "")).replace("_", " ").strip()
+    # 2026-09-28 (Majd's trial 082: "The right most vitamin tube." was trained
+    # as "pick up the vitamin tube" — with two tubes the instruction must say
+    # which): the position / ordinal the intent resolved goes into the text.
+    position = str(attrs.get("position") or "").strip().lower()
+    try:
+        ordinal = int(attrs.get("ordinal") or 0)
+    except (TypeError, ValueError):
+        ordinal = 0
+    if name and ordinal > 0:
+        nth = {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth"}.get(ordinal, f"{ordinal}th")
+        side_from = str(attrs.get("ordinal_from") or "left").strip().lower() or "left"
+        name = f"{nth} {name} from the {side_from}"
+    elif name and position:
+        name = f"{position} {name}"
     thing = f"the {name}" if name else "the object"
     a = (action or "").lower()
     if a in ("pick", "pick_and_place"):
@@ -179,6 +193,50 @@ def wrap_pi(a: np.ndarray) -> np.ndarray:
 
 
 # ----------------------------------------------------------------- I/O ----
+def _fill_tcp_from_ur(s: Dict[str, np.ndarray]) -> int:
+    """2026-09-28: the TF ee pose is NaN where the recorder rejected a stale
+    transform (7-49 steps in each trial of 2026-09-28), and pos_euler8 /
+    eef_delta carried those NaNs into the export. The driver's own TCP pose
+    (ur_tcp, same flange as tool0: < 0.4 mm apart at rest) has no gaps, so
+    a NaN step gets ur_tcp moved by the fixed tool0 -> ee offset measured on
+    the episode's valid steps. Returns how many steps were filled (0 when
+    nothing is missing or ur_tcp is absent — then nothing changes)."""
+    need = ("tcp_pos", "tcp_quat", "tool0_pos", "tool0_quat", "ur_tcp_pos", "ur_tcp_quat")
+    if any(k not in s for k in need):
+        return 0
+    bad = np.isnan(s["tcp_pos"]).any(1) | np.isnan(s["tcp_quat"]).any(1)
+    ok = ~bad & ~np.isnan(s["tool0_pos"]).any(1) & ~np.isnan(s["tool0_quat"]).any(1)
+    fill = bad & ~np.isnan(s["ur_tcp_pos"]).any(1) & ~np.isnan(s["ur_tcp_quat"]).any(1)
+    if not fill.any() or not ok.any():
+        return 0
+
+    def rot(q):   # xyzw -> 3x3
+        x, y, z, w = q
+        return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                         [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                         [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+    def qmul(a, b):
+        ax, ay, az, aw = a; bx, by, bz, bw = b
+        return np.array([aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+                         aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz])
+
+    def qinv(q):
+        return np.array([-q[0], -q[1], -q[2], q[3]])
+
+    # tool0 -> ee offset in the tool0 frame (constant: a rigid gripper)
+    p_off = np.median([rot(s["tool0_quat"][i]).T @ (s["tcp_pos"][i] - s["tool0_pos"][i]) for i in np.where(ok)[0]], axis=0)
+    i0 = int(np.where(ok)[0][0])
+    q_off = qmul(qinv(s["tool0_quat"][i0]), s["tcp_quat"][i0])
+    tcp_pos, tcp_quat = s["tcp_pos"].copy(), s["tcp_quat"].copy()
+    for i in np.where(fill)[0]:
+        q = s["ur_tcp_quat"][i]
+        tcp_pos[i] = s["ur_tcp_pos"][i] + rot(q) @ p_off
+        tcp_quat[i] = qmul(q, q_off)
+    s["tcp_pos"], s["tcp_quat"] = tcp_pos, tcp_quat
+    return int(fill.sum())
+
+
 class Episode:
     def __init__(self, path: Path):
         self.path = Path(path)
@@ -187,6 +245,7 @@ class Episode:
         with np.load(self.path / "steps.npz") as z:
             self.steps: Dict[str, np.ndarray] = {k: z[k] for k in z.files}
         self.n = int(self.steps["t"].shape[0])
+        self.tcp_filled = _fill_tcp_from_ur(self.steps)
 
     def image_path(self, cam: str, i: int) -> Path:
         return self.path / "images" / cam / f"{i:06d}.jpg"

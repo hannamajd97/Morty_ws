@@ -25,7 +25,9 @@ vla_episode_recorder:
     # auto mode: one episode per Morty trial (accepted transcript -> motion intent -> cycle_done)
     auto_mode: false
     intent_topic: "/robot/intent"
-    motion_intents: ["pick_and_place", "pick", "place", "drop_held", "drop_left", "drop_right", "go_home", "carry_release", "release_home", "release", "open_gripper", "close_gripper"]
+    # motion_intents: not set here — the recorder's MOTION_INTENTS is the one list
+    # (2026-09-28: an old copy here lacked confirm_drop / look_* / go_to_* / sleep,
+    # so trial 085's look moves were labelled idle).
     cycle_done_topic: "/grasp_executor_lin_llm/cycle_done"
     intent_wait_s: 25.0
     max_episode_s: 240.0

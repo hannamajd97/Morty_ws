@@ -55,7 +55,8 @@ class BagLink(QtCore.QObject):
             bag_dir = os.path.join(parent_dir, f"{name}_{time.strftime('%H%M%S')}")
         cmd = ["ros2", "bag", "record", "-o", bag_dir] + list(BAG_TOPICS)
         self._proc.start(cmd, env=os.environ.copy(),
-                         log_path=os.path.join(parent_dir, "bag_record.log"))
+                         log_path=os.path.join(parent_dir, "bag_record.log"),
+                         die_with_parent=True)   # 2026-09-28: a dead GUI must not leave it recording (trial 081)
         self.last_dir = bag_dir
         return bag_dir
 

@@ -110,6 +110,19 @@ MOTION_INTENTS = ["pick_and_place", "pick", "place", "drop_held", "drop_left", "
 OUTCOMES = ("success", "failure", "unknown")
 
 
+def episode_task_instruction(instructions: list, events: dict) -> str:
+    """The episode's task text: the last pick instruction before the arm's
+    first motion, else the first instruction (2026-09-28, trial 082: "Grasp
+    for me the vitamin tube." was refused — two tubes — and "The right most
+    vitamin tube." is the pick that ran; the task was the refused one)."""
+    if not instructions:
+        return ""
+    starts = sorted(e["stamp"] for e in events.get("executor_phase", []) if e.get("name") == "motion_start")
+    picks = [i for i in instructions if i["action_intent"] in ("pick", "pick_and_place")
+             and (not starts or i["stamp"] <= starts[0])]
+    return (picks[-1] if picks else instructions[0])["instruction"]
+
+
 def _stamp_s(header) -> float:
     return float(header.stamp.sec) + float(header.stamp.nanosec) * 1e-9
 
@@ -197,6 +210,7 @@ class EpisodeRecorder(Node):
             ("motion_intents", MOTION_INTENTS),
             ("cycle_done_topic", "/grasp_executor_lin_llm/cycle_done"),
             ("timing_topic", "/grasp_executor_lin_llm/timing"),
+            ("selection_timing_topic", "/graspgen/timing"),   # the pipeline's per-pick record (label, source)
             ("interactive_status_topic", "/grasp_executor_lin_llm/interactive_status"),
             ("intent_wait_s", 25.0),
             ("max_episode_s", 240.0),
@@ -278,6 +292,7 @@ class EpisodeRecorder(Node):
         self.create_subscription(String, g("intent_topic"), self._on_intent, 10)
         self.create_subscription(String, g("cycle_done_topic"), self._on_cycle_done, 10)
         self.create_subscription(String, g("timing_topic"), self._on_timing, 20)
+        self.create_subscription(String, g("selection_timing_topic"), self._on_selection_timing, 20)
         self.create_subscription(String, g("interactive_status_topic"), self._on_interactive, 10)
         self.create_subscription(String, "/vla_recorder/cmd", self._on_cmd, 10)
         self.status_pub = self.create_publisher(String, "/vla_recorder/status", LATCHED)
@@ -435,11 +450,50 @@ class EpisodeRecorder(Node):
             # move on a later command; the trial's own Stop decides.
         self._publish_status()
 
-    def _add_instruction(self, payload: dict, action: str, stamp: float) -> None:
+    def _on_selection_timing(self, msg):
+        """2026-09-28 (Majd's trial 084: a pick chosen by POINTING sends no
+        intent, so its approach, grasp and lift were labelled idle and the
+        episode's task became "drop it on the right side"): the pipeline's
+        selection-cycle record names the picked object and where the choice
+        came from. When the instruction active at that moment is not already
+        a pick of this object (a spoken pick, possibly clarified by
+        pointing), a pick instruction starts at the selection."""
+        if not self.recording:
+            return
+        try:
+            rec = json.loads(msg.data)
+        except Exception:
+            return
+        if not isinstance(rec, dict) or rec.get("kind") != "selection_cycle":
+            return
+        label = str(rec.get("label") or "").strip()
+        source = str(rec.get("source") or "")
+        try:
+            stamp = float(rec.get("select") or rec.get("published") or self._ros_now())
+        except (TypeError, ValueError):
+            stamp = self._ros_now()
+        self._event("selection", {"label": label, "source": source, "cycle_id": rec.get("cycle_id")}, stamp)
+        if not label:
+            return
+        before = [i for i in self.instructions if i["stamp"] <= stamp]
+        if before and before[-1]["action_intent"] in ("pick", "pick_and_place") and \
+                str(before[-1].get("object") or "") == label:
+            return
+        self._add_instruction({"action_intent": "pick", "object_intent": label,
+                               "object_attributes": {"source": source or "selection"}}, "pick", stamp,
+                              use_transcript=False)
+        self.instructions.sort(key=lambda i: i["stamp"])
+        for k, ins in enumerate(self.instructions):
+            ins["idx"] = k
+        if self.provisional:
+            self._confirm("selection", "pick")   # a pointed pick moves the arm like a spoken one
+        self._publish_status()
+
+    def _add_instruction(self, payload: dict, action: str, stamp: float, use_transcript: bool = True) -> None:
         """One instruction per motion intent: the transcript that caused it
         (the last accepted one, at most 30 s before) and the canonical text."""
         transcripts = self.events.get("transcript", [])
-        tr = transcripts[-1] if transcripts and stamp - transcripts[-1]["stamp"] < 30.0 else None
+        tr = transcripts[-1] if use_transcript and transcripts and stamp - transcripts[-1]["stamp"] < 30.0 else None
         text = canonical_instruction(action, payload.get("object_intent"), payload.get("object_attributes"),
                                      fallback=(tr or {}).get("text", ""))
         self.instructions.append({
@@ -662,7 +716,7 @@ class EpisodeRecorder(Node):
         np.savez_compressed(self.ep_dir / "steps.npz", **arrays)
         # The language instruction of record: the first motion instruction's
         # canonical text; the raw transcript / trial form stay as fallbacks.
-        first = self.instructions[0]["instruction"] if self.instructions else ""
+        first = episode_task_instruction(self.instructions, self.events)
         task = first or self.task or self.task_fallback
         task_from = "intent" if first else "transcript" if self.task else "trial form"
         meta = {
@@ -720,9 +774,22 @@ class EpisodeRecorder(Node):
         instr = np.full(n, -1.0); phase = np.full(n, -1.0); seg = np.full(n, float(SEGMENT_IDLE))
         # instruction: active from its intent until the next cycle_done / next instruction
         cds = sorted(e["stamp"] for e in self.events.get("cycle_done", []))
+        starts = sorted(e["stamp"] for e in self.events.get("executor_phase", []) if e.get("name") == "motion_start")
+        picks = ("pick", "pick_and_place")
         for k, ins in enumerate(self.instructions):
             t_on = ins["stamp"]
             t_off = self.instructions[k + 1]["stamp"] if k + 1 < len(self.instructions) else np.inf
+            # 2026-09-28 (trial 082): a pick replaced by another pick of the
+            # same object before the arm moved was refused or clarified
+            # ("which tube?") — its steps stay idle instead of teaching
+            # "pick up the vitamin tube" = stand still.
+            nxt = self.instructions[k + 1] if k + 1 < len(self.instructions) else None
+            ins.pop("superseded", None)
+            if (nxt is not None and ins["action_intent"] in picks and nxt["action_intent"] in picks
+                    and ins.get("object") == nxt.get("object")
+                    and not any(t_on <= s < t_off for s in starts)):
+                ins["superseded"] = True
+                continue
             ends = [c for c in cds if c > t_on]
             if ends:
                 t_off = min(t_off, ends[0] + 0.5)      # half a second after the verdict: the arm has stopped

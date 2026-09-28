@@ -3596,6 +3596,12 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 self._named_pose_extra.stop()
                 # The escalation timers die with the GUI; SIGINT is usually
                 # enough, and a reopened GUI re-adopts any survivor.
+        # 2026-09-28: a trial still recording ends here on EVERY close — its
+        # bag and audio are the trial's, not infrastructure (trial 081).
+        try:
+            self.mmhri_win.close_active_trial()
+        except Exception:
+            pass
         # Never leave an adopted executor latched in manual-wait mode after
         # this GUI (the only approval control) has gone away.
         self.bridge.set_grasp_execution_enabled(True)

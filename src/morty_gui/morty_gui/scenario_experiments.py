@@ -78,6 +78,29 @@ def _first(events, source, after=None):
     return None
 
 
+# 2026-09-28: the GUI stamps events when its callback runs, usually 0.1-0.3 s
+# late and once 3 s late (trials 083, 085); an instant command can then be
+# stamped BEFORE the sentence that caused it. The sentence's command is the
+# first intent from this long before it on — "strictly after" paired trial
+# 082's sentence with the NEXT pick 13.4 s later.
+_PAIR_TOL_S = 5.0
+
+
+def _clean_intent_s(v):
+    """Within 0.5 s below zero is stamping jitter around an instant command
+    (true value ~0.01 s): 0.0. Further below zero, the GUI stamped the
+    transcript late: unknown (None), never a made-up number."""
+    if v is None or v >= 0:
+        return v
+    return 0.0 if v >= -0.5 else None
+
+
+def _first_intent_for(events, t_cmd):
+    if t_cmd is None:
+        return _first(events, "intent")
+    return _first(events, "intent", after=t_cmd - _PAIR_TOL_S)
+
+
 def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
     """The trial's timeline (2026-09-18, Majd: "how fast the system is from
     top to bottom, every tiny thing, background and non-background").
@@ -180,7 +203,7 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         lines.append(f"t={rel(t):+8.2f}  {txt}")
 
     # stage times, from the records where they exist, else from the events
-    t_cmd = _first(events, "transcript"); t_int = _first(events, "intent", after=t_cmd)
+    t_cmd = _first(events, "transcript"); t_int = _first_intent_for(events, t_cmd)
     t_cmd_w = mono_to_wall + t_cmd if t_cmd is not None else None
     t_int_w = mono_to_wall + t_int if t_int is not None else None
     sel = sel_cycles[-1] if sel_cycles else None
@@ -191,6 +214,15 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         return round(b - a, 3) if (a is not None and b is not None) else None
 
     t_sel = float(sel["select"]) if sel and sel.get("select") else None
+    # 2026-09-28 (trial 084): a pick started by POINTING has its first
+    # transcript after the selection ("Drop it on the right side."): total
+    # starts at whichever came first, and speech -> intent is not this
+    # pick's (None). A negative speech -> intent means the GUI stamped the
+    # transcript late (seen +3.1 s in trial 083): unknown, not a number.
+    voice_started = t_cmd_w is not None and (t_sel is None or t_cmd_w <= t_sel)
+    t_task0 = t_cmd_w if voice_started else t_sel
+    intent_s = d(t_cmd_w, t_int_w) if voice_started else None
+    intent_s = _clean_intent_s(intent_s)
     t_pub = float(sel["published"]) if sel and sel.get("published") else None
     perception = None; graspgen = None; bg_lead = None
     if sel:
@@ -203,7 +235,7 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
             graspgen = d(float(sel.get("graspgen_start") or 0.0), float(sel.get("graspgen_done") or 0.0)) if sel.get("graspgen_done") else None
     end_t = phases.get("cycle_done") or phases.get("home_done") or phases.get("cycle_failed")
     stage = {
-        "intent_s": d(t_cmd_w, t_int_w),
+        "intent_s": intent_s,
         "yolo_s": perception,
         "graspgen_s": graspgen,
         "planning_s": d(phases.get("candidates_received"), phases.get("motion_start")),
@@ -214,7 +246,7 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
         "execution_s": d(phases.get("motion_start"), end_t),
         "click_to_motion_s": d(t_sel, phases.get("motion_start")),
         "background_lead_s": bg_lead,
-        "total_s": d(t_cmd_w if t_cmd_w is not None else t_sel, end_t),
+        "total_s": d(t_task0, end_t),
         "planner": (ex or {}).get("planner"),
         "path": (sel or {}).get("path"),
     }
@@ -238,7 +270,7 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
 def compute_stage_times(events) -> dict:
     """Derive the four PDF stage durations from the raw event list."""
     t_cmd = _first(events, "transcript")
-    t_int = _first(events, "intent", after=t_cmd)
+    t_int = _first_intent_for(events, t_cmd)
     # Fall back: typed/clicked trials have no transcript.
     anchor = t_cmd if t_cmd is not None else _first(events, "trial")
     t_sel = _first(events, "selection_cycle_id", after=t_int or anchor)
@@ -249,7 +281,7 @@ def compute_stage_times(events) -> dict:
         return round(b - a, 3) if (a is not None and b is not None) else None
 
     return {
-        "intent_s": d(t_cmd, t_int),
+        "intent_s": _clean_intent_s(d(t_cmd, t_int)),
         "yolo_s": d(t_int, t_sel),
         "graspgen_s": d(t_sel, t_pose),
         "execution_s": d(t_pose, t_done),
