@@ -47,6 +47,13 @@ name and `episode_index` the trial number (trial.json names it as `vla_episode`)
 Actions are derived at conversion time from consecutive states (or the controller
 reference when present), so one recording feeds both joint-space and EEF-delta targets.
 
+Tools (2026-09-28): `ros2 run vla_experiments vla_view <trial dir> ...` writes `viewer.html` into the
+folder (both frames per step with the step's time, joints, gripper, TCP, instruction, a timeline of joint
+speed vs image change, the instruction list and every recorded event with its time; `viewer.html#<step>`
+opens at a step). `ros2 run vla_experiments vla_relabel [--apply] <trial dir> ...` rebuilds instructions
+and step labels from the saved events with the current rules (dry run without --apply; originals kept
+as *.orig_<date>; v1 episodes are skipped).
+
 What the v2 recorder guarantees (see `raw_dataset.py` for the exact keys):
 
 * **Original stamps.** Every stream keeps its own header stamp next to the value

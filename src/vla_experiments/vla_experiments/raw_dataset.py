@@ -60,8 +60,11 @@ STEP_KEYS = [
     "tcp_quat",           # (N,4)  ee frame orientation, xyzw
     "tool0_pos",          # (N,3)  tool0 position in base frame [m]
     "tool0_quat",         # (N,4)
-    "gripper",            # (N,)   0 = closed .. 1 = open, from the gripper joint
-    "gripper_cmd",        # (N,)   last commanded gripper target (0/1) from the adapter's command event, NaN if none yet
+    "gripper",            # (N,)   0 = closed .. 1 = open, from the gripper joint. NOT a live finger
+                          #        position: the adapter reports 0 or 1 once an open/close has
+                          #        FINISHED, 0.5-1.7 s after the command (a close on an object ends
+                          #        when the fingers stall). Actions use gripper_cmd (derive_actions).
+    "gripper_cmd",        # (N,)   last commanded gripper target, 1 = open / 0 = close, from the adapter's command event, NaN if none yet
     "grasp_detected",     # (N,)   UR tool digital input (pin 16), -1 if unknown.
                           #        DO NOT USE as a feature or label (2026-09-28): the pin is
                           #        HIGH whenever the fingers stall — on an object OR on each
@@ -131,6 +134,14 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
         return "open the gripper and go back home"
     if a == "carry_release":
         return "go back home and hand it over" if dest == "home" else f"carry it to {side} and hand it over"
+    if a.startswith("drop_") and a.endswith(("_release", "_release_home")):
+        # 2026-09-28: the instant path's compounds (drop_right_release_home …),
+        # worded like the same answer through the LLM (confirm_drop + then).
+        side = "right" if a.startswith("drop_right") else "left"
+        return f"drop it on the {side} side" + (", hand it over and go back home"
+                                                  if a.endswith("_home") else " and hand it over")
+    if a == "go_home_open":
+        return "bring it home and hand it over"
     if a == "confirm_drop":
         # The answer to "where should I drop it?" through the LLM: destination
         # "drop_right" / "right" / "home", then "" / "release" / "release_home".

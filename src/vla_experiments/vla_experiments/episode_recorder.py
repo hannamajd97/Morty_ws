@@ -106,7 +106,14 @@ LATCHED = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE,
 MOTION_INTENTS = ["pick_and_place", "pick", "place", "drop_held", "drop_left", "drop_right", "go_home",
                   "carry_release", "release_home", "release", "open_gripper", "close_gripper",
                   "confirm_drop", "look_left", "look_right", "look_up", "go_to_ready", "go_to_start",
-                  "sleep"]
+                  "sleep",
+                  # 2026-09-28 (Majd's trial 080: "Drop it on the right side. Give me
+                  # the objects and go back home." came from the instant path as ONE
+                  # compound action and got no instruction — the drop, the release and
+                  # the way home were labelled "pick up the tape dispenser"): the
+                  # compound names chat_node's instant layer publishes.
+                  "drop_right_release", "drop_left_release", "drop_right_release_home",
+                  "drop_left_release_home", "go_home_open"]
 OUTCOMES = ("success", "failure", "unknown")
 
 
@@ -475,9 +482,12 @@ class EpisodeRecorder(Node):
         self._event("selection", {"label": label, "source": source, "cycle_id": rec.get("cycle_id")}, stamp)
         if not label:
             return
+        # 2026-09-28: the active instruction being a pick of this cycle is
+        # enough — the pipeline's label is not the spoken name ('vitamin_tube'
+        # for "vitamin c"; see relabel._covered_by_spoken_pick).
         before = [i for i in self.instructions if i["stamp"] <= stamp]
-        if before and before[-1]["action_intent"] in ("pick", "pick_and_place") and \
-                str(before[-1].get("object") or "") == label:
+        if before and before[-1]["action_intent"] in ("pick", "pick_and_place") and not any(
+                before[-1]["stamp"] < c["stamp"] < stamp for c in self.events.get("cycle_done", [])):
             return
         self._add_instruction({"action_intent": "pick", "object_intent": label,
                                "object_attributes": {"source": source or "selection"}}, "pick", stamp,
@@ -779,14 +789,14 @@ class EpisodeRecorder(Node):
         for k, ins in enumerate(self.instructions):
             t_on = ins["stamp"]
             t_off = self.instructions[k + 1]["stamp"] if k + 1 < len(self.instructions) else np.inf
-            # 2026-09-28 (trial 082): a pick replaced by another pick of the
-            # same object before the arm moved was refused or clarified
-            # ("which tube?") — its steps stay idle instead of teaching
-            # "pick up the vitamin tube" = stand still.
+            # 2026-09-28 (trials 082, 071): a pick replaced by another pick
+            # before the arm moved was refused or clarified ("which tube?" —
+            # then "the rightmost" / "the yellow vitamin c"; only one pick
+            # runs, whatever the names) — its steps stay idle instead of
+            # teaching "pick up the vitamin tube" = stand still.
             nxt = self.instructions[k + 1] if k + 1 < len(self.instructions) else None
             ins.pop("superseded", None)
             if (nxt is not None and ins["action_intent"] in picks and nxt["action_intent"] in picks
-                    and ins.get("object") == nxt.get("object")
                     and not any(t_on <= s < t_off for s in starts)):
                 ins["superseded"] = True
                 continue
