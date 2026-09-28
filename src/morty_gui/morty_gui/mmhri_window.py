@@ -425,9 +425,15 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # (excel_window.ExcelExportWindow; refreshed after every trial).
         self.excel_btn = QtWidgets.QPushButton("📊 Excel export")
         self.excel_btn.setToolTip("Choose trials and send everything recorded about them to\n"
-                                  "experiments/mmhri/MMHRI_experiments.xlsx")
+                                  "experiments/MMHRI_experiments.xlsx")
         self.excel_btn.clicked.connect(self._open_excel_window)
         btn_row.addWidget(self.excel_btn)
+        # 2026-09-28 (Majd: "a button just for fast sending the last record")
+        self.excel_last_btn = QtWidgets.QPushButton("📊 Send last trial")
+        self.excel_last_btn.setToolTip("Adds the trial you saved last to the Excel file (only if it is not in it yet;\n"
+                                       "nothing already in the file changes). Waits for its final times first.")
+        self.excel_last_btn.clicked.connect(self._send_last_trial)
+        btn_row.addWidget(self.excel_last_btn)
         lay.addLayout(btn_row)
 
         self.status = QtWidgets.QLabel("idle — fill the header, then ⏺ Start")
@@ -596,6 +602,39 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._excel_win.show()
         self._excel_win.raise_()
         self._excel_win.activateWindow()
+
+    def _last_trial_folder(self) -> str:
+        """The trial saved last in this window, else the newest trial.json."""
+        f = getattr(self, "_last_saved_trial", "")
+        if f and os.path.exists(os.path.join(f, "trial.json")):
+            return f
+        cands = [p for p in all_trial_dirs() if os.path.exists(os.path.join(p, "trial.json"))]
+        return max(cands, key=lambda p: os.path.getmtime(os.path.join(p, "trial.json"))) if cands else ""
+
+    def _send_last_trial(self) -> None:
+        if getattr(self, "_active", False):
+            self.status.setText("✖ not while a trial is recording")
+            return
+        folder = self._last_trial_folder()
+        if not folder:
+            self.status.setText("✖ no saved trial to send")
+            return
+        if getattr(self, "_excel_sender", None) is None:
+            from .excel_window import ExcelSender
+            self._excel_sender = ExcelSender(self)
+            self._excel_sender.progress.connect(lambda t: self.status.setText(t))
+            self._excel_sender.finished.connect(self._on_last_trial_sent)
+        if self._excel_sender.running:
+            return
+        self.excel_last_btn.setEnabled(False)
+        self.status.setText(f"⏳ sending {os.path.basename(folder)} to Excel …")
+        self._excel_sender.send([folder])
+
+    def _on_last_trial_sent(self, res: dict) -> None:
+        from .excel_window import ExcelSender
+        self.excel_last_btn.setEnabled(True)
+        self.status.setText(ExcelSender.describe(res))
+        self._refresh_excel_window()
 
     def _refresh_excel_window(self) -> None:
         """After a saved or deleted trial: the export list shows it."""
@@ -1226,6 +1265,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             f"✔ trial {tid} saved → {self._trial_dir}\n"
             "row appended to mmhri_experiments.csv"
         )
+        self._last_saved_trial = self._trial_root
         self._start_postprocess(self._trial_root)
         self._reset_buttons()
         self._refresh_progress()

@@ -1,17 +1,20 @@
 """The MMHRI window's Excel export (2026-09-28, Majd: "a button inside the
 experiments window, a selection of the experiments to send, and the data
 goes directly into the sheet; the selection updates after every
-experiment").
+experiment" — and later: "don't update the Excel when I send it, what if I
+changed stuff inside; and a button just for fast sending the last record").
 
-One list of every saved trial, newest first. A ticked trial is (or will be)
-in the workbook: the ticks start as what the workbook already holds, a new
-trial arrives unticked, and "📊 Send ticked to Excel" rebuilds the workbook
-with exactly the ticked trials (excel_export.build + recalc, on a worker
-thread). Unticking a trial that is in the workbook and sending removes it —
-the window asks first. The list refreshes after every saved or deleted
-trial (the MMHRI window calls refresh()) and every 10 s while it is open, so
-the "Times" column turns from "preliminary" to "final" when the trial's
-post-processing has finished.
+Sending only ADDS: excel_export.append writes rows for the ticked trials that
+are not in the workbook yet and never touches a row, column, sheet or format
+that is already there. What is "in the workbook" is read from its
+Experiments sheet, so a row deleted there can be sent again. A trial's times
+are final ~10-30 s after ⏹ (the post-processing); a row is never updated
+later, so the sender WAITS for the final times (at most 90 s) before adding.
+While LibreOffice has the file open nothing is written — its next save would
+overwrite the rows, or the rows would overwrite unsaved edits.
+
+ExcelSender is the one background worker, used by this window and by the
+trial window's "📊 Send last trial" button.
 """
 from __future__ import annotations
 
@@ -19,15 +22,80 @@ import json
 import os
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from PyQt5 import QtCore, QtWidgets
 
 from . import excel_export as xl
 
+FINAL_WAIT_S = 90.0
 
-class _Done(QtCore.QObject):
+
+def _times_final(folder: str) -> bool:
+    try:
+        st = json.loads((Path(folder) / "trial.json").read_text()).get("Stage Times") or {}
+        return bool(st.get("event_times"))
+    except Exception:
+        return False
+
+
+class ExcelSender(QtCore.QObject):
+    """Adds trials to the workbook on a worker thread; `progress` and
+    `finished` arrive in the GUI thread (Qt queued signals)."""
+    progress = QtCore.pyqtSignal(str)
     finished = QtCore.pyqtSignal(object)
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.running = False
+
+    def send(self, folders: list) -> bool:
+        if self.running or not folders:
+            return False
+        self.running = True
+        threading.Thread(target=self._work, args=(list(folders),), daemon=True).start()
+        return True
+
+    def _work(self, folders: list) -> None:
+        try:
+            if xl._lock_path(xl.DEFAULT_XLSX).exists():
+                self._finish({"error": "open", "why": "The Excel file is open in LibreOffice — save and close it, then send again."})
+                return
+            t_end = time.time() + FINAL_WAIT_S
+            pending = [f for f in folders if not _times_final(f)]
+            while pending and time.time() < t_end:
+                self.progress.emit(f"⏳ waiting for the final times of {', '.join(os.path.basename(p) for p in pending)} "
+                                   f"(post-processing, about 10-30 s after ⏹) …")
+                time.sleep(2.0)
+                pending = [f for f in folders if not _times_final(f)]
+            self.progress.emit(f"⏳ adding {len(folders)} trial(s) to Excel …")
+            res = xl.append(folders, xl.DEFAULT_XLSX)
+            if not res.get("error") and res.get("added"):
+                res.update(xl.recalc(xl.DEFAULT_XLSX))
+            res["still_preliminary"] = [os.path.basename(p) for p in pending]
+        except Exception as exc:  # noqa: BLE001 - report, never crash the GUI
+            res = {"error": "failed", "why": f"{type(exc).__name__}: {exc}"}
+        self._finish(res)
+
+    def _finish(self, res: dict) -> None:
+        self.running = False          # before the signal: its handler may send again
+        self.finished.emit(res)
+
+    @staticmethod
+    def describe(res: dict) -> str:
+        if res.get("error"):
+            return "✖ " + str(res.get("why") or res["error"])
+        if not res.get("added"):
+            return "✔ nothing to add — " + str(res.get("note") or "already in the Excel file")
+        msg = f"✔ added {res['added']} trial(s) to {os.path.basename(res.get('path', xl.DEFAULT_XLSX))}"
+        if res.get("created"):
+            msg += " (new file)"
+        if res.get("recalculated"):
+            msg += f" · summary updated, {res.get('formula_errors', 0)} formula error(s)"
+        if res.get("still_preliminary"):
+            msg += f" · NOTE: {', '.join(res['still_preliminary'])} added with preliminary times (post-processing did not finish)"
+        return msg
 
 
 class ExcelExportWindow(QtWidgets.QWidget):
@@ -38,11 +106,11 @@ class ExcelExportWindow(QtWidgets.QWidget):
         self.setWindowTitle("MMHRI — Excel export")
         self.resize(980, 640)
         self._is_busy = is_busy
-        self._pending: dict = {}          # folder -> ticked, changed by the user since the last send
+        self._ticked: set = set()          # folders the user ticked (not yet in Excel)
         self._in_excel: set = set()
-        self._running = False
-        self._done = _Done()
-        self._done.finished.connect(self._on_done)
+        self.sender_ = ExcelSender(self)
+        self.sender_.progress.connect(lambda t: self.status.setText(t))
+        self.sender_.finished.connect(self._on_done)
         v = QtWidgets.QVBoxLayout(self)
 
         top = QtWidgets.QHBoxLayout()
@@ -50,9 +118,9 @@ class ExcelExportWindow(QtWidgets.QWidget):
         self.path_lbl = QtWidgets.QLabel(xl.DEFAULT_XLSX)
         self.path_lbl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         top.addWidget(self.path_lbl, 1)
-        self.open_btn = QtWidgets.QPushButton("Open Excel")
-        self.open_btn.clicked.connect(lambda: self._open(xl.DEFAULT_XLSX))
-        top.addWidget(self.open_btn)
+        open_btn = QtWidgets.QPushButton("Open Excel")
+        open_btn.clicked.connect(lambda: self._open(xl.DEFAULT_XLSX))
+        top.addWidget(open_btn)
         folder_btn = QtWidgets.QPushButton("Open folder")
         folder_btn.clicked.connect(lambda: self._open(os.path.dirname(xl.DEFAULT_XLSX)))
         top.addWidget(folder_btn)
@@ -85,13 +153,12 @@ class ExcelExportWindow(QtWidgets.QWidget):
 
         btns = QtWidgets.QHBoxLayout()
         for text, fn in (("Tick all shown", lambda: self._tick_shown(True)),
-                         ("Untick all shown", lambda: self._tick_shown(False)),
-                         ("Tick the new ones", self._tick_new)):
+                         ("Untick all shown", lambda: self._tick_shown(False))):
             b = QtWidgets.QPushButton(text)
             b.clicked.connect(fn)
             btns.addWidget(b)
         btns.addStretch(1)
-        self.send_btn = QtWidgets.QPushButton("📊 Send ticked to Excel")
+        self.send_btn = QtWidgets.QPushButton("📊 Add ticked to Excel")
         self.send_btn.setStyleSheet("QPushButton {background:#1f6f43; color:white; font-weight:bold; padding:4px 14px;}")
         self.send_btn.clicked.connect(self._send)
         btns.addWidget(self.send_btn)
@@ -101,10 +168,11 @@ class ExcelExportWindow(QtWidgets.QWidget):
         self.status.setStyleSheet("color:#888;")
         v.addWidget(self.status)
 
-        self.tree.setToolTip("Ticked = in the Excel file after the next send. New trials arrive unticked.")
-        self.send_btn.setToolTip("Rebuilds the Excel file with exactly the ticked trials, from their folders\n"
-                                 "(trial.json, timeline.json, meta.json) — every sheet up to date.\n"
-                                 "Not while a trial is recording.")
+        self.tree.setToolTip("Tick trials to ADD to the Excel file. Trials already in it are marked ✓ and never\n"
+                             "changed by a send — edit them in Excel. Delete a row there to be able to send it again.")
+        self.send_btn.setToolTip("Adds the ticked trials that are not in the Excel file yet — nothing already in the\n"
+                                 "file is changed. Waits for final times first. Not while a trial is recording,\n"
+                                 "and not while the file is open in LibreOffice.")
         self._timer = QtCore.QTimer(self)
         self._timer.timeout.connect(self._tick_timer)
         self._timer.start(10000)
@@ -112,8 +180,8 @@ class ExcelExportWindow(QtWidgets.QWidget):
 
     # ── data ─────────────────────────────────────────────────────────────
     def refresh(self) -> None:
-        """Re-read the trial folders and the workbook's trial list."""
-        self._in_excel = set(xl.exported_folders(xl.DEFAULT_XLSX))
+        """Re-read the trial folders and what the workbook holds."""
+        keys = xl.workbook_keys(xl.DEFAULT_XLSX)
         rows = []
         for d in xl.all_trial_dirs():
             try:
@@ -124,7 +192,10 @@ class ExcelExportWindow(QtWidgets.QWidget):
             rows.append({"folder": str(d), "id": str(tj.get("Trial ID") or ""), "date": str(tj.get("Date") or ""),
                          "scen": str(tj.get("Scenario") or "").split(":")[0], "cmd": str(tj.get("Command Used") or ""),
                          "full": str(tj.get("Full Task Success?") or ""),
-                         "times": "final" if st.get("event_times") else ("⏳ preliminary" if st else "—")})
+                         "times": "final" if st.get("event_times") else ("⏳ preliminary" if st else "—"),
+                         "in": xl.in_workbook(str(d), keys)})
+        self._in_excel = {r["folder"] for r in rows if r["in"]}
+        self._ticked -= self._in_excel
         rows.sort(key=lambda r: (r["date"], r["id"], r["folder"]), reverse=True)
         days = ["All days"] + sorted({r["date"] for r in rows if r["date"]}, reverse=True)
         cur = self.day.currentText()
@@ -138,15 +209,18 @@ class ExcelExportWindow(QtWidgets.QWidget):
         self.tree.clear()
         for r in rows:
             it = QtWidgets.QTreeWidgetItem(["", r["id"], r["date"], r["scen"], r["cmd"], r["full"], r["times"],
-                                            "✓" if r["folder"] in self._in_excel else ""])
+                                            "✓" if r["in"] else ""])
             it.setData(0, QtCore.Qt.UserRole, r["folder"])
-            it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
-            ticked = self._pending.get(r["folder"], r["folder"] in self._in_excel)
-            it.setCheckState(0, QtCore.Qt.Checked if ticked else QtCore.Qt.Unchecked)
+            if r["in"]:
+                it.setFlags(it.flags() & ~QtCore.Qt.ItemIsUserCheckable)
+                it.setCheckState(0, QtCore.Qt.Checked)
+                for c in range(1, len(self.COLS)):
+                    it.setForeground(c, QtCore.Qt.gray)
+                it.setToolTip(0, "Already in the Excel file — a send never changes it.")
+            else:
+                it.setFlags(it.flags() | QtCore.Qt.ItemIsUserCheckable)
+                it.setCheckState(0, QtCore.Qt.Checked if r["folder"] in self._ticked else QtCore.Qt.Unchecked)
             it.setToolTip(4, r["folder"])
-            if r["times"].startswith("⏳"):
-                it.setToolTip(6, "The trial's post-processing has not finished yet (about 10-30 s after ⏹).\n"
-                                 "Sending now uses the window's own times; send again later for the exact ones.")
             self.tree.addTopLevelItem(it)
         self.tree.blockSignals(False)
         self._apply_filter()
@@ -154,9 +228,6 @@ class ExcelExportWindow(QtWidgets.QWidget):
 
     def _items(self):
         return [self.tree.topLevelItem(i) for i in range(self.tree.topLevelItemCount())]
-
-    def _ticked(self) -> list:
-        return [it.data(0, QtCore.Qt.UserRole) for it in self._items() if it.checkState(0) == QtCore.Qt.Checked]
 
     # ── UI helpers ───────────────────────────────────────────────────────
     def _apply_filter(self) -> None:
@@ -168,36 +239,26 @@ class ExcelExportWindow(QtWidgets.QWidget):
             it.setHidden(hide)
 
     def _on_item_changed(self, it, col) -> None:
-        if col == 0:
-            self._pending[it.data(0, QtCore.Qt.UserRole)] = it.checkState(0) == QtCore.Qt.Checked
+        f = it.data(0, QtCore.Qt.UserRole)
+        if col == 0 and f not in self._in_excel:
+            (self._ticked.add if it.checkState(0) == QtCore.Qt.Checked else self._ticked.discard)(f)
             self._update_status()
 
     def _tick_shown(self, on: bool) -> None:
         for it in self._items():
-            if not it.isHidden():
+            if not it.isHidden() and it.data(0, QtCore.Qt.UserRole) not in self._in_excel:
                 it.setCheckState(0, QtCore.Qt.Checked if on else QtCore.Qt.Unchecked)
 
-    def _tick_new(self) -> None:
-        for it in self._items():
-            if it.data(0, QtCore.Qt.UserRole) not in self._in_excel:
-                it.setCheckState(0, QtCore.Qt.Checked)
-
     def _update_status(self, extra: str = "") -> None:
-        if self._running:
+        if self.sender_.running:
             return
-        ticked = set(self._ticked())
-        add = len(ticked - self._in_excel)
-        rem = len(self._in_excel - ticked)
-        msg = f"{len(self._in_excel)} trial(s) in the Excel file · {len(ticked)} ticked"
-        if add or rem:
-            msg += f" — the next send adds {add} and removes {rem}"
+        msg = f"{len(self._in_excel)} trial(s) in the Excel file · {len(self._ticked)} ticked to add"
         self.status.setText(msg + (("\n" + extra) if extra else ""))
         busy = bool(self._is_busy())
-        self.send_btn.setEnabled(not busy and not self._running)
-        self.send_btn.setToolTip("Not while a trial is recording." if busy else self.send_btn.toolTip())
+        self.send_btn.setEnabled(not busy and bool(self._ticked))
 
     def _tick_timer(self) -> None:
-        if self.isVisible() and not self._running:
+        if self.isVisible() and not self.sender_.running:
             self.refresh()
 
     @staticmethod
@@ -208,45 +269,14 @@ class ExcelExportWindow(QtWidgets.QWidget):
 
     # ── send ─────────────────────────────────────────────────────────────
     def _send(self) -> None:
-        if self._running or self._is_busy():
+        if self._is_busy() or not self._ticked:
             return
-        ticked = self._ticked()
-        removed = sorted(self._in_excel - set(ticked))
-        if removed:
-            names = ", ".join(os.path.basename(p) for p in removed[:6]) + (" …" if len(removed) > 6 else "")
-            if QtWidgets.QMessageBox.question(
-                    self, "Remove trials from the Excel file?",
-                    f"{len(removed)} trial(s) in the Excel file are unticked and will be removed from it:\n{names}\n\n"
-                    "Their folders are not touched. Continue?") != QtWidgets.QMessageBox.Yes:
-                return
-        lock = Path(xl.DEFAULT_XLSX).with_name(".~lock." + Path(xl.DEFAULT_XLSX).name + "#")
-        self._running = True
-        self.send_btn.setEnabled(False)
-        self.status.setText(f"⏳ writing {len(ticked)} trial(s) to Excel and computing the summary …")
-
-        def work():
-            try:
-                res = xl.build(ticked, xl.DEFAULT_XLSX)
-                res.update(xl.recalc(xl.DEFAULT_XLSX))
-                res["open_elsewhere"] = lock.exists()
-            except Exception as exc:  # noqa: BLE001 - report, never crash the GUI
-                res = {"error": f"{type(exc).__name__}: {exc}"}
-            self._done.finished.emit(res)
-        threading.Thread(target=work, daemon=True).start()
+        folders = sorted(self._ticked)
+        if self.sender_.send(folders):
+            self.send_btn.setEnabled(False)
 
     def _on_done(self, res: dict) -> None:
-        self._running = False
-        if res.get("error"):
-            self.refresh()
-            self._update_status(f"✖ Excel export failed: {res['error']}")
-            return
-        self._pending.clear()
+        if not res.get("error"):
+            self._ticked.clear()
         self.refresh()
-        extra = f"✔ {res.get('trials')} trial(s) written to {os.path.basename(res.get('path', ''))}"
-        if res.get("recalculated"):
-            extra += f" · summary computed, {res.get('formula_errors', 0)} formula error(s)"
-        else:
-            extra += f" · summary not pre-computed ({res.get('why')}); Excel computes it on opening"
-        if res.get("open_elsewhere"):
-            extra += " · the file is open in LibreOffice — use File → Reload to see the update"
-        self._update_status(extra)
+        self._update_status(ExcelSender.describe(res))

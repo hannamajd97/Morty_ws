@@ -4,12 +4,13 @@ selection of the experiments to send, updated after every experiment").
 
     python3 -m morty_gui.excel_export [--all | <trial dir> ...] [--out file.xlsx]
 
-The window's "📊 Excel export" does the same through ExcelExportWindow. The
-workbook (default experiments/mmhri/MMHRI_experiments.xlsx) is REBUILT from
-the trial folders on every send — the folders stay the one source of truth
-(trial.json, timeline.json, meta.json, conversation.txt), so a trial whose
-times were finalized after an earlier send is up to date after the next.
-Only the sheets written here are replaced; a sheet you add yourself is kept.
+The window's "📊 Excel export" and "📊 Send last trial" do the same through
+excel_window.ExcelSender. The workbook (default
+experiments/MMHRI_experiments.xlsx) is created on the first send; every later
+send only ADDS rows for trials that are not in it yet (append) — a row, a
+column, a sheet or a format that is already there is never changed, so edits
+made in Excel are safe. Nothing is written while LibreOffice has the file
+open.
 
 Sheets:
   Experiments       one row per trial: the doc's table (Trial ID … Failure
@@ -24,8 +25,8 @@ Sheets:
   Summary           per scenario: trials, verdicts, success rate and mean
                     times — Excel formulas over the Experiments sheet
   Definitions       what every column means
-  _trials           (hidden) the trial folders in this workbook — the
-                    window reads it to tick what is already in Excel
+  _trials           (hidden) the trial folders added (a record only — what is
+                    in the file is read from the Experiments sheet itself)
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ from typing import Dict, List, Optional
 
 EXPERIMENTS_DIR = os.path.expanduser("~/morty_ws/experiments")
 MMHRI_DIR = os.path.join(EXPERIMENTS_DIR, "mmhri")
-DEFAULT_XLSX = os.path.join(MMHRI_DIR, "MMHRI_experiments.xlsx")
+DEFAULT_XLSX = os.path.join(EXPERIMENTS_DIR, "MMHRI_experiments.xlsx")   # 2026-09-28 (Majd): next to the day folders
 
 GENERATED = ["Experiments", "Stage times", "Conversation", "VLA instructions", "Summary", "Definitions", "_trials"]
 VERDICTS = ["User Intent understood correctly?", "Object Detected?", "Correct Object Selected?",
@@ -101,9 +102,9 @@ STAGE_COLUMNS = [
 STAGE_TEXT = {"understood_by", "graspgen_background", "plan_background", "grasp_used", "planner", "path"}
 
 DEFINITIONS = [
-    ("Where the data comes from", "Every sheet is rebuilt from the trial folders (trial.json, timeline.json, meta.json) each time "
-     "the window sends. Edit a trial in the MMHRI window (or its trial.json), not in these sheets — your edits here would be "
-     "replaced. Sheets you add yourself are kept."),
+    ("Where the data comes from", "Each row is written once, from the trial folder (trial.json, timeline.json, meta.json), when "
+     "the MMHRI window sends the trial. Later sends only add new trials — rows, columns, sheets and formatting already in this "
+     "file are never changed, so you can edit here. Delete a trial's row to be able to send it again."),
     ("Interaction Time (s)", "The experiment doc's definition: from the moment the command was GIVEN (you stopped saying it; for "
      "a pick started by pointing, the moment the object was chosen) until the arm STARTS MOVING. Includes speech recognition, "
      "understanding, any clarification ('which one?'), choosing the object and planning."),
@@ -270,20 +271,241 @@ def trial_record(d: Path) -> Optional[dict]:
     return rec
 
 
-def exported_folders(path: str = DEFAULT_XLSX) -> List[str]:
-    """The trial folders the workbook holds (its hidden _trials sheet)."""
+SUMMARY_LAST_ROW = 5000   # the Summary formulas cover Experiments rows 2..5000, so appended rows count
+
+
+def _lock_path(path: str) -> Path:
+    """LibreOffice's lock file while the workbook is open there."""
+    return Path(path).with_name(".~lock." + Path(path).name + "#")
+
+
+def _header_map(ws, row: int) -> Dict[str, int]:
+    return {str(c.value).strip(): c.column for c in ws[row] if c.value not in (None, "")}
+
+
+def _last_row(ws, first: int, cols=(1, 2)) -> int:
+    """The last row (>= first-1) with a value in any of `cols` — formatting
+    alone does not count (openpyxl's max_row does)."""
+    r = ws.max_row
+    while r >= first and all(ws.cell(row=r, column=c).value in (None, "") for c in cols):
+        r -= 1
+    return max(r, first - 1)
+
+
+def workbook_keys(path: str = DEFAULT_XLSX) -> set:
+    """(date, trial folder name) of every row in the Experiments sheet — the
+    sheet itself says what is in the file, so a row deleted there can be
+    sent again. Rows without a folder name count as (date, 'id:<Trial ID>')."""
     if not os.path.exists(path):
-        return []
+        return set()
     try:
         from openpyxl import load_workbook
         wb = load_workbook(path, read_only=True)
-        if "_trials" not in wb.sheetnames:
-            return []
-        out = [str(r[0]) for r in wb["_trials"].iter_rows(min_row=2, values_only=True) if r and r[0]]
+        if "Experiments" not in wb.sheetnames:
+            wb.close()
+            return set()
+        rows = wb["Experiments"].iter_rows(values_only=True)
+        hdr = [str(h).strip() if h is not None else "" for h in next(rows, [])]
+        idx = {h: i for i, h in enumerate(hdr)}
+        out = set()
+        for r in rows:
+            if not r:
+                continue
+            get = lambda h: (r[idx[h]] if h in idx and idx[h] < len(r) else None)  # noqa: E731
+            date, folder, tid = get("Date"), get("Folder"), get("Trial ID")
+            if date is None and tid is None:
+                continue
+            out.add((str(date or ""), str(folder) if folder else f"id:{tid}"))
         wb.close()
         return out
     except Exception:
-        return []
+        return set()
+
+
+def _rec_key(rec: dict) -> tuple:
+    return (rec.get("date") or "", os.path.basename(rec["folder"]))
+
+
+def in_workbook(folder: str, keys: set) -> bool:
+    d = Path(folder)
+    tj = _load_json(d / "trial.json") or {}
+    date = str(tj.get("Date") or "")
+    return (date, d.name) in keys or (date, f"id:{tj.get('Trial ID')}") in keys
+
+
+def exported_folders(path: str = DEFAULT_XLSX) -> List[str]:
+    """The trial folders whose rows are in the workbook's Experiments sheet."""
+    keys = workbook_keys(path)
+    return [str(d) for d in all_trial_dirs() if in_workbook(str(d), keys)] if keys else []
+
+
+# ── row writers (one owner for the look of a row; used by build and append)
+def _styles():
+    from openpyxl.styles import Alignment, Font
+    return {"font": Font(name="Arial", size=10), "bold": Font(name="Arial", size=10, bold=True),
+            "link": Font(name="Arial", size=10, color="0563C1", underline="single"),
+            "wrap": Alignment(wrap_text=True, vertical="top"), "top": Alignment(vertical="top")}
+
+
+def _write_exp_row(ws, r: int, cols: Dict[str, int], rec: dict, st: dict) -> None:
+    """One Experiments row; each value goes to the column whose HEADER names
+    it, so columns you added (or moved) are left alone."""
+    for h, k, fmt, _w in EXP_COLUMNS:
+        c = cols.get(h)
+        if c is None:
+            continue
+        v = rec.get(k)
+        cell = ws.cell(row=r, column=c)
+        if k.startswith("link_"):
+            if v:
+                cell.value = {"link_folder": os.path.basename(rec["folder"]), "link_viewer": "viewer", "link_video": "video"}[k]
+                cell.hyperlink = v
+                cell.font = st["link"]
+            continue
+        cell.value = v
+        cell.font = st["font"]
+        cell.alignment = st["top"]
+        if fmt and v is not None:
+            cell.number_format = fmt
+
+
+STAGE_HEADS = ["Trial ID", "Date", "Scenario ID", "Started by"] + [h for _g, h, _k in STAGE_COLUMNS] + \
+              ["Path", "Times", "Window was late by, max (s)"]
+
+
+def _stage_values(rec: dict) -> list:
+    return [rec["trial_id"], rec["date"], rec["scenario_id"], rec["started_by"]] + \
+           [rec.get(k) for _g, _h, k in STAGE_COLUMNS] + [rec.get("path"), rec.get("times_state"), rec.get("gui_late_max_s")]
+
+
+def _write_stage_row(ws, r: int, cols: Dict[str, int], rec: dict, st: dict) -> None:
+    for h, v in zip(STAGE_HEADS, _stage_values(rec)):
+        c = cols.get(h)
+        if c is None:
+            continue
+        cell = ws.cell(row=r, column=c, value=v)
+        cell.font = st["font"]
+        if isinstance(v, float):
+            cell.number_format = "0.00"
+
+
+CONV_HEADS = ["Trial ID", "Date", "t in trial (s)", "Who", "Text"]
+INS_HEADS = ["Trial ID", "Date", "#", "Starts at t (s)", "Instruction", "Said / from", "Action", "Steps", "Superseded"]
+
+
+def _write_conv_rows(ws, r: int, cols: Dict[str, int], rec: dict, st: dict) -> int:
+    for t, who, txt in rec["conversation"]:
+        for h, v in zip(CONV_HEADS, [rec["trial_id"], rec["date"], t, who, txt]):
+            c = cols.get(h)
+            if c is None:
+                continue
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.font = st["bold"] if (h == "Who" and who == "You") else st["font"]
+            cell.alignment = st["wrap"] if h == "Text" else st["top"]
+            if h == "t in trial (s)" and v is not None:
+                cell.number_format = "0.00"
+        r += 1
+    return r
+
+
+def _write_ins_rows(ws, r: int, cols: Dict[str, int], rec: dict, st: dict) -> int:
+    for i in rec["instructions"]:
+        vals = [rec["trial_id"], rec["date"], i["n"], i["t"], i["text"], i["said"], i["action"], i["steps"], i["superseded"]]
+        for h, v in zip(INS_HEADS, vals):
+            c = cols.get(h)
+            if c is None:
+                continue
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.font = st["font"]
+            cell.alignment = st["wrap"] if h in ("Instruction", "Said / from") else st["top"]
+            if h == "Starts at t (s)" and v is not None:
+                cell.number_format = "0.00"
+        r += 1
+    return r
+
+
+def _extend_filter(ws, last: int) -> None:
+    ref = ws.auto_filter.ref
+    if ref:
+        import re as _re
+        m = _re.match(r"^([A-Z]+\d+):([A-Z]+)\d+$", ref)
+        if m:
+            ws.auto_filter.ref = f"{m.group(1)}:{m.group(2)}{max(last, 2)}"
+
+
+def append(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
+    """ADD rows for the trials that are not in the workbook yet — never
+    change or delete an existing row, a column you added, another sheet or
+    your formatting (2026-09-28, Majd: "don't update the Excel when I send
+    it — what if I changed stuff inside"). Creates the workbook on first use.
+    Refuses while LibreOffice has it open: saving there afterwards would
+    overwrite the added rows, or these would overwrite your unsaved edits."""
+    import re as _re
+    if _lock_path(path).exists():
+        return {"error": "open", "why": "The Excel file is open in LibreOffice — save and close it, then send again."}
+    if not os.path.exists(path):
+        res = build(folders, path)
+        res.update({"created": True, "added": res.get("trials", 0)})
+        return res
+    from openpyxl import load_workbook
+    from openpyxl.formatting.rule import CellIsRule
+    from openpyxl.styles import PatternFill
+    from openpyxl.utils import get_column_letter
+    wb = load_workbook(path)
+    if "Experiments" not in wb.sheetnames:
+        return {"error": "sheet", "why": "The workbook has no 'Experiments' sheet — rename it back or move the file away."}
+    keys = workbook_keys(path)
+    recs = [r for r in (trial_record(Path(f)) for f in folders) if r and not in_workbook(r["folder"], keys)]
+    recs.sort(key=_sort_key)
+    if not recs:
+        return {"path": path, "added": 0, "note": "all of them are already in the file"}
+    st = _styles()
+    ws = wb["Experiments"]
+    cols = _header_map(ws, 1)
+    r0 = _last_row(ws, 2) + 1
+    for i, rec in enumerate(recs):
+        _write_exp_row(ws, r0 + i, cols, rec, st)
+    last = r0 + len(recs) - 1
+    _extend_filter(ws, last)
+    vc = [cols[v] for v in VERDICTS if v in cols]
+    if vc:
+        rng = f"{get_column_letter(min(vc))}{r0}:{get_column_letter(max(vc))}{last}"
+        ws.conditional_formatting.add(rng, CellIsRule(operator="equal", formula=['"yes"'], fill=PatternFill("solid", fgColor="E2F0D9")))
+        ws.conditional_formatting.add(rng, CellIsRule(operator="equal", formula=['"no"'], fill=PatternFill("solid", fgColor="F8D7DA")))
+    if "Stage times" in wb.sheetnames:
+        w2 = wb["Stage times"]
+        c2 = _header_map(w2, 2)
+        s0 = _last_row(w2, 3) + 1
+        for i, rec in enumerate(recs):
+            _write_stage_row(w2, s0 + i, c2, rec, st)
+        _extend_filter(w2, s0 + len(recs) - 1)
+    for name, writer in (("Conversation", _write_conv_rows), ("VLA instructions", _write_ins_rows)):
+        if name in wb.sheetnames:
+            w = wb[name]
+            cc = _header_map(w, 1)
+            rr = _last_row(w, 2) + 1
+            for rec in recs:
+                rr = writer(w, rr, cc, rec, st)
+            _extend_filter(w, rr - 1)
+    # the Summary formulas must reach the appended rows: only the row number
+    # at the end of each 'Experiments!$X$2:$X$<n>' range changes
+    if "Summary" in wb.sheetnames:
+        pat = _re.compile(r"(Experiments!\$[A-Z]+\$2:\$[A-Z]+\$)(\d+)")
+        for row in wb["Summary"].iter_rows():
+            for c in row:
+                if isinstance(c.value, str) and c.value.startswith("=") and "Experiments!" in c.value:
+                    c.value = pat.sub(lambda m: m.group(1) + str(max(int(m.group(2)), SUMMARY_LAST_ROW)), c.value)
+    if "_trials" in wb.sheetnames:
+        w7 = wb["_trials"]
+        t0 = _last_row(w7, 2, cols=(1,)) + 1
+        for i, rec in enumerate(recs):
+            w7.cell(row=t0 + i, column=1, value=rec["folder"])
+    wb.calculation.fullCalcOnLoad = True
+    tmp = os.path.join(os.path.dirname(os.path.abspath(path)), ".append_" + os.path.basename(path))
+    wb.save(tmp)
+    os.replace(tmp, path)
+    return {"path": path, "added": len(recs), "trials": [os.path.basename(r["folder"]) for r in recs],
+            "preliminary": [os.path.basename(r["folder"]) for r in recs if r.get("times_state") != "final"]}
 
 
 def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
@@ -297,14 +519,11 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
 
     recs = [r for r in (trial_record(Path(f)) for f in folders) if r]
     recs.sort(key=_sort_key)
-    if os.path.exists(path):
-        wb = load_workbook(path)
-        for name in GENERATED:
-            if name in wb.sheetnames:
-                del wb[name]
-    else:
-        wb = Workbook()
-        wb.remove(wb.active)
+    # 2026-09-28: build() only CREATES a workbook — every later send goes
+    # through append(), which never rewrites what is already there.
+    wb = Workbook()
+    wb.remove(wb.active)
+    st = _styles()
     FONT = Font(name="Arial", size=10)
     BOLD = Font(name="Arial", size=10, bold=True)
     HEAD_FILL = PatternFill("solid", fgColor="DCE6F1")
@@ -332,21 +551,9 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
     # ── Experiments ─────────────────────────────────────────────────────
     ws = wb.create_sheet("Experiments", 0)
     header(ws, 1, [h for h, _k, _f, _w in EXP_COLUMNS], [w for *_x, w in EXP_COLUMNS], defs)
+    exp_cols = {h: i for i, (h, *_x) in enumerate(EXP_COLUMNS, 1)}
     for r, rec in enumerate(recs, 2):
-        for c, (h, k, fmt, _w) in enumerate(EXP_COLUMNS, 1):
-            v = rec.get(k)
-            cell = ws.cell(row=r, column=c)
-            if k.startswith("link_"):
-                if v:
-                    cell.value = {"link_folder": os.path.basename(rec["folder"]), "link_viewer": "viewer", "link_video": "video"}[k]
-                    cell.hyperlink = v
-                    cell.font = Font(name="Arial", size=10, color="0563C1", underline="single")
-                continue
-            cell.value = v
-            cell.font = FONT
-            cell.alignment = TOP
-            if fmt and v is not None:
-                cell.number_format = fmt
+        _write_exp_row(ws, r, exp_cols, rec, st)
     n = len(recs)
     last = n + 1
     ws.freeze_panes = "C2"
@@ -360,8 +567,7 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
         ws.conditional_formatting.add(rng, CellIsRule(operator="equal", formula=['"no"'], fill=red))
     # ── Stage times ─────────────────────────────────────────────────────
     ws2 = wb.create_sheet("Stage times", 1)
-    heads = ["Trial ID", "Date", "Scenario ID", "Started by"] + [h for _g, h, _k in STAGE_COLUMNS] + \
-            ["Path", "Times", "Window was late by, max (s)"]
+    heads = STAGE_HEADS
     groups = ["", "", "", ""] + [g for g, _h, _k in STAGE_COLUMNS] + ["", "", ""]
     prev = None
     for c, g in enumerate(groups, 1):          # a group row above the headers
@@ -373,47 +579,27 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
             ws2.cell(row=1, column=c).fill = PatternFill("solid", fgColor="B8CCE4")
         prev = g
     header(ws2, 2, heads, [8, 11, 9, 12] + [12] * len(STAGE_COLUMNS) + [12, 10, 12], defs)
+    stage_cols = {h: i for i, h in enumerate(heads, 1)}
     for r, rec in enumerate(recs, 3):
-        vals = [rec["trial_id"], rec["date"], rec["scenario_id"], rec["started_by"]] + \
-               [rec.get(k) for _g, _h, k in STAGE_COLUMNS] + [rec.get("path"), rec.get("times_state"), rec.get("gui_late_max_s")]
-        for c, v in enumerate(vals, 1):
-            cell = ws2.cell(row=r, column=c, value=v)
-            cell.font = FONT
-            if isinstance(v, float):
-                cell.number_format = "0.00"
+        _write_stage_row(ws2, r, stage_cols, rec, st)
     ws2.freeze_panes = "E3"
     if n:
         ws2.auto_filter.ref = f"A2:{get_column_letter(len(heads))}{last + 1}"
     # ── Conversation ────────────────────────────────────────────────────
     ws3 = wb.create_sheet("Conversation", 2)
-    header(ws3, 1, ["Trial ID", "Date", "t in trial (s)", "Who", "Text"], [8, 11, 11, 14, 90])
+    header(ws3, 1, CONV_HEADS, [8, 11, 11, 14, 90])
     r = 2
     for rec in recs:
-        for t, who, txt in rec["conversation"]:
-            for c, v in enumerate([rec["trial_id"], rec["date"], t, who, txt], 1):
-                cell = ws3.cell(row=r, column=c, value=v)
-                cell.font = BOLD if (c == 4 and who == "You") else FONT
-                cell.alignment = WRAP if c == 5 else TOP
-                if c == 3 and v is not None:
-                    cell.number_format = "0.00"
-            r += 1
+        r = _write_conv_rows(ws3, r, {h: i for i, h in enumerate(CONV_HEADS, 1)}, rec, st)
     ws3.freeze_panes = "A2"
     if r > 2:
         ws3.auto_filter.ref = f"A1:E{r - 1}"
     # ── VLA instructions ────────────────────────────────────────────────
     ws4 = wb.create_sheet("VLA instructions", 3)
-    header(ws4, 1, ["Trial ID", "Date", "#", "Starts at t (s)", "Instruction", "Said / from", "Action", "Steps", "Superseded"],
-           [8, 11, 5, 11, 46, 46, 22, 11, 11])
+    header(ws4, 1, INS_HEADS, [8, 11, 5, 11, 46, 46, 22, 11, 11])
     r = 2
     for rec in recs:
-        for i in rec["instructions"]:
-            for c, v in enumerate([rec["trial_id"], rec["date"], i["n"], i["t"], i["text"], i["said"], i["action"], i["steps"], i["superseded"]], 1):
-                cell = ws4.cell(row=r, column=c, value=v)
-                cell.font = FONT
-                cell.alignment = WRAP if c in (5, 6) else TOP
-                if c == 4 and v is not None:
-                    cell.number_format = "0.00"
-            r += 1
+        r = _write_ins_rows(ws4, r, {h: i for i, h in enumerate(INS_HEADS, 1)}, rec, st)
     ws4.freeze_panes = "A2"
     if r > 2:
         ws4.auto_filter.ref = f"A1:I{r - 1}"
@@ -421,13 +607,13 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
     ws5 = wb.create_sheet("Summary", 4)
     ws5["A1"] = "MMHRI experiments — summary per scenario"
     ws5["A1"].font = TITLE
-    ws5["A2"] = (f"Formulas over the Experiments sheet ({n} trials). Success rate = Full Task Success yes / (yes + no); "
+    ws5["A2"] = ("Formulas over the Experiments sheet (rows 2-5000). Success rate = Full Task Success yes / (yes + no); "
                  "averages ignore empty cells.")
     ws5["A2"].font = Font(name="Arial", size=9, italic=True, color="595959")
     col = {h: get_column_letter(i) for i, (h, *_x) in enumerate(EXP_COLUMNS, 1)}
 
     def rng(h):
-        return f"Experiments!${col[h]}$2:${col[h]}${max(last, 2)}"
+        return f"Experiments!${col[h]}$2:${col[h]}${SUMMARY_LAST_ROW}"
 
     sheads = ["Scenario ID", "Scenario", "Trials", "Full task success: yes", "Full task success: no", "Success rate",
               "Grasp success: yes", "Avg Interaction Time (s)", "Avg total time (s)", "Avg robot time (s)",
@@ -469,7 +655,7 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
     # trials per scenario x layout (the window's progress grid)
     gr = tr + 3
     ws5.cell(row=gr - 1, column=1, value="Trials per scenario and layout").font = BOLD
-    layouts = sorted({rec["layout"] for rec in recs if rec.get("layout")}) or ["Layout A", "Layout B", "Layout C"]
+    layouts = sorted({"Layout A", "Layout B", "Layout C"} | {rec["layout"] for rec in recs if rec.get("layout")})
     for c, lay in enumerate(["Scenario ID"] + layouts, 1):
         cell = ws5.cell(row=gr, column=c, value=lay)
         cell.font = BOLD
@@ -500,7 +686,7 @@ def build(folders: List[str], path: str = DEFAULT_XLSX) -> dict:
         w.sheet_view.tabSelected = (w.title == "Experiments")
     wb.calculation.fullCalcOnLoad = True
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = path + ".tmp.xlsx"
+    tmp = os.path.join(os.path.dirname(os.path.abspath(path)), ".build_" + os.path.basename(path))
     wb.save(tmp)
     os.replace(tmp, path)
     return {"path": path, "trials": n, "conversation_lines": sum(len(r["conversation"]) for r in recs),
@@ -571,8 +757,9 @@ def main(argv=None):
         print(__doc__)
         return 2
     folders = [str(p) for p in all_trial_dirs()] if argv == ["--all"] else [str(Path(a).expanduser()) for a in argv]
-    res = build(folders, out)
-    res.update(recalc(out))
+    res = append(folders, out)
+    if not res.get("error") and res.get("added"):
+        res.update(recalc(out))
     print(json.dumps(res, indent=1))
     return 0
 
