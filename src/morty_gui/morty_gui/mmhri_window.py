@@ -1412,16 +1412,19 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             pass
 
     def feed_selection(self) -> None:
-        """Object selection published → Interaction Time."""
+        """Object selection published. 2026-09-28 (Majd, trial 095: the field
+        showed 9.3 s, the time since ⏺ Start): the Interaction Time field is
+        filled only at ⏹, from the stage times (command given -> arm moves);
+        the since-Start time is kept internally, never shown or saved."""
         if self._active and self._interaction_s is None:
             self._interaction_s = time.monotonic() - self._t0
-            self.t_interact.setText(f"{self._interaction_s:.1f}")
 
     def feed_exec_done(self, rc: Optional[int]) -> None:
-        """Executor finished → Total Time."""
+        """Executor finished. 2026-09-28: like feed_selection — the Total Time
+        field is filled only at ⏹ (first command -> cycle end); the
+        since-Start time stays internal."""
         if self._active and self._total_s is None:
             self._total_s = time.monotonic() - self._t0
-            self.t_total.setText(f"{self._total_s:.1f}")
             if self._conv_f is not None:
                 self._conv_f.write(f"[{self._total_s:7.2f}s] executor exit={rc}\n")
 
