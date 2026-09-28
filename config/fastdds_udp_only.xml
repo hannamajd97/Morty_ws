@@ -18,6 +18,18 @@
     <transport_descriptor>
       <transport_id>udp_only</transport_id>
       <type>UDPv4</type>
+      <!-- 2026-09-28: 8 MB socket buffers. With SHM off, the RealSense
+           images (~1.5 MB per colour+depth pair at 30 Hz), /tf and
+           /joint_states (500 Hz) all cross UDP; the Linux default buffer
+           (208 KB) dropped ~280 datagrams/s (/proc/net/snmp RcvbufErrors)
+           in every Morty process, and a lost reliable message is only
+           resent after the writer's heartbeat — the router's object hand-
+           over to the pipeline arrived 3 s late (trial 088), GUI and bag
+           stamps up to 6 s late. Needs net.core.rmem_max/wmem_max >= 8 MB
+           (/etc/sysctl.d/60-morty-udp-buffers.conf); below that the kernel
+           silently caps the request at the old size. -->
+      <sendBufferSize>8388608</sendBufferSize>
+      <receiveBufferSize>8388608</receiveBufferSize>
     </transport_descriptor>
   </transport_descriptors>
   <participant profile_name="udp_only_participant" is_default_profile="true">
