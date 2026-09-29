@@ -127,8 +127,15 @@ CLOSE = _whole(
     r"(?:" + NEG + r" )*(?:you can |can you |could you )?"
     r"(?:close(?: it| up| the gripper| the hand| your hand)?|grip|greifer schließen"
     r"|schließe(?:n)?(?: den)? greifer|zu)")
+# 2026-09-29 (Majd, live at "Where should I drop it?": "I said to drop it on
+# the left side." and "Drop it in on the left side." both went to the model,
+# which answered "I got it" / "It's already on the way" and sent NOTHING):
+# a lead-in that only insists or asks ("I said to", "can you", "please") and
+# up to two prepositions ("in on", "over to") keep a side answer instant.
+_LEAD = (r"(?:(?:i said|i told you|i want you|i would like you|i'd like you|can you|could you"
+         r"|would you|please|just)(?: to)? )?")
 DEST_SIDE = _whole(
-    r"(?:" + AFF + r" )?" + VERB + r"?(?:(?:on|to|at|in|onto|over) )?(?:the )?"
+    r"(?:" + AFF + r" )?" + _LEAD + VERB + r"?(?:(?:on|to|at|in|into|onto|over) ){0,2}(?:the )?"
     # 2026-09-25 (Majd, live: "Go to the drop right, …"): "drop (position)" may
     # also stand BEFORE the side.
     r"(?:drop (?:position )?)?(left|right|links|rechts)(?: (?:side|one|position|drop|drop position))?")

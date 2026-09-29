@@ -3533,7 +3533,10 @@ class ChatIntentNode(Node):
         "destination": ('OPEN QUESTION: "Where should I drop it? Left, right, or home?" — '
                         "answer with confirm_drop (destination drop_left / drop_right / home, "
                         "or here = release right where the arm is: 'here', 'the same place', "
-                        "'put it back', 'just open it', 'give it to me')"),
+                        "'put it back', 'just open it', 'give it to me'). A destination the user "
+                        "said BEFORE this question (even in their first command) did NOT reach "
+                        "the robot: when they repeat it ('I said left'), SEND confirm_drop now — "
+                        "never answer that it is already on its way"),
         # 2026-09-25 (Majd's live test): any consent = open_gripper; never "Left or right?"
         "release": ('OPEN QUESTION: "Should I open the gripper?" (yes/no) — any consent '
                     "(yes / open / give it to me) = open_gripper, no = close_gripper, a named "

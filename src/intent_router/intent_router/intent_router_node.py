@@ -1514,6 +1514,24 @@ class IntentRouterNode(Node):
             self._mark_busy_done("")
             return
 
+        # 2026-09-29: the answer to this node's which-one question keeps the
+        # destination of the pick_and_place it refused (the model often
+        # re-sends only "pick the leftmost vitamin tube").
+        _plan = None if is_pick_and_place else self._clarify_plan_for(label)
+        if _plan:
+            is_pick_and_place = True
+            chosen_drop, destination = _plan.get("drop") or "", _plan.get("destination") or ""
+            if _plan.get("then"):
+                attrs = {**(attrs if isinstance(attrs, dict) else {}), "then": _plan["then"]}
+            self.get_logger().info(
+                f"Which-one answer {obj!r}: carrying the refused pick_and_place's "
+                f"destination {destination!r} (then={_plan.get('then') or ''!r}).")
+        # a which-one question below keeps this pick's destination plan
+        _refused_plan = ({"drop": chosen_drop, "destination": destination,
+                          "then": str(attrs.get("then") or "").strip().lower()
+                          if isinstance(attrs, dict) else ""}
+                         if is_pick_and_place else None)
+
         # NAME → VARIANT inference (Majd 2026-08-31: "Vitamin C" /
         # "B12" ARE disambiguations — the system asked "leftmost or
         # rightmost?" three times at a user who had already named the
@@ -1554,7 +1572,8 @@ class IntentRouterNode(Node):
                 )
                 # 2026-09-25: the real count and its positions (_two_of_line).
                 self._narrate(self._two_of_line(label, n_vit))
-                self._clarify = (self._to_display_label(label).lower(), time.monotonic())
+                self._clarify = (self._to_display_label(label).lower(), time.monotonic(),
+                                 _refused_plan)
                 self._mark_busy_done("")
                 return
 
@@ -1572,7 +1591,8 @@ class IntentRouterNode(Node):
                 f"Refusing {position!r} with exactly two {label!r} visible: "
                 "neither is in the middle. Asking user to clarify.")
             self._narrate(self._two_of_line(label))
-            self._clarify = (self._to_display_label(label).lower(), time.monotonic())
+            self._clarify = (self._to_display_label(label).lower(), time.monotonic(),
+                             _refused_plan)
             self._mark_busy_done("")
             return
 
@@ -1580,23 +1600,11 @@ class IntentRouterNode(Node):
         # set drop_target FIRST (so pick_and_place's destination lands),
         # THEN wait_for_destination, THEN the awaiting flag for our own
         # bypass routing.
-        if is_pick_and_place and chosen_drop:
-            self._set_executor_drop_target(chosen_drop)
-        if is_pick_and_place:
-            self._set_executor_wait_for_destination(False)
-            # 2026-09-25: pick_and_place carries its destination; nothing to latch.
-            self._pick_waits_for_destination = False
-            # 2026-09-25 (review R1): the side it goes to, when known
-            # (drop_center / the executor default -> "").
-            self._pick_fixed_side = (_DESTINATION_WORDS.get(destination or "", "")
-                                     if chosen_drop else "")
-        else:
-            self._set_executor_wait_for_destination(True)
-            self._pick_awaiting_destination = True
-            # 2026-09-25: this pick will ask "Where should I drop it?", so a
-            # destination said before its cycle starts may be latched.
-            self._pick_waits_for_destination = True
-            self._pick_fixed_side = ""   # 2026-09-25 (review R1)
+        _then = str(attrs.get("then") or "").strip().lower() if isinstance(attrs, dict) else ""
+        self._apply_destination_plan(
+            {"drop": chosen_drop, "destination": destination, "then": _then}
+            if is_pick_and_place else None)
+        self._clarify = None   # 2026-09-29: a committed pick ends any which-one question
 
         # Toggle the executor's vitamin-tube special mode. Only enabled
         # for vitamin_c picks AND only if the operator has opted in via
@@ -1624,15 +1632,6 @@ class IntentRouterNode(Node):
 
         self._busy_kind = "pick"
         self._pick_deadline = time.monotonic() + self._pick_timeout_s
-        self._followup_plan = ""
-        # "Pick the bottle, put it on the right, then give it to me (and go
-        # home)" in one sentence (2026-09-24): the release plan rides along
-        # and answers the release pause on arrival, exactly like a follow-up
-        # said while the pick was already in flight.
-        _then = str(attrs.get("then") or "").strip().lower() if isinstance(attrs, dict) else ""
-        if is_pick_and_place and _then in ("release", "release_home"):
-            self._followup_plan = _then
-            self.get_logger().info(f"pick_and_place with then={_then!r}: the release pause will be answered on arrival.")
 
         # The pick cycle moves the arm through several non-named poses
         # (grasp → lift → drop → home). Clear the latched current-pose so
@@ -2535,6 +2534,52 @@ class IntentRouterNode(Node):
         rank = min(range(len(xs)), key=lambda i: abs(xs[i] - cx))
         return ["leftmost", "middle", "rightmost"][rank] if len(xs) == 3 else ["leftmost", "rightmost"][rank]
 
+    def _apply_destination_plan(self, plan: Optional[dict]) -> None:
+        """The executor's destination settings for the pick about to start
+        (moved out of _dispatch 2026-09-29, now shared with the pointing yes).
+        ``plan`` = {"drop", "destination", "then"} of a pick_and_place — the
+        executor carries the object there without asking (drop_target_name
+        FIRST, then wait_for_destination) and a "then" of release /
+        release_home answers the release pause on arrival ("Pick the bottle,
+        put it on the right, then give it to me", 2026-09-24); None = a plain
+        pick, which asks "Where should I drop it?"."""
+        if plan:
+            if plan.get("drop"):
+                self._set_executor_drop_target(plan["drop"])
+            self._set_executor_wait_for_destination(False)
+            # 2026-09-25: pick_and_place carries its destination; nothing to latch.
+            self._pick_waits_for_destination = False
+            # 2026-09-25 (review R1): the side it goes to, when known
+            # (drop_center / the executor default -> "").
+            self._pick_fixed_side = (_DESTINATION_WORDS.get(plan.get("destination") or "", "")
+                                     if plan.get("drop") else "")
+        else:
+            self._set_executor_wait_for_destination(True)
+            self._pick_awaiting_destination = True
+            # 2026-09-25: this pick will ask "Where should I drop it?", so a
+            # destination said before its cycle starts may be latched.
+            self._pick_waits_for_destination = True
+            self._pick_fixed_side = ""   # 2026-09-25 (review R1)
+        then = str((plan or {}).get("then") or "")
+        self._followup_plan = then if then in ("release", "release_home") else ""
+        if self._followup_plan:
+            self.get_logger().info(
+                f"pick_and_place with then={then!r}: the release pause will be answered on arrival.")
+
+    def _clarify_plan_for(self, label: str) -> Optional[dict]:
+        """2026-09-29 (Majd, live: "Pick up the vitamin tube and put it on the
+        left side." -> which one? -> pointed, yes -> "Where should I drop
+        it?"): the destination plan of the pick_and_place this node's
+        which-one question refused, while that question is fresh and about
+        ``label``'s kind — the answer (a pointed yes, or a spoken qualifier)
+        carries it on. None otherwise."""
+        ctx = self._clarify
+        if (ctx is None or len(ctx) < 3 or not ctx[2]
+                or time.monotonic() - ctx[1] > 120.0
+                or ctx[0] != self._to_display_label(label).lower()):
+            return None
+        return ctx[2]
+
     def _pick_confirms_point(self, intent: dict, with_destination: bool = False) -> bool:
         """A plain pick of the proposed kind while its question is open ("Yes,
         grasp the vitamin tube.", or a pick without an object) confirms THAT
@@ -2562,6 +2607,17 @@ class IntentRouterNode(Node):
         q = self._point_q
         if q is None:
             return False
+        if yes:
+            # 2026-09-29: BEFORE the yes (the executor reads these at its
+            # cycle start): the destination of the pick_and_place this
+            # pointing answers, else a plain pick that asks — pointed picks
+            # used to inherit whatever the previous voice pick had set.
+            plan = self._clarify_plan_for(q["label"])
+            self._apply_destination_plan(plan)
+            if plan:
+                self.get_logger().info(
+                    f"Pointed yes carries the refused pick_and_place's destination "
+                    f"{plan.get('destination')!r}.")
         self._point_answer_pub.publish(String(data=f"{'yes' if yes else 'no'}|{q['id']}"))
         self.get_logger().info(
             f"Point proposal {q['id']} ({q['label']}): {'YES' if yes else 'NO'} ({how}).")
@@ -3101,6 +3157,7 @@ class IntentRouterNode(Node):
             self._intent_queue.clear()
         if cleared:
             self.get_logger().info(f"Stop received: cleared {cleared} queued intent(s).")
+        self._clarify = None   # 2026-09-29: a which-one question and its destination end too
         self._handle_stop(src)
         self._busy = False
         self._busy_kind = ""
@@ -3150,6 +3207,7 @@ class IntentRouterNode(Node):
         self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
         self._home_then = None             # 2026-09-25: and a drop pose waiting for its move home
         self._drop_early_dest(f"reset ({src})")
+        self._clarify = None   # 2026-09-29: a which-one question and its destination end too
         self._dest_answer_pending = False
         self._releasing_line = ""   # 2026-09-25 (review R6): the plan is gone
         self._start_suppressed_upto = self._last_cycle_id
