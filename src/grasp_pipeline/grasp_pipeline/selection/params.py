@@ -99,6 +99,11 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("debug_window_height", 550)
     node.declare_parameter("enable_debug_window_click_select", True)
     node.declare_parameter("debug_publish_fps", 10.0)
+    # Light RealSense cloud for RViz (view_cloud.py, 2026-09-29): the topic
+    # RViz's "RealSense Camera cloud downsampled" display listens to; 0 = off.
+    node.declare_parameter("view_cloud_topic", "/camera/camera/depth/color/points_downsampled")
+    node.declare_parameter("view_cloud_period_s", 1.0)
+    node.declare_parameter("view_cloud_stride", 4)
     node.declare_parameter("republish_selected_outputs", True)
     node.declare_parameter("republish_selected_rate_hz", 2.0)
     node.declare_parameter("infer_timer_period_s", 0.05)

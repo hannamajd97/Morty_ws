@@ -55,6 +55,7 @@ from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge
 
 from .frame_buffer import FrameBuffer
+from .view_cloud import ViewCloudPublisher
 from .perception.self_filter import GripperSelfFilter
 from .perception.open_set import OpenSetDetector
 from .perception.identity_check import IdentityCheck
@@ -517,6 +518,13 @@ class YoloLiveSelectGrasp(Node):
         # the MultiThreadedExecutor while inference is still busy.
         # See run_grasp_pipeline.py.
         self._debug_cb_group = MutuallyExclusiveCallbackGroup()
+        # A light RealSense cloud for RViz, only while RViz listens (view_cloud.py).
+        if float(self.get_parameter("view_cloud_period_s").value) > 0:
+            self._view_cloud = ViewCloudPublisher(
+                self, self.fb, str(self.get_parameter("view_cloud_topic").value),
+                period_s=float(self.get_parameter("view_cloud_period_s").value),
+                stride=int(self.get_parameter("view_cloud_stride").value),
+                callback_group=self._debug_cb_group)
 
         self.pose_republish_timer = self.create_timer(
             0.2, self.republish_last_pose, callback_group=self._debug_cb_group
