@@ -215,6 +215,15 @@ class MortyGuiBridge(Node):
             CameraInfo, "/astra/color/camera_info", self._on_astra,
             qos_profile_sensor_data,
         )
+        # The pipeline's Astra pointing picture (boxes, hand, arrow — see
+        # grasp_pipeline/astra_pointing.py): sent only while someone points
+        # with the Astra; the Astra views show it instead of the plain frame
+        # while it is fresh.
+        self._astra_overlay_t = 0.0
+        self.create_subscription(
+            CompressedImage, "/astra/pointing/compressed", self._on_astra_overlay,
+            qos_profile_sensor_data,
+        )
         # VLA recorder status is latched (TRANSIENT_LOCAL) and only
         # re-published on change — subscriber must match the durability.
         self.create_subscription(
@@ -552,7 +561,9 @@ class MortyGuiBridge(Node):
     def _on_astra(self, msg) -> None:
         self._astra_t = time.monotonic()
         # CompressedImage (has .format); the CameraInfo feed shares this callback.
-        if self._astra_viewers and hasattr(msg, "format"):
+        # A fresh pointing picture has the same frame with the arrow on it.
+        if (self._astra_viewers and hasattr(msg, "format")
+                and self._astra_t - self._astra_overlay_t > 0.6):
             try:
                 img = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
             except Exception:
@@ -561,6 +572,19 @@ class MortyGuiBridge(Node):
                 with self._lock:
                     self.astra_bgr = img
                     self.astra_dirty = True
+
+    def _on_astra_overlay(self, msg) -> None:
+        self._astra_overlay_t = time.monotonic()
+        if not self._astra_viewers:
+            return
+        try:
+            img = cv2.imdecode(np.frombuffer(msg.data, np.uint8), cv2.IMREAD_COLOR)
+        except Exception:
+            return
+        if img is not None:
+            with self._lock:
+                self.astra_bgr = img
+                self.astra_dirty = True
 
     def want_astra(self, who: str, on: bool) -> None:
         """The JPEG is decoded only while some view shows the Astra (the main

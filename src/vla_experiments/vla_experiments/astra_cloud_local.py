@@ -9,28 +9,14 @@ Output:      /astra/depth/points_local  PointCloud2 xyz(+rgb), RELIABLE, in the 
 With the driver's depth_registration on, the depth frame is astra_color_optical_frame and
 colour pixel = depth pixel * (colour size / depth size).
 """
-import struct, time
+import time
 import numpy as np
 import cv2
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image, PointCloud2, PointField
-
-
-def decode_compressed_depth(m: CompressedImage):
-    """image_transport compressedDepth: 12-byte ConfigHeader (int32 format, float depthQuantA, depthQuantB) + PNG."""
-    fmt, qa, qb = struct.unpack("<iff", bytes(m.data[:12]))
-    img = cv2.imdecode(np.frombuffer(bytes(m.data[12:]), np.uint8), cv2.IMREAD_UNCHANGED)
-    if img is None:
-        return None
-    if img.dtype == np.uint16:
-        return img.astype(np.float32) / 1000.0
-    if img.dtype == np.uint8 and qa != 0.0:  # inverse-depth quantised 32FC1
-        d = np.zeros(img.shape, np.float32); nz = img > 0
-        d[nz] = qa / (img[nz].astype(np.float32) - qb)
-        return d
-    return img.astype(np.float32)
+from ur3e_fast_observation.compressed_depth import decode_compressed_depth
 
 
 class AstraCloudLocal(Node):

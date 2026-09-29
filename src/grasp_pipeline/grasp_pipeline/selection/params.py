@@ -542,6 +542,11 @@ def declare_all_parameters(node: "Node") -> None:
     # arrow ends on; "angle": spread by the angle off the ray (sigma above).
     node.declare_parameter("pointing_evidence", "arrow")
     node.declare_parameter("pointing_ray_source", "depth")
+    # Which camera the hand is watched in (2026-09-29, Majd: choose one in
+    # Advanced -> Detection, no fusion): "realsense" (the wrist camera, as
+    # always) or "astra" (the fixed Astra on the shuttle; objects placed from
+    # the RealSense detections via TF — see astra_pointing.py). Live.
+    node.declare_parameter("pointing_camera", "realsense")
     # Default changed True -> False (2026-08-06): with True, YOLO stops the
     # moment the selection prompt starts, so the detection boxes in the debug
     # image FREEZE exactly when the user is trying to click one. Keeping

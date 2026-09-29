@@ -107,6 +107,7 @@ def generate_launch_description():
         # 3D pointing (2026-09-03) — "3d" finger ray + angle to 3D centres,
         # "2d" the previous picture-plane line. See point_selector.py.
         DeclareLaunchArgument("pointing_mode", default_value="3d"),
+        DeclareLaunchArgument("pointing_camera", default_value="realsense"),
         DeclareLaunchArgument("mediapipe_cone_deg", default_value="20.0"),
         DeclareLaunchArgument("mediapipe_hysteresis", default_value="0.8"),
         DeclareLaunchArgument("mediapipe_use_tasks_api", default_value="true"),
@@ -423,6 +424,7 @@ def generate_launch_description():
             {"mediapipe_min_detection_confidence": ParameterValue(LaunchConfiguration("mediapipe_min_detection_confidence"), value_type=float)},
             {"mediapipe_min_tracking_confidence": ParameterValue(LaunchConfiguration("mediapipe_min_tracking_confidence"), value_type=float)},
             {"pointing_mode": ParameterValue(LaunchConfiguration("pointing_mode"), value_type=str)},
+            {"pointing_camera": ParameterValue(LaunchConfiguration("pointing_camera"), value_type=str)},
             {"mediapipe_cone_deg": ParameterValue(LaunchConfiguration("mediapipe_cone_deg"), value_type=float)},
             {"mediapipe_hysteresis": ParameterValue(LaunchConfiguration("mediapipe_hysteresis"), value_type=float)},
             {"mediapipe_use_tasks_api": ParameterValue(LaunchConfiguration("mediapipe_use_tasks_api"), value_type=bool)},

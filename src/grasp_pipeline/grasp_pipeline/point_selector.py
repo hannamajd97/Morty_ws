@@ -106,6 +106,46 @@ def _bbox_edge_dist2(p: Tuple[float, float], b: Sequence[float]) -> float:
 
 
 # ── hand-tracking backends (same contract: normalised 21 points or None) ──
+# ── 3D helpers (module level since 2026-09-29: astra_pointing.py measures the
+#    objects with the same rule) ─────────────────────────────────────────
+def deproject(u: float, v: float, z: float, K) -> np.ndarray:
+    fx, fy, cx, cy = K
+    return np.array([(u - cx) * z / fx, (v - cy) * z / fy, z], dtype=np.float64)
+
+
+def project(p: np.ndarray, K) -> Optional[Tuple[float, float]]:
+    fx, fy, cx, cy = K
+    if p[2] <= 1e-6:
+        return None
+    return (float(fx * p[0] / p[2] + cx), float(fy * p[1] / p[2] + cy))
+
+
+def object_centres_3d(dets: List[Dict[str, Any]], depth_m: np.ndarray, K) -> List[Optional[np.ndarray]]:
+    """Each detection's 3D centre: the box centre pixel at the median
+    valid depth of the box's inner 60 % (edges belong to the table). A
+    detection that carries ``centre_3d`` (this camera's frame, metres) is
+    placed there as is — the Astra's objects, measured by the RealSense
+    (astra_pointing.py)."""
+    H, W = depth_m.shape[:2]
+    out: List[Optional[np.ndarray]] = []
+    for d in dets:
+        if d.get("centre_3d") is not None:
+            out.append(np.asarray(d["centre_3d"], dtype=np.float64))
+            continue
+        x1, y1, x2, y2 = d["bbox"]
+        w, h = x2 - x1, y2 - y1
+        ix1, iy1 = int(max(0, x1 + 0.2 * w)), int(max(0, y1 + 0.2 * h))
+        ix2, iy2 = int(min(W, x2 - 0.2 * w)), int(min(H, y2 - 0.2 * h))
+        roi = depth_m[iy1:iy2, ix1:ix2] if (ix2 > ix1 and iy2 > iy1) else np.empty(0)
+        ok = roi[(roi > 0.05) & (roi < 3.0) & np.isfinite(roi)] if roi.size else roi
+        if ok.size < 10:
+            out.append(None)
+            continue
+        cu, cv_ = _bbox_center(d["bbox"])
+        out.append(deproject(cu, cv_, float(np.median(ok)), K))
+    return out
+
+
 class _LegacyHands:
     name = "legacy mp.solutions.hands"
     world: Optional[List[Tuple[float, float, float]]] = None   # metric 3-D hand of the last frame
@@ -441,17 +481,8 @@ class PointOrVoiceSelector:
         ok = win[(win > 0.05) & (win < 3.0) & np.isfinite(win)]
         return float(np.percentile(ok, 20)) if ok.size >= 3 else None
 
-    @staticmethod
-    def _deproject(u: float, v: float, z: float, K) -> np.ndarray:
-        fx, fy, cx, cy = K
-        return np.array([(u - cx) * z / fx, (v - cy) * z / fy, z], dtype=np.float64)
-
-    @staticmethod
-    def _project(p: np.ndarray, K) -> Optional[Tuple[float, float]]:
-        fx, fy, cx, cy = K
-        if p[2] <= 1e-6:
-            return None
-        return (float(fx * p[0] / p[2] + cx), float(fy * p[1] / p[2] + cy))
+    _deproject = staticmethod(deproject)
+    _project = staticmethod(project)
 
     def _ray_3d(self, lm: List[Tuple[float, float]], depth_m: np.ndarray, K) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """Finger ray in camera coordinates, smoothed over frames: origin =
@@ -538,23 +569,7 @@ class PointOrVoiceSelector:
         return (tip, d / n) if n > 1e-9 else None
 
     def _centres_3d(self, dets: List[Dict[str, Any]], depth_m: np.ndarray, K) -> List[Optional[np.ndarray]]:
-        """Each detection's 3D centre: the box centre pixel at the median
-        valid depth of the box's inner 60 % (edges belong to the table)."""
-        H, W = depth_m.shape[:2]
-        out: List[Optional[np.ndarray]] = []
-        for d in dets:
-            x1, y1, x2, y2 = d["bbox"]
-            w, h = x2 - x1, y2 - y1
-            ix1, iy1 = int(max(0, x1 + 0.2 * w)), int(max(0, y1 + 0.2 * h))
-            ix2, iy2 = int(min(W, x2 - 0.2 * w)), int(min(H, y2 - 0.2 * h))
-            roi = depth_m[iy1:iy2, ix1:ix2] if (ix2 > ix1 and iy2 > iy1) else np.empty(0)
-            ok = roi[(roi > 0.05) & (roi < 3.0) & np.isfinite(roi)] if roi.size else roi
-            if ok.size < 10:
-                out.append(None)
-                continue
-            cu, cv_ = _bbox_center(d["bbox"])
-            out.append(self._deproject(cu, cv_, float(np.median(ok)), K))
-        return out
+        return object_centres_3d(dets, depth_m, K)
 
     def _choose_by_ray(self, origin: np.ndarray, direction: np.ndarray,
                        centres: List[Optional[np.ndarray]]) -> Optional[int]:

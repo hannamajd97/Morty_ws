@@ -68,6 +68,7 @@ from .utils import _clean_cropped_cloud, pick_best_grasp, _R_t_from_matrix16
 from .utils import keep_largest_cluster, radius_outlier_filter
 from .debug_image_publisher import DebugImagePublisher
 from .point_selector import PointOrVoiceSelector
+from .astra_pointing import AstraPointingCamera
 from .registration import (
     RegistrationConfig,
     RegistrationView,
@@ -577,9 +578,27 @@ class YoloLiveSelectGrasp(Node):
         self._cycle_id_counter: int = 0
         self._waiting_cycle_id: int = 0
 
+        # The camera of the running pointing session (pointing_camera,
+        # 2026-09-29): the hand and the arrow are drawn on THAT camera's
+        # picture — Astra pixels on the RealSense image would be nonsense.
+        self._point_cam = "realsense"
+        self._astra_pointing: Optional[AstraPointingCamera] = None
+
         def _on_hand(pts, connections):
+            if self._point_cam == "astra" and self._astra_pointing is not None:
+                self._astra_pointing.hand = (pts, connections)
+                return
             self._hand_landmarks_px = pts
             self._hand_connections = connections
+
+        def _on_pointer(px):
+            if self._point_cam == "astra" and self._astra_pointing is not None:
+                self._astra_pointing.pointer_px = px
+                label = self._last_pointed_label
+                self._astra_pointing.publish_overlay(
+                    f"Astra pointing: {label}" if label else "Astra pointing")
+                return
+            self._pointer_px = px
 
         # Latched publisher: emits the label of the detection the user is
         # currently pointing at (or "" when no finger is over an object).
@@ -622,7 +641,9 @@ class YoloLiveSelectGrasp(Node):
             hysteresis=float(self.get_parameter("mediapipe_hysteresis").value),
             use_tasks_api=bool(self.get_parameter("mediapipe_use_tasks_api").value),
             model_path=str(self.get_parameter("mediapipe_model_path").value),
-            depth_provider=lambda: self.fb.paired(),   # colour + depth of the same moment (2026-09-24)
+            # colour + depth of the same moment (2026-09-24), from the session's camera
+            depth_provider=lambda: (self._astra_pointing.sample if self._point_cam == "astra"
+                                    and self._astra_pointing is not None else self.fb.paired()),
             decision=str(self.get_parameter("pointing_decision").value),
             vote_tau_s=float(self.get_parameter("pointing_vote_tau_s").value),
             vote_commit_s=float(self.get_parameter("pointing_vote_commit_s").value),
@@ -631,7 +652,7 @@ class YoloLiveSelectGrasp(Node):
             evidence=str(self.get_parameter("pointing_evidence").value),
             ray_source=str(self.get_parameter("pointing_ray_source").value),
             logger=self.get_logger(),
-            on_pointer=lambda px: setattr(self, "_pointer_px", px),
+            on_pointer=_on_pointer,
             on_hand=_on_hand,
             on_hover=_on_hover,
         )
@@ -647,13 +668,24 @@ class YoloLiveSelectGrasp(Node):
                     on = bool(prm.value) and getattr(self.point_or_voice, "tracker", None) is not None
                     self.point_or_voice.use_mediapipe = on
                     self.get_logger().info(f"Hand pointing selection {'ON' if on else 'OFF'} (use_mediapipe_selection).")
+                elif prm.name == "pointing_camera":
+                    cam = str(prm.value).strip().lower()
+                    if cam not in ("realsense", "astra"):
+                        return SetParametersResult(successful=False,
+                                                   reason="pointing_camera must be 'realsense' or 'astra'")
+                    if cam == "astra":
+                        self._astra()   # start buffering Astra frames before the next session
+                    self.get_logger().info(f"Pointing camera: {cam} (the next pointing session watches it).")
             return SetParametersResult(successful=True)
         self.add_on_set_parameters_callback(_on_params)
+        if str(self.get_parameter("pointing_camera").value).strip().lower() == "astra":
+            self._astra()
         self.get_logger().info(
             f"Selection input: mediapipe_enabled={self.point_or_voice.use_mediapipe}, "
             f"pointing_mode={self.point_or_voice.pointing_mode}, "
             f"pointing_decision={self.point_or_voice.decision}, evidence={self.point_or_voice.evidence_mode}, "
             f"ray_source={self.point_or_voice.ray_source}, "
+            f"pointing_camera={self.get_parameter('pointing_camera').value}, "
             f"require_selection={bool(self.get_parameter('require_selection').value)}, "
             f"attempt_timeout_s={float(self.get_parameter('selection_attempt_timeout_s').value):.1f}, "
             f"manual_wait_s={float(self.get_parameter('selection_manual_wait_s').value):.1f}"
@@ -2046,6 +2078,46 @@ class YoloLiveSelectGrasp(Node):
             self._point_answer = (pid_i, word)
             self._selection_wake.set()
 
+    # ── pointing camera (2026-09-29) ─────────────────────────────────
+    def _astra(self) -> AstraPointingCamera:
+        """The Astra pointing camera, created on first use: while the
+        RealSense is the pointing camera nothing of the Astra is received."""
+        if self._astra_pointing is None:
+            self._astra_pointing = AstraPointingCamera(self, self.tf_buffer, logger=self.get_logger())
+        return self._astra_pointing
+
+    def _choose_by_pointing(self, dets, names) -> Optional[int]:
+        """One pointing session in the camera pointing_camera names. Only
+        that camera is watched (Majd: "when 1 is selected then it should
+        only be focused on it"); switching the camera ends the session so
+        the next one starts in the new camera at once."""
+        cam = "astra" if str(self.get_parameter("pointing_camera").value).strip().lower() == "astra" else "realsense"
+
+        def cancel() -> bool:
+            return (self._pending_manual_choice is not None or self._pick_abort
+                    or self._voice_label_pending()
+                    or str(self.get_parameter("pointing_camera").value).strip().lower() != cam)
+
+        common = dict(names=names,
+                      listen_seconds=float(self.get_parameter("listen_seconds").value),
+                      overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
+                      cancel=cancel)
+        self._point_cam = cam
+        if cam == "realsense":
+            return self.point_or_voice.choose(bgr_frame=self.fb.rgb_frame, dets=dets,
+                                              frame_provider=lambda: self.fb.rgb_frame, **common)
+        astra = self._astra()
+        if not astra.alive():
+            self.get_logger().warn(
+                "[point] the pointing camera is the Astra, but no Astra frames arrive — pointing waits for "
+                "them (shuttle camera: astra restart script; or choose the RealSense in Advanced -> Detection)",
+                throttle_duration_sec=30.0)
+        rs = self.fb.paired()
+        if rs is None or rs[1] is None:
+            rs = self.fb.latest()
+        return self.point_or_voice.choose(bgr_frame=None, dets=astra.begin(dets, rs),
+                                          frame_provider=astra.next_frame, **common)
+
     def _confirm_pointed_choice(self, dets, idx: int, header) -> str:
         """2026-09-28 (Majd: "the pointing just starts the grasp immediately —
         ask 'you pointed at this object, should I grasp it?'"): hold a
@@ -2528,16 +2600,7 @@ class YoloLiveSelectGrasp(Node):
                         self.get_logger().info(
                             "Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)..."
                         )
-                        rgb_now = self.fb.rgb_frame
-                        choice = self.point_or_voice.choose(
-                            bgr_frame=rgb_now,
-                            dets=dets,
-                            names=names,
-                            frame_provider=lambda: self.fb.rgb_frame,
-                            listen_seconds=float(self.get_parameter("listen_seconds").value),
-                            overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
-                            cancel=lambda: self._pending_manual_choice is not None or self._pick_abort or self._voice_label_pending(),
-                        )
+                        choice = self._choose_by_pointing(dets, names)
                     if choice is None:
                         if not bool(self.get_parameter("selection_prompt_once").value):
                             self._speak_if_enabled("No selection captured.")
@@ -2581,15 +2644,7 @@ class YoloLiveSelectGrasp(Node):
                                 # still selects, alongside topic-based
                                 # selections from communication_llm or
                                 # the debug window click.
-                                choice = self.point_or_voice.choose(
-                                    bgr_frame=self.fb.rgb_frame,
-                                    dets=dets,
-                                    names=names,
-                                    frame_provider=lambda: self.fb.rgb_frame,
-                                    listen_seconds=float(self.get_parameter("listen_seconds").value),
-                                    overall_timeout_s=float(self.get_parameter("selection_attempt_timeout_s").value),
-                                    cancel=lambda: self._pending_manual_choice is not None or self._pick_abort or self._voice_label_pending(),
-                                )
+                                choice = self._choose_by_pointing(dets, names)
                             self._selection_nap(0.1)
                     if choice is None:
                         if not bool(self.get_parameter("selection_prompt_once").value):

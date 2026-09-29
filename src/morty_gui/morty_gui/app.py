@@ -253,6 +253,32 @@ class OperatorWindow(QtWidgets.QMainWindow):
             "Off: only clicks and voice select. Switch it off while you rearrange objects on the table:\n"
             "a hand over the table can be read as pointing and start a pick by itself (2026-09-18).")
         df.addWidget(self.cb_pointing)
+        # Pointing camera (2026-09-29, Majd: "make the selection one of them —
+        # in the advanced window we can select which one"; no fusion). Applied
+        # to the running pipeline at once, remembered, and passed as
+        # pointing_camera:= when the pipeline next starts.
+        pc_row = QtWidgets.QHBoxLayout()
+        pc_row.addWidget(QtWidgets.QLabel("Pointing camera:"))
+        self.pointing_cam_combo = QtWidgets.QComboBox()
+        self.pointing_cam_combo.addItem("RealSense (wrist)", "realsense")
+        self.pointing_cam_combo.addItem("Astra (fixed, on the shuttle)", "astra")
+        self.pointing_cam_combo.setCurrentIndex(
+            max(0, self.pointing_cam_combo.findData(str(_qs.value("pointing_camera", "realsense")))))
+        self.pointing_cam_combo.setToolTip(
+            "Which camera watches your hand — only that one is used.\n"
+            "RealSense: the wrist camera, as before.\n"
+            "Astra: the fixed camera (~8 frames/s). The objects are the RealSense detections, placed\n"
+            "in the Astra's view with the saved Astra pose; the Astra picture (view: Astra, or its\n"
+            "own window) shows their boxes and your arrow while you point. Needs the Astra running\n"
+            "on the shuttle.")
+        self.pointing_cam_combo.currentIndexChanged.connect(self._on_pointing_cam_changed)
+        pc_row.addWidget(self.pointing_cam_combo)
+        pc_row.addStretch(1)
+        df.addLayout(pc_row)
+        self.pointing_cam_status = QtWidgets.QLabel("")
+        self.pointing_cam_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        df.addWidget(self.pointing_cam_status)
+        self._astra_alive = False
         # RealSense point cloud for RViz (2026-09-29, Majd: the RViz RAW
         # display should always work). The camera computes it itself (~1 CPU
         # core, 2.4 MB at 30 Hz), so it is a choice: applied to the running
@@ -1803,6 +1829,37 @@ class OperatorWindow(QtWidgets.QMainWindow):
         MotionWindow._set_status(self.rs_cloud_status, "sending to the camera …", GREY)
         QtCore.QTimer.singleShot(1500, self._read_back_rs_cloud)
 
+    def _on_pointing_cam_changed(self, _i: int) -> None:
+        cam = str(self.pointing_cam_combo.currentData())
+        QtCore.QSettings("morty", "morty_gui").setValue("pointing_camera", cam)
+        if not self._pipeline.running():
+            MotionWindow._set_status(self.pointing_cam_status, "saved — used when the pipeline next starts", GREY)
+            return
+        if not self.bridge.set_pipeline_params({"pointing_camera": cam}):
+            MotionWindow._set_status(self.pointing_cam_status, "✗ not applied — the pipeline did not answer", RED)
+            return
+        MotionWindow._set_status(self.pointing_cam_status, "sending…", GREY)
+        QtCore.QTimer.singleShot(600, self._read_back_pointing_cam)
+
+    def _read_back_pointing_cam(self) -> None:
+        want = str(self.pointing_cam_combo.currentData())
+        got = self.bridge.get_pipeline_params(["pointing_camera"])
+        have = str((got or {}).get("pointing_camera") or "")
+        name = {"realsense": "RealSense", "astra": "Astra"}
+        if got is None:
+            MotionWindow._set_status(self.pointing_cam_status, "the pipeline did not answer — try again", ORANGE)
+        elif not have:
+            MotionWindow._set_status(self.pointing_cam_status,
+                                     "the running pipeline has no pointing camera setting — restart it", ORANGE)
+        elif have != want:
+            MotionWindow._set_status(self.pointing_cam_status, f"the pipeline still says {name.get(have, have)}", RED)
+        elif want == "astra" and not self._astra_alive:
+            MotionWindow._set_status(self.pointing_cam_status,
+                                     "Astra — the pipeline confirms, but no Astra frames arrive (start the shuttle camera)",
+                                     ORANGE)
+        else:
+            MotionWindow._set_status(self.pointing_cam_status, f"{name[want]} — the pipeline confirms", GREEN)
+
     def _read_back_rs_cloud(self) -> None:
         state = self.bridge.camera_pointcloud()
         want = self.cb_rs_cloud.isChecked()
@@ -2188,6 +2245,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             cmd.append("registration_enabled:=true")
         cmd.append(f"open_set_enabled:={'true' if self.cb_open_set.isChecked() else 'false'}")
         cmd.append(f"use_mediapipe_selection:={'true' if self.cb_pointing.isChecked() else 'false'}")
+        cmd.append(f"pointing_camera:={self.pointing_cam_combo.currentData()}")
         cmd.append(f"identity_check_enabled:={'true' if self.cb_identity.isChecked() else 'false'}")
         # GraspGen service first (it preloads the model in ~6 s; ZMQ queues
         # the pipeline's first request until the service is bound).
@@ -3530,6 +3588,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # recorder is armed — otherwise a dead fixed cam is just "not
         # streaming", not a fault.
         vla_up = bool(upd.get("vla_node_up"))
+        self._astra_alive = bool(upd.get("astra_alive"))
         if upd.get("astra_alive"):
             paint(self.led_astra, GREEN, "Astra (fixed, on the shuttle) frames flowing")
         elif vla_up:   # recorder up (GUI-launched) but its fixed camera is gone
