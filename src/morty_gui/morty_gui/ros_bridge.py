@@ -44,6 +44,7 @@ try:
 except ImportError:
     ListControllers = SwitchController = None
 
+from ur3e_fast_observation.latest_message import LatestMessage, joint_state_stream
 from .config import VOICE_FILTER_PARAMS as _VOICE_FILTER_PARAMS
 
 PIPELINE_NODE_NAME = "yolo_live_select_grasp"
@@ -194,10 +195,15 @@ class MortyGuiBridge(Node):
         self.create_subscription(PoseArray, "/graspgen/viz/best_pose_raw", lambda m: self._on_poses("best", m), 2)
         self.create_subscription(PoseArray, "/graspgen/viz/executing_pose", lambda m: self._on_poses("exec", m), 2)
         self.create_subscription(Log, "/rosout", self._on_rosout, 20)
-        self.create_subscription(JointState, "/joint_states", self._on_joint_state, 5)
-        self.create_subscription(
-            CameraInfo, "/camera/camera/color/camera_info", self._on_camera_info, 5
-        )
+        # 2026-09-29 (Majd: "the system is very slow"): /joint_states (500 Hz,
+        # arm + gripper streams) and the RealSense camera info (30 Hz) only
+        # feed "newest positions" and the LED freshness stamps — READ at
+        # 20 Hz from standing readers nothing spins (ur3e_fast_observation.
+        # latest_message) instead of ~530 Python callbacks a second.
+        self._js_reader = LatestMessage(self, JointState, "/joint_states", depth=64,
+                                        stream_key=joint_state_stream)
+        self._caminfo_reader = LatestMessage(self, CameraInfo, "/camera/camera/color/camera_info")
+        self.create_timer(0.05, self._poll_fast_topics)
         # Astra liveness: the shuttle relays compressed_slow at 10 Hz
         # best-effort — sensor-data QoS or it never matches. Image is NOT
         # decoded, only timestamped.
@@ -523,6 +529,12 @@ class MortyGuiBridge(Node):
         self.pipeline_params_dirty = False
 
     # ── callbacks (executor thread) ──────────────────────────────────
+    def _poll_fast_topics(self) -> None:
+        for msg in self._js_reader.take_streams():
+            self._on_joint_state(msg)
+        if self._caminfo_reader.take() is not None:
+            self._on_camera_info(None)
+
     def _on_joint_state(self, msg: JointState) -> None:
         self._joint_state_t = time.monotonic()
         if msg.name:
