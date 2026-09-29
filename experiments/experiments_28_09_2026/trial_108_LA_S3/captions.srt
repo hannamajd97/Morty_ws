@@ -1,0 +1,28 @@
+1
+00:00:04,722 --> 00:00:08,722
+You: Can you give me the white bottle
+
+2
+00:00:07,446 --> 00:00:11,446
+Morty (status): Starting grasp on the small bottle.
+
+3
+00:00:12,025 --> 00:00:16,025
+Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+
+4
+00:00:20,621 --> 00:00:24,621
+You: Drop it home and give me the object directly.
+
+5
+00:00:21,922 --> 00:00:25,922
+Morty (status): Going home.
+
+6
+00:00:28,523 --> 00:00:32,523
+Morty (status): Opening the gripper.
+
+7
+00:00:32,525 --> 00:00:36,525
+Morty (status): I'm at the home position. What's next?
+

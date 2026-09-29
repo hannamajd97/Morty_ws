@@ -1,0 +1,9 @@
+[speech_input_node-4] [INFO] [1790607835.967443587] [speech_input_node]: [speaker] human voice (cos 0.12, rms 0.104)
+[speech_input_node-4] [INFO] [1790607836.787915484] [speech_input_node]: [timing] parakeet 0.82s for 2.3s audio
+[speech_input_node-4] [INFO] [1790607836.793129728] [speech_input_node]: Heard: 'What do you see on the table?'
+[chat_node-7] User (voice): What do you see on the table?
+[chat_node-7] [0m[INFO] [1790607836.802911084] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (14 -> 7)[0m
+[chat_node-7] [0m[INFO] [1790607838.166033353] [communication_llm_chat_node]: [timing] LLM main call 1.36s (prompt cache: 6140 tokens read)[0m
+[chat_node-7] Assistant: I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12.
+[speak_action_server-3] [INFO] [1790607838.183297168] [speak_action_server]: Speak: 'I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12.'
+[speak_action_server-3] [INFO] [1790607843.835121234] [speak_action_server]: [timing] TTS first audio after 0.46s, 5.5s of speech, done 5.65s after the request

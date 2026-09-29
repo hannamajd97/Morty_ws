@@ -1,0 +1,13 @@
+# trial 095 started 2026-09-28T18:56:38.470001
+[   7.21s] You: Could you slowly bring me the small bottle, please?
+[  10.14s] Morty (status): Starting grasp on the small bottle.
+[  14.56s] Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+[  22.65s] You: Drop it on the left side.
+[  22.85s] Morty (status): Going to drop left.
+[  25.76s] Morty (status): I'm at the drop left position, still holding the small bottle. Should I open the gripper?
+[  34.65s] You: Yes, opens the gripper.
+[  34.86s] Morty (status): Opening the gripper.
+[  38.35s] Morty (status): Should I go back home?
+[  42.05s] You: Go back home.
+[  42.05s] Morty (status): Going home.
+[  46.25s] Morty (status): Done — I'm back at the home position. What's next?

@@ -1,0 +1,13 @@
+TRIAL TIMELINE  start 2026-09-28 17:06:27  stop 17:06:45  (18.5 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +2.75  you stopped speaking ("Give me the book, Morty.")
+t=   +4.02  you said: "Give me the book, Morty."
+t=   +4.45  trial bag ready
+t=   +5.46  Morty said: "I don't see a book on the table."
+t=   +8.22  Morty said: "I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12."
+t=  +13.88  Morty said: "Would you like me to pick one of those instead?"
+t=  +18.54  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)

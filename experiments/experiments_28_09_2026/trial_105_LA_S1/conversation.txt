@@ -1,0 +1,3 @@
+# trial 105 started 2026-09-28T20:30:45.813004
+[   7.73s] You: Tell me Morty, what kind of object are you seeing right now?
+[   8.89s] Morty: I see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.

@@ -1,0 +1,63 @@
+[chat_node-7] [0m[INFO] [1790621427.837260784] [communication_llm_chat_node]: Pointed-object update: 'tape dispenser'[0m
+[intent_router_node-6] [INFO] [1790621430.027314594] [intent_router_node]: Point proposal 8 (tape_dispenser): asking 'You pointed at the tape dispenser. Should I grasp it?'
+[chat_node-7] [0m[INFO] [1790621430.027756138] [communication_llm_chat_node]: Router question: 'point' ('tape_dispenser')[0m
+[speak_action_server-3] [INFO] [1790621430.033547720] [speak_action_server]: Speak: 'You pointed at the tape dispenser. Should I grasp it?'
+[speak_action_server-3] [INFO] [1790621433.991283716] [speak_action_server]: [timing] TTS first audio after 0.36s, 3.8s of speech, done 3.95s after the request
+[speech_input_node-4] [INFO] [1790621438.727928913] [speech_input_node]: Microphone live again.
+[speech_input_node-4] [INFO] [1790621440.552011773] [speech_input_node]: [speaker] human voice (cos 0.11, rms 0.099)
+[speech_input_node-4] [INFO] [1790621440.911423905] [speech_input_node]: [timing] omni 0.36s for 1.4s audio (today 327, month 916)
+[speech_input_node-4] [INFO] [1790621440.919156360] [speech_input_node]: Heard: 'Yes, grasp it.'
+[chat_node-7] User (voice): Yes, grasp it.
+[chat_node-7] [0m[INFO] [1790621440.970834330] [communication_llm_chat_node]: FAST: matched 'Yes, grasp it.' -> confirm_point (speed=default); published {"action_intent":"confirm_point","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790621440.977758724] [communication_llm_chat_node]: Withholding pre-emptive narration None for 'confirm_point' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790621440.980231810] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer confirm_point, question='point', fresh=True)[0m
+[intent_router_node-6] [INFO] [1790621441.054409543] [intent_router_node]: Point proposal 8 (tape_dispenser): YES (answer).
+[intent_router_node-6] [INFO] [1790621441.055936246] [intent_router_node]: Point question 8 closed: yes.
+[intent_router_node-6] [INFO] [1790621441.059881344] [intent_router_node]: Voice pick: execution gate OPENED (auto-execute checkbox applies to GUI clicks only).
+[intent_router_node-6] [INFO] [1790621441.103747909] [intent_router_node]: Selected detection: label='tape_dispenser' (updating _last_target_label for narration).
+[intent_router_node-6] [INFO] [1790621441.114636665] [intent_router_node]: Set task_object_label='tape_dispenser' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790621441.330171244] [intent_router_node]: task_state: cycle 22 phase='probing' question='' holding=False object='tape_dispenser'
+[chat_node-7] [0m[INFO] [1790621441.335653672] [communication_llm_chat_node]: Router question: 'closed'[0m
+[intent_router_node-6] [INFO] [1790621441.337475883] [intent_router_node]: task_state: cycle 22 phase='approaching' question='' holding=False object='tape_dispenser'
+[chat_node-7] [0m[INFO] [1790621441.339108563] [communication_llm_chat_node]: Cycle state: BUSY — pick running[0m
+[intent_router_node-6] [INFO] [1790621441.709814749] [intent_router_node]: cycle_id=22 (target='tape dispenser') — narrating start
+[speak_action_server-3] [INFO] [1790621441.724273538] [speak_action_server]: Speak: 'Starting grasp on the tape dispenser.'
+[speak_action_server-3] [INFO] [1790621444.852028104] [speak_action_server]: [timing] TTS first audio after 0.35s, 3.0s of speech, done 3.13s after the request
+[intent_router_node-6] [INFO] [1790621445.095017474] [intent_router_node]: Held-object memory: 'tape_dispenser'
+[chat_node-7] [0m[INFO] [1790621445.315296471] [communication_llm_chat_node]: Held-object update (task state): '' -> 'tape_dispenser'[0m
+[intent_router_node-6] [INFO] [1790621446.345385890] [intent_router_node]: task_state: cycle 22 phase='awaiting_destination' question='destination' holding=True object='tape_dispenser'
+[chat_node-7] [0m[INFO] [1790621446.349123602] [communication_llm_chat_node]: Cycle state: HOLDING the object at the grasp pose — waiting for a drop destination[0m
+[speak_action_server-3] [INFO] [1790621446.359245719] [speak_action_server]: Speak: 'Got the tape dispenser. Where should I drop it? Left, right, or home?'
+[speak_action_server-3] [INFO] [1790621451.125808296] [speak_action_server]: [timing] TTS first audio after 0.39s, 4.4s of speech, done 4.76s after the request
+[speech_input_node-4] [INFO] [1790621455.037812576] [speech_input_node]: [speaker] human voice (cos 0.03, rms 0.090)
+[speech_input_node-4] [INFO] [1790621455.409227377] [speech_input_node]: [timing] omni 0.37s for 3.9s audio (today 328, month 917)
+[speech_input_node-4] [INFO] [1790621455.410712710] [speech_input_node]: Heard: 'Drop it on the right side, give me the object and go back home.'
+[chat_node-7] User (voice): Drop it on the right side, give me the object and go back home.
+[chat_node-7] [0m[INFO] [1790621455.420098597] [communication_llm_chat_node]: FAST: matched 'Drop it on the right side, give me the object and go back home.' -> drop_right_release_home (speed=default); published {"action_intent":"drop_right_release_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790621455.421987661] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer drop_right_release_home, question='destination', fresh=True)[0m
+[intent_router_node-6] [INFO] [1790621455.524506637] [intent_router_node]: Resume 'drop_right+release_home' published (compound 'drop_right_release_home').
+[intent_router_node-6] [INFO] [1790621455.571887588] [intent_router_node]: task_state: cycle 22 phase='awaiting_destination' question='' holding=True object='tape_dispenser'
+[intent_router_node-6] [INFO] [1790621455.578876168] [intent_router_node]: task_state: cycle 22 phase='carrying' question='' holding=True object='tape_dispenser'
+[speak_action_server-3] [INFO] [1790621455.583394040] [speak_action_server]: Speak: 'Going to drop right.'
+[chat_node-7] [0m[INFO] [1790621455.803578751] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting destination)[0m
+[chat_node-7] [0m[INFO] [1790621455.806492065] [communication_llm_chat_node]: Cycle state: BUSY — pick running (carrying)[0m
+[speak_action_server-3] [INFO] [1790621457.758269450] [speak_action_server]: [timing] TTS first audio after 0.19s, 2.1s of speech, done 2.17s after the request
+[chat_node-7] [0m[INFO] [1790621460.520522690] [communication_llm_chat_node]: Current pose update: 'home' -> 'vla_drop_right'[0m
+[chat_node-7] [0m[INFO] [1790621460.524252105] [communication_llm_chat_node]: Cycle state: BUSY — pick running (releasing)[0m
+[intent_router_node-6] [INFO] [1790621460.524332132] [intent_router_node]: task_state: cycle 22 phase='releasing' question='' holding=True object='tape_dispenser'
+[speak_action_server-3] [INFO] [1790621460.529060597] [speak_action_server]: Speak: 'Opening the gripper.'
+[intent_router_node-6] [INFO] [1790621460.781017300] [intent_router_node]: Held-object memory: ''
+[chat_node-7] [0m[INFO] [1790621460.821517921] [communication_llm_chat_node]: Held-object update (task state): 'tape_dispenser' -> ''[0m
+[speak_action_server-3] [INFO] [1790621462.719736336] [speak_action_server]: [timing] TTS first audio after 0.20s, 2.0s of speech, done 2.19s after the request
+[chat_node-7] [0m[INFO] [1790621463.379494168] [communication_llm_chat_node]: Cycle state: moving to home[0m
+[intent_router_node-6] [INFO] [1790621463.510229570] [intent_router_node]: task_state: cycle 22 phase='returning_home' question='' holding=False object='tape_dispenser'
+[chat_node-7] [0m[INFO] [1790621467.806471638] [communication_llm_chat_node]: Current pose update: 'vla_drop_right' -> 'home'[0m
+[intent_router_node-6] [INFO] [1790621469.116607971] [intent_router_node]: task_state: cycle 22 phase='idle' question='' holding=False object=''
+[intent_router_node-6] [INFO] [1790621469.121072847] [intent_router_node]: cycle_done received: 'done|22' (outcome=done)
+[intent_router_node-6] [INFO] [1790621469.123234491] [intent_router_node]: Grasp cycle completed successfully.
+[speak_action_server-3] [INFO] [1790621469.130018645] [speak_action_server]: Speak: "Done — I'm back at the home position. What's next?"
+[intent_router_node-6] [INFO] [1790621469.140694514] [intent_router_node]: Set task_object_label='' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790621469.143877436] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[chat_node-7] [0m[INFO] [1790621469.319029476] [communication_llm_chat_node]: Cycle state: IDLE — last pick finished[0m
+[chat_node-7] [0m[INFO] [1790621470.336167710] [communication_llm_chat_node]: Pointed-object update: '<none>'[0m
+[speak_action_server-3] [INFO] [1790621472.654400784] [speak_action_server]: [timing] TTS first audio after 0.34s, 3.5s of speech, done 3.52s after the request

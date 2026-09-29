@@ -1,0 +1,8 @@
+1
+00:00:05,368 --> 00:00:09,368
+You: Give me the toy faucet.
+
+2
+00:00:10,068 --> 00:00:14,068
+Morty (status): I can't see the toy faucet right now.
+

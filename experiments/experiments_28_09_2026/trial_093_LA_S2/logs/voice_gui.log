@@ -1,0 +1,13 @@
+[speech_input_node-4] [INFO] [1790613027.493368689] [speech_input_node]: [speaker] human voice (cos 0.04, rms 0.071)
+[speech_input_node-4] [INFO] [1790613027.801464612] [speech_input_node]: [timing] omni 0.30s for 3.2s audio (today 142, month 731)
+[speech_input_node-4] [INFO] [1790613027.803292142] [speech_input_node]: Heard: 'Could you please bring me my phone?'
+[chat_node-7] User (voice): Could you please bring me my phone?
+[chat_node-7] [0m[INFO] [1790613027.954450701] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (40 -> 30)[0m
+[chat_node-7] [0m[INFO] [1790613029.101590998] [communication_llm_chat_node]: [timing] first sentence spoken 1.14s into the LLM call[0m
+[chat_node-7] [0m[INFO] [1790613029.106304149] [communication_llm_chat_node]: [timing] LLM main call 1.15s (prompt cache: 6140 tokens read)[0m
+[chat_node-7] Assistant: I don't see a phone on the table — only a tape dispenser, a small bottle, and a Vitamin B12. I can pick any of those if you'd like!
+[speak_action_server-3] [INFO] [1790613029.113493359] [speak_action_server]: Speak: "I don't see a phone on the table — only a tape dispenser, a small bottle, and a Vitamin B12."
+[speak_action_server-3] [INFO] [1790613029.117001442] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790613035.504953726] [speak_action_server]: [timing] TTS first audio after 0.42s, 6.2s of speech, done 6.39s after the request
+[speak_action_server-3] [INFO] [1790613035.531454474] [speak_action_server]: Speak: "I can pick any of those if you'd like!"
+[speak_action_server-3] [INFO] [1790613038.661605036] [speak_action_server]: [timing] TTS first audio after 0.35s, 2.8s of speech, done 3.13s after the request

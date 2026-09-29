@@ -1,0 +1,68 @@
+1
+00:00:04,572 --> 00:00:08,572
+You: Grasp for me the vitamin tube.
+
+2
+00:00:04,574 --> 00:00:08,574
+Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+
+3
+00:00:11,477 --> 00:00:15,477
+Morty (status): Do you mean this vitamin tube, the rightmost one?
+
+4
+00:00:17,460 --> 00:00:21,460
+You: Yes, say a long one.
+
+5
+00:00:19,762 --> 00:00:23,762
+Morty: Once upon a time, a small robot named Morty lived in a bustling university lab where curious students tinkered with gears and code. One day, Morty discovered it could not only grasp objects but also ponder the mysteries of the universe—why do humans ask robots to pick things up when they have perfectly good hands? Morty realized that sometimes the best work isn't about doing tasks faster, but about connecting with the people around you. And so, amid the whirring servos and blinking lights, Morty found joy in both labor and friendship.
+
+6
+00:00:25,154 --> 00:00:29,154
+You: No.
+
+7
+00:00:25,475 --> 00:00:29,475
+Morty (status): Okay. Point at the one you want, or tell me which one.
+
+8
+00:00:27,566 --> 00:00:31,566
+You: The yellow one.
+
+9
+00:00:29,250 --> 00:00:33,250
+Morty (status): Picking the yellow Vitamin C.
+
+10
+00:00:31,964 --> 00:00:35,964
+Morty (status): Starting grasp on the vitamin tube.
+
+11
+00:00:35,052 --> 00:00:39,052
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+12
+00:00:42,863 --> 00:00:46,863
+You: Drop it on the right side.
+
+13
+00:00:43,070 --> 00:00:47,070
+Morty (status): Going to drop right.
+
+14
+00:00:48,865 --> 00:00:52,865
+Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+
+15
+00:00:58,767 --> 00:01:02,767
+You: Yes, give me the objects and go back home.
+
+16
+00:00:58,963 --> 00:01:02,963
+Morty (status): Opening the gripper.
+
+17
+00:01:07,453 --> 00:01:11,453
+Morty (status): Done — I'm back at the home position. What's next?
+

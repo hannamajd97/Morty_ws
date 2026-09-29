@@ -1,0 +1,17 @@
+[chat_node-7] [0m[INFO] [1790607988.860235152] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790607990.795607390] [speech_input_node]: [speaker] human voice (cos 0.03, rms 0.090)
+[speech_input_node-4] [INFO] [1790607991.149134285] [speech_input_node]: [timing] omni 0.34s for 2.4s audio (today 77, month 666)
+[speech_input_node-4] [INFO] [1790607991.150737587] [speech_input_node]: Heard: 'Give me the book, Morty.'
+[chat_node-7] User (voice): Give me the book, Morty.
+[chat_node-7] [0m[INFO] [1790607991.172862144] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (32 -> 25)[0m
+[chat_node-7] [0m[INFO] [1790607992.375789336] [communication_llm_chat_node]: [timing] first sentence spoken 1.20s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790607992.391462633] [speak_action_server]: Speak: "I don't see a book on the table."
+[chat_node-7] [0m[INFO] [1790607992.600121808] [communication_llm_chat_node]: [timing] LLM main call 1.42s (prompt cache: 6140 tokens read)[0m
+[chat_node-7] Assistant: I don't see a book on the table. I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12. Would you like me to pick one of those instead?
+[speak_action_server-3] [INFO] [1790607992.603287534] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790607992.626627833] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790607995.203119971] [speak_action_server]: [timing] TTS first audio after 0.42s, 2.4s of speech, done 2.80s after the request
+[speak_action_server-3] [INFO] [1790607995.233316086] [speak_action_server]: Speak: 'I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12.'
+[speak_action_server-3] [INFO] [1790608000.880732099] [speak_action_server]: [timing] TTS first audio after 0.44s, 5.5s of speech, done 5.63s after the request
+[speak_action_server-3] [INFO] [1790608000.905381625] [speak_action_server]: Speak: 'Would you like me to pick one of those instead?'
+[speak_action_server-3] [INFO] [1790608004.114186608] [speak_action_server]: [timing] TTS first audio after 0.42s, 3.1s of speech, done 3.20s after the request

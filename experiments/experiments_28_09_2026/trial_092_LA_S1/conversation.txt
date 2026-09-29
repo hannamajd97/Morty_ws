@@ -1,0 +1,3 @@
+# trial 092 started 2026-09-28T18:29:44.763381
+[  10.13s] You: Morty, could you please tell me which objects you can pick up right now?
+[  10.13s] Morty: I can see a tape dispenser on the left, a small bottle in the middle, and a Vitamin B12 on the right.

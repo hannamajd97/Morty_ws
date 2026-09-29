@@ -1,0 +1,3 @@
+# trial 086 started 2026-09-28T17:03:52.234737
+[   4.78s] You: What do you see on the table?
+[   6.08s] Morty: I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12.

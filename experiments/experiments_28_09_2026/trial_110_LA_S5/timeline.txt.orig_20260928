@@ -1,0 +1,160 @@
+TRIAL TIMELINE  start 2026-09-28 20:48:19  stop 20:49:33  (73.6 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=-3859.03  background: GraspGen for 'vitamin_tube' done (job 9.64 s, 18 grasps)
+t=-3848.89  background: GraspGen for 'vitamin_tube' done (job 1.19 s, 27 grasps)
+t=-3847.41  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.62 s, 1 tried)
+t=-3843.98  background: GraspGen for 'vitamin_tube' done (job 0.80 s, 30 grasps)
+t=-3843.19  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.72 s, 1 tried)
+t=-3761.79  background: GraspGen for 'vitamin_tube' done (job 1.11 s, 31 grasps)
+t=-3760.96  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.58 s, 1 tried)
+t=-3758.79  background: GraspGen for 'vitamin_tube' done (job 1.45 s, 22 grasps)
+t=-3757.81  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.72 s, 1 tried)
+t=-3702.65  background: GraspGen for 'vitamin_tube' done (job 1.20 s, 31 grasps)
+t=-3701.82  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.67 s, 1 tried)
+t=-3622.94  background: GraspGen for 'vitamin_tube' done (job 1.35 s, 17 grasps)
+t=-3619.83  background: 'vitamin_tube' verified for execution via the curve (executor probe 2.87 s, 2 tried)
+t=-3573.61  background: GraspGen for 'vitamin_tube' done (job 1.23 s, 20 grasps)
+t=-3572.71  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.74 s, 1 tried)
+t=-3565.53  background: GraspGen for 'vitamin_tube' done (job 1.52 s, 22 grasps)
+t=-3564.67  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.68 s, 1 tried)
+t=-3540.31  background: GraspGen for 'vitamin_tube' done (job 2.19 s, 17 grasps)
+t=-3535.32  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.82 s, 1 tried)
+t=-3532.14  background: GraspGen for 'vitamin_tube' done (job 1.93 s, 19 grasps)
+t=-3509.64  background: 'vitamin_tube' no feasible grasp (executor probe 11.68 s, 10 tried)
+t=-3506.77  background: GraspGen for 'vitamin_tube' done (job 1.86 s, 20 grasps)
+t=-3495.52  background: 'vitamin_tube' verified for execution via the curve (executor probe 2.85 s, 3 tried)
+t=-3425.48  background: GraspGen for 'vitamin_tube' done (job 2.16 s, 10 grasps)
+t=-3379.13  background: GraspGen for 'vitamin_tube' done (job 1.71 s, 21 grasps)
+t=-3327.39  background: GraspGen for 'vitamin_tube' done (job 1.78 s, 10 grasps)
+t=-3081.38  background: GraspGen for 'vitamin_tube' done (job 2.59 s, 17 grasps)
+t=-3069.97  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.72 s, 1 tried)
+t=-3068.86  background: GraspGen for 'vitamin_tube' done (job 1.84 s, 24 grasps)
+t=-3067.85  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.81 s, 1 tried)
+t=-2922.13  background: GraspGen for 'vitamin_tube' done (job 2.43 s, 15 grasps)
+t=-2874.14  background: GraspGen for 'vitamin_tube' done (job 2.12 s, 26 grasps)
+t=-2865.75  background: 'vitamin_tube' verified for execution via the direct line (executor probe 1.56 s, 1 tried)
+t=-2461.49  background: GraspGen for 'vitamin_tube' done (job 1.77 s, 16 grasps)
+t=-2455.79  background: GraspGen for 'vitamin_tube' done (job 2.72 s, 23 grasps)
+t=-2447.57  background: GraspGen for 'vitamin_tube' done (job 2.42 s, 28 grasps)
+t=-2446.60  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.76 s, 1 tried)
+t=-2441.91  background: GraspGen for 'vitamin_tube' done (job 2.08 s, 18 grasps)
+t=-2433.64  background: 'vitamin_tube' verified for execution via the curve (executor probe 8.08 s, 7 tried)
+t=-2406.55  background: GraspGen for 'vitamin_tube' done (job 3.21 s, 20 grasps)
+t=-2405.09  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.03 s, 1 tried)
+t=-2403.53  background: GraspGen for 'vitamin_tube' done (job 2.56 s, 16 grasps)
+t=-2402.49  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.86 s, 1 tried)
+t=-2281.62  background: GraspGen for 'vitamin_tube' done (job 3.01 s, 26 grasps)
+t=-2280.25  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.87 s, 1 tried)
+t=-2055.85  background: GraspGen for 'vitamin_tube' done (job 1.62 s, 24 grasps)
+t=-2054.66  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.92 s, 1 tried)
+t=-2053.56  background: GraspGen for 'vitamin_tube' done (job 1.71 s, 18 grasps)
+t=-2052.65  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.73 s, 1 tried)
+t=-1431.82  background: GraspGen for 'vitamin_tube' done (job 3.33 s, 24 grasps)
+t=-1425.85  background: 'vitamin_tube' verified for execution via the blended lines (executor probe 0.79 s, 1 tried)
+t=-1420.68  background: GraspGen for 'vitamin_tube' done (job 2.67 s, 21 grasps)
+t=-1419.26  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.17 s, 1 tried)
+t=-1309.40  background: GraspGen for 'vitamin_tube' done (job 4.09 s, 19 grasps)
+t=-1299.22  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.79 s, 1 tried)
+t=-1292.35  background: GraspGen for 'vitamin_tube' done (job 2.27 s, 24 grasps)
+t=-1290.99  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.10 s, 1 tried)
+t=-1178.32  background: GraspGen for 'vitamin_tube' done (job 2.75 s, 23 grasps)
+t=-1175.69  background: 'vitamin_tube' verified for execution via the curve (executor probe 2.37 s, 2 tried)
+t=-1159.99  background: GraspGen for 'vitamin_tube' done (job 2.35 s, 20 grasps)
+t=-1159.04  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.77 s, 1 tried)
+t=-1157.52  background: GraspGen for 'vitamin_tube' done (job 1.84 s, 24 grasps)
+t=-1156.27  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.05 s, 1 tried)
+t=-1100.37  background: GraspGen for 'vitamin_tube' done (job 3.05 s, 27 grasps)
+t=-1093.52  background: GraspGen for 'vitamin_tube' done (job 2.64 s, 22 grasps)
+t=-1075.54  background: GraspGen for 'vitamin_tube' done (job 2.62 s, 23 grasps)
+t=-1057.10  background: GraspGen for 'vitamin_tube' done (job 2.60 s, 18 grasps)
+t=-1044.57  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.74 s, 1 tried)
+t=-1034.12  background: GraspGen for 'vitamin_tube' done (job 2.78 s, 23 grasps)
+t=-1032.72  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.19 s, 1 tried)
+t=  -13.83  background: GraspGen for 'vitamin_tube' done (job 2.29 s, 15 grasps)
+t=  -12.55  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.06 s, 1 tried)
+t=   +0.00  trial start
+t=   +3.16  you stopped speaking ("Grasp for me the vitamin tube.")
+t=   +3.74  trial bag ready
+t=   +4.32  you said: "Grasp for me the vitamin tube."
+t=   +4.33  intent: pick vitamin_tube
+t=   +4.53  Morty said: "I see two vitamin tubes. Could you say leftmost or rightmost, or point at the on"
+t=  +11.17  pointed at the vitamin tube — waiting for your yes
+t=  +11.37  Morty said: "Do you mean this vitamin tube, the rightmost one?"
+t=  +15.94  you stopped speaking ("Yes, say a long one.")
+t=  +17.20  you said: "Yes, say a long one."
+t=  +18.80  Morty said: "Once upon a time, a small robot named Morty lived in a bustling university lab w"
+t=  +24.09  you stopped speaking ("No.")
+t=  +24.85  you said: "No."
+t=  +24.88  intent: reject_point
+t=  +24.91  pointing question: no
+t=  +25.44  Morty said: "Okay. Point at the one you want, or tell me which one."
+t=  +26.24  you stopped speaking ("The yellow one.")
+t=  +27.32  you said: "The yellow one."
+t=  +28.37  intent: pick vitamin_tube
+t=  +28.80  pipeline: 'vitamin_tube' precomputed — GraspGen ran 39.1 s before the click (job 2.29 s), executor verified it via the curve (probe 1.06 s)
+t=  +29.03  pipeline: 15 candidates published (3.77 s after the click, precomputed)
+t=  +29.05  executor: candidates received
+t=  +29.06  executor: precheck hit (+0.00 s)
+t=  +29.12  Morty said: "Picking the yellow Vitamin C."
+t=  +29.19  executor: open sent (+0.13 s)
+t=  +29.19  executor: motion start (+0.00 s)
+t=  +29.41  probe: grasp 1/15: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +31.29  executor: close sent (+2.11 s)
+t=  +31.78  executor: arrival (+0.48 s)
+t=  +31.91  Morty said: "Starting grasp on the vitamin tube."
+t=  +31.92  selection cycle 21 started
+t=  +32.82  executor: grasp verdict (+1.04 s)
+t=  +33.94  executor: lift done (+1.12 s)
+t=  +34.11  executor: wait destination start (+0.17 s)
+t=  +34.18  robot: paused
+t=  +34.96  Morty said: "Got the vitamin tube. Where should I drop it? Left, right, or home?"
+t=  +41.26  you stopped speaking ("Drop it on the right side.")
+t=  +42.40  you said: "Drop it on the right side."
+t=  +42.68  intent: drop_right
+t=  +42.73  executor: destination received (+8.62 s)
+t=  +42.77  robot: resumed:vla drop right
+t=  +43.01  Morty said: "Going to drop right."
+t=  +48.73  robot: awaiting release
+t=  +48.82  Morty said: "I'm at the drop right position, still holding the vitamin tube. Should I open th"
+t=  +57.07  you stopped speaking ("Yes, give me the objects and go back home.")
+t=  +58.53  you said: "Yes, give me the objects and go back home."
+t=  +58.66  intent: release_home
+t=  +58.84  robot: releasing
+t=  +58.92  Morty said: "Opening the gripper."
+t=  +59.49  executor: released (+16.76 s)
+t=  +59.59  robot: released
+t=  +65.82  executor: home done (+6.33 s)
+t=  +67.19  executor: cycle done (+1.37 s)
+t=  +67.19  executor: cycle 21 done via the curve
+t=  +67.35  Morty said: "Done — I'm back at the home position. What's next?"
+t=  +67.38  executor reported: done|21
+t=  +73.64  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves      26.03 s
+  end of your voice -> transcript               1.16 s
+  you stopped speaking -> command               1.17 s
+  transcript -> command (understanding)         0.01 s
+  command -> object chosen (incl. clarification)   27.59 s
+  object chosen -> grasp candidates            -2.89 s
+  GraspGen compute (the run that was used)      2.29 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice          45.75 s
+  reachability check (background probe)         1.06 s
+  executor: candidates -> motion start          0.13 s
+  command -> arm moves                         24.86 s
+  approach                                      2.59 s
+  arrival -> grasp verdict                      1.04 s
+  waiting for the drop side                     8.62 s
+  motion start -> home                         38.00 s
+  command given -> object handed over          56.43 s
+  Morty waited for your answers                32.16 s
+  robot's own time (total - waiting)           30.70 s
+  total                                        62.87 s
+  understood by                              instant rule
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             1 of 15
+  execution plan compute                        1.06 s
+  approach planned by                        curve (precomputed)

@@ -1,0 +1,93 @@
+TRIAL TIMELINE  start 2026-09-28 18:07:10  stop 18:08:29  (78.7 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -423.44  background: GraspGen for 'vitamin_tube' done (job 2.35 s, 11 grasps)
+t= -412.71  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.59 s, 1 tried)
+t= -410.11  background: GraspGen for 'vitamin_tube' done (job 1.23 s, 30 grasps)
+t= -409.32  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.56 s, 1 tried)
+t= -269.62  background: GraspGen for 'vitamin_tube' done (job 2.44 s, 25 grasps)
+t= -268.33  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.74 s, 1 tried)
+t= -251.40  background: GraspGen for 'vitamin_tube' done (job 2.01 s, 21 grasps)
+t= -250.40  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.81 s, 1 tried)
+t= -248.18  background: GraspGen for 'vitamin_tube' done (job 2.51 s, 24 grasps)
+t= -245.36  background: 'vitamin_tube' verified for execution via the curve (executor probe 2.61 s, 2 tried)
+t=   +0.00  trial start
+t=   +3.08  you stopped speaking ("Grasp for me the vitamin tube.")
+t=   +4.36  trial bag ready
+t=   +4.37  you said: "Grasp for me the vitamin tube."
+t=   +4.38  intent: pick vitamin_tube
+t=   +4.43  Morty said: "I see two vitamin tubes. Could you say leftmost or rightmost, or point at the on"
+t=  +12.89  selection cycle 2 started
+t=  +12.90  pipeline: 'vitamin_tube' precomputed — GraspGen ran 256.1 s before the click (job 2.51 s), executor verified it via the curve (probe 2.61 s)
+t=  +13.24  pipeline: 24 candidates published (5.32 s after the click, precomputed)
+t=  +13.25  executor: candidates received
+t=  +13.25  executor: precheck hit (+0.00 s)
+t=  +13.38  executor: open sent (+0.13 s)
+t=  +13.38  executor: motion start (+0.00 s)
+t=  +13.42  probe: grasp 3/24: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +13.44  arm starts moving (joint data)
+t=  +13.51  Morty said: "Starting grasp on the vitamin tube."
+t=  +15.49  executor: close sent (+2.11 s)
+t=  +15.99  executor: arrival (+0.50 s)
+t=  +17.04  executor: grasp verdict (+1.05 s)
+t=  +17.26  arm starts moving (joint data)
+t=  +18.21  executor: lift done (+1.17 s)
+t=  +19.08  executor: wait destination start (+0.87 s)
+t=  +19.08  robot: paused
+t=  +19.09  Morty said: "Got the vitamin tube. Where should I drop it? Left, right, or home?"
+t=  +25.29  you stopped speaking ("Drop it on the right side.")
+t=  +26.44  you said: "Drop it on the right side."
+t=  +26.44  intent: drop_right
+t=  +26.45  executor: destination received (+7.37 s)
+t=  +26.45  robot: resumed:vla drop right
+t=  +26.46  Morty said: "Going to drop right."
+t=  +26.88  arm starts moving (joint data)
+t=  +31.93  robot: awaiting release
+t=  +31.94  Morty said: "I'm at the drop right position, still holding the vitamin tube. Should I open th"
+t=  +38.66  you stopped speaking ("Yes, opens the gripper.")
+t=  +40.26  you said: "Yes, opens the gripper."
+t=  +40.26  intent: open_gripper
+t=  +40.30  robot: releasing
+t=  +40.31  Morty said: "Opening the gripper."
+t=  +41.03  robot: released
+t=  +44.03  robot: awaiting home confirm
+t=  +44.06  Morty said: "Should I go back home?"
+t=  +47.29  you stopped speaking ("Go back home.")
+t=  +48.24  you said: "Go back home."
+t=  +48.24  intent: go_home
+t=  +48.26  Morty said: "Going home."
+t=  +48.59  arm starts moving (joint data)
+t=  +52.44  executor: home done (+25.99 s)
+t=  +53.81  executor: cycle done (+1.38 s)
+t=  +53.81  executor: cycle 2 done via the curve
+t=  +53.81  executor reported: done|2
+t=  +53.83  Morty said: "Done — I'm back at the home position. What's next?"
+t=  +78.70  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves      10.30 s
+  end of your voice -> transcript               1.29 s
+  you stopped speaking -> command               1.30 s
+  transcript -> command (understanding)         0.01 s
+  command -> object chosen (incl. clarification)    8.51 s
+  object chosen -> grasp candidates             0.35 s
+  GraspGen compute (the run that was used)      2.51 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice         261.07 s
+  reachability check (background probe)         2.61 s
+  executor: candidates -> motion start          0.14 s
+  command -> arm moves                          9.01 s
+  approach                                      2.60 s
+  arrival -> grasp verdict                      1.05 s
+  waiting for the drop side                     7.37 s
+  motion start -> home                         40.43 s
+  command given -> object handed over          37.95 s
+  Morty waited for your answers                19.92 s
+  robot's own time (total - waiting)           29.52 s
+  total                                        49.44 s
+  understood by                              instant rule
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             3 of 24
+  execution plan compute                        2.61 s
+  approach planned by                        curve (precomputed)

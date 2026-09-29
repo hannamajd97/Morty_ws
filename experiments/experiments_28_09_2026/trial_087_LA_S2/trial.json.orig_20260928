@@ -1,0 +1,31 @@
+{
+  "Trial ID": "087",
+  "Date": "2026-09-28",
+  "Scenario": "S2: Object NOT in scene ('give me the book')",
+  "Modifiers": "",
+  "Level": "L1 single-step, explicit",
+  "Stage Times": {
+    "intent_s": null,
+    "yolo_s": null,
+    "graspgen_s": null,
+    "execution_s": null,
+    "total_s": null,
+    "started_by": "voice"
+  },
+  "Task ID": "",
+  "Scene Layout": "Layout A",
+  "Command Used": "Give me the book, Morty.",
+  "Intended Target": "tape_dispenser",
+  "Intended Destination": "\u2014",
+  "User Intent understood correctly?": "",
+  "Object Detected?": "",
+  "Correct Object Selected?": "",
+  "Grasp Success?": "",
+  "Action Executed Correctly?": "",
+  "Full Task Success?": "",
+  "Interaction Time (s)": "",
+  "Total Time (s)": "",
+  "Failure Category / Notes": "",
+  "bag": "/home/deep/morty_ws/experiments/experiments_28_09_2026/trial_087_LA_S2/bag",
+  "vla_episode": null
+}

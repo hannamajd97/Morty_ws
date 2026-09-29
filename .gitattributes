@@ -1,1 +1,1 @@
-experiments/experiments_18_09_2026/**/*.db3 filter=lfs diff=lfs merge=lfs -text
+experiments/**/*.db3 filter=lfs diff=lfs merge=lfs -text

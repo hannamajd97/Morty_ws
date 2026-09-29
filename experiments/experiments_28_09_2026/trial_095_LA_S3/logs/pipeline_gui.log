@@ -1,0 +1,162 @@
+[run_grasp_pipeline_venv-1] [INFO] [1790614599.788253469] [yolo_live_select_grasp]: [perf] infer_fps=1.35, infer_ms_avg=390.9, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614602.302093224] [yolo_live_select_grasp]: [perf] infer_fps=1.19, infer_ms_avg=416.5, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614603.088984384] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1790614603.598626515] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790614604.855636054] [yolo_live_select_grasp]: [perf] infer_fps=1.56, infer_ms_avg=389.5, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614606.585704895] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-3).
+[run_grasp_pipeline_venv-1] [INFO] [1790614606.914441651] [yolo_live_select_grasp]: [perf] infer_fps=1.46, infer_ms_avg=381.8, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.595770192] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.616304585] [yolo_live_select_grasp]: [prompt] You chose small_bottle.
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.627605669] [yolo_live_select_grasp]: Selected index 0: small_bottle (by pointing)
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.647908747] [yolo_live_select_grasp]: Published selection cycle_id=2 on '/graspgen/selection_cycle_id'.
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.694561351] [yolo_live_select_grasp]: Published selected 'small_bottle' bbox=(384,263,461,411) | depth=yes (cached)
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.795357208] [yolo_live_select_grasp]: Published 18 grasp candidates on '/graspgen/candidate_poses_base_link'.
+[run_grasp_pipeline_venv-1] [INFO] [1790614607.819092029] [yolo_live_select_grasp]: [viz] executor's ACTUAL pick bridged to viz frame 'camera_color_optical_frame' (ORANGE).
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.427608428] [yolo_live_select_grasp]: [viz] best grasp approach·view = +0.69 -> FRONT approach (correct)
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.429061897] [yolo_live_select_grasp]: [viz] published grasp poses for viewer: 18 kept, 130 rejected (frame=camera_color_optical_frame)
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.457409727] [yolo_live_select_grasp]: [calib] executed pose = GraspGen pose × flipY × offset [+0.000, +0.000, +0.000] m (TCP frame), matrix_normalized=True
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.489958727] [yolo_live_select_grasp]: [fixed] grasp→tcp rotation: flipY
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.518604065] [yolo_live_select_grasp]: Published TCP grasp pose transformed to base_link
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.535854396] [yolo_live_select_grasp]: Source frame pose: t=(0.060,0.054,0.341)
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.536986857] [yolo_live_select_grasp]: base_link pose: t=(0.024,-0.364,0.633)
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.540195625] [yolo_live_select_grasp]: Published TCP-aligned grasp pose (will republish continuously)
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.565044725] [yolo_live_select_grasp]: Best grasp score=0.167 @ t=(0.060,0.054,0.341) frame=camera_color_optical_frame
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.566225017] [yolo_live_select_grasp]: [debug] Cloud centroid=(0.056,0.051,0.335), Best grasp=(0.060,0.054,0.341)
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.581147646] [yolo_live_select_grasp]: [precompute] HIT 'small_bottle' (age 36 s) -> published in 0.91 s
+[run_grasp_pipeline_venv-1] [INFO] [1790614608.582955948] [yolo_live_select_grasp]: Waiting for executor completion on '/grasp_executor_lin_llm/cycle_done' (cycle_id=2)...
+[run_grasp_pipeline_venv-1] [INFO] [1790614644.543784134] [yolo_live_select_grasp]: Received executor cycle status: done (cycle_id=2)
+[run_grasp_pipeline_venv-1] [INFO] [1790614644.637558056] [yolo_live_select_grasp]: Executor cycle complete: done.
+[run_grasp_pipeline_venv-1] [INFO] [1790614644.647535423] [yolo_live_select_grasp]: Resetting for next cycle...
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.246391004] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: wooden_maze_puzzle 0.14 (61% gripper)  (total 8)
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.350486462] [yolo_live_select_grasp]: [perf] infer_fps=0.05, infer_ms_avg=326.8, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.353015523] [yolo_live_select_grasp]: [prompt] I see 2 objects: a vitamin_tube, a tape_dispenser. Point at one, click it in the window, or tell me which to pick.
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.396146780] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.609608465] [yolo_live_select_grasp]: [registration] detection is fresh (<1s) — skipping re-detect.
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.611698357] [yolo_live_select_grasp]: [timing] refresh-detection 0.01s
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.614220292] [yolo_live_select_grasp]: [seg] starting selected-object segmentation bbox=(223,276,306,423)
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.878709623] [yolo_live_select_grasp]: [seg] selected-object segmentation finished in 263.4 ms (waited 180 ms for the detector's lock, model 84 ms)
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.880518064] [yolo_live_select_grasp]: [seg-depth] bbox_valid_depth_px=10440, mask_px=11172, overlap_px=9967
+[run_grasp_pipeline_venv-1] [INFO] [1790614645.988663386] [yolo_live_select_grasp]: [multiframe] fused 5 buffered depth frames (median) in 0.09s for single-view capture.
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.134861012] [yolo_live_select_grasp]: [pregrasp] spatial-outlier filter: kept 896/932 (cutoff=0.150m, p95=0.043m)
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.161464266] [yolo_live_select_grasp]: [pregrasp] counts raw=10823 depth=10619 cluster=932 radius=932 clean=932 plane=896
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.214509140] [yolo_live_select_grasp]: [table] plane from COLOUR: n=[-0.02 -0.98 -0.21] (cloud frame), object height 8.0cm, bottom gap 0.1cm, yellow px 117570 sampled 446 [memory updated]
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.257304920] [yolo_live_select_grasp]: [timing] capture+segment+cloud 0.61s
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.271939176] [yolo_live_select_grasp]: [timing] registration+downsample 0.00s
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.461679733] [yolo_live_select_grasp]: [filter-chain] START: 173 score-ranked candidates of 173 generated
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.587760739] [yolo_live_select_grasp]: [filter-chain] [orient] RAW from GraspGen (post topk): n=173 | fingers: lateral=23 diagonal=90 VERTICAL=60 | tilt med=27deg max=88deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.606485272] [yolo_live_select_grasp]: [filter-chain] after upright: 173
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.620978375] [yolo_live_select_grasp]: [filter-chain] after reject-side: 173
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.622492106] [yolo_live_select_grasp]: [filter-chain] up-vector [table-plane] = [-0.02 -0.98 -0.21]
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.684050993] [yolo_live_select_grasp]: [filter-chain] [orient] entering thesis cascade: n=173 | fingers: lateral=122 diagonal=35 VERTICAL=16 | tilt med=32deg max=88deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.718849382] [yolo_live_select_grasp]: [filter-chain] after support-plane: 111 (from-below 62, under-table 0; table at -0.174 [RANSAC plane])
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.740818565] [yolo_live_select_grasp]: [filter-chain] after level-band (<=25deg): 43 (cut 68)
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.788888831] [yolo_live_select_grasp]: [filter-chain] after height-window: 43 (side 43, cut 0; band 10%-90% of 8.0cm object)
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.853922515] [yolo_live_select_grasp]: [filter-chain] after roll-upright(fingers): 27 (cut 16)
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.877695554] [yolo_live_select_grasp]: [filter-chain] palm-canonicalize: rotated 15/27 twins right side up
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.881989869] [yolo_live_select_grasp]: [filter-chain] after from-behind: 16 (cut 11)
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.884786435] [yolo_live_select_grasp]: [filter-chain] centroid-reweight (sigma 4.1cm): TCP-to-middle median 1.2cm, best 1.1cm
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.888367781] [yolo_live_select_grasp]: [filter-chain] front-preference (w=1.5): approach·view median 0.68, best 0.92
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.900668597] [yolo_live_select_grasp]: [filter-chain] [orient] leaving thesis cascade: n=16 | fingers: lateral=14 diagonal=2 VERTICAL=0 | tilt med=6deg max=25deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.923539961] [yolo_live_select_grasp]: [filter-chain] after side-center: 16
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.926136743] [yolo_live_select_grasp]: [filter-chain] after centroid-reweight: 16
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.927957537] [yolo_live_select_grasp]: [filter-chain] after ee-orientation-reweight: 16
+[run_grasp_pipeline_venv-1] [INFO] [1790614646.979438863] [yolo_live_select_grasp]: Centroid orientation set from gripper_tcp: (-0.016, 0.003, 0.924, -0.382)
+[run_grasp_pipeline_venv-1] [INFO] [1790614647.033339416] [yolo_live_select_grasp]: [filter-chain] after orientation-consistency: 16
+[run_grasp_pipeline_venv-1] [INFO] [1790614647.034821794] [yolo_live_select_grasp]: [filter-chain] SURVIVED: 16/173 generated (173 entered geometric filters)
+[run_grasp_pipeline_venv-1] [INFO] [1790614647.038619504] [yolo_live_select_grasp]: [grasp-utility] final_cloud: U=3.661 (count=16, diversity_deg=22.02, mean_score=0.339, instability=0.000)
+[run_grasp_pipeline_venv-1] [INFO] [1790614647.040932687] [yolo_live_select_grasp]: [precompute] 'tape_dispenser' ready in 1.44 s: 16 grasps kept of 173 (stored 2)
+[run_grasp_pipeline_venv-1] [INFO] [1790614647.163002062] [yolo_live_select_grasp]: [precompute] 'tape_dispenser' sent 16 candidates for the LIN check (set 16)
+[run_grasp_pipeline_venv-1] [INFO] [1790614647.750429605] [yolo_live_select_grasp]: [perf] infer_fps=1.26, infer_ms_avg=498.8, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614648.885157620] [yolo_live_select_grasp]: [precompute] 'tape_dispenser' LIN-verified: candidate 2 (set 16, 2 probed)
+[run_grasp_pipeline_venv-1] [INFO] [1790614649.885890706] [yolo_live_select_grasp]: [perf] infer_fps=1.41, infer_ms_avg=472.5, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614650.518182392] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-1).
+[run_grasp_pipeline_venv-1] [INFO] [1790614650.751449968] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: wooden_maze_puzzle 0.10 (59% gripper)  (total 16)
+[run_grasp_pipeline_venv-1] [INFO] [1790614651.923450201] [yolo_live_select_grasp]: [perf] infer_fps=1.95, infer_ms_avg=294.8, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614654.033421381] [yolo_live_select_grasp]: [perf] infer_fps=1.91, infer_ms_avg=353.0, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614655.690465451] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1790614655.977662132] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: wooden_maze_puzzle 0.17 (61% gripper)  (total 26)
+[run_grasp_pipeline_venv-1] [INFO] [1790614656.146181636] [yolo_live_select_grasp]: [perf] infer_fps=1.88, infer_ms_avg=339.9, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614656.191794866] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790614658.631832478] [yolo_live_select_grasp]: [perf] infer_fps=2.00, infer_ms_avg=330.5, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614659.497361544] [yolo_live_select_grasp]: [identity] vitamin_c 0.13 rejected (looks 0.38 like it)  (rejected so far 4)
+[run_grasp_pipeline_venv-1] [INFO] [1790614661.084367221] [yolo_live_select_grasp]: [perf] infer_fps=2.08, infer_ms_avg=280.1, last_dets=2, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614661.256475292] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-1).
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.034771335] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: small_bottle 0.09 (76% gripper)  (total 37)
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.393999719] [yolo_live_select_grasp]: [registration] detection is fresh (<1s) — skipping re-detect.
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.397015617] [yolo_live_select_grasp]: [timing] refresh-detection 0.01s
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.398038844] [yolo_live_select_grasp]: [seg] starting selected-object segmentation bbox=(405,266,484,420)
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.564357245] [yolo_live_select_grasp]: [seg] selected-object segmentation finished in 162.7 ms (waited 96 ms for the detector's lock, model 67 ms)
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.581463539] [yolo_live_select_grasp]: [seg-depth] bbox_valid_depth_px=8387, mask_px=11979, overlap_px=8381
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.661028332] [yolo_live_select_grasp]: [multiframe] fused 5 buffered depth frames (median) in 0.08s for single-view capture.
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.716721109] [yolo_live_select_grasp]: [pregrasp] spatial-outlier filter: kept 521/525 (cutoff=0.150m, p95=0.038m)
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.717733194] [yolo_live_select_grasp]: [pregrasp] counts raw=8959 depth=8794 cluster=525 radius=525 clean=525 plane=521
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.770010955] [yolo_live_select_grasp]: [table] plane from COLOUR: n=[-0.02 -0.98 -0.21] (cloud frame), object height 8.4cm, bottom gap 0.4cm, yellow px 103093 sampled 464 [memory updated]
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.779082313] [yolo_live_select_grasp]: [timing] capture+segment+cloud 0.38s
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.791472794] [yolo_live_select_grasp]: [timing] registration+downsample 0.00s
+[run_grasp_pipeline_venv-1] [INFO] [1790614662.989827067] [yolo_live_select_grasp]: [filter-chain] START: 167 score-ranked candidates of 167 generated
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.019230276] [yolo_live_select_grasp]: [filter-chain] [orient] RAW from GraspGen (post topk): n=167 | fingers: lateral=16 diagonal=39 VERTICAL=112 | tilt med=19deg max=81deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.020377947] [yolo_live_select_grasp]: [filter-chain] after upright: 167
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.021399852] [yolo_live_select_grasp]: [filter-chain] after reject-side: 167
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.022944363] [yolo_live_select_grasp]: [filter-chain] up-vector [table-plane] = [-0.02 -0.98 -0.21]
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.054525666] [yolo_live_select_grasp]: [filter-chain] [orient] entering thesis cascade: n=167 | fingers: lateral=158 diagonal=6 VERTICAL=3 | tilt med=32deg max=88deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.093417283] [yolo_live_select_grasp]: [filter-chain] after support-plane: 110 (from-below 57, under-table 0; table at -0.173 [RANSAC plane])
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.100437706] [yolo_live_select_grasp]: [filter-chain] after level-band (<=25deg): 40 (cut 70)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.125613150] [yolo_live_select_grasp]: [filter-chain] after height-window: 40 (side 40, cut 0; band 10%-90% of 8.4cm object)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.131964554] [yolo_live_select_grasp]: [filter-chain] after roll-upright(fingers): 37 (cut 3)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.133520058] [yolo_live_select_grasp]: [filter-chain] palm-canonicalize: rotated 16/37 twins right side up
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.164531563] [yolo_live_select_grasp]: [filter-chain] after from-behind: 21 (cut 16)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.193358583] [yolo_live_select_grasp]: [filter-chain] centroid-reweight (sigma 4.0cm): TCP-to-middle median 1.2cm, best 1.0cm
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.195926027] [yolo_live_select_grasp]: [filter-chain] front-preference (w=1.5): approach·view median 0.40, best 0.96
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.198262274] [yolo_live_select_grasp]: [filter-chain] [orient] leaving thesis cascade: n=21 | fingers: lateral=20 diagonal=1 VERTICAL=0 | tilt med=7deg max=20deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.199673173] [yolo_live_select_grasp]: [filter-chain] after side-center: 21
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.200993930] [yolo_live_select_grasp]: [filter-chain] after centroid-reweight: 21
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.229032941] [yolo_live_select_grasp]: [filter-chain] after ee-orientation-reweight: 21
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.233799894] [yolo_live_select_grasp]: Centroid orientation set from gripper_tcp: (-0.016, 0.003, 0.924, -0.382)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.244297955] [yolo_live_select_grasp]: [filter-chain] after orientation-consistency: 21
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.257591457] [yolo_live_select_grasp]: [filter-chain] SURVIVED: 21/167 generated (167 entered geometric filters)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.262115837] [yolo_live_select_grasp]: [grasp-utility] final_cloud: U=3.995 (count=21, diversity_deg=28.06, mean_score=0.281, instability=0.000)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.264197937] [yolo_live_select_grasp]: [precompute] 'small_bottle' ready in 0.88 s: 21 grasps kept of 167 (stored 3)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.460836662] [yolo_live_select_grasp]: [precompute] 'small_bottle' sent 21 candidates for the LIN check (set 17)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.500856823] [yolo_live_select_grasp]: [registration] detection is fresh (<1s) — skipping re-detect.
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.527857604] [yolo_live_select_grasp]: [timing] refresh-detection 0.03s
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.530816002] [yolo_live_select_grasp]: [seg] starting selected-object segmentation bbox=(598,154,638,421)
+[run_grasp_pipeline_venv-1] [INFO] [1790614663.882239920] [yolo_live_select_grasp]: [perf] infer_fps=1.41, infer_ms_avg=394.3, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.024069570] [yolo_live_select_grasp]: [seg] selected-object segmentation finished in 491.6 ms (waited 352 ms for the detector's lock, model 140 ms)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.039942523] [yolo_live_select_grasp]: [seg-depth] bbox_valid_depth_px=7751, mask_px=9634, overlap_px=7673
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.135806763] [yolo_live_select_grasp]: [multiframe] fused 5 buffered depth frames (median) in 0.10s for single-view capture.
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.184393592] [yolo_live_select_grasp]: [pregrasp] spatial-outlier filter: kept 443/443 (cutoff=0.150m, p95=0.071m)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.185534872] [yolo_live_select_grasp]: [pregrasp] counts raw=7961 depth=7839 cluster=443 radius=443 clean=443 plane=443
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.198690020] [yolo_live_select_grasp]: [table] plane from COLOUR: n=[-0.02 -0.98 -0.21] (cloud frame), object height 14.4cm, bottom gap 0.1cm, yellow px 105122 sampled 471 [memory updated]
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.212907477] [yolo_live_select_grasp]: [timing] capture+segment+cloud 0.67s
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.243314592] [yolo_live_select_grasp]: [timing] registration+downsample 0.00s
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.427407277] [yolo_live_select_grasp]: [filter-chain] START: 215 score-ranked candidates of 215 generated
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.494343741] [yolo_live_select_grasp]: [filter-chain] [orient] RAW from GraspGen (post topk): n=215 | fingers: lateral=27 diagonal=119 VERTICAL=69 | tilt med=30deg max=84deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.495701579] [yolo_live_select_grasp]: [filter-chain] after upright: 215
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.504192723] [yolo_live_select_grasp]: [filter-chain] after reject-side: 215
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.522736724] [yolo_live_select_grasp]: [filter-chain] up-vector [table-plane] = [-0.02 -0.98 -0.21]
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.542956574] [yolo_live_select_grasp]: [filter-chain] [orient] entering thesis cascade: n=215 | fingers: lateral=206 diagonal=9 VERTICAL=0 | tilt med=33deg max=89deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.618185103] [yolo_live_select_grasp]: [filter-chain] after support-plane: 124 (from-below 91, under-table 0; table at -0.173 [RANSAC plane])
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.635850654] [yolo_live_select_grasp]: [filter-chain] after level-band (<=25deg): 56 (cut 68)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.687980388] [yolo_live_select_grasp]: [filter-chain] after height-window: 56 (side 56, cut 0; band 10%-90% of 14.4cm object)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.699975821] [yolo_live_select_grasp]: [filter-chain] after roll-upright(fingers): 53 (cut 3)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.701951285] [yolo_live_select_grasp]: [filter-chain] palm-canonicalize: rotated 23/53 twins right side up
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.720421896] [yolo_live_select_grasp]: [filter-chain] after from-behind: 28 (cut 25)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.737619432] [yolo_live_select_grasp]: [filter-chain] centroid-reweight (sigma 7.0cm): TCP-to-middle median 1.3cm, best 1.0cm
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.785120902] [yolo_live_select_grasp]: [filter-chain] front-preference (w=1.5): approach·view median 0.53, best 0.99
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.815421446] [yolo_live_select_grasp]: [filter-chain] [orient] leaving thesis cascade: n=28 | fingers: lateral=28 diagonal=0 VERTICAL=0 | tilt med=6deg max=24deg
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.820069878] [yolo_live_select_grasp]: [filter-chain] after side-center: 28
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.824962663] [yolo_live_select_grasp]: [filter-chain] after centroid-reweight: 28
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.835564858] [yolo_live_select_grasp]: [filter-chain] after ee-orientation-reweight: 28
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.838192321] [yolo_live_select_grasp]: Centroid orientation set from gripper_tcp: (-0.016, 0.003, 0.924, -0.382)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.841153564] [yolo_live_select_grasp]: [filter-chain] after orientation-consistency: 28
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.847096632] [yolo_live_select_grasp]: [filter-chain] SURVIVED: 28/215 generated (215 entered geometric filters)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.862072186] [yolo_live_select_grasp]: [grasp-utility] final_cloud: U=4.290 (count=28, diversity_deg=24.17, mean_score=0.385, instability=0.000)
+[run_grasp_pipeline_venv-1] [INFO] [1790614664.866658326] [yolo_live_select_grasp]: [precompute] job 'nutmeg_jar' discarded: object moved during the capture
+[run_grasp_pipeline_venv-1] [INFO] [1790614665.036769783] [yolo_live_select_grasp]: [identity] nutmeg_jar 0.89 rejected (looks 0.38 like it)  (rejected so far 11)
+[run_grasp_pipeline_venv-1] [INFO] [1790614665.369809354] [yolo_live_select_grasp]: [precompute] 'small_bottle' LIN-verified: candidate 2 (set 17, 2 probed)
+[run_grasp_pipeline_venv-1] [INFO] [1790614666.263276620] [yolo_live_select_grasp]: [perf] infer_fps=1.25, infer_ms_avg=410.0, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790614666.455124606] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1790614666.964773651] [yolo_live_select_grasp]: [prompt] I see 3 objects: a vitamin_tube, a tape_dispenser, a small_bottle. Point at one, click it in the window, or tell me which to pick.
+[run_grasp_pipeline_venv-1] [INFO] [1790614666.965459898] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790614667.094034558] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: small_bottle 0.12 (76% gripper)  (total 44)
+[run_grasp_pipeline_venv-1] [INFO] [1790614668.665615657] [yolo_live_select_grasp]: [perf] infer_fps=1.67, infer_ms_avg=365.7, last_dets=3, detector_device=cuda

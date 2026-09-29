@@ -1,0 +1,908 @@
+{
+ "start_wall": 1790614598.4463575,
+ "stop_wall": 1790614669.8808064,
+ "stage_times": {
+  "interaction_s": 4.194,
+  "voice_to_transcript_s": 1.629,
+  "understood_by": "language model",
+  "graspgen_background": "yes",
+  "plan_background": "yes",
+  "plan_compute_s": 3.04,
+  "grasp_used": "3 of 18",
+  "grasp_probes": 1,
+  "release_s": 29.932,
+  "human_wait_s": 20.712,
+  "robot_time_s": 18.5,
+  "morty_questions": 4,
+  "your_utterances": 4,
+  "speech_end_to_intent_s": 2.586,
+  "intent_s": 0.957,
+  "choice_s": 1.349,
+  "yolo_s": 0.141,
+  "graspgen_s": 0.0,
+  "graspgen_compute_s": 1.336,
+  "graspgen_wait_s": 0.0,
+  "graspgen_lead_s": 34.711,
+  "verify_compute_s": 3.04,
+  "planning_s": 0.106,
+  "command_to_motion_s": 2.565,
+  "approach_s": 2.643,
+  "grasp_s": 0.974,
+  "wait_destination_s": 8.196,
+  "transport_s": null,
+  "execution_s": 36.647,
+  "click_to_motion_s": 0.259,
+  "background_lead_s": 34.711,
+  "total_s": 39.212,
+  "planner": "curve",
+  "path": "precomputed",
+  "started_by": "voice"
+ },
+ "selection_cycles": [
+  {
+   "kind": "selection_cycle",
+   "cycle_id": 2,
+   "label": "small_bottle",
+   "source": "pointing",
+   "n_candidates": 18,
+   "path": "precomputed",
+   "select": 1790614607.5966015,
+   "hit": 1790614607.6554434,
+   "precompute": {
+    "label": "small_bottle",
+    "key": "small_bottle",
+    "job_start": 1790614571.5867107,
+    "job_done": 1790614572.9234955,
+    "job_s": 1.3362843350005278,
+    "verified_at": 1790614576.095476,
+    "probe_s": 3.040154,
+    "planner": "curve"
+   },
+   "published": 1790614607.7754629
+  }
+ ],
+ "executor_cycles": [
+  {
+   "kind": "executor_cycle",
+   "cycle_id": 2,
+   "ok": true,
+   "planner": "curve",
+   "phases": [
+    {
+     "name": "candidates_received",
+     "t": 1790614607.787
+    },
+    {
+     "name": "precheck_hit",
+     "t": 1790614607.788
+    },
+    {
+     "name": "open_sent",
+     "t": 1790614607.893
+    },
+    {
+     "name": "motion_start",
+     "t": 1790614607.893
+    },
+    {
+     "name": "close_sent",
+     "t": 1790614609.999
+    },
+    {
+     "name": "arrival",
+     "t": 1790614610.536
+    },
+    {
+     "name": "grasp_verdict",
+     "t": 1790614611.51
+    },
+    {
+     "name": "lift_done",
+     "t": 1790614612.627
+    },
+    {
+     "name": "wait_destination_start",
+     "t": 1790614612.748
+    },
+    {
+     "name": "destination_received",
+     "t": 1790614620.944
+    },
+    {
+     "name": "home_done",
+     "t": 1790614643.208
+    },
+    {
+     "name": "cycle_done",
+     "t": 1790614644.54
+    }
+   ]
+  }
+ ],
+ "background": [
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614459.3585277,
+   "job_done": 1790614467.9984446,
+   "job_s": 8.639301934999821,
+   "n_grasps": 18
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614478.66844,
+   "job_done": 1790614479.4634836,
+   "job_s": 0.7947395970004436,
+   "n_grasps": 19
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614488.996974,
+   "probe_s": 9.279967,
+   "feasible": -1,
+   "tried": 10,
+   "planner": ""
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614490.035818,
+   "job_done": 1790614491.0928717,
+   "job_s": 1.0567221179990156,
+   "n_grasps": 15
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614500.6650312,
+   "probe_s": 9.539465,
+   "feasible": -1,
+   "tried": 10,
+   "planner": ""
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614501.7997913,
+   "job_done": 1790614502.4469655,
+   "job_s": 0.646661843999027,
+   "n_grasps": 22
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614504.0727875,
+   "probe_s": 1.545765,
+   "feasible": 1,
+   "tried": 2,
+   "planner": "curve"
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614508.5362158,
+   "job_done": 1790614509.211151,
+   "job_s": 0.6743878519991995,
+   "n_grasps": 14
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614518.378471,
+   "job_done": 1790614519.2355871,
+   "job_s": 0.8566651429973717,
+   "n_grasps": 22
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614528.4659326,
+   "job_done": 1790614529.600275,
+   "job_s": 1.1338665969997237,
+   "n_grasps": 22
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614530.3886046,
+   "probe_s": 0.673814,
+   "feasible": 0,
+   "tried": 1,
+   "planner": "curve"
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614536.9369965,
+   "job_done": 1790614537.7378507,
+   "job_s": 0.8003665899996122,
+   "n_grasps": 10
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614539.538426,
+   "probe_s": 1.697607,
+   "feasible": 1,
+   "tried": 2,
+   "planner": "curve"
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614547.2316675,
+   "job_done": 1790614548.044595,
+   "job_s": 0.8123835570004303,
+   "n_grasps": 18
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614555.5991733,
+   "job_done": 1790614556.3849773,
+   "job_s": 0.7853240610020293,
+   "n_grasps": 33
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614571.5867107,
+   "job_done": 1790614572.9234955,
+   "job_s": 1.3362843350005278,
+   "n_grasps": 18
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614576.095476,
+   "probe_s": 3.040154,
+   "feasible": 2,
+   "tried": 3,
+   "planner": "curve"
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790614662.3825045,
+   "job_done": 1790614663.2627501,
+   "job_s": 0.8796890169978724,
+   "n_grasps": 21
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790614665.353873,
+   "probe_s": 1.943982,
+   "feasible": 1,
+   "tried": 2,
+   "planner": "curve"
+  }
+ ],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.225,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9558786153793335, \"bbox\": [384.32281494140625, 263.4533386230469, 461.7430114746094, 411.28570556640625], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9347383975982666, "
+  },
+  {
+   "t": 1.386,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9549383521080017, \"bbox\": [384.31365966796875, 263.47210693359375, 461.5616455078125, 411.3307189941406], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.934709370136261, \""
+  },
+  {
+   "t": 3.733,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 4.775,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.955707848072052, \"bbox\": [384.2982177734375, 263.4501037597656, 461.5623779296875, 411.4839172363281], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9351771473884583, \"bb"
+  },
+  {
+   "t": 6.525,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9557971358299255, \"bbox\": [384.3591613769531, 263.46728515625, 461.59332275390625, 411.3752746582031], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9348194599151611, \"bb"
+  },
+  {
+   "t": 6.881,
+   "source": "utterance",
+   "text": "{\"text\": \"Could you slowly bring me the small bottle, please?\", \"speech_end\": 1790614603.699, \"voiced_ms\": 2500, \"speech_start\": 1790614600.741, \"published\": 1790614605.328}"
+  },
+  {
+   "t": 6.882,
+   "source": "transcript",
+   "text": "Could you slowly bring me the small bottle, please?"
+  },
+  {
+   "t": 7.839,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"small_bottle\",\"object_attributes\":{\"colour\":null,\"shape\":null,\"position\":null,\"ordinal\":null,\"ordinal_from\":null,\"speed\":\"slow\",\"destination\":null,\"then\":null},\"stamp\":1790614606.285}"
+  },
+  {
+   "t": 8.036,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.955801248550415, \"bbox\": [384.27581787109375, 263.37823486328125, 461.48187255859375, 411.91748046875], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9344685077667236, \"b"
+  },
+  {
+   "t": 9.188,
+   "source": "selection_cycle_id",
+   "text": "2"
+  },
+  {
+   "t": 9.523,
+   "source": "grasp_poses",
+   "text": "18 kept"
+  },
+  {
+   "t": 9.54,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 9.619,
+   "source": "cand_status",
+   "text": "grasp 3/18: FEASIBLE (verified in the background via the curve) \u2014 executing this one"
+  },
+  {
+   "t": 9.647,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9568809866905212, \"bbox\": [384.3193664550781, 263.4258117675781, 461.6263122558594, 411.55657958984375], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.934873104095459, \"b"
+  },
+  {
+   "t": 9.801,
+   "source": "morty_said",
+   "text": "Starting grasp on the small bottle."
+  },
+  {
+   "t": 13.258,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 14.302,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 14.311,
+   "source": "morty_said",
+   "text": "Got the small bottle. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 22.438,
+   "source": "transcript",
+   "text": "Drop it on the left side."
+  },
+  {
+   "t": 22.438,
+   "source": "utterance",
+   "text": "{\"text\": \"Drop it on the left side.\", \"speech_end\": 1790614619.336, \"voiced_ms\": 1200, \"speech_start\": 1790614617.847, \"published\": 1790614620.884}"
+  },
+  {
+   "t": 22.45,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_left\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790614620.896}"
+  },
+  {
+   "t": 22.498,
+   "source": "robot_status",
+   "text": "resumed:vla_drop_left"
+  },
+  {
+   "t": 22.512,
+   "source": "morty_said",
+   "text": "Going to drop left."
+  },
+  {
+   "t": 22.818,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 25.528,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 25.537,
+   "source": "morty_said",
+   "text": "I'm at the drop left position, still holding the small bottle. Should I open the gripper?"
+  },
+  {
+   "t": 34.477,
+   "source": "transcript",
+   "text": "Yes, opens the gripper."
+  },
+  {
+   "t": 34.477,
+   "source": "utterance",
+   "text": "{\"text\": \"Yes, opens the gripper.\", \"speech_end\": 1790614631.579, \"voiced_ms\": 1000, \"speech_start\": 1790614630.231, \"published\": 1790614632.923}"
+  },
+  {
+   "t": 34.495,
+   "source": "intent",
+   "text": "{\"action_intent\":\"open_gripper\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790614632.941}"
+  },
+  {
+   "t": 34.527,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 34.533,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 35.185,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 38.185,
+   "source": "robot_status",
+   "text": "awaiting_home_confirm"
+  },
+  {
+   "t": 38.193,
+   "source": "morty_said",
+   "text": "Should I go back home?"
+  },
+  {
+   "t": 41.777,
+   "source": "transcript",
+   "text": "Go back home."
+  },
+  {
+   "t": 41.777,
+   "source": "utterance",
+   "text": "{\"text\": \"Go back home.\", \"speech_end\": 1790614639.297, \"voiced_ms\": 500, \"speech_start\": 1790614638.573, \"published\": 1790614640.223}"
+  },
+  {
+   "t": 41.784,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790614640.23}"
+  },
+  {
+   "t": 41.794,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 42.022,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 46.094,
+   "source": "cycle_done",
+   "text": "done|2"
+  },
+  {
+   "t": 46.104,
+   "source": "morty_said",
+   "text": "Done \u2014 I'm back at the home position. What's next?"
+  },
+  {
+   "t": 47.03,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9026966094970703, \"bbox\": [10.339767456054688, 166.2216339111328, 97.8280029296875, 430.2795104980469], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.845064759254"
+  },
+  {
+   "t": 48.795,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9111059308052063, \"bbox\": [10.294517517089844, 166.29052734375, 97.7806396484375, 430.305419921875], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.849049746990203"
+  },
+  {
+   "t": 50.238,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9037826657295227, \"bbox\": [10.297733306884766, 166.36489868164062, 97.86809539794922, 430.2137451171875], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8454788923"
+  },
+  {
+   "t": 51.608,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.901755154132843, \"bbox\": [10.355487823486328, 166.29490661621094, 97.82933807373047, 430.02587890625], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8472652435302"
+  },
+  {
+   "t": 52.611,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9058665633201599, \"bbox\": [10.317153930664062, 166.30055236816406, 97.84064483642578, 430.33929443359375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.848497867"
+  },
+  {
+   "t": 53.643,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.903766393661499, \"bbox\": [10.328907012939453, 166.30560302734375, 97.89131164550781, 430.10247802734375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8450881838"
+  },
+  {
+   "t": 54.693,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9015188813209534, \"bbox\": [10.320934295654297, 166.27621459960938, 97.84431457519531, 430.3149719238281], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8488560914"
+  },
+  {
+   "t": 56.165,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9034472703933716, \"bbox\": [10.312759399414062, 166.28636169433594, 97.89787292480469, 430.02874755859375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.849253177"
+  },
+  {
+   "t": 57.341,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.896306037902832, \"bbox\": [10.397857666015625, 166.3154296875, 97.94998168945312, 430.1268005371094], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.847931981086731"
+  },
+  {
+   "t": 58.842,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9032911062240601, \"bbox\": [10.36630630493164, 166.30419921875, 97.86248016357422, 430.0431823730469], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.84802681207656"
+  },
+  {
+   "t": 60.28,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9058502316474915, \"bbox\": [10.27557373046875, 166.3175811767578, 97.84796142578125, 430.353515625], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.847404420375824,"
+  },
+  {
+   "t": 61.785,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9161702990531921, \"bbox\": [10.339221954345703, 166.3750457763672, 97.65873718261719, 430.3019104003906], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.84706985950"
+  },
+  {
+   "t": 63.246,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9095805883407593, \"bbox\": [10.39129638671875, 165.96539306640625, 97.73648071289062, 430.19219970703125], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8183004260"
+  },
+  {
+   "t": 65.602,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.920731782913208, \"bbox\": [10.196956634521484, 166.4282684326172, 97.63101196289062, 430.3674621582031], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.850807428359"
+  },
+  {
+   "t": 66.806,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9227830171585083, \"bbox\": [10.174823760986328, 166.53660583496094, 97.68663024902344, 430.3759765625], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8440917134284"
+  },
+  {
+   "t": 67.945,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9231607913970947, \"bbox\": [10.117671966552734, 166.4634552001953, 97.68496704101562, 430.4017639160156], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.84948676824"
+  },
+  {
+   "t": 68.987,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9203275442123413, \"bbox\": [10.241081237792969, 166.50076293945312, 97.58519744873047, 430.26043701171875], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.847811043"
+  },
+  {
+   "t": 70.377,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9186679720878601, \"bbox\": [10.19131851196289, 166.44577026367188, 97.64875793457031, 430.26019287109375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8453478217"
+  },
+  {
+   "t": 71.428,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "events_gui": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.225,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9558786153793335, \"bbox\": [384.32281494140625, 263.4533386230469, 461.7430114746094, 411.28570556640625], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9347383975982666, "
+  },
+  {
+   "t": 1.386,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9549383521080017, \"bbox\": [384.31365966796875, 263.47210693359375, 461.5616455078125, 411.3307189941406], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.934709370136261, \""
+  },
+  {
+   "t": 3.733,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 4.775,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.955707848072052, \"bbox\": [384.2982177734375, 263.4501037597656, 461.5623779296875, 411.4839172363281], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9351771473884583, \"bb"
+  },
+  {
+   "t": 6.525,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9557971358299255, \"bbox\": [384.3591613769531, 263.46728515625, 461.59332275390625, 411.3752746582031], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9348194599151611, \"bb"
+  },
+  {
+   "t": 6.882,
+   "source": "transcript",
+   "text": "Could you slowly bring me the small bottle, please?"
+  },
+  {
+   "t": 7.071,
+   "source": "utterance",
+   "text": "{\"text\": \"Could you slowly bring me the small bottle, please?\", \"speech_end\": 1790614603.699, \"voiced_ms\": 2500, \"speech_start\": 1790614600.741, \"published\": 1790614605.328}"
+  },
+  {
+   "t": 7.839,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"small_bottle\",\"object_attributes\":{\"colour\":null,\"shape\":null,\"position\":null,\"ordinal\":null,\"ordinal_from\":null,\"speed\":\"slow\",\"destination\":null,\"then\":null},\"stamp\":1790614606.285}"
+  },
+  {
+   "t": 8.036,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.955801248550415, \"bbox\": [384.27581787109375, 263.37823486328125, 461.48187255859375, 411.91748046875], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9344685077667236, \"b"
+  },
+  {
+   "t": 9.314,
+   "source": "selection_cycle_id",
+   "text": "2"
+  },
+  {
+   "t": 9.523,
+   "source": "grasp_poses",
+   "text": "18 kept"
+  },
+  {
+   "t": 9.619,
+   "source": "cand_status",
+   "text": "grasp 3/18: FEASIBLE (verified in the background via the curve) \u2014 executing this one"
+  },
+  {
+   "t": 9.647,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9568809866905212, \"bbox\": [384.3193664550781, 263.4258117675781, 461.6263122558594, 411.55657958984375], \"reach_pct\": 83.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.934873104095459, \"b"
+  },
+  {
+   "t": 9.964,
+   "source": "morty_said",
+   "text": "Starting grasp on the small bottle."
+  },
+  {
+   "t": 14.384,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 14.462,
+   "source": "morty_said",
+   "text": "Got the small bottle. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 22.438,
+   "source": "transcript",
+   "text": "Drop it on the left side."
+  },
+  {
+   "t": 22.45,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_left\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790614620.896}"
+  },
+  {
+   "t": 22.595,
+   "source": "utterance",
+   "text": "{\"text\": \"Drop it on the left side.\", \"speech_end\": 1790614619.336, \"voiced_ms\": 1200, \"speech_start\": 1790614617.847, \"published\": 1790614620.884}"
+  },
+  {
+   "t": 22.671,
+   "source": "robot_status",
+   "text": "resumed:vla_drop_left"
+  },
+  {
+   "t": 22.764,
+   "source": "morty_said",
+   "text": "Going to drop left."
+  },
+  {
+   "t": 25.581,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 25.658,
+   "source": "morty_said",
+   "text": "I'm at the drop left position, still holding the small bottle. Should I open the gripper?"
+  },
+  {
+   "t": 34.477,
+   "source": "transcript",
+   "text": "Yes, opens the gripper."
+  },
+  {
+   "t": 34.495,
+   "source": "intent",
+   "text": "{\"action_intent\":\"open_gripper\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790614632.941}"
+  },
+  {
+   "t": 34.63,
+   "source": "utterance",
+   "text": "{\"text\": \"Yes, opens the gripper.\", \"speech_end\": 1790614631.579, \"voiced_ms\": 1000, \"speech_start\": 1790614630.231, \"published\": 1790614632.923}"
+  },
+  {
+   "t": 34.702,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 34.783,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 35.319,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 38.253,
+   "source": "robot_status",
+   "text": "awaiting_home_confirm"
+  },
+  {
+   "t": 38.334,
+   "source": "morty_said",
+   "text": "Should I go back home?"
+  },
+  {
+   "t": 41.777,
+   "source": "transcript",
+   "text": "Go back home."
+  },
+  {
+   "t": 41.784,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790614640.23}"
+  },
+  {
+   "t": 42.004,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 42.058,
+   "source": "utterance",
+   "text": "{\"text\": \"Go back home.\", \"speech_end\": 1790614639.297, \"voiced_ms\": 500, \"speech_start\": 1790614638.573, \"published\": 1790614640.223}"
+  },
+  {
+   "t": 46.219,
+   "source": "morty_said",
+   "text": "Done \u2014 I'm back at the home position. What's next?"
+  },
+  {
+   "t": 46.239,
+   "source": "cycle_done",
+   "text": "done|2"
+  },
+  {
+   "t": 47.03,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9026966094970703, \"bbox\": [10.339767456054688, 166.2216339111328, 97.8280029296875, 430.2795104980469], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.845064759254"
+  },
+  {
+   "t": 48.795,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9111059308052063, \"bbox\": [10.294517517089844, 166.29052734375, 97.7806396484375, 430.305419921875], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.849049746990203"
+  },
+  {
+   "t": 50.238,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9037826657295227, \"bbox\": [10.297733306884766, 166.36489868164062, 97.86809539794922, 430.2137451171875], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8454788923"
+  },
+  {
+   "t": 51.608,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.901755154132843, \"bbox\": [10.355487823486328, 166.29490661621094, 97.82933807373047, 430.02587890625], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8472652435302"
+  },
+  {
+   "t": 52.611,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9058665633201599, \"bbox\": [10.317153930664062, 166.30055236816406, 97.84064483642578, 430.33929443359375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.848497867"
+  },
+  {
+   "t": 53.643,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.903766393661499, \"bbox\": [10.328907012939453, 166.30560302734375, 97.89131164550781, 430.10247802734375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8450881838"
+  },
+  {
+   "t": 54.693,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9015188813209534, \"bbox\": [10.320934295654297, 166.27621459960938, 97.84431457519531, 430.3149719238281], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8488560914"
+  },
+  {
+   "t": 56.165,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9034472703933716, \"bbox\": [10.312759399414062, 166.28636169433594, 97.89787292480469, 430.02874755859375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.849253177"
+  },
+  {
+   "t": 57.341,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.896306037902832, \"bbox\": [10.397857666015625, 166.3154296875, 97.94998168945312, 430.1268005371094], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.847931981086731"
+  },
+  {
+   "t": 58.842,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9032911062240601, \"bbox\": [10.36630630493164, 166.30419921875, 97.86248016357422, 430.0431823730469], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.84802681207656"
+  },
+  {
+   "t": 60.28,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9058502316474915, \"bbox\": [10.27557373046875, 166.3175811767578, 97.84796142578125, 430.353515625], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.847404420375824,"
+  },
+  {
+   "t": 61.785,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9161702990531921, \"bbox\": [10.339221954345703, 166.3750457763672, 97.65873718261719, 430.3019104003906], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.84706985950"
+  },
+  {
+   "t": 63.246,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9095805883407593, \"bbox\": [10.39129638671875, 165.96539306640625, 97.73648071289062, 430.19219970703125], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8183004260"
+  },
+  {
+   "t": 65.602,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.920731782913208, \"bbox\": [10.196956634521484, 166.4282684326172, 97.63101196289062, 430.3674621582031], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.850807428359"
+  },
+  {
+   "t": 66.806,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9227830171585083, \"bbox\": [10.174823760986328, 166.53660583496094, 97.68663024902344, 430.3759765625], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8440917134284"
+  },
+  {
+   "t": 67.945,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9231607913970947, \"bbox\": [10.117671966552734, 166.4634552001953, 97.68496704101562, 430.4017639160156], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.84948676824"
+  },
+  {
+   "t": 68.987,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9203275442123413, \"bbox\": [10.241081237792969, 166.50076293945312, 97.58519744873047, 430.26043701171875], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.847811043"
+  },
+  {
+   "t": 70.377,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9186679720878601, \"bbox\": [10.19131851196289, 166.44577026367188, 97.64875793457031, 430.26019287109375], \"reach_pct\": 78.8, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8453478217"
+  },
+  {
+   "t": 71.428,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "event_times": {
+  "moved": 24,
+  "from": {
+   "bag": 20,
+   "vla": 4
+  },
+  "gui_late_by_s": {
+   "median": 0.145,
+   "max": 0.281
+  },
+  "note": "GUI event times moved to the bag's receive stamps (else the VLA recorder's); stage times rebuilt from them"
+ }
+}

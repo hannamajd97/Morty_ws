@@ -1,0 +1,93 @@
+TRIAL TIMELINE  start 2026-09-28 20:04:34  stop 20:05:31  (57.3 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -924.33  background: GraspGen for 'tape_dispenser' done (job 2.13 s, 25 grasps)
+t= -911.20  background: 'tape_dispenser' verified for execution via the curve (executor probe 6.35 s, 5 tried)
+t= -657.30  background: GraspGen for 'tape_dispenser' done (job 1.22 s, 28 grasps)
+t= -653.51  background: 'tape_dispenser' verified for execution via the curve (executor probe 3.59 s, 3 tried)
+t= -585.17  background: GraspGen for 'tape_dispenser' done (job 1.65 s, 21 grasps)
+t= -541.35  background: GraspGen for 'tape_dispenser' done (job 2.10 s, 24 grasps)
+t= -516.41  background: 'tape_dispenser' no feasible grasp (executor probe 14.16 s, 10 tried)
+t= -512.66  background: GraspGen for 'tape_dispenser' done (job 2.61 s, 24 grasps)
+t= -489.40  background: 'tape_dispenser' no feasible grasp (executor probe 14.69 s, 10 tried)
+t= -485.46  background: GraspGen for 'tape_dispenser' done (job 2.84 s, 30 grasps)
+t= -470.14  background: 'tape_dispenser' verified for execution via the curve (executor probe 6.10 s, 5 tried)
+t= -441.69  background: GraspGen for 'tape_dispenser' done (job 1.53 s, 22 grasps)
+t= -440.65  background: 'tape_dispenser' verified for execution via the curve (executor probe 0.92 s, 1 tried)
+t= -283.65  background: GraspGen for 'tape_dispenser' done (job 2.36 s, 15 grasps)
+t= -273.46  background: 'tape_dispenser' verified for execution via the curve (executor probe 0.86 s, 1 tried)
+t= -237.50  background: GraspGen for 'tape_dispenser' done (job 1.95 s, 18 grasps)
+t= -236.20  background: 'tape_dispenser' verified for execution via the curve (executor probe 1.15 s, 1 tried)
+t=  -31.83  background: GraspGen for 'tape_dispenser' done (job 3.62 s, 17 grasps)
+t=  -25.63  background: 'tape_dispenser' verified for execution via the curve (executor probe 5.96 s, 4 tried)
+t=   +0.00  trial start
+t=   +3.51  trial bag ready
+t=   +9.55  you stopped speaking ("I need a tape dispenser.")
+t=  +13.18  you said: "I need a tape dispenser."
+t=  +14.27  intent: pick tape_dispenser
+t=  +15.52  pipeline: 'tape_dispenser' precomputed — GraspGen ran 47.3 s before the click (job 3.62 s), executor verified it via the curve (probe 5.96 s)
+t=  +15.62  selection cycle 14 started
+t=  +15.77  pipeline: 17 candidates published (0.32 s after the click, precomputed)
+t=  +15.78  executor: candidates received
+t=  +15.78  executor: precheck hit (+0.00 s)
+t=  +15.92  executor: open sent (+0.14 s)
+t=  +15.92  executor: motion start (+0.00 s)
+t=  +16.06  probe: grasp 5/17: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +16.44  Morty said: "Starting grasp on the tape dispenser."
+t=  +18.03  executor: close sent (+2.10 s)
+t=  +18.52  executor: arrival (+0.50 s)
+t=  +19.54  executor: grasp verdict (+1.02 s)
+t=  +20.60  executor: lift done (+1.06 s)
+t=  +20.78  executor: wait destination start (+0.18 s)
+t=  +20.95  Morty said: "Got the tape dispenser. Where should I drop it? Left, right, or home?"
+t=  +23.90  robot: paused
+t=  +27.48  you stopped speaking ("Mm.")
+t=  +28.61  you stopped speaking ("Home.")
+t=  +29.59  you said: "Home."
+t=  +29.60  intent: go_home
+t=  +29.62  executor: destination received (+8.84 s)
+t=  +29.70  robot: resumed:home
+t=  +29.81  Morty said: "Going home."
+t=  +36.03  robot: awaiting release
+t=  +36.24  Morty said: "I'm at the home position, still holding the tape dispenser. Should I open the gr"
+t=  +41.93  you stopped speaking ("Yes.")
+t=  +42.73  you said: "Yes."
+t=  +42.73  intent: open_gripper
+t=  +42.84  robot: releasing
+t=  +42.95  Morty said: "Opening the gripper."
+t=  +43.32  executor: home done (+13.70 s)
+t=  +43.45  robot: released
+t=  +46.70  executor: cycle done (+3.38 s)
+t=  +46.70  executor: cycle 14 done via the curve
+t=  +46.84  executor reported: done|14
+t=  +46.95  Morty said: "I'm at the home position. What's next?"
+t=  +51.32  background: GraspGen for 'tape_dispenser' done (job 3.32 s, 15 grasps)
+t=  +57.29  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves       6.37 s
+  end of your voice -> transcript               3.63 s
+  you stopped speaking -> command               4.72 s
+  transcript -> command (understanding)         1.09 s
+  command -> object chosen (incl. clarification)    1.35 s
+  object chosen -> grasp candidates             0.15 s
+  GraspGen compute (the run that was used)      3.62 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice          47.45 s
+  reachability check (background probe)         5.96 s
+  executor: candidates -> motion start          0.14 s
+  command -> arm moves                          2.75 s
+  approach                                      2.60 s
+  arrival -> grasp verdict                      1.02 s
+  waiting for the drop side                     8.84 s
+  motion start -> home                         30.78 s
+  command given -> object handed over          33.90 s
+  Morty waited for your answers                12.40 s
+  robot's own time (total - waiting)           21.13 s
+  total                                        33.52 s
+  understood by                              language model
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             5 of 17
+  execution plan compute                        5.96 s
+  approach planned by                        curve (precomputed)

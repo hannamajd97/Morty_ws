@@ -1,0 +1,5 @@
+{"postprocess": "trial_111_LA_S5", "ready": {"bag": true, "episode": false, "waited": false}, "after_s": 0.0}
+[INFO] [1790621473.430893671] [rosbag2_storage]: Opened database '/home/deep/morty_ws/experiments/experiments_28_09_2026/trial_111_LA_S5/bag/bag_0.db3' for READ_ONLY.
+{"trial": "trial_111_LA_S5", "samples": 23898, "rate_hz": 500.0, "ctrl_samples": 4308, "ctrl_acc_filled": 336, "acc_p99": [3.72, 3.27, 5.06, 3.59, 4.89, 3.57]}
+[INFO] [1790621487.090806317] [rosbag2_storage]: Opened database '/home/deep/morty_ws/experiments/experiments_28_09_2026/trial_111_LA_S5/bag/bag_0.db3' for READ_ONLY.
+{"trial": "trial_111_LA_S5", "event_times": {"moved": 16, "from": {"bag": 16}, "gui_late_by_s": {"median": 0.17, "max": 0.298}, "note": "GUI event times moved to the bag's receive stamps (else the VLA recorder's); stage times rebuilt from them"}, "csv_values_updated": 1, "stage": {"interaction_s": 1.465, "speech_end_to_intent_s": 0.956, "intent_s": 0.042, "choice_s": 0.134, "yolo_s": 0.221, "graspgen_compute_s": 2.283, "graspgen_wait_s": 0.0, "graspgen_lead_s": 141.099, "verify_compute_s": 0.933, "command_to_motion_s": 0.551, "total_s": 28.187, "started_by": "voice"}}

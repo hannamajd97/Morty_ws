@@ -1,0 +1,2 @@
+[gripper_command_adapter-3] [INFO] [1790613002.756766874] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790613002.763092221] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']

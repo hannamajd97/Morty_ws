@@ -1,0 +1,101 @@
+TRIAL TIMELINE  start 2026-09-28 18:56:38  stop 18:57:49  (71.4 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -130.45  background: GraspGen for 'small_bottle' done (job 8.64 s, 18 grasps)
+t= -118.98  background: GraspGen for 'small_bottle' done (job 0.79 s, 19 grasps)
+t= -109.45  background: 'small_bottle' no feasible grasp (executor probe 9.28 s, 10 tried)
+t= -107.35  background: GraspGen for 'small_bottle' done (job 1.06 s, 15 grasps)
+t=  -97.78  background: 'small_bottle' no feasible grasp (executor probe 9.54 s, 10 tried)
+t=  -96.00  background: GraspGen for 'small_bottle' done (job 0.65 s, 22 grasps)
+t=  -94.37  background: 'small_bottle' verified for execution via the curve (executor probe 1.55 s, 2 tried)
+t=  -89.24  background: GraspGen for 'small_bottle' done (job 0.67 s, 14 grasps)
+t=  -79.21  background: GraspGen for 'small_bottle' done (job 0.86 s, 22 grasps)
+t=  -68.85  background: GraspGen for 'small_bottle' done (job 1.13 s, 22 grasps)
+t=  -68.06  background: 'small_bottle' verified for execution via the curve (executor probe 0.67 s, 1 tried)
+t=  -60.71  background: GraspGen for 'small_bottle' done (job 0.80 s, 10 grasps)
+t=  -58.91  background: 'small_bottle' verified for execution via the curve (executor probe 1.70 s, 2 tried)
+t=  -50.40  background: GraspGen for 'small_bottle' done (job 0.81 s, 18 grasps)
+t=  -42.06  background: GraspGen for 'small_bottle' done (job 0.79 s, 33 grasps)
+t=  -25.52  background: GraspGen for 'small_bottle' done (job 1.34 s, 18 grasps)
+t=  -22.35  background: 'small_bottle' verified for execution via the curve (executor probe 3.04 s, 3 tried)
+t=   +0.00  trial start
+t=   +3.73  trial bag ready
+t=   +5.25  you stopped speaking ("Could you slowly bring me the small bottle, please?")
+t=   +6.88  you said: "Could you slowly bring me the small bottle, please?"
+t=   +7.84  intent: pick small_bottle
+t=   +9.19  selection cycle 2 started
+t=   +9.21  pipeline: 'small_bottle' precomputed — GraspGen ran 34.7 s before the click (job 1.34 s), executor verified it via the curve (probe 3.04 s)
+t=   +9.33  pipeline: 18 candidates published (0.18 s after the click, precomputed)
+t=   +9.34  executor: candidates received
+t=   +9.34  executor: precheck hit (+0.00 s)
+t=   +9.45  executor: open sent (+0.10 s)
+t=   +9.45  executor: motion start (+0.00 s)
+t=   +9.54  arm starts moving (joint data)
+t=   +9.62  probe: grasp 3/18: FEASIBLE (verified in the background via the curve) — executing this one
+t=   +9.80  Morty said: "Starting grasp on the small bottle."
+t=  +11.55  executor: close sent (+2.11 s)
+t=  +12.09  executor: arrival (+0.54 s)
+t=  +13.06  executor: grasp verdict (+0.97 s)
+t=  +13.26  arm starts moving (joint data)
+t=  +14.18  executor: lift done (+1.12 s)
+t=  +14.30  executor: wait destination start (+0.12 s)
+t=  +14.30  robot: paused
+t=  +14.31  Morty said: "Got the small bottle. Where should I drop it? Left, right, or home?"
+t=  +20.89  you stopped speaking ("Drop it on the left side.")
+t=  +22.44  you said: "Drop it on the left side."
+t=  +22.45  intent: drop_left
+t=  +22.50  executor: destination received (+8.20 s)
+t=  +22.50  robot: resumed:vla drop left
+t=  +22.51  Morty said: "Going to drop left."
+t=  +22.82  arm starts moving (joint data)
+t=  +25.53  robot: awaiting release
+t=  +25.54  Morty said: "I'm at the drop left position, still holding the small bottle. Should I open the"
+t=  +33.13  you stopped speaking ("Yes, opens the gripper.")
+t=  +34.48  you said: "Yes, opens the gripper."
+t=  +34.49  intent: open_gripper
+t=  +34.53  robot: releasing
+t=  +34.53  Morty said: "Opening the gripper."
+t=  +35.19  robot: released
+t=  +38.19  robot: awaiting home confirm
+t=  +38.19  Morty said: "Should I go back home?"
+t=  +40.85  you stopped speaking ("Go back home.")
+t=  +41.78  you said: "Go back home."
+t=  +41.78  intent: go_home
+t=  +41.79  Morty said: "Going home."
+t=  +42.02  arm starts moving (joint data)
+t=  +44.76  executor: home done (+22.26 s)
+t=  +46.09  executor: cycle done (+1.33 s)
+t=  +46.09  executor reported: done|2
+t=  +46.09  executor: cycle 2 done via the curve
+t=  +46.10  Morty said: "Done — I'm back at the home position. What's next?"
+t=  +64.82  background: GraspGen for 'small_bottle' done (job 0.88 s, 21 grasps)
+t=  +66.91  background: 'small_bottle' verified for execution via the curve (executor probe 1.94 s, 2 tried)
+t=  +71.43  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves       4.19 s
+  end of your voice -> transcript               1.63 s
+  you stopped speaking -> command               2.59 s
+  transcript -> command (understanding)         0.96 s
+  command -> object chosen (incl. clarification)    1.35 s
+  object chosen -> grasp candidates             0.14 s
+  GraspGen compute (the run that was used)      1.34 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice          34.71 s
+  reachability check (background probe)         3.04 s
+  executor: candidates -> motion start          0.11 s
+  command -> arm moves                          2.56 s
+  approach                                      2.64 s
+  arrival -> grasp verdict                      0.97 s
+  waiting for the drop side                     8.20 s
+  motion start -> home                         36.65 s
+  command given -> object handed over          29.93 s
+  Morty waited for your answers                20.71 s
+  robot's own time (total - waiting)           18.50 s
+  total                                        39.21 s
+  understood by                              language model
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             3 of 18
+  execution plan compute                        3.04 s
+  approach planned by                        curve (precomputed)

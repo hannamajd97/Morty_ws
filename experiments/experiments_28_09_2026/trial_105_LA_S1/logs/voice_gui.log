@@ -1,0 +1,10 @@
+[chat_node-7] [0m[INFO] [1790620247.484988609] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790620250.961431652] [speech_input_node]: [speaker] human voice (cos 0.05, rms 0.068)
+[speech_input_node-4] [INFO] [1790620251.492679231] [speech_input_node]: [timing] omni 0.52s for 3.7s audio (today 293, month 882)
+[speech_input_node-4] [INFO] [1790620251.498009550] [speech_input_node]: Heard: 'Tell me Morty, what kind of object are you seeing right now?'
+[chat_node-7] User (voice): Tell me Morty, what kind of object are you seeing right now?
+[chat_node-7] [0m[INFO] [1790620251.516470196] [communication_llm_chat_node]: [timing] pruned 11 stale message(s) from the LLM context (48 -> 37)[0m
+[chat_node-7] [0m[INFO] [1790620252.819702083] [communication_llm_chat_node]: [timing] LLM main call 1.26s (prompt cache: 6325 tokens read)[0m
+[chat_node-7] Assistant: I see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[speak_action_server-3] [INFO] [1790620252.831352692] [speak_action_server]: Speak: 'I see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.'
+[speak_action_server-3] [INFO] [1790620258.442380034] [speak_action_server]: [timing] TTS first audio after 0.43s, 5.4s of speech, done 5.61s after the request

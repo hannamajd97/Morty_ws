@@ -1,0 +1,114 @@
+TRIAL TIMELINE  start 2026-09-28 20:45:47  stop 20:46:24  (37.2 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=-3402.53  background: GraspGen for 'small_bottle' done (job 1.21 s, 18 grasps)
+t=-3390.26  background: 'small_bottle' no feasible grasp (executor probe 12.12 s, 10 tried)
+t=-3382.57  background: GraspGen for 'small_bottle' done (job 1.31 s, 24 grasps)
+t=-3369.15  background: 'small_bottle' no feasible grasp (executor probe 13.23 s, 10 tried)
+t=-3366.54  background: GraspGen for 'small_bottle' done (job 1.56 s, 16 grasps)
+t=-3346.12  background: 'small_bottle' no feasible grasp (executor probe 11.18 s, 10 tried)
+t=-3343.21  background: GraspGen for 'small_bottle' done (job 1.84 s, 31 grasps)
+t=-3331.24  background: 'small_bottle' no feasible grasp (executor probe 11.76 s, 10 tried)
+t=-3328.44  background: GraspGen for 'small_bottle' done (job 1.62 s, 21 grasps)
+t=-3316.21  background: 'small_bottle' no feasible grasp (executor probe 11.60 s, 10 tried)
+t=-2942.03  background: GraspGen for 'small_bottle' done (job 2.13 s, 21 grasps)
+t=-2932.73  background: GraspGen for 'small_bottle' done (job 2.25 s, 15 grasps)
+t=-2918.47  background: 'small_bottle' no feasible grasp (executor probe 14.19 s, 10 tried)
+t=-2912.15  background: GraspGen for 'small_bottle' done (job 1.76 s, 13 grasps)
+t=-2910.08  background: 'small_bottle' verified for execution via the curve (executor probe 1.96 s, 2 tried)
+t=-2773.30  background: GraspGen for 'small_bottle' done (job 1.27 s, 23 grasps)
+t=-2758.76  background: 'small_bottle' no feasible grasp (executor probe 11.40 s, 10 tried)
+t=-2741.35  background: GraspGen for 'small_bottle' done (job 2.23 s, 24 grasps)
+t=-2729.61  background: 'small_bottle' no feasible grasp (executor probe 11.46 s, 10 tried)
+t=-2725.96  background: GraspGen for 'small_bottle' done (job 2.33 s, 25 grasps)
+t=-2712.64  background: GraspGen for 'small_bottle' done (job 2.12 s, 25 grasps)
+t=-2711.59  background: 'small_bottle' verified for execution via the curve (executor probe 0.92 s, 1 tried)
+t=-2306.77  background: GraspGen for 'small_bottle' done (job 1.97 s, 14 grasps)
+t=-2298.06  background: GraspGen for 'small_bottle' done (job 1.80 s, 21 grasps)
+t=-2296.89  background: 'small_bottle' verified for execution via the curve (executor probe 0.94 s, 1 tried)
+t=-2258.45  background: GraspGen for 'small_bottle' done (job 2.36 s, 26 grasps)
+t=-2254.59  background: 'small_bottle' verified for execution via the curve (executor probe 3.64 s, 3 tried)
+t=-1286.98  background: GraspGen for 'small_bottle' done (job 1.98 s, 17 grasps)
+t=-1274.41  background: 'small_bottle' no feasible grasp (executor probe 12.31 s, 10 tried)
+t=-1265.77  background: GraspGen for 'small_bottle' done (job 2.29 s, 18 grasps)
+t=-1252.68  background: 'small_bottle' no feasible grasp (executor probe 12.79 s, 10 tried)
+t=-1248.96  background: GraspGen for 'small_bottle' done (job 2.08 s, 28 grasps)
+t=-1235.20  background: 'small_bottle' no feasible grasp (executor probe 13.36 s, 10 tried)
+t=-1230.32  background: GraspGen for 'small_bottle' done (job 3.81 s, 14 grasps)
+t=-1161.74  background: GraspGen for 'small_bottle' done (job 3.32 s, 16 grasps)
+t=-1147.77  background: 'small_bottle' no feasible grasp (executor probe 13.68 s, 10 tried)
+t=-1137.45  background: GraspGen for 'small_bottle' done (job 2.40 s, 17 grasps)
+t=-1123.05  background: 'small_bottle' no feasible grasp (executor probe 14.11 s, 10 tried)
+t=-1119.78  background: GraspGen for 'small_bottle' done (job 1.93 s, 16 grasps)
+t=-1105.47  background: 'small_bottle' no feasible grasp (executor probe 13.99 s, 10 tried)
+t=-1102.63  background: GraspGen for 'small_bottle' done (job 1.79 s, 25 grasps)
+t=-1099.52  background: 'small_bottle' verified for execution via the curve (executor probe 2.87 s, 3 tried)
+t= -890.13  background: GraspGen for 'small_bottle' done (job 2.13 s, 19 grasps)
+t= -884.66  background: 'small_bottle' verified for execution via the curve (executor probe 5.30 s, 4 tried)
+t=   +0.00  trial start
+t=   +3.08  you stopped speaking ("Can you give me the white bottle")
+t=   +3.21  trial bag ready
+t=   +4.23  you said: "Can you give me the white bottle"
+t=   +5.55  intent: pick small_bottle
+t=   +6.43  selection cycle 19 started
+t=   +6.46  pipeline: 'small_bottle' precomputed — GraspGen ran 896.5 s before the click (job 2.13 s), executor verified it via the curve (probe 5.30 s)
+t=   +6.69  pipeline: 19 candidates published (0.35 s after the click, precomputed)
+t=   +6.71  executor: candidates received
+t=   +6.71  executor: precheck hit (+0.00 s)
+t=   +6.83  probe: grasp 4/19: FEASIBLE (verified in the background via the curve) — executing this one
+t=   +6.84  executor: open sent (+0.13 s)
+t=   +6.84  executor: motion start (+0.00 s)
+t=   +6.88  arm starts moving (joint data)
+t=   +7.14  Morty said: "Starting grasp on the small bottle."
+t=   +8.94  executor: close sent (+2.11 s)
+t=   +9.43  executor: arrival (+0.49 s)
+t=  +10.46  executor: grasp verdict (+1.03 s)
+t=  +10.67  arm starts moving (joint data)
+t=  +11.58  executor: lift done (+1.12 s)
+t=  +11.78  executor: wait destination start (+0.20 s)
+t=  +11.78  robot: paused
+t=  +11.80  Morty said: "Got the small bottle. Where should I drop it? Left, right, or home?"
+t=  +19.15  you stopped speaking ("Drop it home and give me the object directly.")
+t=  +20.35  you said: "Drop it home and give me the object directly."
+t=  +21.50  intent: confirm_drop
+t=  +21.66  executor: destination received (+9.88 s)
+t=  +21.66  robot: resumed:home
+t=  +21.68  Morty said: "Going home."
+t=  +22.24  arm starts moving (joint data)
+t=  +28.28  robot: releasing
+t=  +28.30  Morty said: "Opening the gripper."
+t=  +28.97  executor: home done (+7.31 s)
+t=  +28.97  robot: released
+t=  +32.31  executor: cycle done (+3.34 s)
+t=  +32.31  executor reported: done|19
+t=  +32.31  executor: cycle 19 done via the curve
+t=  +32.32  Morty said: "I'm at the home position. What's next?"
+t=  +37.18  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves       3.76 s
+  end of your voice -> transcript               1.15 s
+  you stopped speaking -> command               2.47 s
+  transcript -> command (understanding)         1.32 s
+  command -> object chosen (incl. clarification)    0.88 s
+  object chosen -> grasp candidates             0.26 s
+  GraspGen compute (the run that was used)      2.13 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice         896.56 s
+  reachability check (background probe)         5.30 s
+  executor: candidates -> motion start          0.13 s
+  command -> arm moves                          2.61 s
+  approach                                      2.60 s
+  arrival -> grasp verdict                      1.03 s
+  waiting for the drop side                     9.88 s
+  motion start -> home                         25.47 s
+  command given -> object handed over          25.89 s
+  Morty waited for your answers                 9.71 s
+  robot's own time (total - waiting)           18.37 s
+  total                                        28.08 s
+  understood by                              language model
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             4 of 19
+  execution plan compute                        5.30 s
+  approach planned by                        curve (precomputed)

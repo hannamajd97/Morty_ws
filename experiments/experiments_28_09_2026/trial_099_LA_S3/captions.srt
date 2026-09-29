@@ -1,0 +1,56 @@
+1
+00:00:08,079 --> 00:00:12,079
+You: Can you give me the small bottle?
+
+2
+00:00:09,936 --> 00:00:13,936
+Morty (status): Starting grasp on the small bottle.
+
+3
+00:00:14,577 --> 00:00:18,577
+Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+
+4
+00:00:20,579 --> 00:00:24,579
+You: Right.
+
+5
+00:00:20,580 --> 00:00:24,580
+Morty (status): Going to drop right.
+
+6
+00:00:25,796 --> 00:00:29,796
+Morty (status): I'm at the drop right position, still holding the small bottle. Should I open the gripper?
+
+7
+00:00:31,281 --> 00:00:35,281
+You: Yeah.
+
+8
+00:00:31,381 --> 00:00:35,381
+Morty (status): Opening the gripper.
+
+9
+00:00:32,680 --> 00:00:36,680
+You: Give it to me.
+
+10
+00:00:33,679 --> 00:00:37,679
+Morty: The bottle is already on the right side—you can grab it from there.
+
+11
+00:00:38,387 --> 00:00:42,387
+Morty (status): Should I go back home?
+
+12
+00:00:44,771 --> 00:00:48,771
+You: Let's go back home.
+
+13
+00:00:44,772 --> 00:00:48,772
+Morty (status): Going home.
+
+14
+00:00:50,385 --> 00:00:54,385
+Morty (status): Done — I'm back at the home position. What's next?
+

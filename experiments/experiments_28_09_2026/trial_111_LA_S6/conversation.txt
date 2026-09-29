@@ -1,0 +1,9 @@
+# trial 111 started 2026-09-28T20:50:20.757442
+[   9.58s] Morty (status): You pointed at the tape dispenser. Should I grasp it?
+[  20.38s] You: Yes, grasp it.
+[  21.38s] Morty (status): Starting grasp on the tape dispenser.
+[  25.87s] Morty (status): Got the tape dispenser. Where should I drop it? Left, right, or home?
+[  34.97s] You: Drop it on the right side, give me the object and go back home.
+[  35.07s] Morty (status): Going to drop right.
+[  40.08s] Morty (status): Opening the gripper.
+[  48.65s] Morty (status): Done — I'm back at the home position. What's next?

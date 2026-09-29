@@ -1,0 +1,13 @@
+TRIAL TIMELINE  start 2026-09-28 18:30:22  stop 18:30:47  (24.9 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +3.75  trial bag ready
+t=   +4.06  you stopped speaking ("Could you please bring me my phone?")
+t=   +5.20  you said: "Could you please bring me my phone?"
+t=   +6.62  Morty said: "I don't see a phone on the table — only a tape dispenser, a small bottle, and a "
+t=  +13.03  Morty said: "I can pick any of those if you'd like!"
+t=  +24.89  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  end of your voice -> transcript               1.14 s

@@ -1,0 +1,36 @@
+1
+00:00:13,429 --> 00:00:17,429
+You: I need a tape dispenser.
+
+2
+00:00:16,535 --> 00:00:20,535
+Morty (status): Starting grasp on the tape dispenser.
+
+3
+00:00:21,023 --> 00:00:25,023
+Morty (status): Got the tape dispenser. Where should I drop it? Left, right, or home?
+
+4
+00:00:29,826 --> 00:00:33,826
+You: Home.
+
+5
+00:00:29,927 --> 00:00:33,927
+Morty (status): Going home.
+
+6
+00:00:36,344 --> 00:00:40,344
+Morty (status): I'm at the home position, still holding the tape dispenser. Should I open the gripper?
+
+7
+00:00:43,172 --> 00:00:47,172
+You: Yes.
+
+8
+00:00:43,173 --> 00:00:47,173
+Morty (status): Opening the gripper.
+
+9
+00:00:47,108 --> 00:00:51,108
+Morty (status): I'm at the home position. What's next?
+

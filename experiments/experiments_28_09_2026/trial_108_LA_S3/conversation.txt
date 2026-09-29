@@ -1,0 +1,8 @@
+# trial 108 started 2026-09-28T20:45:47.404814
+[   4.72s] You: Can you give me the white bottle
+[   7.45s] Morty (status): Starting grasp on the small bottle.
+[  12.03s] Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+[  20.62s] You: Drop it home and give me the object directly.
+[  21.92s] Morty (status): Going home.
+[  28.52s] Morty (status): Opening the gripper.
+[  32.53s] Morty (status): I'm at the home position. What's next?

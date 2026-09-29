@@ -1,0 +1,31 @@
+{
+  "Trial ID": "086",
+  "Date": "2026-09-28",
+  "Scenario": "S1: Available objects \u2014 no physical action",
+  "Modifiers": "",
+  "Level": "L1 single-step, explicit",
+  "Stage Times": {
+    "intent_s": null,
+    "yolo_s": null,
+    "graspgen_s": null,
+    "execution_s": null,
+    "total_s": null,
+    "started_by": "voice"
+  },
+  "Task ID": "",
+  "Scene Layout": "Layout A",
+  "Command Used": "What do you see on the table?",
+  "Intended Target": "",
+  "Intended Destination": "",
+  "User Intent understood correctly?": "",
+  "Object Detected?": "",
+  "Correct Object Selected?": "",
+  "Grasp Success?": "",
+  "Action Executed Correctly?": "",
+  "Full Task Success?": "",
+  "Interaction Time (s)": "",
+  "Total Time (s)": "",
+  "Failure Category / Notes": "",
+  "bag": "/home/deep/morty_ws/experiments/experiments_28_09_2026/trial_086_LA_S1/bag",
+  "vla_episode": null
+}

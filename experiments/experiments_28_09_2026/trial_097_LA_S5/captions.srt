@@ -1,0 +1,40 @@
+1
+00:00:06,412 --> 00:00:10,412
+You: Get me the vitamin tube.
+
+2
+00:00:07,591 --> 00:00:11,591
+Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+
+3
+00:00:15,855 --> 00:00:19,855
+Morty (status): Starting grasp on the vitamin tube.
+
+4
+00:00:21,190 --> 00:00:25,190
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+5
+00:00:29,085 --> 00:00:33,085
+You: Drop it on the right side.
+
+6
+00:00:29,194 --> 00:00:33,194
+Morty (status): Going to drop right.
+
+7
+00:00:33,990 --> 00:00:37,990
+Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+
+8
+00:00:42,887 --> 00:00:46,887
+You: Yes, open the gripper, go back home.
+
+9
+00:00:42,888 --> 00:00:46,888
+Morty (status): Opening the gripper.
+
+10
+00:00:50,883 --> 00:00:54,883
+Morty (status): Done — I'm back at the home position. What's next?
+

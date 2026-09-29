@@ -1,0 +1,38 @@
+[run_grasp_pipeline_venv-1] [INFO] [1790611881.593919144] [yolo_live_select_grasp]: [perf] infer_fps=0.90, infer_ms_avg=633.4, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611885.068251053] [yolo_live_select_grasp]: [perf] infer_fps=0.29, infer_ms_avg=1998.3, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611885.821353465] [yolo_live_select_grasp]: [point] chose index 3 by vote via 3d after 5.0 s (4/4 frames had a 3d ray, 0 rejected for background depth)
+[run_grasp_pipeline_venv-1] [INFO] [1790611885.829984793] [yolo_live_select_grasp]: [prompt] You chose tape_dispenser.
+[run_grasp_pipeline_venv-1] [INFO] [1790611885.854996619] [yolo_live_select_grasp]: Selected index 3: tape_dispenser (by pointing)
+[run_grasp_pipeline_venv-1] [INFO] [1790611885.923799640] [yolo_live_select_grasp]: Published selection cycle_id=4 on '/graspgen/selection_cycle_id'.
+[run_grasp_pipeline_venv-1] [INFO] [1790611885.967246533] [yolo_live_select_grasp]: Published selected 'tape_dispenser' bbox=(191,264,257,397) | depth=yes (cached)
+[run_grasp_pipeline_venv-1] [INFO] [1790611886.301145592] [yolo_live_select_grasp]: Published 25 grasp candidates on '/graspgen/candidate_poses_base_link'.
+[run_grasp_pipeline_venv-1] [INFO] [1790611886.368952841] [yolo_live_select_grasp]: [viz] executor's ACTUAL pick bridged to viz frame 'camera_color_optical_frame' (ORANGE).
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.207198496] [yolo_live_select_grasp]: [perf] infer_fps=0.32, infer_ms_avg=1504.1, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.283791402] [yolo_live_select_grasp]: [viz] best grasp approach·view = +0.99 -> FRONT approach (correct)
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.295209637] [yolo_live_select_grasp]: [viz] published grasp poses for viewer: 25 kept, 162 rejected (frame=camera_color_optical_frame)
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.327118182] [yolo_live_select_grasp]: [calib] executed pose = GraspGen pose × flipY × offset [+0.000, +0.000, +0.000] m (TCP frame), matrix_normalized=True
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.330180459] [yolo_live_select_grasp]: [fixed] grasp→tcp rotation: flipY
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.376318868] [yolo_live_select_grasp]: Published TCP grasp pose transformed to base_link
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.442463466] [yolo_live_select_grasp]: Source frame pose: t=(-0.067,0.059,0.379)
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.462879414] [yolo_live_select_grasp]: base_link pose: t=(0.217,-0.228,0.721)
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.468719405] [yolo_live_select_grasp]: Published TCP-aligned grasp pose (will republish continuously)
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.480202057] [yolo_live_select_grasp]: Best grasp score=0.264 @ t=(-0.067,0.059,0.379) frame=camera_color_optical_frame
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.501455249] [yolo_live_select_grasp]: [debug] Cloud centroid=(-0.060,0.055,0.370), Best grasp=(-0.067,0.059,0.379)
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.516885399] [yolo_live_select_grasp]: [precompute] HIT 'tape_dispenser' (age 70 s) -> published in 2.57 s
+[run_grasp_pipeline_venv-1] [INFO] [1790611888.534393501] [yolo_live_select_grasp]: Waiting for executor completion on '/grasp_executor_lin_llm/cycle_done' (cycle_id=4)...
+[run_grasp_pipeline_venv-1] [INFO] [1790611933.014958233] [yolo_live_select_grasp]: Received executor cycle status: done (cycle_id=4)
+[run_grasp_pipeline_venv-1] [INFO] [1790611933.068088074] [yolo_live_select_grasp]: Executor cycle complete: done.
+[run_grasp_pipeline_venv-1] [INFO] [1790611933.087196339] [yolo_live_select_grasp]: Resetting for next cycle...
+[run_grasp_pipeline_venv-1] [INFO] [1790611934.033466225] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: wooden_maze_puzzle 0.14 (71% gripper)  (total 1)
+[run_grasp_pipeline_venv-1] [INFO] [1790611934.441203401] [yolo_live_select_grasp]: [prompt] I see 3 objects: a small_bottle, a vitamin_tube 2, a vitamin_tube. Point at one, click it in the window, or tell me which to pick.
+[run_grasp_pipeline_venv-1] [INFO] [1790611934.449133099] [yolo_live_select_grasp]: [perf] infer_fps=0.02, infer_ms_avg=570.8, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611934.452876593] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790611936.965421232] [yolo_live_select_grasp]: [perf] infer_fps=0.78, infer_ms_avg=760.0, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611939.088405818] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: wooden_maze_puzzle 0.12 (71% gripper)  (total 5)
+[run_grasp_pipeline_venv-1] [INFO] [1790611939.445028257] [yolo_live_select_grasp]: [perf] infer_fps=0.81, infer_ms_avg=766.7, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611939.537618266] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-2).
+[run_grasp_pipeline_venv-1] [INFO] [1790611942.436341223] [yolo_live_select_grasp]: [perf] infer_fps=0.68, infer_ms_avg=818.1, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611944.421510365] [yolo_live_select_grasp]: [self-filter] dropped 1 detection(s) on the gripper: wooden_maze_puzzle 0.10 (70% gripper)  (total 9)
+[run_grasp_pipeline_venv-1] [INFO] [1790611944.748298969] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1790611944.942991116] [yolo_live_select_grasp]: [perf] infer_fps=0.79, infer_ms_avg=761.6, last_dets=3, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790611945.253120993] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...

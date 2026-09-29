@@ -1,0 +1,8 @@
+1
+00:00:08,087 --> 00:00:12,087
+You: Could you please bring me my phone?
+
+2
+00:00:08,089 --> 00:00:12,089
+Morty: I don't see a phone on the table — only a tape dispenser, a small bottle, and a Vitamin B12. I can pick any of those if you'd like!
+

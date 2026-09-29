@@ -1,0 +1,9 @@
+[speech_input_node-4] [INFO] [1790612992.582695594] [speech_input_node]: [speaker] human voice (cos 0.01, rms 0.062)
+[speech_input_node-4] [INFO] [1790612993.007009600] [speech_input_node]: [timing] omni 0.42s for 5.3s audio (today 141, month 730)
+[speech_input_node-4] [INFO] [1790612993.008976881] [speech_input_node]: Heard: 'Morty, could you please tell me which objects you can pick up right now?'
+[chat_node-7] User (voice): Morty, could you please tell me which objects you can pick up right now?
+[chat_node-7] [0m[INFO] [1790612993.016559206] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (40 -> 31)[0m
+[chat_node-7] [0m[INFO] [1790612993.858475862] [communication_llm_chat_node]: [timing] LLM main call 0.84s (prompt cache: 6140 tokens read)[0m
+[chat_node-7] Assistant: I can see a tape dispenser on the left, a small bottle in the middle, and a Vitamin B12 on the right.
+[speak_action_server-3] [INFO] [1790612993.874257183] [speak_action_server]: Speak: 'I can see a tape dispenser on the left, a small bottle in the middle, and a Vitamin B12 on the right.'
+[speak_action_server-3] [INFO] [1790613000.750850398] [speak_action_server]: [timing] TTS first audio after 0.50s, 6.5s of speech, done 6.87s after the request

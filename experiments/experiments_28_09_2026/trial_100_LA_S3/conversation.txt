@@ -1,0 +1,10 @@
+# trial 100 started 2026-09-28T20:04:34.707036
+[  13.43s] You: I need a tape dispenser.
+[  16.54s] Morty (status): Starting grasp on the tape dispenser.
+[  21.02s] Morty (status): Got the tape dispenser. Where should I drop it? Left, right, or home?
+[  29.83s] You: Home.
+[  29.93s] Morty (status): Going home.
+[  36.34s] Morty (status): I'm at the home position, still holding the tape dispenser. Should I open the gripper?
+[  43.17s] You: Yes.
+[  43.17s] Morty (status): Opening the gripper.
+[  47.11s] Morty (status): I'm at the home position. What's next?

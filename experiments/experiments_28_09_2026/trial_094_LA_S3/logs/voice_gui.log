@@ -1,0 +1,83 @@
+[speech_input_node-4] [INFO] [1790613073.761387970] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.103)
+[speech_input_node-4] [INFO] [1790613074.557171160] [speech_input_node]: [timing] omni 0.79s for 4.0s audio (today 143, month 732)
+[speech_input_node-4] [INFO] [1790613074.559904846] [speech_input_node]: Heard: 'Could you slowly bring me the small bottle, please?'
+[chat_node-7] User (voice): Could you slowly bring me the small bottle, please?
+[chat_node-7] [0m[INFO] [1790613074.568101789] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (39 -> 29)[0m
+[chat_node-7] [0m[INFO] [1790613075.798537843] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"pick","object_intent":"small_bottle","object_attributes":{"colour":null,"shape":null,"position":null,"ordinal":null,"ordinal_from":null,"speed":"slow","destination":null,"then":null}}[0m
+[chat_node-7] [0m[INFO] [1790613075.800431508] [communication_llm_chat_node]: [timing] intent dispatched 1.23s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790613075.803157481] [communication_llm_chat_node]: [timing] LLM main call 1.23s (prompt cache: 6140 tokens read)[0m
+[intent_router_node-6] [INFO] [1790613075.803609750] [intent_router_node]: Queued intent 'pick'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790613075.806199567] [intent_router_node]: dispatching: action='pick', object='small_bottle', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790613075.811532191] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790613075.852915770] [intent_router_node]: Voice pick: execution gate OPENED (auto-execute checkbox applies to GUI clicks only).
+[intent_router_node-6] [INFO] [1790613075.881647661] [intent_router_node]: Set wait_for_destination=True on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790613075.893376760] [intent_router_node]: Set vitamin_mode_active=False on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790613075.899898920] [intent_router_node]: Set task_object_label='small_bottle' on grasp_executor_lin_llm.
+[chat_node-7] [0m[INFO] [1790613076.095426805] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[chat_node-7] [0m[INFO] [1790613076.587902501] [communication_llm_chat_node]: [timing] LLM follow-up call 0.78s[0m
+[intent_router_node-6] [INFO] [1790613078.916975390] [intent_router_node]: Set auto_select_label='small_bottle' on /yolo_live_select_grasp.
+[chat_node-7] [0m[INFO] [1790613080.625104747] [communication_llm_chat_node]: Cycle state: BUSY — pick running[0m
+[intent_router_node-6] [INFO] [1790613080.627324332] [intent_router_node]: task_state: cycle 7 phase='probing' question='' holding=False object='small_bottle'
+[intent_router_node-6] [INFO] [1790613080.830490376] [intent_router_node]: cycle_id=7 (target='small bottle') — narrating start
+[speak_action_server-3] [INFO] [1790613080.857703986] [speak_action_server]: Speak: 'Starting grasp on the small bottle.'
+[intent_router_node-6] [INFO] [1790613082.263942962] [intent_router_node]: task_state: cycle 7 phase='approaching' question='' holding=False object='small_bottle'
+[speak_action_server-3] [INFO] [1790613084.043808016] [speak_action_server]: [timing] TTS first audio after 0.40s, 2.9s of speech, done 3.18s after the request
+[chat_node-7] [0m[INFO] [1790613086.003116930] [communication_llm_chat_node]: Held-object update (task state): '' -> 'small_bottle'[0m
+[intent_router_node-6] [INFO] [1790613086.003841355] [intent_router_node]: Held-object memory: 'small_bottle'
+[chat_node-7] [0m[INFO] [1790613087.485758253] [communication_llm_chat_node]: Cycle state: HOLDING the object at the grasp pose — waiting for a drop destination[0m
+[intent_router_node-6] [INFO] [1790613087.490456301] [intent_router_node]: task_state: cycle 7 phase='awaiting_destination' question='destination' holding=True object='small_bottle'
+[speak_action_server-3] [INFO] [1790613087.500771342] [speak_action_server]: Speak: 'Got the small bottle. Where should I drop it? Left, right, or home?'
+[speak_action_server-3] [INFO] [1790613091.884074198] [speak_action_server]: [timing] TTS first audio after 0.40s, 4.3s of speech, done 4.38s after the request
+[speech_input_node-4] [INFO] [1790613099.962453691] [speech_input_node]: [speaker] human voice (cos 0.10, rms 0.073)
+[speech_input_node-4] [INFO] [1790613100.249134392] [speech_input_node]: [timing] omni 0.28s for 1.3s audio (today 144, month 733)
+[speech_input_node-4] [INFO] [1790613100.251125104] [speech_input_node]: Heard: 'Drop it home.'
+[chat_node-7] User (voice): Drop it home.
+[chat_node-7] [0m[INFO] [1790613100.260108805] [communication_llm_chat_node]: FAST: matched 'Drop it home.' -> go_home (speed=default); published {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1790613100.260408986] [intent_router_node]: Resume 'home' published (bypass queue (pick paused): plain 'go_home').
+[chat_node-7] [0m[INFO] [1790613100.267127382] [communication_llm_chat_node]: Withholding pre-emptive narration 'Going home.' for 'go_home' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790613100.269205760] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer go_home, question='destination', fresh=True)[0m
+[intent_router_node-6] [INFO] [1790613100.284004262] [intent_router_node]: task_state: cycle 7 phase='awaiting_destination' question='' holding=True object='small_bottle'
+[intent_router_node-6] [INFO] [1790613100.293248059] [intent_router_node]: task_state: cycle 7 phase='carrying' question='' holding=True object='small_bottle'
+[speak_action_server-3] [INFO] [1790613100.298407876] [speak_action_server]: Speak: 'Going home.'
+[chat_node-7] [0m[INFO] [1790613100.503902837] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting destination)[0m
+[chat_node-7] [0m[INFO] [1790613100.510602646] [communication_llm_chat_node]: Cycle state: BUSY — pick running (carrying)[0m
+[speech_input_node-4] [INFO] [1790613101.485449956] [speech_input_node]: [speaker] human voice (cos 0.03, rms 0.065)
+[speech_input_node-4] [INFO] [1790613101.725366274] [speech_input_node]: [timing] omni 0.24s for 1.2s audio (today 145, month 734)
+[speech_input_node-4] [INFO] [1790613101.727213478] [speech_input_node]: Heard: 'Go home.'
+[chat_node-7] User (voice): Go home.
+[chat_node-7] [0m[INFO] [1790613101.741795650] [communication_llm_chat_node]: FAST: matched 'Go home.' -> go_home (speed=default); published {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1790613101.743045823] [intent_router_node]: Resume 'home' published (bypass queue (pick paused): plain 'go_home').
+[chat_node-7] [0m[INFO] [1790613101.743556569] [communication_llm_chat_node]: Withholding pre-emptive narration 'Going home.' for 'go_home' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790613101.744982700] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer go_home, question='', fresh=False)[0m
+[speak_action_server-3] [INFO] [1790613102.286883005] [speak_action_server]: [timing] TTS first audio after 0.41s, 1.7s of speech, done 1.99s after the request
+[chat_node-7] [0m[INFO] [1790613103.616603411] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[intent_router_node-6] [INFO] [1790613106.860561433] [intent_router_node]: task_state: cycle 7 phase='awaiting_release' question='release' holding=True object='small_bottle'
+[speak_action_server-3] [INFO] [1790613106.865826527] [speak_action_server]: Speak: "I'm at the home position, still holding the small bottle. Should I open the gripper?"
+[chat_node-7] [0m[INFO] [1790613106.960570178] [communication_llm_chat_node]: Cycle state: HOLDING at the drop pose — waiting for release confirmation[0m
+[speak_action_server-3] [INFO] [1790613112.058447994] [speak_action_server]: [timing] TTS first audio after 0.41s, 5.1s of speech, done 5.19s after the request
+[speech_input_node-4] [INFO] [1790613115.658177531] [speech_input_node]: [speaker] human voice (cos 0.01, rms 0.083)
+[speech_input_node-4] [INFO] [1790613115.928331360] [speech_input_node]: [timing] omni 0.27s for 1.9s audio (today 146, month 735)
+[speech_input_node-4] [INFO] [1790613115.929609234] [speech_input_node]: Heard: 'Open the gripper.'
+[chat_node-7] User (voice): Open the gripper.
+[intent_router_node-6] [INFO] [1790613115.937029931] [intent_router_node]: Resume 'release' published (bypass queue (release paused): open_gripper).
+[chat_node-7] [0m[INFO] [1790613115.937333936] [communication_llm_chat_node]: FAST: matched 'Open the gripper.' -> open_gripper (speed=default); published {"action_intent":"open_gripper","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790613115.938837484] [communication_llm_chat_node]: Withholding pre-emptive narration 'Opening the gripper.' for 'open_gripper' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790613115.940486666] [communication_llm_chat_node]: [timing] handled in 0.00s (route=GRAMMAR answer open_gripper, question='release', fresh=True)[0m
+[chat_node-7] [0m[INFO] [1790613115.975323548] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting release)[0m
+[intent_router_node-6] [INFO] [1790613115.975394255] [intent_router_node]: task_state: cycle 7 phase='awaiting_release' question='' holding=True object='small_bottle'
+[chat_node-7] [0m[INFO] [1790613115.978236296] [communication_llm_chat_node]: Cycle state: BUSY — pick running (releasing)[0m
+[intent_router_node-6] [INFO] [1790613115.979855425] [intent_router_node]: task_state: cycle 7 phase='releasing' question='' holding=True object='small_bottle'
+[speak_action_server-3] [INFO] [1790613115.984420000] [speak_action_server]: Speak: 'Opening the gripper.'
+[chat_node-7] [0m[INFO] [1790613116.236301933] [communication_llm_chat_node]: Held-object update (task state): 'small_bottle' -> ''[0m
+[intent_router_node-6] [INFO] [1790613116.239244685] [intent_router_node]: Held-object memory: ''
+[speak_action_server-3] [INFO] [1790613118.282817580] [speak_action_server]: [timing] TTS first audio after 0.31s, 2.0s of speech, done 2.30s after the request
+[intent_router_node-6] [INFO] [1790613120.050684194] [intent_router_node]: cycle_done received: 'done|7' (outcome=done)
+[chat_node-7] [0m[INFO] [1790613120.050841688] [communication_llm_chat_node]: Cycle state: IDLE — last pick finished[0m
+[intent_router_node-6] [INFO] [1790613120.052482623] [intent_router_node]: Grasp cycle completed successfully.
+[intent_router_node-6] [INFO] [1790613120.055616356] [intent_router_node]: task_state: cycle 7 phase='idle' question='' holding=False object=''
+[speak_action_server-3] [INFO] [1790613120.058630763] [speak_action_server]: Speak: "I'm at the home position. What's next?"
+[intent_router_node-6] [INFO] [1790613120.062366903] [intent_router_node]: Selected detection: label='small_bottle' (updating _last_target_label for narration).
+[intent_router_node-6] [INFO] [1790613120.073114340] [intent_router_node]: Set task_object_label='' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790613120.088633483] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[intent_router_node-6] [INFO] [1790613120.095770064] [intent_router_node]: Set task_object_label='small_bottle' on grasp_executor_lin_llm.
+[speak_action_server-3] [INFO] [1790613123.072251996] [speak_action_server]: [timing] TTS first audio after 0.23s, 2.9s of speech, done 3.01s after the request

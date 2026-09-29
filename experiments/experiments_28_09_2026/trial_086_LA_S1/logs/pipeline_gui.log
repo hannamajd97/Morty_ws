@@ -1,0 +1,9 @@
+[run_grasp_pipeline_venv-1] [INFO] [1790607832.580787757] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790607832.812213910] [yolo_live_select_grasp]: [perf] infer_fps=1.13, infer_ms_avg=428.3, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790607835.352675311] [yolo_live_select_grasp]: [perf] infer_fps=0.39, infer_ms_avg=1308.0, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790607837.802357603] [yolo_live_select_grasp]: Waiting for selection on '/yolo/select_index' (communication_llm voice or debug-window click) or via mediapipe pointing (indices 0-3).
+[run_grasp_pipeline_venv-1] [INFO] [1790607837.921725135] [yolo_live_select_grasp]: [perf] infer_fps=0.39, infer_ms_avg=1686.3, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790607841.199736770] [yolo_live_select_grasp]: [perf] infer_fps=0.61, infer_ms_avg=902.9, last_dets=4, detector_device=cuda
+[run_grasp_pipeline_venv-1] [INFO] [1790607843.022363475] [yolo_live_select_grasp]: No selection yet; retrying until a valid selection is made.
+[run_grasp_pipeline_venv-1] [INFO] [1790607843.542603451] [yolo_live_select_grasp]: Waiting for selection (mediapipe pointing, debug-window click, or voice via communication_llm)...
+[run_grasp_pipeline_venv-1] [INFO] [1790607844.520589971] [yolo_live_select_grasp]: [perf] infer_fps=0.60, infer_ms_avg=817.0, last_dets=4, detector_device=cuda

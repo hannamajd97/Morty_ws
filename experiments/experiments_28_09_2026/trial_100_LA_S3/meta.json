@@ -1,0 +1,445 @@
+{
+  "format": "morty_vla_raw_v2",
+  "episode_id": "trial_100_LA_S3",
+  "episode_index": 100,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_28_09_2026/trial_100_LA_S3",
+  "in_trial_dir": true,
+  "trial_id": "100",
+  "task": "pick up the tape dispenser",
+  "task_from": "intent",
+  "outcome": "success",
+  "success": true,
+  "intent": "open_gripper",
+  "cycle_done": "done|14",
+  "note": "outcome: human",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_28_09_2026/trial_100_LA_S3",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "I need a tape dispenser.",
+  "trial_form_task": "pick up the tape dispenser and bring it home",
+  "transcripts": [
+    "I need a tape dispenser.",
+    "Home.",
+    "Yes."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "t": 14.21861982345581,
+      "stamp": 1790618688.943,
+      "action_intent": "pick",
+      "object": "tape_dispenser",
+      "attributes": null,
+      "transcript": "I need a tape dispenser.",
+      "transcript_stamp": 1790618687.875396,
+      "instruction": "pick up the tape dispenser"
+    },
+    {
+      "idx": 1,
+      "t": 29.548619747161865,
+      "stamp": 1790618704.273,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Home.",
+      "transcript_stamp": 1790618704.2727313,
+      "instruction": "go back home"
+    },
+    {
+      "idx": 2,
+      "t": 42.68361973762512,
+      "stamp": 1790618717.408,
+      "action_intent": "open_gripper",
+      "object": null,
+      "attributes": null,
+      "transcript": "Yes.",
+      "transcript_stamp": 1790618717.4123898,
+      "instruction": "open the gripper"
+    }
+  ],
+  "events": {
+    "transcript": [
+      {
+        "t": 13.151015758514404,
+        "stamp": 1790618687.875396,
+        "text": "I need a tape dispenser."
+      },
+      {
+        "t": 29.548351049423218,
+        "stamp": 1790618704.2727313,
+        "text": "Home."
+      },
+      {
+        "t": 42.68800950050354,
+        "stamp": 1790618717.4123898,
+        "text": "Yes."
+      }
+    ],
+    "intent": [
+      {
+        "t": 14.21861982345581,
+        "stamp": 1790618688.943,
+        "action_intent": "pick",
+        "object_intent": "tape_dispenser",
+        "object_attributes": null
+      },
+      {
+        "t": 29.548619747161865,
+        "stamp": 1790618704.273,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 42.68361973762512,
+        "stamp": 1790618717.408,
+        "action_intent": "open_gripper",
+        "object_intent": null,
+        "object_attributes": null
+      }
+    ],
+    "selection": [
+      {
+        "t": 15.407295227050781,
+        "stamp": 1790618690.1316755,
+        "label": "tape_dispenser",
+        "source": "voice",
+        "cycle_id": 14
+      }
+    ],
+    "gripper_cmd": [
+      {
+        "t": 16.131338119506836,
+        "stamp": 1790618690.8557184,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 18.229493379592896,
+        "stamp": 1790618692.9538736,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      },
+      {
+        "t": 42.95218539237976,
+        "stamp": 1790618717.6765656,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 45.53653860092163,
+        "stamp": 1790618720.2609189,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      }
+    ],
+    "interactive_status": [
+      {
+        "t": 20.74122643470764,
+        "stamp": 1790618695.4656067,
+        "status": "paused"
+      },
+      {
+        "t": 29.599734783172607,
+        "stamp": 1790618704.324115,
+        "status": "resumed:home"
+      },
+      {
+        "t": 35.93895435333252,
+        "stamp": 1790618710.6633346,
+        "status": "awaiting_release"
+      },
+      {
+        "t": 42.70206832885742,
+        "stamp": 1790618717.4264486,
+        "status": "releasing"
+      },
+      {
+        "t": 43.27105784416199,
+        "stamp": 1790618717.995438,
+        "status": "released"
+      }
+    ],
+    "cycle_done": [
+      {
+        "t": 46.654932737350464,
+        "stamp": 1790618721.379313,
+        "ok": true,
+        "cycle_id": "14",
+        "reason": ""
+      }
+    ],
+    "executor_phase": [
+      {
+        "t": 15.726619720458984,
+        "stamp": 1790618690.451,
+        "name": "candidates_received",
+        "cycle_id": 14
+      },
+      {
+        "t": 15.727619647979736,
+        "stamp": 1790618690.452,
+        "name": "precheck_hit",
+        "cycle_id": 14
+      },
+      {
+        "t": 15.871619701385498,
+        "stamp": 1790618690.596,
+        "name": "open_sent",
+        "cycle_id": 14
+      },
+      {
+        "t": 15.871619701385498,
+        "stamp": 1790618690.596,
+        "name": "motion_start",
+        "cycle_id": 14
+      },
+      {
+        "t": 17.9746196269989,
+        "stamp": 1790618692.699,
+        "name": "close_sent",
+        "cycle_id": 14
+      },
+      {
+        "t": 18.469619750976562,
+        "stamp": 1790618693.194,
+        "name": "arrival",
+        "cycle_id": 14
+      },
+      {
+        "t": 19.49161982536316,
+        "stamp": 1790618694.216,
+        "name": "grasp_verdict",
+        "cycle_id": 14
+      },
+      {
+        "t": 20.552619695663452,
+        "stamp": 1790618695.277,
+        "name": "lift_done",
+        "cycle_id": 14
+      },
+      {
+        "t": 20.73061966896057,
+        "stamp": 1790618695.455,
+        "name": "wait_destination_start",
+        "cycle_id": 14
+      },
+      {
+        "t": 29.566619634628296,
+        "stamp": 1790618704.291,
+        "name": "destination_received",
+        "cycle_id": 14
+      },
+      {
+        "t": 43.26561975479126,
+        "stamp": 1790618717.99,
+        "name": "home_done",
+        "cycle_id": 14
+      },
+      {
+        "t": 46.65061974525452,
+        "stamp": 1790618721.375,
+        "name": "cycle_done",
+        "cycle_id": 14
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 572,
+  "duration_s": 57.195969104766846,
+  "dropped_ticks": 0,
+  "drop_reasons": {},
+  "started_unix": 1790618674.7246215,
+  "started_ros": 1790618674.7243803,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.51,
+      0.51,
+      0.065
+    ],
+    "rpy": [
+      0.0,
+      -0.576,
+      -0.77
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2
+  },
+  "phase_names": [
+    "candidates_received",
+    "precheck_hit",
+    "open_sent",
+    "motion_start",
+    "close_sent",
+    "arrival",
+    "grasp_verdict",
+    "lift_done",
+    "wait_destination_start",
+    "destination_received",
+    "home_done",
+    "cycle_done"
+  ],
+  "quality": {
+    "ok": true,
+    "issues": [],
+    "num_steps": 572,
+    "task_steps": 329,
+    "idle_steps": 243,
+    "reset_steps": 0,
+    "step_gaps": [],
+    "dt_max_s": 0.19881963729858398,
+    "images": {
+      "exterior": {
+        "age_max_s": 0.22673549899991485,
+        "age_p95_s": 0.12309069015136628,
+        "missing": 0
+      },
+      "wrist": {
+        "age_max_s": 0.24102971100001014,
+        "age_p95_s": 0.03660678540072693,
+        "missing": 0
+      }
+    },
+    "joint_age_max_s": 0.10984864100100822,
+    "tcp_stale_steps": 0,
+    "ur_tcp_missing_steps": 0,
+    "gripper_commands": [
+      {
+        "t": 16.131338119506836,
+        "cmd": "open",
+        "state_lag_s": 0.4753122329711914
+      },
+      {
+        "t": 18.229493379592896,
+        "cmd": "close",
+        "state_lag_s": 1.3768231868743896
+      },
+      {
+        "t": 42.95218539237976,
+        "cmd": "open",
+        "state_lag_s": 0.3557608127593994
+      },
+      {
+        "t": 45.53653860092163,
+        "cmd": "close",
+        "state_lag_s": 1.1695361137390137
+      }
+    ],
+    "gripper_state_changes": 4,
+    "n_transcripts": 3,
+    "n_intents": 3,
+    "n_instructions": 3,
+    "n_executor_phases": 12
+  }
+}

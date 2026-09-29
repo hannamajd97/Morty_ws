@@ -1,0 +1,420 @@
+{
+ "start_wall": 1790613067.143185,
+ "stop_wall": 1790613125.7877626,
+ "stage_times": {
+  "interaction_s": 9.442,
+  "voice_to_transcript_s": 1.631,
+  "understood_by": "language model",
+  "graspgen_background": "yes",
+  "plan_background": "no",
+  "plan_compute_s": 1.565,
+  "grasp_used": "1 of 20",
+  "grasp_probes": 1,
+  "release_s": 43.777,
+  "human_wait_s": 21.712,
+  "robot_time_s": 23.776,
+  "morty_questions": 3,
+  "your_utterances": 4,
+  "speech_end_to_intent_s": 2.867,
+  "intent_s": 1.236,
+  "choice_s": 4.434,
+  "yolo_s": 0.382,
+  "graspgen_s": 0.0,
+  "graspgen_compute_s": 1.796,
+  "graspgen_wait_s": 0.0,
+  "graspgen_lead_s": 1811.963,
+  "verify_compute_s": 0.881,
+  "planning_s": 1.752,
+  "command_to_motion_s": 7.811,
+  "approach_s": 2.62,
+  "grasp_s": 1.01,
+  "wait_destination_s": 12.801,
+  "transport_s": null,
+  "execution_s": 37.677,
+  "click_to_motion_s": 2.141,
+  "background_lead_s": 1811.963,
+  "total_s": 45.488,
+  "planner": "curve",
+  "path": "precomputed",
+  "started_by": "voice"
+ },
+ "selection_cycles": [
+  {
+   "kind": "selection_cycle",
+   "cycle_id": 7,
+   "label": "small_bottle",
+   "source": "pointing",
+   "n_candidates": 20,
+   "path": "precomputed",
+   "select": 1790613080.1230109,
+   "hit": 1790613080.1836135,
+   "precompute": {
+    "label": "small_bottle",
+    "key": "small_bottle",
+    "job_start": 1790611266.4713113,
+    "job_done": 1790611268.2674775,
+    "job_s": 1.7956304979998094,
+    "verified_at": 1790611269.2702954,
+    "probe_s": 0.880842,
+    "planner": "curve"
+   },
+   "published": 1790613080.6123078
+  }
+ ],
+ "executor_cycles": [
+  {
+   "kind": "executor_cycle",
+   "cycle_id": 7,
+   "ok": true,
+   "planner": "curve",
+   "phases": [
+    {
+     "name": "candidates_received",
+     "t": 1790613080.619
+    },
+    {
+     "name": "precheck_miss",
+     "t": 1790613080.622
+    },
+    {
+     "name": "probe_feasible",
+     "t": 1790613082.187
+    },
+    {
+     "name": "open_sent",
+     "t": 1790613082.371
+    },
+    {
+     "name": "motion_start",
+     "t": 1790613082.371
+    },
+    {
+     "name": "close_sent",
+     "t": 1790613084.478
+    },
+    {
+     "name": "arrival",
+     "t": 1790613084.991
+    },
+    {
+     "name": "grasp_verdict",
+     "t": 1790613086.001
+    },
+    {
+     "name": "lift_done",
+     "t": 1790613087.215
+    },
+    {
+     "name": "wait_destination_start",
+     "t": 1790613087.482
+    },
+    {
+     "name": "destination_received",
+     "t": 1790613100.283
+    },
+    {
+     "name": "home_done",
+     "t": 1790613116.665
+    },
+    {
+     "name": "cycle_done",
+     "t": 1790613120.048
+    }
+   ]
+  }
+ ],
+ "background": [
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790611187.515397,
+   "job_done": 1790611204.2593946,
+   "job_s": 16.743450054000277,
+   "n_grasps": 20
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790611217.2930553,
+   "probe_s": 12.83515,
+   "feasible": -1,
+   "tried": 10,
+   "planner": ""
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790611220.7573118,
+   "job_done": 1790611222.3410397,
+   "job_s": 1.5754285680013709,
+   "n_grasps": 28
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790611234.950414,
+   "probe_s": 12.230574,
+   "feasible": -1,
+   "tried": 10,
+   "planner": ""
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790611236.1360164,
+   "job_done": 1790611237.845674,
+   "job_s": 1.709239300002082,
+   "n_grasps": 28
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790611250.2622676,
+   "probe_s": 12.274413,
+   "feasible": -1,
+   "tried": 10,
+   "planner": ""
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790611251.4699447,
+   "job_done": 1790611252.8944058,
+   "job_s": 1.4237020809996466,
+   "n_grasps": 26
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790611265.4248354,
+   "probe_s": 12.341328,
+   "feasible": -1,
+   "tried": 10,
+   "planner": ""
+  },
+  {
+   "kind": "background_job",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "job_start": 1790611266.4713113,
+   "job_done": 1790611268.2674775,
+   "job_s": 1.7956304979998094,
+   "n_grasps": 20
+  },
+  {
+   "kind": "background_verdict",
+   "label": "small_bottle",
+   "key": "small_bottle",
+   "verified_at": 1790611269.2702954,
+   "probe_s": 0.880842,
+   "feasible": 0,
+   "tried": 1,
+   "planner": "curve"
+  }
+ ],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.268,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9610400199890137, \"bbox\": [357.8643493652344, 266.81866455078125, 432.98583984375, 423.63629150390625], \"reach_pct\": 82.1, \"reach_state\": \"green\", \"reach_angle_deg\": 27.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9307429194450378, \"b"
+  },
+  {
+   "t": 3.879,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 4.651,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.960862934589386, \"bbox\": [357.86846923828125, 266.8372802734375, 432.91290283203125, 423.48492431640625], \"reach_pct\": 82.1, \"reach_state\": \"green\", \"reach_angle_deg\": 27.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9308212995529175, "
+  },
+  {
+   "t": 6.307,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9608394503593445, \"bbox\": [357.8583679199219, 266.8167419433594, 433.0295715332031, 423.7168273925781], \"reach_pct\": 82.1, \"reach_state\": \"green\", \"reach_angle_deg\": 27.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9309247136116028, \"b"
+  },
+  {
+   "t": 7.417,
+   "source": "transcript",
+   "text": "Could you slowly bring me the small bottle, please?"
+  },
+  {
+   "t": 8.305,
+   "source": "utterance",
+   "text": "{\"text\": \"Could you slowly bring me the small bottle, please?\", \"speech_end\": 1790613072.929, \"voiced_ms\": 2900, \"speech_start\": 1790613069.684, \"published\": 1790613074.56}"
+  },
+  {
+   "t": 8.653,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"small_bottle\",\"object_attributes\":{\"colour\":null,\"shape\":null,\"position\":null,\"ordinal\":null,\"ordinal_from\":null,\"speed\":\"slow\",\"destination\":null,\"then\":null},\"stamp\":1790613075.796}"
+  },
+  {
+   "t": 8.95,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9608915448188782, \"bbox\": [357.8775329589844, 266.82171630859375, 433.0262451171875, 423.7470703125], \"reach_pct\": 82.1, \"reach_state\": \"green\", \"reach_angle_deg\": 27.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9316075444221497, \"bbo"
+  },
+  {
+   "t": 11.764,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9608861207962036, \"bbox\": [357.84918212890625, 266.7859191894531, 432.9903564453125, 423.5423889160156], \"reach_pct\": 82.1, \"reach_state\": \"green\", \"reach_angle_deg\": 27.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9313737750053406, \""
+  },
+  {
+   "t": 13.087,
+   "source": "selection_cycle_id",
+   "text": "7"
+  },
+  {
+   "t": 14.026,
+   "source": "grasp_poses",
+   "text": "20 kept"
+  },
+  {
+   "t": 15.094,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9603384137153625, \"bbox\": [357.95196533203125, 266.814697265625, 433.22772216796875, 423.7525634765625], \"reach_pct\": 82.1, \"reach_state\": \"green\", \"reach_angle_deg\": 27.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9306548237800598, \""
+  },
+  {
+   "t": 15.236,
+   "source": "cand_status",
+   "text": "grasp 1/20: FEASIBLE \u2014 executing this one via the curve (z=0.61m, 0.69m from base, angled, tilt=58deg up, roll=95deg, flat)"
+  },
+  {
+   "t": 16.902,
+   "source": "morty_said",
+   "text": "Starting grasp on the small bottle."
+  },
+  {
+   "t": 20.412,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 20.496,
+   "source": "morty_said",
+   "text": "Got the small bottle. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 33.108,
+   "source": "transcript",
+   "text": "Drop it home."
+  },
+  {
+   "t": 33.114,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790613100.257}"
+  },
+  {
+   "t": 33.182,
+   "source": "robot_status",
+   "text": "resumed:home"
+  },
+  {
+   "t": 33.292,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 34.585,
+   "source": "transcript",
+   "text": "Go home."
+  },
+  {
+   "t": 34.593,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790613101.736}"
+  },
+  {
+   "t": 36.3,
+   "source": "utterance",
+   "text": "{\"text\": \"Drop it home.\", \"speech_end\": 1790613099.428, \"voiced_ms\": 500, \"speech_start\": 1790613098.581, \"published\": 1790613100.251}"
+  },
+  {
+   "t": 36.41,
+   "source": "utterance",
+   "text": "{\"text\": \"Go home.\", \"speech_end\": 1790613100.948, \"voiced_ms\": 400, \"speech_start\": 1790613100.226, \"published\": 1790613101.728}"
+  },
+  {
+   "t": 39.782,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 39.867,
+   "source": "morty_said",
+   "text": "I'm at the home position, still holding the small bottle. Should I open the gripper?"
+  },
+  {
+   "t": 48.787,
+   "source": "transcript",
+   "text": "Open the gripper."
+  },
+  {
+   "t": 48.792,
+   "source": "intent",
+   "text": "{\"action_intent\":\"open_gripper\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790613115.935}"
+  },
+  {
+   "t": 48.913,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 49.015,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 49.058,
+   "source": "utterance",
+   "text": "{\"text\": \"Open the gripper.\", \"speech_end\": 1790613114.835, \"voiced_ms\": 800, \"speech_start\": 1790613113.741, \"published\": 1790613115.93}"
+  },
+  {
+   "t": 49.563,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 53.11,
+   "source": "morty_said",
+   "text": "I'm at the home position. What's next?"
+  },
+  {
+   "t": 53.131,
+   "source": "cycle_done",
+   "text": "done|7"
+  },
+  {
+   "t": 54.351,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9254921674728394, \"bbox\": [553.3482666015625, 160.193359375, 630.5712280273438, 430.89678955078125], \"reach_pct\": 84.5, \"reach_state\": \"green\", \"reach_angle_deg\": 31.2, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"purple\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9250420928001404,"
+  },
+  {
+   "t": 55.54,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.924320638179779, \"bbox\": [10.120697021484375, 165.9851531982422, 97.4038314819336, 430.6345520019531], \"reach_pct\": 78.7, \"reach_state\": \"green\", \"reach_angle_deg\": 21.7, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.923927724361419"
+  },
+  {
+   "t": 56.852,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9245964288711548, \"bbox\": [553.3284912109375, 160.18777465820312, 630.8197021484375, 430.9657287597656], \"reach_pct\": 84.5, \"reach_state\": \"green\", \"reach_angle_deg\": 31.2, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"purple\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9245364665985"
+  },
+  {
+   "t": 58.644,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

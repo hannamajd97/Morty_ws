@@ -1,0 +1,21 @@
+[speech_input_node-4] [INFO] [1790621067.143160319] [speech_input_node]: [speaker] human voice (cos 0.04, rms 0.129)
+[speech_input_node-4] [INFO] [1790621067.444705006] [speech_input_node]: [timing] omni 0.30s for 2.6s audio (today 305, month 894)
+[speech_input_node-4] [INFO] [1790621067.446006272] [speech_input_node]: Heard: 'Give me the toy faucet.'
+[chat_node-7] User (voice): Give me the toy faucet.
+[chat_node-7] [0m[INFO] [1790621067.457380805] [communication_llm_chat_node]: FAST-PICK: 'Give me the toy faucet.' -> toy_faucet; published {"action_intent":"pick","object_intent":"toy_faucet","object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790621067.458893256] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR pick toy_faucet)[0m
+[intent_router_node-6] [INFO] [1790621067.503746982] [intent_router_node]: Queued intent 'pick'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790621067.505102494] [intent_router_node]: dispatching: action='pick', object='toy_faucet', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790621067.506988566] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[chat_node-7] [0m[INFO] [1790621067.523319162] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[intent_router_node-6] [INFO] [1790621067.525492081] [intent_router_node]: Voice pick: execution gate OPENED (auto-execute checkbox applies to GUI clicks only).
+[intent_router_node-6] [INFO] [1790621067.532419926] [intent_router_node]: Set wait_for_destination=True on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790621067.543045743] [intent_router_node]: Set auto_select_label='toy_faucet' on /yolo_live_select_grasp.
+[intent_router_node-6] [INFO] [1790621067.548345960] [intent_router_node]: Set vitamin_mode_active=False on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790621067.565545587] [intent_router_node]: Set task_object_label='toy_faucet' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790621072.100959721] [intent_router_node]: cycle_done received: "failed|0|I can't see the toy faucet right now." (outcome=failed)
+[speak_action_server-3] [INFO] [1790621072.107754019] [speak_action_server]: Speak: "I can't see the toy faucet right now."
+[intent_router_node-6] [INFO] [1790621072.117429221] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[intent_router_node-6] [INFO] [1790621072.130964928] [intent_router_node]: Set task_object_label='' on grasp_executor_lin_llm.
+[chat_node-7] [0m[INFO] [1790621072.310927429] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[speak_action_server-3] [INFO] [1790621075.284861165] [speak_action_server]: [timing] TTS first audio after 0.39s, 2.9s of speech, done 3.18s after the request

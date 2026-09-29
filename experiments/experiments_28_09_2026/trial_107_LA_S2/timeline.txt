@@ -1,0 +1,16 @@
+TRIAL TIMELINE  start 2026-09-28 20:44:22  stop 20:44:37  (15.4 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +2.25  trial bag ready
+t=   +3.99  you stopped speaking ("Give me the toy faucet.")
+t=   +5.12  you said: "Give me the toy faucet."
+t=   +5.12  intent: pick toy_faucet
+t=   +9.78  Morty said: "I can't see the toy faucet right now."
+t=  +15.38  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  end of your voice -> transcript               1.13 s
+  you stopped speaking -> command               1.14 s
+  transcript -> command (understanding)         0.01 s
+  understood by                              instant rule

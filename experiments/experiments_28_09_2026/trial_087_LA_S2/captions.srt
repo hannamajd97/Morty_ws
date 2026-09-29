@@ -1,0 +1,8 @@
+1
+00:00:04,158 --> 00:00:08,158
+You: Give me the book, Morty.
+
+2
+00:00:05,659 --> 00:00:09,659
+Morty: I don't see a book on the table. I see a Vitamin C, a tape dispenser, a small bottle, and a Vitamin B12. Would you like me to pick one of those instead?
+

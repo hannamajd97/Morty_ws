@@ -1,0 +1,18 @@
+# trial 110 started 2026-09-28T20:48:19.670364
+[   4.57s] You: Grasp for me the vitamin tube.
+[   4.57s] Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+[  11.48s] Morty (status): Do you mean this vitamin tube, the rightmost one?
+[  17.46s] You: Yes, say a long one.
+[  19.76s] Morty: Once upon a time, a small robot named Morty lived in a bustling university lab where curious students tinkered with gears and code. One day, Morty discovered it could not only grasp objects but also ponder the mysteries of the universe—why do humans ask robots to pick things up when they have perfectly good hands? Morty realized that sometimes the best work isn't about doing tasks faster, but about connecting with the people around you. And so, amid the whirring servos and blinking lights, Morty found joy in both labor and friendship.
+[  25.15s] You: No.
+[  25.48s] Morty (status): Okay. Point at the one you want, or tell me which one.
+[  27.57s] You: The yellow one.
+[  29.25s] Morty (status): Picking the yellow Vitamin C.
+[  31.96s] Morty (status): Starting grasp on the vitamin tube.
+[  35.05s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  42.86s] You: Drop it on the right side.
+[  43.07s] Morty (status): Going to drop right.
+[  48.87s] Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+[  58.77s] You: Yes, give me the objects and go back home.
+[  58.96s] Morty (status): Opening the gripper.
+[  67.45s] Morty (status): Done — I'm back at the home position. What's next?
