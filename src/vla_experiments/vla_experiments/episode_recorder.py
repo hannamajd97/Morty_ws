@@ -342,10 +342,12 @@ class EpisodeRecorder(Node):
     # ------------------------------------------------------------- inputs
     def _poll_state(self) -> None:
         """The newest message of every fast state topic, into the same
-        handlers the subscriptions used (see __init__)."""
+        handlers the subscriptions used (see __init__), each with the time
+        DDS RECEIVED it — the ages and staleness checks (joint_age,
+        max_joint_age_s ...) measure arrival as before, not this read."""
         for reader, handler in self._fast:
-            for msg in reader.take_streams():
-                handler(msg)
+            for msg, age in reader.take_streams(with_age=True):
+                handler(msg, time.monotonic() - age)
         for cam, reader in list(self._info_readers.items()):
             msg = reader.take()
             if msg is not None:
@@ -377,14 +379,14 @@ class EpisodeRecorder(Node):
             self.info[cam] = {"width": msg.width, "height": msg.height, "K": list(msg.k), "D": list(msg.d),
                               "distortion_model": msg.distortion_model, "frame_id": msg.header.frame_id}
 
-    def _on_joints(self, msg: JointState):
+    def _on_joints(self, msg: JointState, recv: float | None = None):
         names = list(msg.name)
         try:
             idx = [names.index(j) for j in ARM_JOINTS]
         except ValueError:
             idx = None
         with self.lock:
-            now = time.monotonic()
+            now = time.monotonic() if recv is None else recv
             if idx is not None:
                 pos = np.array([msg.position[i] for i in idx], dtype=np.float64)
                 vel = np.array([msg.velocity[i] if i < len(msg.velocity) else np.nan for i in idx], dtype=np.float64)
@@ -394,7 +396,7 @@ class EpisodeRecorder(Node):
                 gpos = float(msg.position[names.index(self.gripper_joint)])
                 self.joints[4] = float(np.clip(gpos / self.gripper_open, 0.0, 1.0)) if self.gripper_open > 0 else gpos
 
-    def _on_ctrl(self, msg):
+    def _on_ctrl(self, msg, recv: float | None = None):
         pt = msg.reference if len(msg.reference.positions) else msg.desired
         if not len(pt.positions):
             return
@@ -404,19 +406,22 @@ class EpisodeRecorder(Node):
         except ValueError:
             return
         with self.lock:
-            self.joint_cmd = (time.monotonic(), _stamp_s(msg.header), pos)
+            self.joint_cmd = (time.monotonic() if recv is None else recv, _stamp_s(msg.header), pos)
 
-    def _on_tcp(self, msg: PoseStamped):
+    def _on_tcp(self, msg: PoseStamped, recv: float | None = None):
         p, o = msg.pose.position, msg.pose.orientation
         with self.lock:
-            self.ur_tcp = (time.monotonic(), _stamp_s(msg.header), msg.header.frame_id,
+            self.ur_tcp = (time.monotonic() if recv is None else recv, _stamp_s(msg.header), msg.header.frame_id,
                            np.array([p.x, p.y, p.z]), np.array([o.x, o.y, o.z, o.w]))
 
-    def _on_io(self, msg):
+    def _on_io(self, msg, recv: float | None = None):
+        # IOStates has no header: its stamp is the receipt, on the ROS clock
+        now = time.monotonic()
+        recv = now if recv is None else recv
         for d in msg.digital_in_states:
             if d.pin == self.grasp_pin:
                 with self.lock:
-                    self.io_grasp = (time.monotonic(), self._ros_now(), bool(d.state))
+                    self.io_grasp = (recv, self._ros_now() - (now - recv), bool(d.state))
 
     def _on_gripper_cmd(self, msg):
         """Adapter event JSON {"cmd","target","stamp","backend"} or the CLI's

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import struct
 import threading
+import time
 from typing import Any, Callable, List, Optional
 
 import rclpy
@@ -61,7 +62,10 @@ class LatestMessage:
 
     With ``stream_key`` (a function of the serialized bytes) and a
     ``depth`` that holds everything arriving between two reads,
-    ``take_streams()`` returns the newest message of EACH stream."""
+    ``take_streams()`` returns the newest message of EACH stream;
+    ``with_age=True`` pairs each with how long ago DDS received it (the
+    reader's receipt time, so a consumer that stores "when it arrived"
+    stays exact although it reads later)."""
 
     def __init__(self, node: Node, msg_type: Any, topic: str, depth: int = 1,
                  stream_key: Optional[Callable[[bytes], int]] = None) -> None:
@@ -86,8 +90,8 @@ class LatestMessage:
             msg_type, topic, lambda _m: None, qos, raw=True)
 
     def _drain(self) -> dict:
-        """Everything queued since the last read: newest bytes per stream,
-        in arrival order of each stream's newest message."""
+        """Everything queued since the last read: (bytes, receipt ns) of the
+        newest message per stream, in arrival order of those."""
         newest: dict = {}
         with self._lock, self._sub.handle:
             while True:
@@ -96,17 +100,24 @@ class LatestMessage:
                     break
                 key = self._stream_key(got[0]) if self._stream_key else 0
                 newest.pop(key, None)
-                newest[key] = got[0]
+                newest[key] = (got[0], int(got[1].get("received_timestamp") or 0))
         return newest
 
     def take(self) -> Optional[Any]:
         newest = self._drain()
         if not newest:
             return None
-        return deserialize_message(list(newest.values())[-1], self._msg_type)
+        return deserialize_message(list(newest.values())[-1][0], self._msg_type)
 
-    def take_streams(self) -> List[Any]:
-        return [deserialize_message(b, self._msg_type) for b in self._drain().values()]
+    def take_streams(self, with_age: bool = False) -> List[Any]:
+        now_ns = time.time_ns()
+        out = []
+        for data, recv_ns in self._drain().values():
+            msg = deserialize_message(data, self._msg_type)
+            # receipt stamps are system-clock ns; 0 = the RMW did not give one
+            age = max(0.0, (now_ns - recv_ns) / 1e9) if recv_ns else 0.0
+            out.append((msg, age) if with_age else msg)
+        return out
 
     def destroy(self) -> None:
         with self._lock:
