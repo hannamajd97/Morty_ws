@@ -1,9 +1,11 @@
 """Static transform for the fixed Orbbec Astra: base_link -> astra_link.
 
-Pose set manually by Majd in RViz on 2026-09-02 (Astra cloud overlaid on the RealSense cloud):
-  xyz  -0.51  0.51  0.065     (0.72 m straight up: in this base frame vertical is (-0.707, 0.707, 0);
-                               0.065 m sideways along base z)
-  rpy   0.0  -0.5760  -0.77   (yaw ~ -44 deg like the table, pitch -33 deg => looking ~57 deg down)
+Pose set manually by Majd in RViz (Astra cloud overlaid on the RealSense cloud), last on
+2026-09-29 with astra_restart_laptop.sh x:=... (the 2026-09-02 pose was -0.51 0.51 0.065 /
+0.0 -0.576 -0.77; with the UDP buffers fixed the overlay showed it ~10 cm off along the table):
+  xyz  -0.50  0.50  0.06      (0.71 m straight up: in this base frame vertical is (-0.707, 0.707, 0);
+                               0.06 m sideways along base z)
+  rpy   0.0  -0.50  -0.80     (yaw ~ -46 deg like the table, pitch -29 deg => looking ~61 deg down)
 Override from the command line, e.g.
   ros2 launch vla_experiments astra_tf.launch.py z:=0.10 pitch:=-0.55
 The Astra driver runs with camera_name:=astra and camera_link_frame_id:=astra_link (see
@@ -17,12 +19,12 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     args = [
-        DeclareLaunchArgument("x", default_value="-0.51"),
-        DeclareLaunchArgument("y", default_value="0.51"),
-        DeclareLaunchArgument("z", default_value="0.065"),
+        DeclareLaunchArgument("x", default_value="-0.5"),
+        DeclareLaunchArgument("y", default_value="0.5"),
+        DeclareLaunchArgument("z", default_value="0.06"),
         DeclareLaunchArgument("roll", default_value="0.0"),
-        DeclareLaunchArgument("pitch", default_value="-0.576"),
-        DeclareLaunchArgument("yaw", default_value="-0.77"),
+        DeclareLaunchArgument("pitch", default_value="-0.50"),
+        DeclareLaunchArgument("yaw", default_value="-0.80"),
         DeclareLaunchArgument("parent_frame", default_value="base_link"),
         DeclareLaunchArgument("child_frame", default_value="astra_link"),
     ]

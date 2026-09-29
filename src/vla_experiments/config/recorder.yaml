@@ -45,5 +45,5 @@ vla_episode_recorder:
     preflight: true          # refuse to open an episode while joints / cameras / TF are stale
     jpeg_quality: 95
     # copied into every episode's meta.json so the dataset documents the camera pose it was recorded with
-    astra_tf_xyz: [-0.51, 0.51, 0.065]
-    astra_tf_rpy: [0.0, -0.576, -0.77]
+    astra_tf_xyz: [-0.5, 0.5, 0.06]
+    astra_tf_rpy: [0.0, -0.50, -0.80]
