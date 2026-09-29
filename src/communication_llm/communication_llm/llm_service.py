@@ -298,8 +298,14 @@ INTENT_TOOL = {
                     "drop_right",
                     "drop_left",
                     "home",
+                    # 2026-09-29 (Majd): release where the arm is
+                    "here",
                 ],
                 "description": (
+                    "'here' ONLY with confirm_drop at 'Where should I drop "
+                    "it?': release where the arm is, above the spot it picked "
+                    "from ('here', 'in the same place', 'put it back', 'where "
+                    "it was', 'don't move, just open it').\n"
                     "Used with action_intent='pick_and_place', and with "
                     "'confirm_drop' when the robot asked 'Where should I drop "
                     "it?'. Where to place the picked object. Map: 'on the right' / 'right "

@@ -1935,6 +1935,8 @@ public:
     // object. Step 3a below is skipped when this succeeds.
     bool auto_release = false;
     bool auto_home = false;
+    // 2026-09-28: "here" at the destination question — see below.
+    bool release_here = false;
     if (wait_for_destination_) {
       RCLCPP_INFO(node_->get_logger(),
         "Interactive drop: object grasped, pausing at grasp pose. "
@@ -2077,6 +2079,21 @@ public:
         drop_target_name_ = drop_left_target_;
       } else if (dest_lc == "home") {
         drop_target_name_ = "home";
+      } else if (dest_lc == "here" || dest_lc == "in_place") {
+        // 2026-09-28 (Majd, live: "I don't want you to move right now. I
+        // just want you to open the gripper, give me the object." at this
+        // question — only left / right / home existed, so the open was put
+        // off to a release pause that never came, and "drop it in the same
+        // place" had no answer at all): release WHERE THE ARM IS, just
+        // above the spot it picked from (or into the operator's hand). No
+        // transport; the gripper opens at once, the arm rises clear of the
+        // object, then "Should I go back home?" as after any release
+        // ("+release_home": straight home). The name is a label for the
+        // task state and the logs, never a pose to move to (re-read from
+        // the parameter at the next pick).
+        release_here = true;
+        auto_release = true;
+        drop_target_name_ = "grasp_spot";
       } else if (!dest_lc.empty()) {
         RCLCPP_WARN(node_->get_logger(),
           "Interactive drop: unknown destination '%s'; using configured "
@@ -2109,6 +2126,10 @@ public:
     if (lifted_after_grasp) {
       RCLCPP_INFO(node_->get_logger(),
         "Step 3a - already lifted right after the grasp; skipping.");
+    } else if (release_here) {
+      // the post-grasp lift failed: releasing at table level puts it back
+      RCLCPP_INFO(node_->get_logger(),
+        "Step 3a - release here: not lifting (the object goes back down where it was).");
     } else if (lift_height_m_ > 0.0) {
       rclcpp::sleep_for(std::chrono::milliseconds(150));
       if (!lift_object(grasp_pose_world, "Step 3a - Lift object")) {
@@ -2128,14 +2149,18 @@ public:
     // Give the joint-state monitor a moment to catch up after the lift.
     // Without this small wait, getCurrentPose() returns a stale snapshot
     // and Pilz's LIN planner rejects the start state.
-    if (sequence_ok && !lifted_after_grasp &&
+    if (release_here) {
+      RCLCPP_INFO(node_->get_logger(),
+        "Release here: no transport — opening at the grasp spot.");
+    }
+    if (sequence_ok && !lifted_after_grasp && !release_here &&
         (post_lift_up_m_ > 0.0 || post_lift_back_m_ > 0.0)) {
       rclcpp::sleep_for(std::chrono::milliseconds(150));
     }
 
     // 3a-up) Extra straight-up retreat in base_link so the next moves
     // start from above the table.
-    if (sequence_ok && post_lift_up_m_ > 0.0 && !lifted_after_grasp) {
+    if (sequence_ok && post_lift_up_m_ > 0.0 && !lifted_after_grasp && !release_here) {
       // (skipped when the post-grasp TRUE-UP lift succeeded — this
       // base+z retreat is horizontal on this rig and always NO_IK'd,
       // costing ~2.5 s per cycle for nothing.)
@@ -2163,7 +2188,7 @@ public:
     // Skipped after a successful true-up lift: post-lift it only burned a
     // 1 s stale-state timeout and then silently did nothing (x=y=0 from
     // the failed pose fetch) — measured 2026-08-26.
-    if (sequence_ok && post_lift_back_m_ > 0.0 && !lifted_after_grasp) {
+    if (sequence_ok && post_lift_back_m_ > 0.0 && !lifted_after_grasp && !release_here) {
       geometry_msgs::msg::PoseStamped current = arm_group_.getCurrentPose(arm_group_.getEndEffectorLink());
       const double x = current.pose.position.x;
       const double y = current.pose.position.y;
@@ -2201,7 +2226,7 @@ public:
       return false;
     }
     bool blended_ok = false;
-    if (sequence_ok && blend_via_home_ && !skip_reset_before_drop_ &&
+    if (sequence_ok && !release_here && blend_via_home_ && !skip_reset_before_drop_ &&
         !vitamin_mode_active_ && use_fast_replay_for_named_targets_ &&
         use_named_pose_action_ &&
         // "take it home" makes the drop target BE home; blending home
@@ -2222,7 +2247,7 @@ public:
 
     // Wall clock around the two-step path so the blended and unblended
     // totals can be compared from the log alone.
-    const bool two_step_ran = sequence_ok && !blended_ok;
+    const bool two_step_ran = sequence_ok && !blended_ok && !release_here;
     const auto two_step_t0 = std::chrono::steady_clock::now();
 
     // 3b) Move directly to reset target (initgrasp) before drop sequence.
@@ -2230,11 +2255,11 @@ public:
     // already moved the arm to a safe pose, so going to home first is
     // wasted motion and may even put the arm into a worse position to
     // plan a PTP to drop_right_side from.
-    if (sequence_ok && !blended_ok && !skip_reset_before_drop_) {
+    if (sequence_ok && !blended_ok && !release_here && !skip_reset_before_drop_) {
       if (!execute_arm_named_target(reset_target_name_, "Step 3b - Move to reset target")) {
         sequence_ok = false;
       }
-    } else if (sequence_ok && !blended_ok) {
+    } else if (sequence_ok && !blended_ok && !release_here) {
       RCLCPP_INFO(node_->get_logger(),
         "Step 3b skipped (skip_reset_before_drop=true). Going straight "
         "from retreat waypoint to '%s'.", drop_target_name_.c_str());
@@ -2243,7 +2268,7 @@ public:
     // 4) Move to drop_right_side and hold.
     // Vitamin-tube mode: use the special "slow + retighten at 20%"
     // variant. Other objects use the standard execute path.
-    if (sequence_ok && !blended_ok) {
+    if (sequence_ok && !blended_ok && !release_here) {
       bool step4_ok;
       if (vitamin_mode_active_) {
         step4_ok = execute_arm_to_drop_with_vitamin_retighten(drop_target_name_);
@@ -2852,6 +2877,14 @@ public:
           s_ok.data = "released";
           interactive_status_pub_->publish(s_ok);
         } catch (...) {}
+        if (release_here && lift_height_m_ > 0.0) {
+          // 2026-09-28: opened right above the object — rise clear of it
+          // before any move home, so the open fingers never sweep it.
+          if (!execute_fast_joint_lift(lift_height_m_)) {
+            RCLCPP_WARN(node_->get_logger(),
+              "Release here: the clearance lift after the open failed; continuing.");
+          }
+        }
         if (execute_ && post_release_wait_s_ > 0.0 && !ask_home_before_reset) {
           RCLCPP_INFO(node_->get_logger(),
             "Step 5c - Released; staying %.1f s at the drop pose before going home.", post_release_wait_s_);

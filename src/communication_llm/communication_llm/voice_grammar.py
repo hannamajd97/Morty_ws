@@ -157,6 +157,17 @@ DEST_COMPOUND = _whole(
 # I open the gripper?"): release here, then home — the release_home answer.
 RELEASE_HOME = _whole(r"(?:" + AFF + r" )?(?:now )?" + RELEASE + r" " + _CONN
                       + r"(?:now )?(?:go )?(?:back )?(?:to )?(?:the )?home(?: position)?")
+# 2026-09-29 (Majd, live: "Drop it in the same place." / "I just want you to
+# open the gripper, give me the object." at "Where should I drop it?" — only
+# left / right / home existed): a whole "here" answer — release where the arm
+# is (the router sends the executor's "here").
+_HERE = (r"(?:(?:right )?here|(?:(?:in|on|at|to) )?(?:the )?same (?:place|spot|position)"
+         r"|(?:back )?where it was|in place)")
+_HERE_VERB = r"(?:just )?(?:drop|put|leave|place|set|release|open|let go of)(?: it)?"
+DEST_HERE = _whole(
+    r"(?:" + AFF + r" )?(?:(?:" + _HERE_VERB + r"(?: down)? )?" + _HERE
+    # "put it back (down)" — "back" only after a verb: alone it may mean home
+    + r"|" + _HERE_VERB + r" back(?: down)?(?: " + _HERE + r")?)")
 # 2026-09-25 (Majd's I1): a whole NO to "Where should I drop it?" — the
 # executor keeps waiting for a destination, so nothing is sent; the LLM
 # used to answer "Don't drop it." with "Sorry, I'll pick it up instead."
@@ -421,6 +432,12 @@ def classify(text: str, question: str = "", fresh: bool = False,
         elif question == "destination":
             if NO_DEST.match(t):
                 return ("negative", "keep")          # 2026-09-25 (I1): nothing is sent
+            # 2026-09-29 (Majd): release where the arm is — "Drop it in the
+            # same place.", "Put it back.", "Just open it, give it to me."
+            # The router turns an open at this question into the executor's
+            # "here" (no transport).
+            if DEST_HERE.match(t) or OPEN.match(t) or _release_consent(t):
+                return ("answer", "open_gripper")
             if ext_dest:
                 m = DEST_COMPOUND.match(t)           # 2026-09-25 (B2)
                 if m:

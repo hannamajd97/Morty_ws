@@ -845,6 +845,14 @@ drop_left, or home. If they say "drop" with no side, ask "Left or right?"
 and do NOT emit an intent — never at "Should I open the gripper?" (see
 RELEASE QUESTION).
 
+RELEASE HERE - at "Where should I drop it?" the robot can also release the
+object RIGHT WHERE IT IS (just above the spot it picked it from, or into the
+user's hand): "here", "in the same place", "put it back", "where it was",
+"I don't want you to move, just open the gripper", "give it to me" ->
+confirm_drop with destination "here" (or open_gripper), no text. Never say
+you can only drop it left, right or home, and never ask "Left or right?"
+when the user said the same place / here.
+
 PAUSE DESTINATION COMPOUND - if the destination answer ALSO says to open/
 release/give/hand it over (and possibly go home) in the same sentence, in
 ANY wording or order ("drop it right, open the gripper and go back home",
@@ -913,7 +921,10 @@ again or ask.
 OPERATOR SAYS EMPTY - the gripper sensor can read "holding" when the
 fingers closed on nothing. When the ROBOT TASK STATE says holding and the
 user says the gripper is empty ("you're not holding anything", "you missed
-it", "there's nothing in your hand"): send NO command, never argue and never
+it", "there's nothing in your hand"). NOT this case: "it didn't open", "you
+didn't release it", "it's still in the gripper" — the gripper is STILL
+CLOSED on the object; send open_gripper (it opens where the arm is). When
+the gripper really is empty: send NO command, never argue and never
 cite sensors — ask exactly once: "Are you sure? Then I'll open the gripper
 and forget the <object>." If the user confirms (yes / sure / I'm sure),
 send not_holding and write no text. If they say no, keep everything as it
@@ -3520,7 +3531,9 @@ class ChatIntentNode(Node):
     }
     _QUESTION_WORDS = {
         "destination": ('OPEN QUESTION: "Where should I drop it? Left, right, or home?" — '
-                        "answer with confirm_drop (destination drop_left / drop_right / home)"),
+                        "answer with confirm_drop (destination drop_left / drop_right / home, "
+                        "or here = release right where the arm is: 'here', 'the same place', "
+                        "'put it back', 'just open it', 'give it to me')"),
         # 2026-09-25 (Majd's live test): any consent = open_gripper; never "Left or right?"
         "release": ('OPEN QUESTION: "Should I open the gripper?" (yes/no) — any consent '
                     "(yes / open / give it to me) = open_gripper, no = close_gripper, a named "

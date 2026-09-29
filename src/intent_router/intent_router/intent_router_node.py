@@ -65,6 +65,11 @@ RESET_INTENTS = {"reset"}
 # destination latch (_destination_token). Values are what the executor's
 # destination pause accepts; the keys are every spelling the chat node and
 # the LLM tool use for the three answers to "Left, right, or home?".
+# 2026-09-29: destinations that mean "release where the arm is" (the
+# executor's "here" at the destination question).
+_HERE_WORDS = {"here", "in_place", "in place", "same_place", "same place",
+               "the same place", "grasp_spot", "where it was", "back"}
+
 _DESTINATION_WORDS = {
     "drop_right": "drop_right", "right": "drop_right",
     "drop right": "drop_right", "drop_right_side": "drop_right",
@@ -1060,6 +1065,25 @@ class IntentRouterNode(Node):
                 attrs = dict(attrs) if isinstance(attrs, dict) else {}
                 attrs["then"] = _plan
                 action = "confirm_drop"
+            # 2026-09-29 (Majd, live: "I don't want you to move right now. I
+            # just want you to open the gripper, give me the object." at
+            # "Where should I drop it?" was put off below to a release pause
+            # that never came — nothing opened, nothing was said, and the
+            # model then claimed "The gripper just opened"): an open /
+            # release with no side AT the destination question, or a
+            # destination meaning "here" ("the same place", "where it was"),
+            # releases WHERE THE ARM IS — the executor's "here" (no
+            # transport, open, rise clear, then "Should I go back home?").
+            if self._question_open("destination") and (
+                    (action in ("release_home", "release", "open_gripper") and not dest)
+                    or (action == "confirm_drop" and dest in _HERE_WORDS)):
+                _tok = "here+release_home" if (_then_home(action, attrs) or (
+                    isinstance(attrs, dict) and str(attrs.get("then") or "").strip().lower()
+                    == "release_home")) else "here+release"
+                if not self._claim_executor_resume(
+                        _tok, f"{action!r} at the destination question: release here"):
+                    self._narrate_ignored_resume(action, _tok)
+                return
             if action == "confirm_drop":
                 dest = dest or "drop_right"
                 # Compound plan (2026-08-25): "drop right, open the
@@ -1114,6 +1138,11 @@ class IntentRouterNode(Node):
                 self.get_logger().info(
                     f"Follow-up {action!r} noted while the pick is in flight — "
                     f"it answers the release pause when it opens (plan={plan}).")
+                # 2026-09-29: said, not silent — the model filled the silence
+                # with "The gripper just opened" (Majd's live test).
+                self._narrate("Okay — I'll open the gripper once I'm there."
+                              if (self._live_task() or {}).get("holding") else
+                              "Okay — I'll give it to you once I have it.")
                 return
 
         # Deduplicate: don't queue the same action twice in a row, and don't
@@ -3853,6 +3882,8 @@ class IntentRouterNode(Node):
         """2026-09-25: the line for a destination the executor accepted from
         the router — on resumed:<t> (destination question) and, since review
         R5, on redirect:<t> (a side claimed at the release question)."""
+        if target == "grasp_spot":
+            return   # 2026-09-29: release here — "Opening the gripper." follows at once
         if "right" in target:
             self._narrate("Going to drop right.")
         elif "left" in target:
