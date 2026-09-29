@@ -510,6 +510,10 @@ class MortyGuiBridge(Node):
         )
         self._router_set_cli = self.create_client(
             SetParameters, "/intent_router_node/set_parameters")
+        # The RealSense node itself (2026-09-29): the Advanced "RealSense
+        # point cloud" switch sets pointcloud.enable on the running camera.
+        self._cam_get_cli = self.create_client(GetParameters, "/camera/camera/get_parameters")
+        self._cam_set_cli = self.create_client(SetParameters, "/camera/camera/set_parameters")
         self._exec_set_cli = self.create_client(
             SetParameters, "/grasp_executor_lin_llm/set_parameters"
         )
@@ -1282,6 +1286,22 @@ class MortyGuiBridge(Node):
         self._pipe_set_cli.call_async(req)
         self.get_logger().info(f"Pipeline params set: {list(mapping.keys())}")
         return True
+
+    def set_camera_pointcloud(self, on: bool) -> bool:
+        """pointcloud.enable on the running RealSense node (async; read it
+        back with camera_pointcloud()). False when the camera is not up."""
+        if not self._cam_set_cli.service_is_ready():
+            if not self._cam_set_cli.wait_for_service(timeout_sec=0.5):
+                return False
+        self._cam_set_cli.call_async(SetParameters.Request(
+            parameters=[Parameter(name="pointcloud.enable", value=self._py_to_pv(bool(on)))]))
+        self.get_logger().info(f"RealSense pointcloud.enable -> {bool(on)}")
+        return True
+
+    def camera_pointcloud(self) -> Optional[bool]:
+        """The camera's own pointcloud.enable, read back (None: no answer)."""
+        vals = self._get_params_sync(self._cam_get_cli, ["pointcloud.enable"], "RealSense")
+        return None if not vals or "pointcloud.enable" not in vals else bool(vals["pointcloud.enable"])
 
     def _get_params_sync(self, client, names, label: str) -> Optional[Dict[str, Any]]:
         """Bounded, synchronous GetParameters read for the Qt thread.

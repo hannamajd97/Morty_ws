@@ -41,6 +41,14 @@ class AstraCloudLocal(Node):
         self.declare_parameter("max_range_m", 4.0)
         self.declare_parameter("color_max_age_s", 1.0)
         self.declare_parameter("use_compressed", True)
+        # 2026-09-29 (Majd: "it should not cost much PC overhead"): no decoding
+        # and no cloud while nothing subscribes to the cloud, and an exit after
+        # input_timeout_s without Astra depth — started at boot before the
+        # shuttle camera, the node sat silent all day (09-28/29); the
+        # supervisor loop (scripts/astra_cloud_supervise.sh) starts it again.
+        self.declare_parameter("input_timeout_s", 60.0)
+        self._last_input = time.monotonic()
+        self.create_timer(5.0, self._watchdog)
         self.info = None
         self.color = None  # (wall_time, rgb HxWx3)
         self.count = 0
@@ -57,18 +65,34 @@ class AstraCloudLocal(Node):
     def _on_info(self, m):
         self.info = (m.width, m.height, m.k[0], m.k[4], m.k[2], m.k[5])
 
+    def _watchdog(self):
+        idle = time.monotonic() - self._last_input
+        if idle > float(self.get_parameter("input_timeout_s").value):
+            self.get_logger().warn(f"no Astra depth for {idle:.0f} s — exiting so the supervisor starts a fresh node")
+            raise SystemExit(3)
+
+    def _wanted(self) -> bool:
+        return self.pub.get_subscription_count() > 0
+
     def _on_color(self, m):
+        if not self._wanted():
+            return
         if m.encoding not in ("rgb8", "bgr8"):
             return
         a = np.frombuffer(bytes(m.data), np.uint8).reshape(m.height, m.width, 3)
         self.color = (time.time(), a[:, :, ::-1] if m.encoding == "bgr8" else a)
 
     def _on_ccolor(self, m):
+        if not self._wanted():
+            return
         bgr = cv2.imdecode(np.frombuffer(bytes(m.data), np.uint8), cv2.IMREAD_COLOR)
         if bgr is not None:
             self.color = (time.time(), bgr[:, :, ::-1])
 
     def _on_depth(self, m):
+        self._last_input = time.monotonic()
+        if not self._wanted():
+            return
         if m.encoding == "16UC1":
             d = np.frombuffer(bytes(m.data), np.uint16).reshape(m.height, m.width).astype(np.float32) / 1000.0
         elif m.encoding == "32FC1":
@@ -78,6 +102,9 @@ class AstraCloudLocal(Node):
         self._publish(d, m.header)
 
     def _on_cdepth(self, m):
+        self._last_input = time.monotonic()
+        if not self._wanted():
+            return
         d = decode_compressed_depth(m)
         if d is not None:
             self._publish(d, m.header)

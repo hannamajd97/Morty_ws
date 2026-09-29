@@ -253,6 +253,24 @@ class OperatorWindow(QtWidgets.QMainWindow):
             "Off: only clicks and voice select. Switch it off while you rearrange objects on the table:\n"
             "a hand over the table can be read as pointing and start a pick by itself (2026-09-18).")
         df.addWidget(self.cb_pointing)
+        # RealSense point cloud for RViz (2026-09-29, Majd: the RViz RAW
+        # display should always work). The camera computes it itself (~1 CPU
+        # core, 2.4 MB at 30 Hz), so it is a choice: applied to the running
+        # camera at once, passed as camera_pointcloud:= at the next driver
+        # start, and re-applied whenever the camera (re)starts.
+        self.cb_rs_cloud = QtWidgets.QCheckBox(
+            "RealSense point cloud for RViz  (the camera's own cloud, ~1 CPU core)")
+        self.cb_rs_cloud.setChecked(_qs.value("camera_pointcloud", False, type=bool))
+        self.cb_rs_cloud.setToolTip(
+            "On: the RealSense publishes /camera/camera/depth/color/points (RViz 'RAW' display) and the\n"
+            "driver starts with camera_pointcloud:=true. Off: no camera cloud; the pipeline still sends\n"
+            "RViz a light one-per-second cloud ('downsampled' display) while it runs.")
+        self.cb_rs_cloud.toggled.connect(self._on_rs_cloud_toggled)
+        df.addWidget(self.cb_rs_cloud)
+        self.rs_cloud_status = QtWidgets.QLabel("")
+        self.rs_cloud_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        df.addWidget(self.rs_cloud_status)
+        self._rs_cam_alive = False
         det_note = QtWidgets.QLabel(
             "Apply sends both switches to the running pipeline and reads them back; they are "
             "also used when the pipeline next starts. Turning unknown-object detection off "
@@ -1776,6 +1794,26 @@ class OperatorWindow(QtWidgets.QMainWindow):
                 {"graspgen_model": m.key, "graspgen_origin_to_fingertip_m": float(m.fingertip_m)})
         self.statusBar().showMessage(f"GraspGen now runs {m.label}.")
 
+    def _on_rs_cloud_toggled(self, on: bool) -> None:
+        QtCore.QSettings("morty", "morty_gui").setValue("camera_pointcloud", bool(on))
+        if not self.bridge.set_camera_pointcloud(on):
+            MotionWindow._set_status(self.rs_cloud_status,
+                                     f"saved ({'on' if on else 'off'}) — the camera is not running; used at the next driver start", GREY)
+            return
+        MotionWindow._set_status(self.rs_cloud_status, "sending to the camera …", GREY)
+        QtCore.QTimer.singleShot(1500, self._read_back_rs_cloud)
+
+    def _read_back_rs_cloud(self) -> None:
+        state = self.bridge.camera_pointcloud()
+        want = self.cb_rs_cloud.isChecked()
+        if state is None:
+            MotionWindow._set_status(self.rs_cloud_status, "the camera did not answer — try again", ORANGE)
+        elif state == want:
+            MotionWindow._set_status(self.rs_cloud_status,
+                                     "on — the camera confirms (RViz 'RAW' display)" if state else "off — the camera confirms", GREEN)
+        else:
+            MotionWindow._set_status(self.rs_cloud_status, f"the camera still says {'on' if state else 'off'}", RED)
+
     def _apply_detection(self) -> None:
         """Apply button of the Detection tab: save, push both switches onto
         the running pipeline, read them back, start/stop the naming service."""
@@ -2109,6 +2147,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         else:
             cmd = list(DRIVER_LAUNCH[self.cb_camera.isChecked()])
         cmd.append(f"start_rviz:={'true' if self.cb_rviz.isChecked() else 'false'}")
+        cmd.append(f"camera_pointcloud:={'true' if self.cb_rs_cloud.isChecked() else 'false'}")
         self._driver.start(
             cmd, log_path=os.path.expanduser("~/morty_ws/logs/driver_gui.log")
         )
@@ -3474,6 +3513,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
             paint(self.led_driver, RED, "driver launched but /joint_states not flowing yet")
         else:
             paint(self.led_driver, GREY, "driver not running")
+        alive = bool(upd.get("camera_alive"))
+        if alive and not self._rs_cam_alive and self.cb_rs_cloud.isChecked():
+            # The camera came (back) up — a camera restarted outside the
+            # driver launch would start with its cloud off.
+            if self.bridge.set_camera_pointcloud(True):
+                QtCore.QTimer.singleShot(2000, self._read_back_rs_cloud)
+        self._rs_cam_alive = alive
         if upd.get("camera_alive"):
             paint(self.led_camera, GREEN, "RealSense (wrist) frames flowing")
         elif self.cb_camera.isChecked() and self._driver.running():
