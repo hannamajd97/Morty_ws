@@ -26,6 +26,8 @@
   <!-- For move_to_named_pose_server: MoveIt collision pre-check + action def -->
   <exec_depend>moveit_msgs</exec_depend>
   <exec_depend>morty_interfaces</exec_depend>
+  <exec_depend>tf2_ros_py</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

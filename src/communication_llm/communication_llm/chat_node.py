@@ -52,7 +52,7 @@ from rclpy.qos import (
     QoSProfile,
     ReliabilityPolicy,
 )
-from rclpy.wait_for_message import wait_for_message
+from ur3e_fast_observation.latest_message import LatestMessage
 from std_msgs.msg import Bool, String
 from geometry_msgs.msg import PoseArray, PoseStamped
 from sensor_msgs.msg import JointState
@@ -4853,43 +4853,22 @@ class ChatIntentNode(Node):
         self._last_tf_at = self.get_clock().now().nanoseconds / 1e9
 
     def _sample_one_message(self, msg_type, topic: str):
-        """Take ONE message from *topic* through a MOMENTARY subscription.
+        """The newest message on *topic* since the previous call, or None.
 
-        Returns the message, or None if nothing arrived inside
-        ``liveness_sample_timeout_s``. Never raises: a liveness probe must
-        not be able to take the node down, and a failed probe is
-        indistinguishable from a silent topic, which the freshness windows
-        already handle.
-
-        Why not a standing subscription: rclpy pays a per-message wait-set
-        cost even when the callback body is trivial, so subscribing to a
-        ~494 Hz topic burns most of a CPU core to do nothing.
-
-        Why rclpy's wait_for_message() and not the create/destroy busy-wait
-        in ur3e_fast_observation's replay_node._capture_current_joints():
-        that node runs a MultiThreadedExecutor, so a subscription in a
-        dedicated ReentrantCallbackGroup can still be delivered while the
-        caller blocks. THIS node runs rclpy.spin() — a SingleThreadedExecutor
-        — where no callback can ever be delivered while another callback is
-        on the stack, so that pattern would time out every single time.
-        wait_for_message() builds its OWN private wait set and takes the
-        message directly, bypassing the executor, and destroys the
-        subscription in a finally: block so nothing can leak.
-        """
+        2026-09-29: from a standing reader (ur3e_fast_observation's
+        LatestMessage — a private node nothing spins, drained with
+        take_message). It used to be rclpy's wait_for_message(): a
+        subscription created and destroyed every 0.5 s on 500-830 Hz
+        topics, which with SHM off meant a discovery round per sample and
+        the driver streaming to readers already gone — this node's busy
+        Fast DDS thread and its UDP drops (see latest_message.py). Never
+        raises; a missing publisher simply gives None."""
         try:
-            # Cheap local graph query. With no publisher at all (driver
-            # not started — the common case) there is nothing to wait for,
-            # so skip the bounded wait entirely rather than blocking this
-            # node's only executor thread for nothing.
-            if self.count_publishers(topic) == 0:
-                return None
-            ok, msg = wait_for_message(
-                msg_type,
-                self,
-                topic,
-                time_to_wait=max(0.0, self._liveness_sample_timeout_s),
-            )
-            return msg if ok else None
+            readers = self.__dict__.setdefault("_latest_readers", {})
+            reader = readers.get(topic)
+            if reader is None:
+                reader = readers[topic] = LatestMessage(self, msg_type, topic)
+            return reader.take()
         except Exception:
             return None
 
@@ -4901,36 +4880,14 @@ class ChatIntentNode(Node):
         Failures are silent: the freshness stamps stop advancing, which is
         exactly what a dead publisher always looked like.
         """
-        # HALF-UP GUARD (2026-08-31). A publisher can exist while NO data
-        # flows (driver process alive, robot off / e-stopped / cable out —
-        # measured live: 2 publishers, 0 msgs in 6 s). Then every probe
-        # burns its FULL 0.3 s timeout on this node's only executor
-        # thread: 0.3 s of every 0.5 s tick = ~60% of the node stalled,
-        # which Majd felt as "very slow with answering". Exponential
-        # backoff (1 -> 2 -> 4 -> 8 -> 10 s cap) while the topic is
-        # silent; any received message resets to full rate instantly.
-        now_mono = time.monotonic()
-        if now_mono < getattr(self, "_liveness_backoff_until", 0.0):
-            return
+        # 2026-09-29: the reads never block any more (standing readers, see
+        # _sample_one_message), so the 2026-08-31 half-up backoff — which
+        # kept a silent driver from costing 0.3 s per tick — is gone.
         msg = self._sample_one_message(JointState, "/joint_states")
         if msg is None:
             # No joint states => the driver is down, and _system_status_summary
-            # only ever reads tf_alive INSIDE its driver_up branch, so the /tf
-            # probe would change no output. Skipping it also keeps the worst
-            # case at ONE bounded wait per tick instead of two.
-            if self.count_publishers("/joint_states") > 0:
-                prev = getattr(self, "_liveness_backoff_s", 0.0)
-                self._liveness_backoff_s = min(10.0, max(1.0, prev * 2.0))
-                self._liveness_backoff_until = (
-                    now_mono + self._liveness_backoff_s)
-                if prev == 0.0:
-                    self.get_logger().info(
-                        "/joint_states has a publisher but no data (robot "
-                        "off / e-stop?) — backing liveness probes off so "
-                        "chat stays responsive.")
+            # only ever reads tf_alive INSIDE its driver_up branch.
             return
-        self._liveness_backoff_s = 0.0
-        self._liveness_backoff_until = 0.0
         self._on_joint_state(msg)
         tf_msg = self._sample_one_message(self._tf_msg_type, "/tf")
         if tf_msg is not None:

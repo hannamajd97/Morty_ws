@@ -85,7 +85,8 @@ class _Jpeg:
 from geometry_msgs.msg import PoseStamped
 from control_msgs.msg import JointTrajectoryControllerState
 from tf2_ros import Buffer, TransformException
-from grasp_pipeline.tf_listener_lite import DecimatedTransformListener
+from ur3e_fast_observation.tf_listener_lite import DecimatedTransformListener
+from ur3e_fast_observation.latest_message import LatestMessage, joint_state_stream
 
 from .raw_dataset import ARM_JOINTS, STEP_KEYS, SEGMENT_IDLE, SEGMENT_TASK, SEGMENT_RESET, canonical_instruction
 
@@ -291,12 +292,26 @@ class EpisodeRecorder(Node):
             else:
                 self.create_subscription(Image, rtopic, lambda m, c=cam: self._on_img(c, m), qos_profile_sensor_data)
                 self.img_source[cam] = rtopic
-            self.create_subscription(CameraInfo, g(f"{cam}_info_topic"), lambda m, c=cam: self._on_info(c, m), qos_profile_sensor_data)
-        self.create_subscription(JointState, g("joint_states_topic"), self._on_joints, qos_profile_sensor_data)
-        self.create_subscription(JointTrajectoryControllerState, g("controller_state_topic"), self._on_ctrl, 10)
-        self.create_subscription(PoseStamped, g("tcp_pose_topic"), self._on_tcp, qos_profile_sensor_data)
+        # 2026-09-29 (Majd: "the system is very slow"): the fast state topics
+        # — /joint_states, the TCP pose and io_states at 500 Hz, the
+        # controller state — were subscribed, >1500 Python callbacks a second
+        # all day long that only overwrote "the latest value"; the idle
+        # recorder took a full core. They are READ now (_poll_state: at each
+        # tick while recording, and for the freshness check) from standing
+        # readers nothing spins — the same handlers, the newest message.
+        # /joint_states keeps the newest per stream (the arm and the
+        # gripper adapter publish there) with room for a tick's messages.
+        # The camera infos are read until the first one arrived.
+        self._fast = [
+            (LatestMessage(self, JointState, g("joint_states_topic"), depth=128,
+                           stream_key=joint_state_stream), self._on_joints),
+            (LatestMessage(self, JointTrajectoryControllerState, g("controller_state_topic")), self._on_ctrl),
+            (LatestMessage(self, PoseStamped, g("tcp_pose_topic")), self._on_tcp),
+        ]
         if IOStates is not None:
-            self.create_subscription(IOStates, g("io_states_topic"), self._on_io, 10)
+            self._fast.append((LatestMessage(self, IOStates, g("io_states_topic")), self._on_io))
+        self._info_readers = {cam: LatestMessage(self, CameraInfo, g(f"{cam}_info_topic"))
+                              for cam in ("exterior", "wrist")}
         self.create_subscription(String, g("gripper_cmd_topic"), self._on_gripper_cmd, 10)
         self.create_subscription(String, "/vla_recorder/gripper_cmd", self._on_gripper_cmd, 10)   # the CLI's manual note
         self.create_subscription(String, g("transcript_topic"), self._on_transcript, 10)
@@ -325,6 +340,19 @@ class EpisodeRecorder(Node):
         self._publish_status()
 
     # ------------------------------------------------------------- inputs
+    def _poll_state(self) -> None:
+        """The newest message of every fast state topic, into the same
+        handlers the subscriptions used (see __init__)."""
+        for reader, handler in self._fast:
+            for msg in reader.take_streams():
+                handler(msg)
+        for cam, reader in list(self._info_readers.items()):
+            msg = reader.take()
+            if msg is not None:
+                self._on_info(cam, msg)
+                reader.destroy()
+                del self._info_readers[cam]
+
     def _ros_now(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
 
@@ -929,6 +957,7 @@ class EpisodeRecorder(Node):
     def _tick(self):
         if not self.recording:
             return
+        self._poll_state()
         now = time.monotonic(); ros_now = self._ros_now()
         with self.lock:
             ext, wri, joints, jcmd, grasp, gcmd, ur = (self.img["exterior"], self.img["wrist"], self.joints,
@@ -986,6 +1015,7 @@ class EpisodeRecorder(Node):
         r["instruction_idx"].append(-1.0); r["phase"].append(-1.0); r["segment"].append(float(SEGMENT_IDLE))  # labelled at stop
 
     def _freshness(self) -> dict:
+        self._poll_state()
         now = time.monotonic()
         with self.lock:
             fresh = {k: (v is not None and now - v[0] < self.max_img_age) for k, v in self.img.items()}
