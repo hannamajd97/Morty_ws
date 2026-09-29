@@ -1,0 +1,12 @@
+# trial 125 started 2026-09-29T16:33:19.808932
+[  12.65s] You: Morty, I need to seal a parcel. Would you grab for me the tape dispenser?
+[  15.34s] Morty (status): Starting grasp on the tape dispenser.
+[  19.73s] Morty (status): Got the tape dispenser. Where should I drop it? Left, right, or home?
+[  28.54s] You: Drop it on the right side.
+[  28.73s] Morty (status): Going to drop right.
+[  33.43s] Morty (status): I'm at the drop right position, still holding the tape dispenser. Should I open the gripper?
+[  36.06s] You: My mind go to the home position.
+[  41.23s] Morty (status): I'm at the home position, still holding the tape dispenser. Should I open the gripper?
+[  51.00s] You: Yes, open the gripper, give me the object.
+[  51.00s] Morty (status): Opening the gripper.
+[  55.03s] Morty (status): I'm at the home position. What's next?

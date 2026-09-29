@@ -1,0 +1,101 @@
+TRIAL TIMELINE  start 2026-09-29 16:40:40  stop 16:41:36  (55.2 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -945.48  background: GraspGen for 'vitamin_tube' done (job 11.70 s, 28 grasps)
+t= -944.77  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.59 s, 1 tried)
+t= -941.82  background: GraspGen for 'vitamin_tube' done (job 1.15 s, 20 grasps)
+t= -929.81  background: 'vitamin_tube' verified for execution via the curve (executor probe 2.28 s, 2 tried)
+t= -458.50  background: GraspGen for 'vitamin_tube' done (job 3.21 s, 17 grasps)
+t= -457.09  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.25 s, 1 tried)
+t= -324.00  background: GraspGen for 'vitamin_tube' done (job 2.71 s, 22 grasps)
+t= -312.85  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.89 s, 1 tried)
+t= -130.60  background: GraspGen for 'vitamin_tube' done (job 4.75 s, 26 grasps)
+t= -126.65  background: 'vitamin_tube' verified for execution via the curve (executor probe 3.71 s, 3 tried)
+t=  -68.83  background: GraspGen for 'vitamin_tube' done (job 3.76 s, 28 grasps)
+t=  -66.45  background: 'vitamin_tube' verified for execution via the curve (executor probe 0.89 s, 1 tried)
+t=  -60.78  background: GraspGen for 'vitamin_tube' done (job 7.14 s, 25 grasps)
+t=  -58.80  background: 'vitamin_tube' verified for execution via the curve (executor probe 1.10 s, 1 tried)
+t=   +0.00  trial start
+t=   +3.86  you stopped speaking ("Give me the vitamin tube.")
+t=   +4.12  trial bag ready
+t=   +5.11  you said: "Give me the vitamin tube."
+t=   +5.12  intent: pick vitamin_tube
+t=   +5.23  Morty said: "I see two vitamin tubes. Could you say leftmost or rightmost, or point at the on"
+t=  +11.91  you stopped speaking ("This one.")
+t=  +12.72  you said: "This one."
+t=  +12.75  pointed at the vitamin tube — waiting for your yes
+t=  +13.00  Morty said: "Do you mean this vitamin tube, the rightmost one?"
+t=  +13.95  intent: confirm_point
+t=  +13.98  pointing question: yes
+t=  +14.02  pipeline: 'vitamin_tube' precomputed — GraspGen ran 65.8 s before the click (job 7.14 s), executor verified it via the curve (probe 1.10 s)
+t=  +14.15  selection cycle 5 started
+t=  +14.25  pipeline: 25 candidates published (9.24 s after the click, precomputed)
+t=  +14.25  executor: candidates received
+t=  +14.25  executor: precheck hit (+0.00 s)
+t=  +14.42  probe: grasp 2/25: FEASIBLE (verified in the background via the curve) — executing this one
+t=  +14.42  executor: open sent (+0.16 s)
+t=  +14.42  executor: motion start (+0.00 s)
+t=  +16.51  Morty said: "The operator is pointing at vitamin_tube 2 (the Vitamin C on the right)."
+t=  +16.52  executor: close sent (+2.10 s)
+t=  +17.01  executor: arrival (+0.49 s)
+t=  +18.04  executor: grasp verdict (+1.02 s)
+t=  +19.89  executor: lift done (+1.86 s)
+t=  +20.04  executor: wait destination start (+0.15 s)
+t=  +20.08  robot: paused
+t=  +21.59  Morty said: "Starting grasp on the vitamin tube."
+t=  +24.61  Morty said: "Got the vitamin tube. Where should I drop it? Left, right, or home?"
+t=  +29.25  you stopped speaking ("That was correct. Now, give me that drop left side.")
+t=  +30.52  you said: "That was correct. Now, give me that drop left side."
+t=  +31.60  intent: confirm_drop
+t=  +31.62  executor: destination received (+11.58 s)
+t=  +31.70  robot: resumed:vla drop left
+t=  +31.78  Morty said: "Going to drop left."
+t=  +34.83  robot: awaiting release
+t=  +34.88  Morty said: "I'm at the drop left position, still holding the vitamin tube. Should I open the"
+t=  +38.14  you stopped speaking ("You know what, I changed my mind, go back to the home positi")
+t=  +39.39  you said: "You know what, I changed my mind, go back to the home position."
+t=  +40.42  intent: go_home
+t=  +40.63  robot: redirect:home
+t=  +43.60  robot: resumed:home
+t=  +43.66  Morty said: "I'm at the home position, still holding the vitamin tube. Should I open the grip"
+t=  +43.74  robot: awaiting release
+t=  +44.45  you stopped speaking ("Now give me the object.")
+t=  +45.62  you said: "Now give me the object."
+t=  +45.62  intent: open_gripper
+t=  +45.72  robot: releasing
+t=  +45.98  Morty said: "Opening the gripper."
+t=  +46.37  executor: home done (+14.75 s)
+t=  +46.42  robot: released
+t=  +49.75  executor: cycle done (+3.38 s)
+t=  +49.75  executor: cycle 5 done via the curve
+t=  +49.88  Morty said: "I'm at the home position. What's next?"
+t=  +49.90  executor reported: done|5
+t=  +55.25  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves      10.56 s
+  end of your voice -> transcript               1.25 s
+  you stopped speaking -> command               1.26 s
+  transcript -> command (understanding)         0.01 s
+  command -> object chosen (incl. clarification)    9.03 s
+  object chosen -> grasp candidates             0.10 s
+  GraspGen compute (the run that was used)      7.14 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice          74.93 s
+  reachability check (background probe)         1.10 s
+  executor: candidates -> motion start          0.17 s
+  command -> arm moves                          9.31 s
+  approach                                      2.60 s
+  arrival -> grasp verdict                      1.02 s
+  waiting for the drop side                    11.58 s
+  motion start -> home                         35.33 s
+  command given -> object handed over          42.57 s
+  Morty waited for your answers                20.22 s
+  robot's own time (total - waiting)           24.42 s
+  total                                        44.64 s
+  understood by                              instant rule
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             2 of 25
+  execution plan compute                        1.10 s
+  approach planned by                        curve (precomputed)

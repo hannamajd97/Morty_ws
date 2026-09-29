@@ -1,0 +1,3 @@
+# trial 123 started 2026-09-29T16:28:06.746840
+[  11.57s] You: Hi Morty, before we start, tell me everything that is in front of you from left to right.
+[  13.88s] Morty: I see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C from left to right.

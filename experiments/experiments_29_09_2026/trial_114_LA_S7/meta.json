@@ -1,0 +1,276 @@
+{
+  "format": "morty_vla_raw_v2",
+  "episode_id": "trial_114_LA_S7",
+  "episode_index": 114,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_114_LA_S7",
+  "in_trial_dir": true,
+  "trial_id": "114",
+  "task": "look to the right",
+  "task_from": "intent",
+  "outcome": "success",
+  "success": true,
+  "intent": "go_home",
+  "cycle_done": "",
+  "note": "outcome: human",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_114_LA_S7",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "Morty, look at the right side first, then go home.",
+  "trial_form_task": "S7: Moving without grasping",
+  "transcripts": [
+    "Morty, look at the right side first, then go home.",
+    "After that, I want you to go to the drop right position.",
+    "After that, I want you to go back home."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "t": 9.970893144607544,
+      "stamp": 1790682687.979,
+      "action_intent": "look_right",
+      "object": null,
+      "attributes": null,
+      "transcript": "Morty, look at the right side first, then go home.",
+      "transcript_stamp": 1790682686.1390314,
+      "instruction": "look to the right"
+    },
+    {
+      "idx": 1,
+      "t": 9.978893041610718,
+      "stamp": 1790682687.987,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Morty, look at the right side first, then go home.",
+      "transcript_stamp": 1790682686.1390314,
+      "instruction": "go back home"
+    },
+    {
+      "idx": 2,
+      "t": 29.014893054962158,
+      "stamp": 1790682707.023,
+      "action_intent": "drop_right",
+      "object": null,
+      "attributes": null,
+      "transcript": "After that, I want you to go to the drop right position.",
+      "transcript_stamp": 1790682705.3947458,
+      "instruction": "drop it on the right side"
+    },
+    {
+      "idx": 3,
+      "t": 45.535892963409424,
+      "stamp": 1790682723.544,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "After that, I want you to go back home.",
+      "transcript_stamp": 1790682721.7474248,
+      "instruction": "go back home"
+    }
+  ],
+  "events": {
+    "transcript": [
+      {
+        "t": 8.130924463272095,
+        "stamp": 1790682686.1390314,
+        "text": "Morty, look at the right side first, then go home."
+      },
+      {
+        "t": 27.386638879776,
+        "stamp": 1790682705.3947458,
+        "text": "After that, I want you to go to the drop right position."
+      },
+      {
+        "t": 43.739317893981934,
+        "stamp": 1790682721.7474248,
+        "text": "After that, I want you to go back home."
+      }
+    ],
+    "intent": [
+      {
+        "t": 9.970893144607544,
+        "stamp": 1790682687.979,
+        "action_intent": "look_right",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 9.978893041610718,
+        "stamp": 1790682687.987,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 29.014893054962158,
+        "stamp": 1790682707.023,
+        "action_intent": "drop_right",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 45.535892963409424,
+        "stamp": 1790682723.544,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 559,
+  "duration_s": 55.801230669021606,
+  "dropped_ticks": 0,
+  "drop_reasons": {},
+  "started_unix": 1790682678.0081263,
+  "started_ros": 1790682678.008107,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.51,
+      0.51,
+      0.065
+    ],
+    "rpy": [
+      0.0,
+      -0.576,
+      -0.77
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2
+  },
+  "phase_names": [],
+  "quality": {
+    "ok": true,
+    "issues": [],
+    "num_steps": 559,
+    "task_steps": 460,
+    "idle_steps": 99,
+    "reset_steps": 0,
+    "step_gaps": [],
+    "dt_max_s": 0.1454143524169922,
+    "images": {
+      "exterior": {
+        "age_max_s": 0.21072111900139134,
+        "age_p95_s": 0.12535463540407363,
+        "missing": 0
+      },
+      "wrist": {
+        "age_max_s": 0.1360265539988177,
+        "age_p95_s": 0.04219096990418622,
+        "missing": 0
+      }
+    },
+    "joint_age_max_s": 0.09711981999862473,
+    "tcp_stale_steps": 0,
+    "ur_tcp_missing_steps": 0,
+    "gripper_commands": [],
+    "gripper_state_changes": 0,
+    "n_transcripts": 3,
+    "n_intents": 4,
+    "n_instructions": 4,
+    "n_executor_phases": 0
+  }
+}

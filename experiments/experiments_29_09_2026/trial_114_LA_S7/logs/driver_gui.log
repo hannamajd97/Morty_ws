@@ -1,0 +1,46 @@
+[gripper_command_adapter-3] [INFO] [1790682679.744155983] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682679.748783146] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790682684.866129535] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682684.877198323] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790682689.856886433] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682689.863752417] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [WARN] [1790682691.609814135] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1790682691.609954852] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1790682691.610083929] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[ur_ros2_control_node-7] [INFO] [1790682693.030859275] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682693.031963788] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790682694.954754745] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682694.959341896] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682697.035117286] [scaled_joint_trajectory_controller]: Goal reached, success!
+[ur_ros2_control_node-7] [INFO] [1790682698.235913309] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682698.236072281] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790682699.965511381] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682699.972519401] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682702.238971752] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790682705.063863079] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682705.068636426] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790682710.048128984] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682710.054357608] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [WARN] [1790682710.235977556] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1790682710.236115593] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1790682710.236257996] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[move_group-15] [INFO] [1790682710.951551818] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790682710.952295180] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 30 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[ur_ros2_control_node-7] [INFO] [1790682711.747874202] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682711.748024981] [scaled_joint_trajectory_controller]: Accepted new action goal
+[move_group-15] [INFO] [1790682711.812445186] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 31 points (followed 100.000000% of requested trajectory)
+[gripper_command_adapter-3] [INFO] [1790682715.054748948] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682715.059900682] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682717.416995278] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790682720.065234267] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682720.072132809] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [WARN] [1790682723.578980086] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1790682723.579190472] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1790682723.579377308] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[ur_ros2_control_node-7] [INFO] [1790682724.807430385] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682724.807893585] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790682725.167570459] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682725.174745555] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790682730.152233468] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682730.155730773] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682730.475103513] [scaled_joint_trajectory_controller]: Goal reached, success!

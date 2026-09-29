@@ -1,0 +1,8 @@
+# trial 114 started 2026-09-29T13:51:17.993340
+[   8.34s] You: Morty, look at the right side first, then go home.
+[  11.59s] Morty (status): Looking right.
+[  13.76s] Morty (status): Going home.
+[  27.65s] You: After that, I want you to go to the drop right position.
+[  30.84s] Morty (status): Going to drop right.
+[  44.03s] You: After that, I want you to go back home.
+[  47.04s] Morty (status): Going home.

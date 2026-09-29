@@ -1,0 +1,503 @@
+{
+ "timings": {
+  "interaction_s": 9.284,
+  "voice_to_transcript_s": 1.473,
+  "understood_by": "language model",
+  "graspgen_background": null,
+  "plan_background": null,
+  "plan_compute_s": null,
+  "grasp_used": null,
+  "grasp_probes": null,
+  "release_s": null,
+  "human_wait_s": null,
+  "robot_time_s": null,
+  "morty_questions": 0,
+  "your_utterances": 3,
+  "speech_end_to_intent_s": 4.213,
+  "intent_s": 2.74,
+  "choice_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "graspgen_compute_s": null,
+  "graspgen_wait_s": null,
+  "graspgen_lead_s": null,
+  "verify_compute_s": null,
+  "planning_s": null,
+  "command_to_motion_s": 7.811,
+  "approach_s": null,
+  "grasp_s": null,
+  "wait_destination_s": null,
+  "transport_s": null,
+  "execution_s": null,
+  "click_to_motion_s": null,
+  "background_lead_s": null,
+  "total_s": null,
+  "planner": null,
+  "path": null,
+  "started_by": "voice"
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.211,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9216300845146179, \"bbox\": [506.33154296875, 159.3277130126953, 583.0187377929688, 434.9407043457031], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.800110399723"
+  },
+  {
+   "t": 3.258,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.922050416469574, \"bbox\": [506.3379821777344, 159.29873657226562, 583.0181274414062, 434.83624267578125], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.805510878"
+  },
+  {
+   "t": 5.222,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.43,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9210178852081299, \"bbox\": [506.4799499511719, 159.29798889160156, 583.130126953125, 434.850830078125], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80871570110"
+  },
+  {
+   "t": 7.32,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9218864440917969, \"bbox\": [506.32989501953125, 159.34182739257812, 583.1101684570312, 434.8767395019531], \"reach_pct\": 82.5, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80625921"
+  },
+  {
+   "t": 7.431,
+   "source": "utterance",
+   "text": "{\"text\": \"Morty, look at the right side first, then go home.\", \"speech_end\": 1790682683.766, \"voiced_ms\": 3300, \"speech_start\": 1790682679.532, \"published\": 1790682685.239}"
+  },
+  {
+   "t": 8.313,
+   "source": "transcript",
+   "text": "Morty, look at the right side first, then go home."
+  },
+  {
+   "t": 9.733,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9220314621925354, \"bbox\": [506.48162841796875, 159.29257202148438, 583.115234375, 434.9667053222656], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.806716740131"
+  },
+  {
+   "t": 10.118,
+   "source": "intent",
+   "text": "{\"action_intent\":\"look_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682687.979}"
+  },
+  {
+   "t": 10.259,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682687.987}"
+  },
+  {
+   "t": 11.552,
+   "source": "morty_said",
+   "text": "Looking right."
+  },
+  {
+   "t": 11.693,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9202371835708618, \"bbox\": [506.31329345703125, 159.2757568359375, 583.0921630859375, 435.04632568359375], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80782288"
+  },
+  {
+   "t": 13.395,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9223654270172119, \"bbox\": [506.389892578125, 159.32273864746094, 583.0426635742188, 434.9097595214844], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8056344389"
+  },
+  {
+   "t": 13.666,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 15.74,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9212300181388855, \"bbox\": [506.3587646484375, 159.3378448486328, 583.06201171875, 434.91400146484375], \"reach_pct\": 82.5, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80634146928"
+  },
+  {
+   "t": 17.977,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9360522031784058, \"bbox\": [504.564208984375, 157.41738891601562, 579.4281616210938, 433.696044921875], \"reach_pct\": 124.5, \"reach_state\": \"red\", \"reach_angle_deg\": 26.2, \"reach_closer_cm\": 32.6, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"black\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8650153279"
+  },
+  {
+   "t": 19.571,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9542128443717957, \"bbox\": [304.43768310546875, 296.8103332519531, 385.72393798828125, 456.1028137207031], \"reach_pct\": 83.8, \"reach_state\": \"green\", \"reach_angle_deg\": 27.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8368878364562988"
+  },
+  {
+   "t": 20.762,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9244890809059143, \"bbox\": [425.3390197753906, 235.57598876953125, 508.45001220703125, 477.3670959472656], \"reach_pct\": 82.8, \"reach_state\": \"green\", \"reach_angle_deg\": 30.1, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.64052605"
+  },
+  {
+   "t": 24.613,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.923926830291748, \"bbox\": [310.22802734375, 331.77581787109375, 384.78826904296875, 479.9046630859375], \"reach_pct\": 88.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 29.0, \"reach_closer_cm\": 2.7, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8316294550895691"
+  },
+  {
+   "t": 26.403,
+   "source": "utterance",
+   "text": "{\"text\": \"After that, I want you to go to the drop right position.\", \"speech_end\": 1790682702.685, \"voiced_ms\": 2900, \"speech_start\": 1790682699.295, \"published\": 1790682704.202}"
+  },
+  {
+   "t": 27.572,
+   "source": "transcript",
+   "text": "After that, I want you to go to the drop right position."
+  },
+  {
+   "t": 28.445,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9015233516693115, \"bbox\": [506.7467956542969, 159.5731201171875, 583.0855712890625, 435.24810791015625], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.783631861"
+  },
+  {
+   "t": 29.238,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682707.023}"
+  },
+  {
+   "t": 29.65,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8676036596298218, \"bbox\": [506.8684387207031, 159.52877807617188, 583.1862182617188, 435.0733642578125], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.781411230"
+  },
+  {
+   "t": 30.738,
+   "source": "morty_said",
+   "text": "Going to drop right."
+  },
+  {
+   "t": 33.445,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9172969460487366, \"bbox\": [506.7402648925781, 159.611572265625, 583.18896484375, 435.13177490234375], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.782354593276"
+  },
+  {
+   "t": 37.098,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9131761789321899, \"bbox\": [506.7091064453125, 159.58941650390625, 583.172119140625, 435.0513916015625], \"reach_pct\": 163.5, \"reach_state\": \"red\", \"reach_angle_deg\": 76.1, \"reach_closer_cm\": 55.1, \"source\": \"ys\", \"colour\": \"gray\", \"cap_colour\": \"gray\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.785179078578"
+  },
+  {
+   "t": 39.498,
+   "source": "utterance",
+   "text": "{\"text\": \"After that, I want you to go back home.\", \"speech_end\": 1790682715.78, \"voiced_ms\": 2300, \"speech_start\": 1790682713.119, \"published\": 1790682717.277}"
+  },
+  {
+   "t": 39.903,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 41.342,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 42.66,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 43.973,
+   "source": "transcript",
+   "text": "After that, I want you to go back home."
+  },
+  {
+   "t": 43.985,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 45.658,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 45.818,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682723.544}"
+  },
+  {
+   "t": 47.008,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 47.425,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 48.896,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 50.375,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 52.59,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 53.826,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9533390998840332, \"bbox\": [349.23309326171875, 256.42108154296875, 428.3500671386719, 460.8744812011719], \"reach_pct\": 81.7, \"reach_state\": \"green\", \"reach_angle_deg\": 28.1, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9295079112052917, \"b"
+  },
+  {
+   "t": 55.082,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9251982569694519, \"bbox\": [506.1903991699219, 159.0379638671875, 582.9838256835938, 434.6396484375], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 29.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.7983440160751"
+  },
+  {
+   "t": 56.014,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "events_exact": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.211,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9216300845146179, \"bbox\": [506.33154296875, 159.3277130126953, 583.0187377929688, 434.9407043457031], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.800110399723"
+  },
+  {
+   "t": 3.258,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.922050416469574, \"bbox\": [506.3379821777344, 159.29873657226562, 583.0181274414062, 434.83624267578125], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.805510878"
+  },
+  {
+   "t": 5.222,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.43,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9210178852081299, \"bbox\": [506.4799499511719, 159.29798889160156, 583.130126953125, 434.850830078125], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80871570110"
+  },
+  {
+   "t": 7.281,
+   "source": "transcript",
+   "text": "Morty, look at the right side first, then go home."
+  },
+  {
+   "t": 7.284,
+   "source": "utterance",
+   "text": "{\"text\": \"Morty, look at the right side first, then go home.\", \"speech_end\": 1790682683.766, \"voiced_ms\": 3300, \"speech_start\": 1790682679.532, \"published\": 1790682685.239}"
+  },
+  {
+   "t": 7.32,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9218864440917969, \"bbox\": [506.32989501953125, 159.34182739257812, 583.1101684570312, 434.8767395019531], \"reach_pct\": 82.5, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80625921"
+  },
+  {
+   "t": 9.733,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9220314621925354, \"bbox\": [506.48162841796875, 159.29257202148438, 583.115234375, 434.9667053222656], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.806716740131"
+  },
+  {
+   "t": 10.021,
+   "source": "intent",
+   "text": "{\"action_intent\":\"look_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682687.979}"
+  },
+  {
+   "t": 10.029,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682687.987}"
+  },
+  {
+   "t": 11.475,
+   "source": "morty_said",
+   "text": "Looking right."
+  },
+  {
+   "t": 11.693,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9202371835708618, \"bbox\": [506.31329345703125, 159.2757568359375, 583.0921630859375, 435.04632568359375], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80782288"
+  },
+  {
+   "t": 13.395,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9223654270172119, \"bbox\": [506.389892578125, 159.32273864746094, 583.0426635742188, 434.9097595214844], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8056344389"
+  },
+  {
+   "t": 13.428,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 15.093,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 15.74,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9212300181388855, \"bbox\": [506.3587646484375, 159.3378448486328, 583.06201171875, 434.91400146484375], \"reach_pct\": 82.5, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.80634146928"
+  },
+  {
+   "t": 17.977,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9360522031784058, \"bbox\": [504.564208984375, 157.41738891601562, 579.4281616210938, 433.696044921875], \"reach_pct\": 124.5, \"reach_state\": \"red\", \"reach_angle_deg\": 26.2, \"reach_closer_cm\": 32.6, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"black\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8650153279"
+  },
+  {
+   "t": 19.571,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9542128443717957, \"bbox\": [304.43768310546875, 296.8103332519531, 385.72393798828125, 456.1028137207031], \"reach_pct\": 83.8, \"reach_state\": \"green\", \"reach_angle_deg\": 27.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8368878364562988"
+  },
+  {
+   "t": 20.297,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 20.762,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9244890809059143, \"bbox\": [425.3390197753906, 235.57598876953125, 508.45001220703125, 477.3670959472656], \"reach_pct\": 82.8, \"reach_state\": \"green\", \"reach_angle_deg\": 30.1, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.64052605"
+  },
+  {
+   "t": 24.613,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.923926830291748, \"bbox\": [310.22802734375, 331.77581787109375, 384.78826904296875, 479.9046630859375], \"reach_pct\": 88.3, \"reach_state\": \"orange\", \"reach_angle_deg\": 29.0, \"reach_closer_cm\": 2.7, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8316294550895691"
+  },
+  {
+   "t": 26.244,
+   "source": "transcript",
+   "text": "After that, I want you to go to the drop right position."
+  },
+  {
+   "t": 26.245,
+   "source": "utterance",
+   "text": "{\"text\": \"After that, I want you to go to the drop right position.\", \"speech_end\": 1790682702.685, \"voiced_ms\": 2900, \"speech_start\": 1790682699.295, \"published\": 1790682704.202}"
+  },
+  {
+   "t": 28.445,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9015233516693115, \"bbox\": [506.7467956542969, 159.5731201171875, 583.0855712890625, 435.24810791015625], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.783631861"
+  },
+  {
+   "t": 29.065,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682707.023}"
+  },
+  {
+   "t": 29.65,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8676036596298218, \"bbox\": [506.8684387207031, 159.52877807617188, 583.1862182617188, 435.0733642578125], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.781411230"
+  },
+  {
+   "t": 30.605,
+   "source": "morty_said",
+   "text": "Going to drop right."
+  },
+  {
+   "t": 33.445,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9172969460487366, \"bbox\": [506.7402648925781, 159.611572265625, 583.18896484375, 435.13177490234375], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 30.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.782354593276"
+  },
+  {
+   "t": 33.811,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 37.098,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9131761789321899, \"bbox\": [506.7091064453125, 159.58941650390625, 583.172119140625, 435.0513916015625], \"reach_pct\": 163.5, \"reach_state\": \"red\", \"reach_angle_deg\": 76.1, \"reach_closer_cm\": 55.1, \"source\": \"ys\", \"colour\": \"gray\", \"cap_colour\": \"gray\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.785179078578"
+  },
+  {
+   "t": 39.319,
+   "source": "transcript",
+   "text": "After that, I want you to go back home."
+  },
+  {
+   "t": 39.32,
+   "source": "utterance",
+   "text": "{\"text\": \"After that, I want you to go back home.\", \"speech_end\": 1790682715.78, \"voiced_ms\": 2300, \"speech_start\": 1790682713.119, \"published\": 1790682717.277}"
+  },
+  {
+   "t": 39.903,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 41.342,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 42.66,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 43.985,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 45.586,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790682723.544}"
+  },
+  {
+   "t": 45.658,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 46.814,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 46.867,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 47.425,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 48.896,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 50.375,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 52.59,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 53.826,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9533390998840332, \"bbox\": [349.23309326171875, 256.42108154296875, 428.3500671386719, 460.8744812011719], \"reach_pct\": 81.7, \"reach_state\": \"green\", \"reach_angle_deg\": 28.1, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9295079112052917, \"b"
+  },
+  {
+   "t": 55.082,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9251982569694519, \"bbox\": [506.1903991699219, 159.0379638671875, 582.9838256835938, 434.6396484375], \"reach_pct\": 82.6, \"reach_state\": \"green\", \"reach_angle_deg\": 29.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.7983440160751"
+  },
+  {
+   "t": 56.014,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

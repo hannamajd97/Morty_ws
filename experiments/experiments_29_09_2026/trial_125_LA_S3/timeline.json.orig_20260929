@@ -1,0 +1,413 @@
+{
+ "start_wall": 1790692399.7672763,
+ "stop_wall": 1790692459.6390011,
+ "stage_times": {
+  "interaction_s": 4.418,
+  "voice_to_transcript_s": 2.201,
+  "understood_by": "language model",
+  "graspgen_background": "yes",
+  "plan_background": "yes",
+  "plan_compute_s": 0.994,
+  "grasp_used": "1 of 20",
+  "grasp_probes": 1,
+  "release_s": 41.357,
+  "human_wait_s": 21.796,
+  "robot_time_s": 20.676,
+  "morty_questions": 4,
+  "your_utterances": 4,
+  "speech_end_to_intent_s": 3.579,
+  "intent_s": 1.378,
+  "choice_s": 0.621,
+  "yolo_s": 0.077,
+  "graspgen_s": 0.0,
+  "graspgen_compute_s": 1.325,
+  "graspgen_wait_s": 0.0,
+  "graspgen_lead_s": 38.694,
+  "verify_compute_s": 0.994,
+  "planning_s": 0.139,
+  "command_to_motion_s": 2.217,
+  "approach_s": 2.608,
+  "grasp_s": 1.033,
+  "wait_destination_s": 8.816,
+  "transport_s": null,
+  "execution_s": 40.255,
+  "click_to_motion_s": 0.218,
+  "background_lead_s": 38.694,
+  "total_s": 42.472,
+  "planner": "curve",
+  "path": "precomputed",
+  "started_by": "voice"
+ },
+ "selection_cycles": [
+  {
+   "kind": "selection_cycle",
+   "cycle_id": 3,
+   "label": "tape_dispenser",
+   "source": "voice",
+   "n_candidates": 20,
+   "path": "precomputed",
+   "select": 1790692413.9825406,
+   "hit": 1790692414.0578654,
+   "precompute": {
+    "label": "tape_dispenser",
+    "key": "tape_dispenser",
+    "job_start": 1790692374.1300075,
+    "job_done": 1790692375.4560149,
+    "job_s": 1.3253889999905368,
+    "verified_at": 1790692376.6616848,
+    "probe_s": 0.99388,
+    "planner": "curve"
+   },
+   "published": 1790692414.227217
+  }
+ ],
+ "executor_cycles": [
+  {
+   "kind": "executor_cycle",
+   "cycle_id": 3,
+   "ok": true,
+   "planner": "curve",
+   "phases": [
+    {
+     "name": "candidates_received",
+     "t": 1790692414.229
+    },
+    {
+     "name": "precheck_hit",
+     "t": 1790692414.23
+    },
+    {
+     "name": "open_sent",
+     "t": 1790692414.368
+    },
+    {
+     "name": "motion_start",
+     "t": 1790692414.368
+    },
+    {
+     "name": "close_sent",
+     "t": 1790692416.476
+    },
+    {
+     "name": "arrival",
+     "t": 1790692416.976
+    },
+    {
+     "name": "grasp_verdict",
+     "t": 1790692418.009
+    },
+    {
+     "name": "lift_done",
+     "t": 1790692419.112
+    },
+    {
+     "name": "wait_destination_start",
+     "t": 1790692419.311
+    },
+    {
+     "name": "destination_received",
+     "t": 1790692428.127
+    },
+    {
+     "name": "home_done",
+     "t": 1790692451.24
+    },
+    {
+     "name": "cycle_done",
+     "t": 1790692454.623
+    }
+   ]
+  }
+ ],
+ "background": [
+  {
+   "kind": "background_job",
+   "label": "tape_dispenser",
+   "key": "tape_dispenser",
+   "job_start": 1790691895.4770913,
+   "job_done": 1790691896.6046882,
+   "job_s": 1.1271626009984175,
+   "n_grasps": 18
+  },
+  {
+   "kind": "background_verdict",
+   "label": "tape_dispenser",
+   "key": "tape_dispenser",
+   "verified_at": 1790691897.4246063,
+   "probe_s": 0.73694,
+   "feasible": 0,
+   "tried": 1,
+   "planner": "curve"
+  },
+  {
+   "kind": "background_job",
+   "label": "tape_dispenser",
+   "key": "tape_dispenser",
+   "job_start": 1790692032.5354657,
+   "job_done": 1790692033.8486578,
+   "job_s": 1.3127287540119141,
+   "n_grasps": 23
+  },
+  {
+   "kind": "background_verdict",
+   "label": "tape_dispenser",
+   "key": "tape_dispenser",
+   "verified_at": 1790692034.6151752,
+   "probe_s": 0.575533,
+   "feasible": 0,
+   "tried": 1,
+   "planner": "curve"
+  },
+  {
+   "kind": "background_job",
+   "label": "tape_dispenser",
+   "key": "tape_dispenser",
+   "job_start": 1790692374.1300075,
+   "job_done": 1790692375.4560149,
+   "job_s": 1.3253889999905368,
+   "n_grasps": 20
+  },
+  {
+   "kind": "background_verdict",
+   "label": "tape_dispenser",
+   "key": "tape_dispenser",
+   "verified_at": 1790692376.6616848,
+   "probe_s": 0.99388,
+   "feasible": 0,
+   "tried": 1,
+   "planner": "curve"
+  }
+ ],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.129,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9365995526313782, \"bbox\": [386.1188659667969, 253.52252197265625, 457.6692810058594, 400.5087890625], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9265599846839905, \"bbox"
+  },
+  {
+   "t": 3.497,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 3.915,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9358423352241516, \"bbox\": [386.1259460449219, 253.5455780029297, 457.64093017578125, 400.5128173828125], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9267634749412537, \"b"
+  },
+  {
+   "t": 5.003,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9369213581085205, \"bbox\": [386.1885986328125, 253.5722198486328, 457.7012023925781, 400.5640563964844], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9271950721740723, \"bb"
+  },
+  {
+   "t": 6.818,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9368447065353394, \"bbox\": [386.1399841308594, 253.54698181152344, 457.64678955078125, 400.58685302734375], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9271206259727478, "
+  },
+  {
+   "t": 8.052,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9368586540222168, \"bbox\": [386.0309143066406, 253.61160278320312, 457.67529296875, 400.95806884765625], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9262668490409851, \"bb"
+  },
+  {
+   "t": 9.454,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9366774559020996, \"bbox\": [386.04620361328125, 253.59051513671875, 457.6584777832031, 400.39141845703125], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9271660447120667, "
+  },
+  {
+   "t": 11.254,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9359001517295837, \"bbox\": [386.12646484375, 253.55322265625, 457.67596435546875, 400.48443603515625], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9273842573165894, \"bbox"
+  },
+  {
+   "t": 12.384,
+   "source": "transcript",
+   "text": "Morty, I need to seal a parcel. Would you grab for me the tape dispenser?"
+  },
+  {
+   "t": 12.611,
+   "source": "utterance",
+   "text": "{\"text\": \"Morty, I need to seal a parcel. Would you grab for me the tape dispenser?\", \"speech_end\": 1790692409.95, \"voiced_ms\": 4300, \"speech_start\": 1790692404.29, \"published\": 1790692412.151}"
+  },
+  {
+   "t": 12.812,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9364545345306396, \"bbox\": [386.1456604003906, 253.49594116210938, 457.6712951660156, 400.5107116699219], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9278088212013245, \"b"
+  },
+  {
+   "t": 13.762,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"tape_dispenser\",\"object_attributes\":null,\"stamp\":1790692413.529}"
+  },
+  {
+   "t": 14.383,
+   "source": "selection_cycle_id",
+   "text": "3"
+  },
+  {
+   "t": 14.63,
+   "source": "cand_status",
+   "text": "grasp 1/20: FEASIBLE (verified in the background via the curve) \u2014 executing this one"
+  },
+  {
+   "t": 14.768,
+   "source": "grasp_poses",
+   "text": "20 kept"
+  },
+  {
+   "t": 15.178,
+   "source": "morty_said",
+   "text": "Starting grasp on the tape dispenser."
+  },
+  {
+   "t": 15.374,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9360368847846985, \"bbox\": [386.18212890625, 253.5962677001953, 457.67352294921875, 400.4534912109375], \"reach_pct\": 85.8, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.7, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9282111525535583, \"bbo"
+  },
+  {
+   "t": 19.63,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 19.691,
+   "source": "morty_said",
+   "text": "Got the tape dispenser. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 28.329,
+   "source": "transcript",
+   "text": "Drop it on the right side."
+  },
+  {
+   "t": 28.335,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790692428.102}"
+  },
+  {
+   "t": 28.416,
+   "source": "robot_status",
+   "text": "resumed:vla_drop_right"
+  },
+  {
+   "t": 28.538,
+   "source": "utterance",
+   "text": "{\"text\": \"Drop it on the right side.\", \"speech_end\": 1790692426.943, \"voiced_ms\": 1300, \"speech_start\": 1790692425.306, \"published\": 1790692428.096}"
+  },
+  {
+   "t": 28.635,
+   "source": "morty_said",
+   "text": "Going to drop right."
+  },
+  {
+   "t": 33.298,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 33.352,
+   "source": "morty_said",
+   "text": "I'm at the drop right position, still holding the tape dispenser. Should I open the gripper?"
+  },
+  {
+   "t": 35.847,
+   "source": "transcript",
+   "text": "My mind go to the home position."
+  },
+  {
+   "t": 36.002,
+   "source": "utterance",
+   "text": "{\"text\": \"My mind go to the home position.\", \"speech_end\": 1790692434.459, \"voiced_ms\": 1900, \"speech_start\": 1790692432.646, \"published\": 1790692435.614}"
+  },
+  {
+   "t": 36.996,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790692436.763}"
+  },
+  {
+   "t": 37.167,
+   "source": "robot_status",
+   "text": "redirect:home"
+  },
+  {
+   "t": 41.139,
+   "source": "robot_status",
+   "text": "resumed:home"
+  },
+  {
+   "t": 41.198,
+   "source": "morty_said",
+   "text": "I'm at the home position, still holding the tape dispenser. Should I open the gripper?"
+  },
+  {
+   "t": 41.288,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 50.663,
+   "source": "transcript",
+   "text": "Yes, open the gripper, give me the object."
+  },
+  {
+   "t": 50.682,
+   "source": "intent",
+   "text": "{\"action_intent\":\"open_gripper\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790692450.449}"
+  },
+  {
+   "t": 50.794,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 50.858,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 50.889,
+   "source": "utterance",
+   "text": "{\"text\": \"Yes, open the gripper, give me the object.\", \"speech_end\": 1790692448.177, \"voiced_ms\": 1700, \"speech_start\": 1790692446.113, \"published\": 1790692450.43}"
+  },
+  {
+   "t": 51.54,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 54.985,
+   "source": "morty_said",
+   "text": "I'm at the home position. What's next?"
+  },
+  {
+   "t": 55.005,
+   "source": "cycle_done",
+   "text": "done|3"
+  },
+  {
+   "t": 56.393,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9265507459640503, \"bbox\": [386.1839904785156, 253.67071533203125, 457.6558837890625, 400.2374572753906], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9147267937660217, \"b"
+  },
+  {
+   "t": 57.768,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9257791638374329, \"bbox\": [386.2010803222656, 253.69818115234375, 457.6397399902344, 400.53997802734375], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9152010083198547, \""
+  },
+  {
+   "t": 58.77,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9268130660057068, \"bbox\": [386.23785400390625, 253.67559814453125, 457.7083740234375, 400.11798095703125], \"reach_pct\": 85.7, \"reach_state\": \"orange\", \"reach_angle_deg\": 27.3, \"reach_closer_cm\": 0.6, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9148790836334229, "
+  },
+  {
+   "t": 59.872,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

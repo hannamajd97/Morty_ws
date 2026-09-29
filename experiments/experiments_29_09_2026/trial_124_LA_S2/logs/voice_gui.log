@@ -1,0 +1,25 @@
+[speech_input_node-4] [INFO] [1790692150.378298388] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.099)
+[speech_input_node-4] [INFO] [1790692150.764367554] [speech_input_node]: [timing] omni 0.38s for 5.0s audio (today 117, month 1045)
+[speech_input_node-4] [INFO] [1790692150.767010109] [speech_input_node]: Heard: "Morty, I'm really thirsty. Can you hand me the coffee?"
+[chat_node-7] User (voice): Morty, I'm really thirsty. Can you hand me the coffee?
+[chat_node-7] [0m[INFO] [1790692150.773876339] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (29 -> 22)[0m
+[chat_node-7] [0m[INFO] [1790692151.775252172] [communication_llm_chat_node]: [timing] first sentence spoken 1.00s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790692151.796384263] [speak_action_server]: Speak: "I don't see a coffee on the table."
+[chat_node-7] [0m[INFO] [1790692151.863486317] [communication_llm_chat_node]: [timing] LLM main call 1.09s (prompt cache: 6863 tokens read)[0m
+[chat_node-7] Assistant: I don't see a coffee on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[speak_action_server-3] [INFO] [1790692151.869545226] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speech_input_node-4] [INFO] [1790692152.577177559] [speech_input_node]: [speaker] human voice (cos 0.08, rms 0.085)
+[speech_input_node-4] [INFO] [1790692152.872072400] [speech_input_node]: [timing] omni 0.29s for 2.2s audio (today 118, month 1046)
+[speech_input_node-4] [INFO] [1790692152.873859333] [speech_input_node]: Heard: 'Mug next to the bottle.'
+[speak_action_server-3] [INFO] [1790692152.889851620] [speak_action_server]: [timing] TTS first audio after 0.35s, 2.6s of speech, done 1.09s after the request
+[chat_node-7] [0m[INFO] [1790692152.891201112] [communication_llm_chat_node]: Answer 4 interrupted (the operator said something new): 2 queued sentence(s) cancelled; nothing more of it will be said.[0m
+[chat_node-7] User (voice): Mug next to the bottle.
+[chat_node-7] [0m[INFO] [1790692152.907439183] [communication_llm_chat_node]: [timing] pruned 7 stale message(s) from the LLM context (31 -> 24)[0m
+[chat_node-7] [0m[INFO] [1790692154.067108556] [communication_llm_chat_node]: [timing] first sentence spoken 1.16s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790692154.074738201] [speak_action_server]: Speak: "I don't see a mug on the table."
+[chat_node-7] [0m[INFO] [1790692154.094355960] [communication_llm_chat_node]: [timing] LLM main call 1.18s (prompt cache: 6863 tokens read)[0m
+[chat_node-7] Assistant: I don't see a mug on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[speak_action_server-3] [INFO] [1790692154.100138945] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790692156.724011836] [speak_action_server]: [timing] TTS first audio after 0.31s, 2.5s of speech, done 2.65s after the request
+[speak_action_server-3] [INFO] [1790692156.746746086] [speak_action_server]: Speak: 'I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.'
+[speak_action_server-3] [INFO] [1790692162.644152858] [speak_action_server]: [timing] TTS first audio after 0.36s, 5.6s of speech, done 5.90s after the request

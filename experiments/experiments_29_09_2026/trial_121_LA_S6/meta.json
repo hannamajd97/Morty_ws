@@ -1,0 +1,539 @@
+{
+  "format": "morty_vla_raw_v2",
+  "episode_id": "trial_121_LA_S6",
+  "episode_index": 121,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_121_LA_S6",
+  "in_trial_dir": true,
+  "trial_id": "121",
+  "task": "pick up the vitamin tube",
+  "task_from": "intent",
+  "outcome": "success",
+  "success": true,
+  "intent": "go_home",
+  "cycle_done": "done|6",
+  "note": "outcome: human",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_121_LA_S6",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "Yes, grasp this vitamin tube.",
+  "trial_form_task": "pick up the vitamin c",
+  "transcripts": [
+    "Yes, grasp this vitamin tube.",
+    "Grasp it.",
+    "Drop it home.",
+    "I changed my mind. Go to the drop right.",
+    "Yes, open the gripper, give me the object.",
+    "Go back home."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "t": -0.15454959869384766,
+      "stamp": 1790691041.6460514,
+      "action_intent": "pick",
+      "object": "vitamin_tube",
+      "attributes": {
+        "source": "pointing"
+      },
+      "transcript": null,
+      "transcript_stamp": null,
+      "instruction": "pick up the vitamin tube"
+    },
+    {
+      "idx": 1,
+      "t": 18.819398880004883,
+      "stamp": 1790691060.62,
+      "action_intent": "release_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Yes, grasp this vitamin tube.",
+      "transcript_stamp": 1790691059.568989,
+      "instruction": "open the gripper and go back home"
+    },
+    {
+      "idx": 2,
+      "t": 49.535398960113525,
+      "stamp": 1790691091.336,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Drop it home.",
+      "transcript_stamp": 1790691091.3354318,
+      "instruction": "go back home"
+    },
+    {
+      "idx": 3,
+      "t": 60.339399099349976,
+      "stamp": 1790691102.14,
+      "action_intent": "drop_right",
+      "object": null,
+      "attributes": null,
+      "transcript": "I changed my mind. Go to the drop right.",
+      "transcript_stamp": 1790691100.9481432,
+      "instruction": "drop it on the right side"
+    },
+    {
+      "idx": 4,
+      "t": 74.30439901351929,
+      "stamp": 1790691116.105,
+      "action_intent": "open_gripper",
+      "object": null,
+      "attributes": null,
+      "transcript": "Yes, open the gripper, give me the object.",
+      "transcript_stamp": 1790691116.1047575,
+      "instruction": "open the gripper"
+    },
+    {
+      "idx": 5,
+      "t": 81.58639907836914,
+      "stamp": 1790691123.387,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Go back home.",
+      "transcript_stamp": 1790691123.3766937,
+      "instruction": "go back home"
+    }
+  ],
+  "events": {
+    "transcript": [
+      {
+        "t": 17.768388032913208,
+        "stamp": 1790691059.568989,
+        "text": "Yes, grasp this vitamin tube."
+      },
+      {
+        "t": 36.50217866897583,
+        "stamp": 1790691078.3027797,
+        "text": "Grasp it."
+      },
+      {
+        "t": 49.534830808639526,
+        "stamp": 1790691091.3354318,
+        "text": "Drop it home."
+      },
+      {
+        "t": 59.147542238235474,
+        "stamp": 1790691100.9481432,
+        "text": "I changed my mind. Go to the drop right."
+      },
+      {
+        "t": 74.30415654182434,
+        "stamp": 1790691116.1047575,
+        "text": "Yes, open the gripper, give me the object."
+      },
+      {
+        "t": 81.57609272003174,
+        "stamp": 1790691123.3766937,
+        "text": "Go back home."
+      }
+    ],
+    "intent": [
+      {
+        "t": 18.819398880004883,
+        "stamp": 1790691060.62,
+        "action_intent": "release_home",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 36.50239896774292,
+        "stamp": 1790691078.303,
+        "action_intent": "confirm_point",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 49.535398960113525,
+        "stamp": 1790691091.336,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 60.339399099349976,
+        "stamp": 1790691102.14,
+        "action_intent": "drop_right",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 74.30439901351929,
+        "stamp": 1790691116.105,
+        "action_intent": "open_gripper",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 81.58639907836914,
+        "stamp": 1790691123.387,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      }
+    ],
+    "selection": [
+      {
+        "t": -0.15454959869384766,
+        "stamp": 1790691041.6460514,
+        "label": "vitamin_tube",
+        "source": "pointing",
+        "cycle_id": 6
+      }
+    ],
+    "gripper_cmd": [
+      {
+        "t": 37.28621506690979,
+        "stamp": 1790691079.086816,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 39.38262462615967,
+        "stamp": 1790691081.1832256,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      },
+      {
+        "t": 74.60806322097778,
+        "stamp": 1790691116.4086642,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 85.87165355682373,
+        "stamp": 1790691127.6722546,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      }
+    ],
+    "interactive_status": [
+      {
+        "t": 41.90841579437256,
+        "stamp": 1790691083.7090168,
+        "status": "paused"
+      },
+      {
+        "t": 49.565656661987305,
+        "stamp": 1790691091.3662577,
+        "status": "resumed:home"
+      },
+      {
+        "t": 55.776981592178345,
+        "stamp": 1790691097.5775826,
+        "status": "awaiting_release"
+      },
+      {
+        "t": 60.36139750480652,
+        "stamp": 1790691102.1619985,
+        "status": "redirect:vla_drop_right"
+      },
+      {
+        "t": 64.57414674758911,
+        "stamp": 1790691106.3747478,
+        "status": "resumed:vla_drop_right"
+      },
+      {
+        "t": 64.5751588344574,
+        "stamp": 1790691106.3757598,
+        "status": "awaiting_release"
+      },
+      {
+        "t": 74.35205030441284,
+        "stamp": 1790691116.1526513,
+        "status": "releasing"
+      },
+      {
+        "t": 75.07754683494568,
+        "stamp": 1790691116.8781478,
+        "status": "released"
+      },
+      {
+        "t": 78.07822370529175,
+        "stamp": 1790691119.8788247,
+        "status": "awaiting_home_confirm"
+      }
+    ],
+    "executor_phase": [
+      {
+        "t": 36.869399070739746,
+        "stamp": 1790691078.67,
+        "name": "candidates_received",
+        "cycle_id": 6
+      },
+      {
+        "t": 36.8703989982605,
+        "stamp": 1790691078.671,
+        "name": "precheck_hit",
+        "cycle_id": 6
+      },
+      {
+        "t": 37.022398948669434,
+        "stamp": 1790691078.823,
+        "name": "open_sent",
+        "cycle_id": 6
+      },
+      {
+        "t": 37.022398948669434,
+        "stamp": 1790691078.823,
+        "name": "motion_start",
+        "cycle_id": 6
+      },
+      {
+        "t": 39.12739896774292,
+        "stamp": 1790691080.928,
+        "name": "close_sent",
+        "cycle_id": 6
+      },
+      {
+        "t": 39.624398946762085,
+        "stamp": 1790691081.425,
+        "name": "arrival",
+        "cycle_id": 6
+      },
+      {
+        "t": 40.648398876190186,
+        "stamp": 1790691082.449,
+        "name": "grasp_verdict",
+        "cycle_id": 6
+      },
+      {
+        "t": 41.74139904975891,
+        "stamp": 1790691083.542,
+        "name": "lift_done",
+        "cycle_id": 6
+      },
+      {
+        "t": 41.90739893913269,
+        "stamp": 1790691083.708,
+        "name": "wait_destination_start",
+        "cycle_id": 6
+      },
+      {
+        "t": 49.565398931503296,
+        "stamp": 1790691091.366,
+        "name": "destination_received",
+        "cycle_id": 6
+      },
+      {
+        "t": 85.61439895629883,
+        "stamp": 1790691127.415,
+        "name": "home_done",
+        "cycle_id": 6
+      },
+      {
+        "t": 86.98539900779724,
+        "stamp": 1790691128.786,
+        "name": "cycle_done",
+        "cycle_id": 6
+      }
+    ],
+    "cycle_done": [
+      {
+        "t": 86.98709058761597,
+        "stamp": 1790691128.7876916,
+        "ok": true,
+        "cycle_id": "6",
+        "reason": ""
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 921,
+  "duration_s": 92.00681686401367,
+  "dropped_ticks": 0,
+  "drop_reasons": {},
+  "started_unix": 1790691041.8006241,
+  "started_ros": 1790691041.800601,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.5,
+      0.5,
+      0.06
+    ],
+    "rpy": [
+      0.0,
+      -0.5,
+      -0.8
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2
+  },
+  "phase_names": [
+    "candidates_received",
+    "precheck_hit",
+    "open_sent",
+    "motion_start",
+    "close_sent",
+    "arrival",
+    "grasp_verdict",
+    "lift_done",
+    "wait_destination_start",
+    "destination_received",
+    "home_done",
+    "cycle_done"
+  ],
+  "quality": {
+    "ok": true,
+    "issues": [],
+    "num_steps": 921,
+    "task_steps": 875,
+    "idle_steps": 46,
+    "reset_steps": 0,
+    "step_gaps": [],
+    "dt_max_s": 0.18680977821350098,
+    "images": {
+      "exterior": {
+        "age_max_s": 0.21386614099901635,
+        "age_p95_s": 0.1272961619979469,
+        "missing": 0
+      },
+      "wrist": {
+        "age_max_s": 0.12842619899311103,
+        "age_p95_s": 0.04093448900675867,
+        "missing": 0
+      }
+    },
+    "joint_age_max_s": 0.06303167500300333,
+    "tcp_stale_steps": 0,
+    "ur_tcp_missing_steps": 0,
+    "gripper_commands": [
+      {
+        "t": 37.28621506690979,
+        "cmd": "open",
+        "state_lag_s": 0.34261035919189453
+      },
+      {
+        "t": 39.38262462615967,
+        "cmd": "close",
+        "state_lag_s": 1.145711898803711
+      },
+      {
+        "t": 74.60806322097778,
+        "cmd": "open",
+        "state_lag_s": 0.31847381591796875
+      },
+      {
+        "t": 85.87165355682373,
+        "cmd": "close",
+        "state_lag_s": 1.1587553024291992
+      }
+    ],
+    "gripper_state_changes": 4,
+    "n_transcripts": 6,
+    "n_intents": 6,
+    "n_instructions": 6,
+    "n_executor_phases": 12
+  }
+}

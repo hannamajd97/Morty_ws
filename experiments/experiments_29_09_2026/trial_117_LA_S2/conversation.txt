@@ -1,0 +1,7 @@
+# trial 117 started 2026-09-29T14:24:24.486284
+[   8.07s] You: Grasp.
+[  10.27s] Morty: Which object do you mean? Say its name or point at it.
+[  11.59s] You: Grasp the banana and put it on the right side.
+[  11.60s] Morty: I don't see a banana on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[  16.11s] You: Grasp the banana.
+[  16.11s] Morty: I don't see a banana on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.

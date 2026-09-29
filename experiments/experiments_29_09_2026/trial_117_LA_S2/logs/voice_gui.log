@@ -1,0 +1,41 @@
+[speech_input_node-4] [INFO] [1790684669.174600008] [speech_input_node]: [speaker] human voice (cos 0.09, rms 0.086)
+[speech_input_node-4] [INFO] [1790684669.558638595] [speech_input_node]: [timing] omni 0.38s for 1.2s audio (today 58, month 986)
+[speech_input_node-4] [INFO] [1790684669.562607559] [speech_input_node]: Heard: 'Grasp.'
+[chat_node-7] User (voice): Grasp.
+[chat_node-7] [0m[INFO] [1790684670.553947461] [communication_llm_chat_node]: [timing] pruned 12 stale message(s) from the LLM context (43 -> 31)[0m
+[chat_node-7] [0m[INFO] [1790684671.601957881] [communication_llm_chat_node]: [timing] first sentence spoken 1.02s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790684671.614406935] [speak_action_server]: Speak: 'Which object do you mean?'
+[chat_node-7] [0m[INFO] [1790684671.643373346] [communication_llm_chat_node]: [timing] LLM main call 1.06s[0m
+[chat_node-7] Assistant: Which object do you mean? Say its name or point at it.
+[speak_action_server-3] [INFO] [1790684671.672761283] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[chat_node-7] [0m[INFO] [1790684672.051168462] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790684672.168348545] [speech_input_node]: [speaker] human voice (cos -0.00, rms 0.111)
+[speech_input_node-4] [INFO] [1790684672.915805948] [speech_input_node]: [timing] omni 0.74s for 3.0s audio (today 59, month 987)
+[speech_input_node-4] [INFO] [1790684672.918479458] [speech_input_node]: Heard: 'Grasp the banana and put it on the right side.'
+[speak_action_server-3] [INFO] [1790684674.030701874] [speak_action_server]: [timing] TTS first audio after 0.43s, 2.2s of speech, done 2.41s after the request
+[speak_action_server-3] [INFO] [1790684674.060558838] [speak_action_server]: Speak: 'Say its name or point at it.'
+[chat_node-7] [0m[INFO] [1790684674.327646149] [communication_llm_chat_node]: Answer 51 interrupted (the operator said something new): 2 queued sentence(s) cancelled; nothing more of it will be said.[0m
+[chat_node-7] User (voice): Grasp the banana and put it on the right side.
+[chat_node-7] [0m[INFO] [1790684674.347066693] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (39 -> 30)[0m
+[chat_node-7] [0m[INFO] [1790684675.402770456] [communication_llm_chat_node]: [timing] first sentence spoken 1.04s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790684675.428720233] [speak_action_server]: Speak: "I don't see a banana on the table."
+[chat_node-7] [0m[INFO] [1790684675.535890936] [communication_llm_chat_node]: [timing] LLM main call 1.18s (prompt cache: 6540 tokens read)[0m
+[chat_node-7] Assistant: I don't see a banana on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[speak_action_server-3] [INFO] [1790684675.546362229] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speech_input_node-4] [INFO] [1790684676.780418050] [speech_input_node]: [speaker] barge-in: a human is talking over Morty (cos 0.07, rms 0.246 vs echo 0.229) — stopping playback
+[speak_action_server-3] [INFO] [1790684676.831856502] [speak_action_server]: Barge-in: the operator is talking — stopping playback, dropping 1 queued sentence(s); new speech waits until they finish.
+[speak_action_server-3] [INFO] [1790684677.080694214] [speak_action_server]: [timing] TTS first audio after 0.45s, 2.7s of speech, done 1.64s after the request
+[speech_input_node-4] [INFO] [1790684677.620822342] [speech_input_node]: [speaker] human voice (cos 0.05, rms 0.095)
+[chat_node-7] [0m[INFO] [1790684677.977667481] [communication_llm_chat_node]: Answer 52 interrupted (the operator talked over it): 1 queued sentence(s) cancelled; nothing more of it will be said.[0m
+[speech_input_node-4] [INFO] [1790684678.108216495] [speech_input_node]: [timing] omni 0.48s for 2.0s audio (today 60, month 988)
+[speech_input_node-4] [INFO] [1790684678.110351570] [speech_input_node]: Heard: 'Grasp the banana.'
+[chat_node-7] User (voice): Grasp the banana.
+[chat_node-7] [0m[INFO] [1790684678.125812845] [communication_llm_chat_node]: [timing] pruned 11 stale message(s) from the LLM context (39 -> 28)[0m
+[chat_node-7] [0m[INFO] [1790684679.156881522] [communication_llm_chat_node]: [timing] first sentence spoken 1.02s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790684679.170638482] [speak_action_server]: Speak: "I don't see a banana on the table."
+[chat_node-7] [0m[INFO] [1790684679.181515388] [communication_llm_chat_node]: [timing] LLM main call 1.04s (prompt cache: 6540 tokens read)[0m
+[chat_node-7] Assistant: I don't see a banana on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[speak_action_server-3] [INFO] [1790684679.194882700] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790684682.079767078] [speak_action_server]: [timing] TTS first audio after 0.51s, 2.7s of speech, done 2.89s after the request
+[speak_action_server-3] [INFO] [1790684682.123697051] [speak_action_server]: Speak: 'I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.'
+[speak_action_server-3] [INFO] [1790684688.218214939] [speak_action_server]: [timing] TTS first audio after 0.51s, 5.6s of speech, done 6.08s after the request

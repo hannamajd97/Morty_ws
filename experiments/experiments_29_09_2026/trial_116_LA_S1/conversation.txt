@@ -1,0 +1,3 @@
+# trial 116 started 2026-09-29T14:15:53.415851
+[  10.02s] You: How many vitamins tubes do you see and where are they
+[  11.83s] Morty: I see 2 vitamin tubes: a Vitamin B12 on the leftmost side and a Vitamin C on the rightmost side.

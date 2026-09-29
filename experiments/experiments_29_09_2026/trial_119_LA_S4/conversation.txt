@@ -1,0 +1,16 @@
+# trial 119 started 2026-09-29T15:58:04.670700
+[   5.32s] You: Bring me the vitamins.
+[   6.25s] Morty: I see two vitamin tubes — the leftmost one is Vitamin B12 and the rightmost one is Vitamin C. Which one would you like?
+[  18.56s] You: The right most vitamin tube.
+[  19.96s] Morty (status): Picking the rightmost Vitamin C.
+[  22.56s] Morty (status): Starting grasp on the vitamin tube.
+[  29.25s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  37.36s] You: Drop it on the right side.
+[  37.47s] Morty (status): Going to drop right.
+[  43.14s] Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+[  50.26s] You: Yes.
+[  50.46s] Morty (status): Opening the gripper.
+[  53.96s] Morty (status): Should I go back home?
+[  58.17s] You: Go back home.
+[  58.25s] Morty (status): Going home.
+[  63.56s] Morty (status): Done — I'm back at the home position. What's next?

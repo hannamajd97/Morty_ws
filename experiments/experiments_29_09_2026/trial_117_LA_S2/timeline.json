@@ -1,0 +1,259 @@
+{
+ "start_wall": 1790684664.3720028,
+ "stop_wall": 1790684690.5377696,
+ "stage_times": {
+  "interaction_s": null,
+  "voice_to_transcript_s": 0.992,
+  "understood_by": null,
+  "graspgen_background": null,
+  "plan_background": null,
+  "plan_compute_s": null,
+  "grasp_used": null,
+  "grasp_probes": null,
+  "release_s": null,
+  "human_wait_s": null,
+  "robot_time_s": null,
+  "morty_questions": 1,
+  "your_utterances": 3,
+  "speech_end_to_intent_s": null,
+  "intent_s": null,
+  "choice_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "graspgen_compute_s": null,
+  "graspgen_wait_s": null,
+  "graspgen_lead_s": null,
+  "verify_compute_s": null,
+  "planning_s": null,
+  "command_to_motion_s": null,
+  "approach_s": null,
+  "grasp_s": null,
+  "wait_destination_s": null,
+  "transport_s": null,
+  "execution_s": null,
+  "click_to_motion_s": null,
+  "background_lead_s": null,
+  "total_s": null,
+  "planner": null,
+  "path": null,
+  "started_by": "voice"
+ },
+ "selection_cycles": [],
+ "executor_cycles": [],
+ "background": [],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 3.509,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8631964921951294, \"bbox\": [174.9866485595703, 280.6212158203125, 254.51202392578125, 431.30853271484375], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8009621500968933,"
+  },
+  {
+   "t": 5.191,
+   "source": "transcript",
+   "text": "Grasp."
+  },
+  {
+   "t": 5.371,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp.\", \"speech_end\": 1790684668.571, \"voiced_ms\": 400, \"speech_start\": 1790684667.893, \"published\": 1790684669.563}"
+  },
+  {
+   "t": 5.934,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 7.253,
+   "source": "morty_said",
+   "text": "Which object do you mean?"
+  },
+  {
+   "t": 8.266,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.861891508102417, \"bbox\": [174.90179443359375, 280.6244812011719, 254.47146606445312, 431.0973205566406], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8289336562156677"
+  },
+  {
+   "t": 8.548,
+   "source": "transcript",
+   "text": "Grasp the banana and put it on the right side."
+  },
+  {
+   "t": 8.549,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp the banana and put it on the right side.\", \"speech_end\": 1790684671.327, \"voiced_ms\": 1900, \"speech_start\": 1790684669.063, \"published\": 1790684672.92}"
+  },
+  {
+   "t": 9.691,
+   "source": "morty_said",
+   "text": "Say its name or point at it."
+  },
+  {
+   "t": 10.763,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8628171682357788, \"bbox\": [174.9767608642578, 280.5706787109375, 254.41554260253906, 430.9859924316406], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8550821542739868"
+  },
+  {
+   "t": 13.739,
+   "source": "transcript",
+   "text": "Grasp the banana."
+  },
+  {
+   "t": 13.745,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp the banana.\", \"speech_end\": 1790684676.665, \"voiced_ms\": 800, \"speech_start\": 1790684676.007, \"published\": 1790684678.111}"
+  },
+  {
+   "t": 14.015,
+   "source": "morty_said",
+   "text": "I don't see a banana on the table."
+  },
+  {
+   "t": 14.8,
+   "source": "morty_said",
+   "text": "I don't see a banana on the table."
+  },
+  {
+   "t": 16.345,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8617783188819885, \"bbox\": [174.93223571777344, 280.6184997558594, 254.5098419189453, 431.1007385253906], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8045068979263306, "
+  },
+  {
+   "t": 17.764,
+   "source": "morty_said",
+   "text": "I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C."
+  },
+  {
+   "t": 19.702,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8627430200576782, \"bbox\": [174.92532348632812, 280.6370849609375, 254.5177764892578, 431.01959228515625], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.862164080142974"
+  },
+  {
+   "t": 23.227,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8607721924781799, \"bbox\": [175.009765625, 280.58978271484375, 254.46575927734375, 431.24176025390625], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8599056005477905, "
+  },
+  {
+   "t": 26.165,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "events_gui": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 3.509,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8631964921951294, \"bbox\": [174.9866485595703, 280.6212158203125, 254.51202392578125, 431.30853271484375], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8009621500968933,"
+  },
+  {
+   "t": 5.191,
+   "source": "transcript",
+   "text": "Grasp."
+  },
+  {
+   "t": 5.371,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp.\", \"speech_end\": 1790684668.571, \"voiced_ms\": 400, \"speech_start\": 1790684667.893, \"published\": 1790684669.563}"
+  },
+  {
+   "t": 5.934,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 8.234,
+   "source": "morty_said",
+   "text": "Which object do you mean?"
+  },
+  {
+   "t": 8.266,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.861891508102417, \"bbox\": [174.90179443359375, 280.6244812011719, 254.47146606445312, 431.0973205566406], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8289336562156677"
+  },
+  {
+   "t": 8.548,
+   "source": "transcript",
+   "text": "Grasp the banana and put it on the right side."
+  },
+  {
+   "t": 8.659,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp the banana and put it on the right side.\", \"speech_end\": 1790684671.327, \"voiced_ms\": 1900, \"speech_start\": 1790684669.063, \"published\": 1790684672.92}"
+  },
+  {
+   "t": 10.48,
+   "source": "morty_said",
+   "text": "Say its name or point at it."
+  },
+  {
+   "t": 10.763,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8628171682357788, \"bbox\": [174.9767608642578, 280.5706787109375, 254.41554260253906, 430.9859924316406], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8550821542739868"
+  },
+  {
+   "t": 13.739,
+   "source": "transcript",
+   "text": "Grasp the banana."
+  },
+  {
+   "t": 14.015,
+   "source": "morty_said",
+   "text": "I don't see a banana on the table."
+  },
+  {
+   "t": 14.077,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp the banana.\", \"speech_end\": 1790684676.665, \"voiced_ms\": 800, \"speech_start\": 1790684676.007, \"published\": 1790684678.111}"
+  },
+  {
+   "t": 15.003,
+   "source": "morty_said",
+   "text": "I don't see a banana on the table."
+  },
+  {
+   "t": 16.345,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8617783188819885, \"bbox\": [174.93223571777344, 280.6184997558594, 254.5098419189453, 431.1007385253906], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8045068979263306, "
+  },
+  {
+   "t": 17.876,
+   "source": "morty_said",
+   "text": "I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C."
+  },
+  {
+   "t": 19.702,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8627430200576782, \"bbox\": [174.92532348632812, 280.6370849609375, 254.5177764892578, 431.01959228515625], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.862164080142974"
+  },
+  {
+   "t": 23.227,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8607721924781799, \"bbox\": [175.009765625, 280.58978271484375, 254.46575927734375, 431.24176025390625], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8599056005477905, "
+  },
+  {
+   "t": 26.165,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "event_times": {
+  "moved": 6,
+  "from": {
+   "bag": 6
+  },
+  "gui_late_by_s": {
+   "median": 0.332,
+   "max": 0.981
+  },
+  "note": "GUI event times moved to the bag's receive stamps (else the VLA recorder's); stage times rebuilt from them"
+ }
+}

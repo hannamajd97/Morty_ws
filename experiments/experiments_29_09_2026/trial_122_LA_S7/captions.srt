@@ -1,0 +1,24 @@
+1
+00:00:07,069 --> 00:00:11,069
+You: Hello Morty, tell me a story while you are looking at the right side.
+
+2
+00:00:11,353 --> 00:00:15,353
+Morty: Once upon a time, a curious robot named Morty discovered that the best adventures weren't always the farthest away — sometimes they were right beside him, waiting to be noticed. He learned that kindness and patience could unlock doors that strength alone never could, and that helping others was the greatest discovery of all.
+
+3
+00:00:31,956 --> 00:00:35,956
+You: Whatever about your story, go to the left side. Look at the left side.
+
+4
+00:00:33,920 --> 00:00:37,920
+Morty (status): Looking left.
+
+5
+00:00:43,054 --> 00:00:47,054
+You: Now go back home.
+
+6
+00:00:43,056 --> 00:00:47,056
+Morty (status): Going home.
+

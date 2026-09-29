@@ -1,0 +1,7 @@
+# trial 122 started 2026-09-29T16:16:44.672746
+[   7.07s] You: Hello Morty, tell me a story while you are looking at the right side.
+[  11.35s] Morty: Once upon a time, a curious robot named Morty discovered that the best adventures weren't always the farthest away — sometimes they were right beside him, waiting to be noticed. He learned that kindness and patience could unlock doors that strength alone never could, and that helping others was the greatest discovery of all.
+[  31.96s] You: Whatever about your story, go to the left side. Look at the left side.
+[  33.92s] Morty (status): Looking left.
+[  43.05s] You: Now go back home.
+[  43.06s] Morty (status): Going home.

@@ -1,0 +1,44 @@
+1
+00:00:12,650 --> 00:00:16,650
+You: Morty, I need to seal a parcel. Would you grab for me the tape dispenser?
+
+2
+00:00:15,338 --> 00:00:19,338
+Morty (status): Starting grasp on the tape dispenser.
+
+3
+00:00:19,730 --> 00:00:23,730
+Morty (status): Got the tape dispenser. Where should I drop it? Left, right, or home?
+
+4
+00:00:28,536 --> 00:00:32,536
+You: Drop it on the right side.
+
+5
+00:00:28,729 --> 00:00:32,729
+Morty (status): Going to drop right.
+
+6
+00:00:33,433 --> 00:00:37,433
+Morty (status): I'm at the drop right position, still holding the tape dispenser. Should I open the gripper?
+
+7
+00:00:36,063 --> 00:00:40,063
+You: My mind go to the home position.
+
+8
+00:00:41,230 --> 00:00:45,230
+Morty (status): I'm at the home position, still holding the tape dispenser. Should I open the gripper?
+
+9
+00:00:51,001 --> 00:00:55,001
+You: Yes, open the gripper, give me the object.
+
+10
+00:00:51,003 --> 00:00:55,003
+Morty (status): Opening the gripper.
+
+11
+00:00:55,034 --> 00:00:59,034
+Morty (status): I'm at the home position. What's next?
+

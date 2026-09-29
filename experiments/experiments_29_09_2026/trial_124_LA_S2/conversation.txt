@@ -1,0 +1,5 @@
+# trial 124 started 2026-09-29T16:29:04.274066
+[   8.72s] You: Morty, I'm really thirsty. Can you hand me the coffee?
+[   8.72s] Morty: I don't see a coffee on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+[  10.82s] You: Mug next to the bottle.
+[  11.80s] Morty: I don't see a mug on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.

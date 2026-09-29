@@ -1,0 +1,20 @@
+TRIAL TIMELINE  start 2026-09-29 14:24:24  stop 14:24:50  (26.2 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +4.20  you stopped speaking ("Grasp.")
+t=   +5.19  you said: "Grasp."
+t=   +5.93  trial bag ready
+t=   +6.95  you stopped speaking ("Grasp the banana and put it on the right side.")
+t=   +8.23  Morty said: "Which object do you mean?"
+t=   +8.55  you said: "Grasp the banana and put it on the right side."
+t=  +10.48  Morty said: "Say its name or point at it."
+t=  +12.29  you stopped speaking ("Grasp the banana.")
+t=  +13.74  you said: "Grasp the banana."
+t=  +14.01  Morty said: "I don't see a banana on the table."
+t=  +15.00  Morty said: "I don't see a banana on the table."
+t=  +17.88  Morty said: "I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C."
+t=  +26.17  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  end of your voice -> transcript               0.99 s

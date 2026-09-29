@@ -1,0 +1,5 @@
+[gripper_command_adapter-3] [WARN] [1790684668.720318838] [gripper_controller.gripper_command_adapter]: New subscription discovered on topic '/joint_states', requesting incompatible QoS. No messages will be sent to it. Last incompatible policy: DURABILITY
+[gripper_command_adapter-3] [INFO] [1790684682.691293896] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790684682.704526020] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790684687.988273105] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790684687.999020389] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']

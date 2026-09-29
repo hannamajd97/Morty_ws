@@ -1,0 +1,11 @@
+# trial 115 started 2026-09-29T14:11:43.416701
+[   6.62s] Morty (status): You pointed at the small bottle. Should I grasp it?
+[  13.32s] You: Yes, grasp a small bottle for me.
+[  16.58s] Morty (status): Starting grasp on the small bottle.
+[  25.95s] Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+[  39.82s] You: Give it me on the right side and go back home after that.
+[  41.22s] Morty (status): Going to drop right.
+[  47.34s] Morty (status): Opening the gripper.
+[  49.92s] You: and the gripper and go back home.
+[  51.12s] Morty: I've already sent that command — dropping on the right, opening the gripper, and heading home.
+[  56.90s] Morty (status): Done — I'm back at the home position. What's next?

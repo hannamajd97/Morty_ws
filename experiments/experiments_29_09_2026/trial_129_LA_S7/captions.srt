@@ -1,0 +1,44 @@
+1
+00:00:07,478 --> 00:00:11,478
+You: Now go to the drop right. While you are doing that, tell me a good story.
+
+2
+00:00:10,367 --> 00:00:14,367
+Morty: Once there was a curious robot at a university who spent its days moving objects around a table. One day it realized: every object it picked taught it something new — the weight, the shape, the fragility. By the end of the year, the robot wasn't just grasping things anymore; it understood them. And that's when it became not just a machine, but a true helper. Sometimes the smallest tasks carry the biggest lessons!
+
+3
+00:00:32,877 --> 00:00:36,877
+You: You know enough, enough. I am got enough from you. Go back home and then, do the drop left.
+
+4
+00:00:35,078 --> 00:00:39,078
+Morty (status): Going home.
+
+5
+00:00:36,985 --> 00:00:40,985
+Morty (status): Going to drop left.
+
+6
+00:00:47,968 --> 00:00:51,968
+You: I will look at the left side.
+
+7
+00:00:48,976 --> 00:00:52,976
+Morty: Go ahead — I'm here if you need me.
+
+8
+00:00:55,675 --> 00:00:59,675
+You: No, I said like look at the left side.
+
+9
+00:00:57,677 --> 00:01:01,677
+Morty (status): Looking left.
+
+10
+00:01:04,166 --> 00:01:08,166
+You: Nice job.
+
+11
+00:01:04,976 --> 00:01:08,976
+Morty: Thanks! Anything else you need?
+

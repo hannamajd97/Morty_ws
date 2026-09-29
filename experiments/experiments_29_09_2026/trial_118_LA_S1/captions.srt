@@ -1,0 +1,24 @@
+1
+00:00:09,018 --> 00:00:13,018
+You: Pick up the tape dispenser and put it on the right side.
+
+2
+00:00:12,414 --> 00:00:16,414
+Morty (status): Starting grasp on the tape dispenser.
+
+3
+00:00:21,817 --> 00:00:25,817
+Morty (status): I'm at the drop position, still holding the tape dispenser. Should I open the gripper?
+
+4
+00:00:31,412 --> 00:00:35,412
+You: Yes, open the gripper. Give me the object and go back home.
+
+5
+00:00:32,620 --> 00:00:36,620
+Morty (status): Opening the gripper.
+
+6
+00:00:41,119 --> 00:00:45,119
+Morty (status): Done — I'm back at the home position. What's next?
+

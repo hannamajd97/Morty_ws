@@ -1,0 +1,738 @@
+{
+ "timings": {
+  "interaction_s": 2.44,
+  "voice_to_transcript_s": 1.288,
+  "understood_by": "language model",
+  "graspgen_background": null,
+  "plan_background": null,
+  "plan_compute_s": null,
+  "grasp_used": null,
+  "grasp_probes": null,
+  "release_s": null,
+  "human_wait_s": null,
+  "robot_time_s": null,
+  "morty_questions": 1,
+  "your_utterances": 5,
+  "speech_end_to_intent_s": 2.223,
+  "intent_s": 0.935,
+  "choice_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "graspgen_compute_s": null,
+  "graspgen_wait_s": null,
+  "graspgen_lead_s": null,
+  "verify_compute_s": null,
+  "planning_s": null,
+  "command_to_motion_s": 1.152,
+  "approach_s": null,
+  "grasp_s": null,
+  "wait_destination_s": null,
+  "transport_s": null,
+  "execution_s": null,
+  "click_to_motion_s": null,
+  "background_lead_s": null,
+  "total_s": null,
+  "planner": null,
+  "path": null,
+  "started_by": "voice"
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.161,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9526247978210449, \"bbox\": [352.80645751953125, 263.0145263671875, 427.9383544921875, 419.984130859375], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9249160885810852, \"b"
+  },
+  {
+   "t": 2.426,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.335,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9533458352088928, \"bbox\": [352.7378234863281, 262.93621826171875, 427.72039794921875, 420.00360107421875], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9245958924293518,"
+  },
+  {
+   "t": 7.078,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9526025056838989, \"bbox\": [352.8616638183594, 262.97564697265625, 427.8267822265625, 419.9457702636719], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9246132969856262, \""
+  },
+  {
+   "t": 7.403,
+   "source": "transcript",
+   "text": "Now go to the drop right. While you are doing that, tell me a good story."
+  },
+  {
+   "t": 7.413,
+   "source": "utterance",
+   "text": "{\"text\": \"Now go to the drop right. While you are doing that, tell me a good story.\", \"speech_end\": 1790693711.829, \"voiced_ms\": 3800, \"speech_start\": 1790693706.878, \"published\": 1790693713.117}"
+  },
+  {
+   "t": 8.09,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9524655342102051, \"bbox\": [352.7796630859375, 263.05731201171875, 427.6792907714844, 420.3332214355469], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9239318370819092, \""
+  },
+  {
+   "t": 8.412,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693714.052}"
+  },
+  {
+   "t": 9.552,
+   "source": "morty_said",
+   "text": "Once there was a curious robot at a university who spent its days moving objects around a table."
+  },
+  {
+   "t": 10.328,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.96360182762146, \"bbox\": [337.1976013183594, 244.57542419433594, 415.9687805175781, 405.12249755859375], \"reach_pct\": 159.8, \"reach_state\": \"red\", \"reach_angle_deg\": 41.4, \"reach_closer_cm\": 59.4, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9308825135231018, \"b"
+  },
+  {
+   "t": 12.961,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 14.653,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 15.755,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 16.325,
+   "source": "morty_said",
+   "text": "One day it realized: every object it picked taught it something new \u2014 the weight, the shape, the fragility."
+  },
+  {
+   "t": 17.127,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 18.209,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 19.613,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 21.087,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 22.454,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 22.775,
+   "source": "morty_said",
+   "text": "By the end of the year, the robot wasn't just grasping things anymore; it understood them."
+  },
+  {
+   "t": 23.991,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 25.061,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 26.665,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 27.949,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 29.393,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 30.893,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 32.292,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 32.868,
+   "source": "transcript",
+   "text": "You know enough, enough. I am got enough from you. Go back home and then, do the drop left."
+  },
+  {
+   "t": 32.879,
+   "source": "utterance",
+   "text": "{\"text\": \"You know enough, enough. I am got enough from you. Go back home and then, do the drop left.\", \"speech_end\": 1790693737.14, \"voiced_ms\": 4700, \"speech_start\": 1790693731.694, \"published\": 1790693738.483}"
+  },
+  {
+   "t": 33.429,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 34.13,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693739.678}"
+  },
+  {
+   "t": 34.276,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_left\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693739.735}"
+  },
+  {
+   "t": 34.971,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 34.995,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 36.429,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 36.927,
+   "source": "morty_said",
+   "text": "Going to drop left."
+  },
+  {
+   "t": 37.9,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 39.478,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8624284863471985, \"bbox\": [61.21092224121094, 56.358253479003906, 235.02517700195312, 275.584716796875], \"reach_pct\": 158.3, \"reach_state\": \"red\", \"reach_angle_deg\": 11.0, \"reach_closer_cm\": 61.6, \"source\": \"ys\", \"colour\": \"orange\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.7496453523635864, \""
+  },
+  {
+   "t": 41.134,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9185813665390015, \"bbox\": [489.7041320800781, 82.59365844726562, 560.960205078125, 367.0098876953125], \"reach_pct\": 171.6, \"reach_state\": \"red\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 72.2, \"source\": \"ys\", \"colour\": \"gray\", \"cap_colour\": \"gray\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.903669178485870"
+  },
+  {
+   "t": 42.222,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9081182479858398, \"bbox\": [528.9212036132812, 311.41290283203125, 606.4566650390625, 479.2036437988281], \"reach_pct\": 162.6, \"reach_state\": \"red\", \"reach_angle_deg\": 9.7, \"reach_closer_cm\": 65.2, \"source\": \"ys\", \"colour\": \"gray\", \"cap_colour\": \"gray\"}]"
+  },
+  {
+   "t": 43.715,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 45.695,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 46.821,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 47.915,
+   "source": "transcript",
+   "text": "I will look at the left side."
+  },
+  {
+   "t": 47.925,
+   "source": "utterance",
+   "text": "{\"text\": \"I will look at the left side.\", \"speech_end\": 1790693752.45, \"voiced_ms\": 1500, \"speech_start\": 1790693750.19, \"published\": 1790693753.58}"
+  },
+  {
+   "t": 48.613,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 49.063,
+   "source": "morty_said",
+   "text": "Go ahead \u2014 I'm here if you need me."
+  },
+  {
+   "t": 49.65,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 50.915,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 52.245,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 53.864,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 55.33,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 55.643,
+   "source": "transcript",
+   "text": "No, I said like look at the left side."
+  },
+  {
+   "t": 55.653,
+   "source": "utterance",
+   "text": "{\"text\": \"No, I said like look at the left side.\", \"speech_end\": 1790693760.149, \"voiced_ms\": 2400, \"speech_start\": 1790693757.369, \"published\": 1790693761.363}"
+  },
+  {
+   "t": 56.593,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 56.821,
+   "source": "intent",
+   "text": "{\"action_intent\":\"look_left\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693762.457}"
+  },
+  {
+   "t": 57.616,
+   "source": "morty_said",
+   "text": "Looking left."
+  },
+  {
+   "t": 58.239,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 59.528,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 61.026,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 62.538,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9417782425880432, \"bbox\": [475.36492919921875, 131.9009246826172, 523.4093017578125, 326.1448974609375], \"reach_pct\": 84.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.5, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9409941434860"
+  },
+  {
+   "t": 64.104,
+   "source": "transcript",
+   "text": "Nice job."
+  },
+  {
+   "t": 64.115,
+   "source": "utterance",
+   "text": "{\"text\": \"Nice job.\", \"speech_end\": 1790693768.949, \"voiced_ms\": 400, \"speech_start\": 1790693768.271, \"published\": 1790693769.713}"
+  },
+  {
+   "t": 65.031,
+   "source": "morty_said",
+   "text": "Thanks! Anything else you need?"
+  },
+  {
+   "t": 65.605,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9419821500778198, \"bbox\": [475.4380187988281, 131.81787109375, 523.3919067382812, 325.8951416015625], \"reach_pct\": 84.1, \"reach_state\": \"green\", \"reach_angle_deg\": 28.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9408006072044373"
+  },
+  {
+   "t": 67.105,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9421554207801819, \"bbox\": [475.39361572265625, 131.80223083496094, 523.509521484375, 325.7235107421875], \"reach_pct\": 84.1, \"reach_state\": \"green\", \"reach_angle_deg\": 28.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9410835504531"
+  },
+  {
+   "t": 68.603,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "events_exact": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.161,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9526247978210449, \"bbox\": [352.80645751953125, 263.0145263671875, 427.9383544921875, 419.984130859375], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9249160885810852, \"b"
+  },
+  {
+   "t": 2.427,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.335,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9533458352088928, \"bbox\": [352.7378234863281, 262.93621826171875, 427.72039794921875, 420.00360107421875], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9245958924293518,"
+  },
+  {
+   "t": 7.078,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9526025056838989, \"bbox\": [352.8616638183594, 262.97564697265625, 427.8267822265625, 419.9457702636719], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9246132969856262, \""
+  },
+  {
+   "t": 7.296,
+   "source": "transcript",
+   "text": "Now go to the drop right. While you are doing that, tell me a good story."
+  },
+  {
+   "t": 7.297,
+   "source": "utterance",
+   "text": "{\"text\": \"Now go to the drop right. While you are doing that, tell me a good story.\", \"speech_end\": 1790693711.829, \"voiced_ms\": 3800, \"speech_start\": 1790693706.878, \"published\": 1790693713.117}"
+  },
+  {
+   "t": 8.09,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9524655342102051, \"bbox\": [352.7796630859375, 263.05731201171875, 427.6792907714844, 420.3332214355469], \"reach_pct\": 82.4, \"reach_state\": \"green\", \"reach_angle_deg\": 27.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9239318370819092, \""
+  },
+  {
+   "t": 8.231,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693714.052}"
+  },
+  {
+   "t": 8.448,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 9.42,
+   "source": "morty_said",
+   "text": "Once there was a curious robot at a university who spent its days moving objects around a table."
+  },
+  {
+   "t": 10.328,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.96360182762146, \"bbox\": [337.1976013183594, 244.57542419433594, 415.9687805175781, 405.12249755859375], \"reach_pct\": 159.8, \"reach_state\": \"red\", \"reach_angle_deg\": 41.4, \"reach_closer_cm\": 59.4, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9308825135231018, \"b"
+  },
+  {
+   "t": 12.961,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 14.653,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 15.755,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 16.208,
+   "source": "morty_said",
+   "text": "One day it realized: every object it picked taught it something new \u2014 the weight, the shape, the fragility."
+  },
+  {
+   "t": 17.127,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 18.209,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 19.613,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 21.087,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 22.454,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 22.592,
+   "source": "morty_said",
+   "text": "By the end of the year, the robot wasn't just grasping things anymore; it understood them."
+  },
+  {
+   "t": 23.991,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 25.061,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 26.665,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 27.949,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 29.393,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 30.893,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 32.292,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 32.662,
+   "source": "transcript",
+   "text": "You know enough, enough. I am got enough from you. Go back home and then, do the drop left."
+  },
+  {
+   "t": 32.663,
+   "source": "utterance",
+   "text": "{\"text\": \"You know enough, enough. I am got enough from you. Go back home and then, do the drop left.\", \"speech_end\": 1790693737.14, \"voiced_ms\": 4700, \"speech_start\": 1790693731.694, \"published\": 1790693738.483}"
+  },
+  {
+   "t": 33.429,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 33.857,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693739.678}"
+  },
+  {
+   "t": 33.914,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_left\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693739.735}"
+  },
+  {
+   "t": 34.092,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 34.875,
+   "source": "morty_said",
+   "text": "Going home."
+  },
+  {
+   "t": 34.995,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 36.429,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 36.74,
+   "source": "morty_said",
+   "text": "Going to drop left."
+  },
+  {
+   "t": 37.9,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 39.478,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8624284863471985, \"bbox\": [61.21092224121094, 56.358253479003906, 235.02517700195312, 275.584716796875], \"reach_pct\": 158.3, \"reach_state\": \"red\", \"reach_angle_deg\": 11.0, \"reach_closer_cm\": 61.6, \"source\": \"ys\", \"colour\": \"orange\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.7496453523635864, \""
+  },
+  {
+   "t": 41.134,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9185813665390015, \"bbox\": [489.7041320800781, 82.59365844726562, 560.960205078125, 367.0098876953125], \"reach_pct\": 171.6, \"reach_state\": \"red\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 72.2, \"source\": \"ys\", \"colour\": \"gray\", \"cap_colour\": \"gray\"}, {\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.903669178485870"
+  },
+  {
+   "t": 42.222,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9081182479858398, \"bbox\": [528.9212036132812, 311.41290283203125, 606.4566650390625, 479.2036437988281], \"reach_pct\": 162.6, \"reach_state\": \"red\", \"reach_angle_deg\": 9.7, \"reach_closer_cm\": 65.2, \"source\": \"ys\", \"colour\": \"gray\", \"cap_colour\": \"gray\"}]"
+  },
+  {
+   "t": 43.715,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 45.695,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 46.821,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 47.759,
+   "source": "transcript",
+   "text": "I will look at the left side."
+  },
+  {
+   "t": 47.759,
+   "source": "utterance",
+   "text": "{\"text\": \"I will look at the left side.\", \"speech_end\": 1790693752.45, \"voiced_ms\": 1500, \"speech_start\": 1790693750.19, \"published\": 1790693753.58}"
+  },
+  {
+   "t": 48.613,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 48.827,
+   "source": "morty_said",
+   "text": "Go ahead \u2014 I'm here if you need me."
+  },
+  {
+   "t": 49.65,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 50.915,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 52.245,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 53.864,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 55.33,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 55.542,
+   "source": "utterance",
+   "text": "{\"text\": \"No, I said like look at the left side.\", \"speech_end\": 1790693760.149, \"voiced_ms\": 2400, \"speech_start\": 1790693757.369, \"published\": 1790693761.363}"
+  },
+  {
+   "t": 55.542,
+   "source": "transcript",
+   "text": "No, I said like look at the left side."
+  },
+  {
+   "t": 56.593,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 56.636,
+   "source": "intent",
+   "text": "{\"action_intent\":\"look_left\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790693762.457}"
+  },
+  {
+   "t": 56.962,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 57.432,
+   "source": "morty_said",
+   "text": "Looking left."
+  },
+  {
+   "t": 58.239,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 59.528,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 61.026,
+   "source": "detections",
+   "text": "[]"
+  },
+  {
+   "t": 62.538,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9417782425880432, \"bbox\": [475.36492919921875, 131.9009246826172, 523.4093017578125, 326.1448974609375], \"reach_pct\": 84.2, \"reach_state\": \"green\", \"reach_angle_deg\": 28.5, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9409941434860"
+  },
+  {
+   "t": 63.892,
+   "source": "utterance",
+   "text": "{\"text\": \"Nice job.\", \"speech_end\": 1790693768.949, \"voiced_ms\": 400, \"speech_start\": 1790693768.271, \"published\": 1790693769.713}"
+  },
+  {
+   "t": 63.892,
+   "source": "transcript",
+   "text": "Nice job."
+  },
+  {
+   "t": 64.825,
+   "source": "morty_said",
+   "text": "Thanks! Anything else you need?"
+  },
+  {
+   "t": 65.605,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9419821500778198, \"bbox\": [475.4380187988281, 131.81787109375, 523.3919067382812, 325.8951416015625], \"reach_pct\": 84.1, \"reach_state\": \"green\", \"reach_angle_deg\": 28.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9408006072044373"
+  },
+  {
+   "t": 67.105,
+   "source": "detections",
+   "text": "[{\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.9421554207801819, \"bbox\": [475.39361572265625, 131.80223083496094, 523.509521484375, 325.7235107421875], \"reach_pct\": 84.1, \"reach_state\": \"green\", \"reach_angle_deg\": 28.4, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"orange\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.9410835504531"
+  },
+  {
+   "t": 68.603,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

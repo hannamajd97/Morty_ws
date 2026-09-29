@@ -1,0 +1,28 @@
+1
+00:00:08,339 --> 00:00:12,339
+You: Morty, look at the right side first, then go home.
+
+2
+00:00:11,590 --> 00:00:15,590
+Morty (status): Looking right.
+
+3
+00:00:13,758 --> 00:00:17,758
+Morty (status): Going home.
+
+4
+00:00:27,646 --> 00:00:31,646
+You: After that, I want you to go to the drop right position.
+
+5
+00:00:30,840 --> 00:00:34,840
+Morty (status): Going to drop right.
+
+6
+00:00:44,032 --> 00:00:48,032
+You: After that, I want you to go back home.
+
+7
+00:00:47,044 --> 00:00:51,044
+Morty (status): Going home.
+

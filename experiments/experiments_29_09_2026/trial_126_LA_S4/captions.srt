@@ -1,0 +1,80 @@
+1
+00:00:07,072 --> 00:00:11,072
+You: Morty, give me the vitamin tube.
+
+2
+00:00:07,179 --> 00:00:11,179
+Morty (status): I see two vitamin tubes. Could you say leftmost or rightmost, or point at the one you want?
+
+3
+00:00:16,611 --> 00:00:20,611
+You: This one's at our right sink.
+
+4
+00:00:17,773 --> 00:00:21,773
+Morty: I see two vitamin tubes on the table — could you say leftmost or rightmost?
+
+5
+00:00:26,981 --> 00:00:30,981
+You: No, no, I mean it have red.
+
+6
+00:00:27,485 --> 00:00:31,485
+You: No, no, I mean it have red. Color.
+
+7
+00:00:29,192 --> 00:00:33,192
+Morty (status): Picking the red Vitamin B12.
+
+8
+00:00:33,183 --> 00:00:37,183
+Morty (status): Starting grasp on the vitamin tube.
+
+9
+00:00:37,685 --> 00:00:41,685
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+10
+00:00:45,904 --> 00:00:49,904
+You: Drop it on the left side.
+
+11
+00:00:46,083 --> 00:00:50,083
+Morty (status): Going to drop left.
+
+12
+00:00:49,178 --> 00:00:53,178
+Morty (status): I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?
+
+13
+00:00:55,176 --> 00:00:59,176
+You: I changed my mind. Go to the back to the home position.
+
+14
+00:00:59,081 --> 00:01:03,081
+Morty (status): I'm at the home position, still holding the vitamin tube. Should I open the gripper?
+
+15
+00:01:08,581 --> 00:01:12,581
+You: No, no, don't open it. Go to the drop right.
+
+16
+00:01:09,782 --> 00:01:13,782
+Morty (status): Going to drop right.
+
+17
+00:01:13,882 --> 00:01:17,882
+Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+
+18
+00:01:24,681 --> 00:01:28,681
+You: Yes, open the gripper, give me the objects and go back home.
+
+19
+00:01:25,880 --> 00:01:29,880
+Morty (status): Opening the gripper.
+
+20
+00:01:34,078 --> 00:01:38,078
+Morty (status): Done — I'm back at the home position. What's next?
+

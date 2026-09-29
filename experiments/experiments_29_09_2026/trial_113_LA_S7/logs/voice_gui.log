@@ -1,0 +1,44 @@
+[chat_node-7] [0m[INFO] [1790682573.840550166] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790682576.315475218] [speech_input_node]: [speaker] human voice (cos 0.10, rms 0.123)
+[chat_node-7] [0m[INFO] [1790682576.882488022] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790682577.079846816] [speech_input_node]: [timing] omni 0.75s for 6.7s audio (today 40, month 968)
+[speech_input_node-4] [INFO] [1790682577.084524782] [speech_input_node]: Heard: 'Morty, how are you? Can you look at the left side, then go to the drop right side.'
+[chat_node-7] User (voice): Morty, how are you? Can you look at the left side, then go to the drop right side.
+[chat_node-7] [0m[INFO] [1790682577.095208285] [communication_llm_chat_node]: [timing] pruned 14 stale message(s) from the LLM context (50 -> 36)[0m
+[chat_node-7] [0m[INFO] [1790682578.719060171] [communication_llm_chat_node]: [timing] first sentence spoken 1.62s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790682578.733976972] [speak_action_server]: Speak: "I'm doing well, thanks for asking!"
+[chat_node-7] [0m[INFO] [1790682578.930115516] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_left","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790682578.933056927] [communication_llm_chat_node]: [timing] intent dispatched 1.83s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790682579.136780339] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"drop_right","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790682579.138196187] [communication_llm_chat_node]: [timing] intent dispatched 2.04s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790682579.146998809] [communication_llm_chat_node]: [timing] LLM main call 2.05s (prompt cache: 6540 tokens read)[0m
+[chat_node-7] [0m[INFO] [1790682579.335229408] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[intent_router_node-6] [INFO] [1790682579.567633383] [intent_router_node]: Queued intent 'look_left'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790682579.577999927] [intent_router_node]: dispatching: action='look_left', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790682579.580466952] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790682579.584752318] [intent_router_node]: Sending MoveToNamedPose -> 'detect_left' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790682579.587951305] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[chat_node-7] [0m[INFO] [1790682580.777646210] [communication_llm_chat_node]: [timing] LLM follow-up call 1.63s[0m
+[speak_action_server-3] [INFO] [1790682580.800465296] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790682580.811507041] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790682581.519376260] [speak_action_server]: [timing] TTS first audio after 0.41s, 2.7s of speech, done 2.78s after the request
+[speak_action_server-3] [INFO] [1790682581.546581760] [speak_action_server]: Speak: 'Looking left.'
+[chat_node-7] [0m[INFO] [1790682583.015997263] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speak_action_server-3] [INFO] [1790682583.503063454] [speak_action_server]: [timing] TTS first audio after 0.38s, 1.6s of speech, done 1.95s after the request
+[speak_action_server-3] [INFO] [1790682583.527201682] [speak_action_server]: Speak: 'Going to drop right.'
+[intent_router_node-6] [INFO] [1790682584.623850164] [intent_router_node]: MoveToNamedPose completed.
+[intent_router_node-6] [INFO] [1790682585.186367666] [intent_router_node]: Queued intent 'drop_right'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790682585.200909506] [intent_router_node]: dispatching: action='drop_right', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790682585.203700772] [intent_router_node]: drop pose 'vla_drop_right' from 'detect_left': home first, as its own move, then the drop pose
+[intent_router_node-6] [INFO] [1790682585.208289581] [intent_router_node]: Sending MoveToNamedPose -> 'home' (velocity_scaling=0.20)
+[speak_action_server-3] [INFO] [1790682585.846519743] [speak_action_server]: [timing] TTS first audio after 0.34s, 2.1s of speech, done 2.32s after the request
+[chat_node-7] [0m[INFO] [1790682588.631319824] [communication_llm_chat_node]: Current pose update: '' -> 'detect_left'[0m
+[intent_router_node-6] [INFO] [1790682590.560972770] [intent_router_node]: MoveToNamedPose completed.
+[intent_router_node-6] [INFO] [1790682590.562909967] [intent_router_node]: home reached — now 'vla_drop_right'
+[intent_router_node-6] [INFO] [1790682590.565114807] [intent_router_node]: Sending MoveToNamedPose -> 'vla_drop_right' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790682591.439685869] [communication_llm_chat_node]: Current pose update: 'detect_left' -> 'home'[0m
+[chat_node-7] [0m[INFO] [1790682591.816704819] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[chat_node-7] [0m[INFO] [1790682596.669709548] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[chat_node-7] [0m[INFO] [1790682596.680191817] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[chat_node-7] [0m[INFO] [1790682597.477250203] [communication_llm_chat_node]: Current pose update: '' -> 'vla_drop_right'[0m
+[intent_router_node-6] [INFO] [1790682597.543371114] [intent_router_node]: MoveToNamedPose completed.

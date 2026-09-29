@@ -1,0 +1,288 @@
+{
+  "format": "morty_vla_raw_v2",
+  "episode_id": "trial_129_LA_S7",
+  "episode_index": 129,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_129_LA_S7",
+  "in_trial_dir": true,
+  "trial_id": "129",
+  "task": "drop it on the right side",
+  "task_from": "intent",
+  "outcome": "unknown",
+  "success": null,
+  "intent": "look_left",
+  "cycle_done": "",
+  "note": "outcome: unknown (no human verdict, no executor verdict)",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_129_LA_S7",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "Now go to the drop right. While you are doing that, tell me a good story.",
+  "trial_form_task": "S7: Moving without grasping",
+  "transcripts": [
+    "Now go to the drop right. While you are doing that, tell me a good story.",
+    "You know enough, enough. I am got enough from you. Go back home and then, do the drop left.",
+    "I will look at the left side.",
+    "No, I said like look at the left side.",
+    "Nice job."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "t": 8.178403377532959,
+      "stamp": 1790693714.052,
+      "action_intent": "drop_right",
+      "object": null,
+      "attributes": null,
+      "transcript": "Now go to the drop right. While you are doing that, tell me a good story.",
+      "transcript_stamp": 1790693713.1209774,
+      "instruction": "drop it on the right side"
+    },
+    {
+      "idx": 1,
+      "t": 33.80440330505371,
+      "stamp": 1790693739.678,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "You know enough, enough. I am got enough from you. Go back home and then, do the drop left.",
+      "transcript_stamp": 1790693738.4882,
+      "instruction": "go back home"
+    },
+    {
+      "idx": 2,
+      "t": 33.86140322685242,
+      "stamp": 1790693739.735,
+      "action_intent": "drop_left",
+      "object": null,
+      "attributes": null,
+      "transcript": "You know enough, enough. I am got enough from you. Go back home and then, do the drop left.",
+      "transcript_stamp": 1790693738.4882,
+      "instruction": "drop it on the left side"
+    },
+    {
+      "idx": 3,
+      "t": 56.58340334892273,
+      "stamp": 1790693762.457,
+      "action_intent": "look_left",
+      "object": null,
+      "attributes": null,
+      "transcript": "No, I said like look at the left side.",
+      "transcript_stamp": 1790693761.3667111,
+      "instruction": "look to the left"
+    }
+  ],
+  "events": {
+    "transcript": [
+      {
+        "t": 7.24738073348999,
+        "stamp": 1790693713.1209774,
+        "text": "Now go to the drop right. While you are doing that, tell me a good story."
+      },
+      {
+        "t": 32.61460328102112,
+        "stamp": 1790693738.4882,
+        "text": "You know enough, enough. I am got enough from you. Go back home and then, do the drop left."
+      },
+      {
+        "t": 47.710944175720215,
+        "stamp": 1790693753.5845408,
+        "text": "I will look at the left side."
+      },
+      {
+        "t": 55.49311447143555,
+        "stamp": 1790693761.3667111,
+        "text": "No, I said like look at the left side."
+      },
+      {
+        "t": 63.84489297866821,
+        "stamp": 1790693769.7184896,
+        "text": "Nice job."
+      }
+    ],
+    "intent": [
+      {
+        "t": 8.178403377532959,
+        "stamp": 1790693714.052,
+        "action_intent": "drop_right",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 33.80440330505371,
+        "stamp": 1790693739.678,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 33.86140322685242,
+        "stamp": 1790693739.735,
+        "action_intent": "drop_left",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 56.58340334892273,
+        "stamp": 1790693762.457,
+        "action_intent": "look_left",
+        "object_intent": null,
+        "object_attributes": null
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 675,
+  "duration_s": 67.40160942077637,
+  "dropped_ticks": 0,
+  "drop_reasons": {},
+  "started_unix": 1790693705.8736184,
+  "started_ros": 1790693705.8735967,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.5,
+      0.5,
+      0.06
+    ],
+    "rpy": [
+      0.0,
+      -0.5,
+      -0.8
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2
+  },
+  "phase_names": [],
+  "quality": {
+    "ok": true,
+    "issues": [],
+    "num_steps": 675,
+    "task_steps": 593,
+    "idle_steps": 82,
+    "reset_steps": 0,
+    "step_gaps": [],
+    "dt_max_s": 0.1850595474243164,
+    "images": {
+      "exterior": {
+        "age_max_s": 0.21517797200067434,
+        "age_p95_s": 0.12799169780191733,
+        "missing": 0
+      },
+      "wrist": {
+        "age_max_s": 0.16285581000556704,
+        "age_p95_s": 0.0509999300047638,
+        "missing": 0
+      }
+    },
+    "joint_age_max_s": 0.05743308299861383,
+    "tcp_stale_steps": 0,
+    "ur_tcp_missing_steps": 0,
+    "gripper_commands": [],
+    "gripper_state_changes": 0,
+    "n_transcripts": 5,
+    "n_intents": 4,
+    "n_instructions": 4,
+    "n_executor_phases": 0
+  }
+}

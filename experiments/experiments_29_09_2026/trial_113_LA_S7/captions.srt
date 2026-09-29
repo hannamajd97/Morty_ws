@@ -1,0 +1,12 @@
+1
+00:00:08,601 --> 00:00:12,601
+You: Morty, how are you? Can you look at the left side, then go to the drop right side.
+
+2
+00:00:13,116 --> 00:00:17,116
+Morty (status): Looking left.
+
+3
+00:00:15,115 --> 00:00:19,115
+Morty (status): Going to drop right.
+

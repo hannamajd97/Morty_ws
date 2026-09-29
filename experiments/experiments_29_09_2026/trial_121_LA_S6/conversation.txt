@@ -1,0 +1,19 @@
+# trial 121 started 2026-09-29T16:10:41.786584
+[   8.65s] Morty (status): You pointed at the vitamin tube. Should I grasp it?
+[  18.05s] You: Yes, grasp this vitamin tube.
+[  36.84s] You: Grasp it.
+[  37.62s] Morty (status): Starting grasp on the vitamin tube.
+[  42.24s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  49.74s] You: Drop it home.
+[  49.94s] Morty (status): Going home.
+[  56.15s] Morty (status): I'm at the home position, still holding the vitamin tube. Should I open the gripper?
+[  59.43s] You: I changed my mind. Go to the drop right.
+[  60.66s] Morty (status): Going to drop right.
+[  64.83s] Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+[  74.54s] You: Yes, open the gripper, give me the object.
+[  74.74s] Morty (status): Opening the gripper.
+[  78.34s] Morty (status): Should I go back home?
+[  81.74s] You: Go back home.
+[  81.94s] Morty (status): Going home.
+[  87.26s] Morty (status): Done — I'm back at the home position. What's next?
+[  97.85s] You: He was the whole time in the video, bro.

@@ -1,0 +1,63 @@
+[speech_input_node-4] [INFO] [1790691411.124875741] [speech_input_node]: [speaker] human voice (cos 0.04, rms 0.099)
+[speech_input_node-4] [INFO] [1790691411.582770345] [speech_input_node]: [timing] omni 0.45s for 5.2s audio (today 108, month 1036)
+[speech_input_node-4] [INFO] [1790691411.584197960] [speech_input_node]: Heard: 'Hello Morty, tell me a story while you are looking at the right side.'
+[chat_node-7] User (voice): Hello Morty, tell me a story while you are looking at the right side.
+[chat_node-7] [0m[INFO] [1790691411.592106785] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (35 -> 25)[0m
+[chat_node-7] [0m[INFO] [1790691412.832995097] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_right","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1790691412.833290272] [intent_router_node]: Queued intent 'look_right'; queue size now 1, busy=False
+[chat_node-7] [0m[INFO] [1790691412.834464266] [communication_llm_chat_node]: [timing] intent dispatched 1.24s into the LLM call (before the reply finished)[0m
+[intent_router_node-6] [INFO] [1790691412.836718927] [intent_router_node]: dispatching: action='look_right', object='', colour='', shape='', position='', speed='slow'
+[chat_node-7] [0m[INFO] [1790691412.837402822] [communication_llm_chat_node]: [timing] LLM main call 1.24s (prompt cache: 6807 tokens read)[0m
+[intent_router_node-6] [INFO] [1790691412.838836821] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790691412.841277255] [intent_router_node]: Sending MoveToNamedPose -> 'detect_right' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790691412.848841774] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[chat_node-7] [0m[INFO] [1790691415.458406094] [communication_llm_chat_node]: [timing] first sentence spoken 3.86s into the LLM call[0m
+[speak_action_server-3] [INFO] [1790691415.468950471] [speak_action_server]: Speak: "Once upon a time, a curious robot named Morty discovered that the best adventures weren't always the farthest away — sometimes they were right beside him, waiting to be noticed."
+[chat_node-7] [0m[INFO] [1790691415.771226744] [communication_llm_chat_node]: [timing] LLM follow-up call 2.93s[0m
+[chat_node-7] Assistant: Once upon a time, a curious robot named Morty discovered that the best adventures weren't always the farthest away — sometimes they were right beside him, waiting to be noticed. He learned that kindness and patience could unlock doors that strength alone never could, and that helping others was the greatest discovery of all.
+[speak_action_server-3] [INFO] [1790691415.782020906] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790691415.785813671] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[chat_node-7] [0m[INFO] [1790691417.306187035] [communication_llm_chat_node]: Current pose update: '' -> 'detect_right'[0m
+[intent_router_node-6] [INFO] [1790691417.310794036] [intent_router_node]: MoveToNamedPose completed.
+[speak_action_server-3] [INFO] [1790691426.820906858] [speak_action_server]: [timing] TTS first audio after 0.62s, 10.9s of speech, done 11.35s after the request
+[speak_action_server-3] [INFO] [1790691426.843757245] [speak_action_server]: Speak: 'He learned that kindness and patience could unlock doors that strength alone never could, and that helping others was the greatest discovery of all.'
+[speech_input_node-4] [INFO] [1790691427.187146897] [speech_input_node]: [speaker] barge-in: a human is talking over Morty (cos 0.07, rms 0.272 vs echo 0.298) — stopping playback
+[chat_node-7] [0m[INFO] [1790691427.190596085] [communication_llm_chat_node]: Answer 28 interrupted (the operator talked over it): 2 queued sentence(s) cancelled; nothing more of it will be said.[0m
+[speak_action_server-3] [INFO] [1790691427.200854575] [speak_action_server]: Barge-in: the operator is talking — stopping playback, dropping 1 queued sentence(s); new speech waits until they finish.
+[speech_input_node-4] [INFO] [1790691432.716383463] [speech_input_node]: [speaker] human voice (cos 0.03, rms 0.079)
+[speech_input_node-4] [WARN] [1790691432.876794492] [speech_input_node]: [omni] HTTP 500 — Parakeet for the next 30 s
+[speech_input_node-4] [INFO] [1790691436.366427087] [speech_input_node]: [timing] parakeet 3.49s for 6.6s audio
+[speech_input_node-4] [INFO] [1790691436.370274398] [speech_input_node]: Heard: 'Whatever about your story, go to the left side. Look at the left side.'
+[chat_node-7] User (voice): Whatever about your story, go to the left side. Look at the left side.
+[chat_node-7] [0m[INFO] [1790691436.380753620] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (36 -> 27)[0m
+[intent_router_node-6] [INFO] [1790691437.253375936] [intent_router_node]: Queued intent 'look_left'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790691437.255190221] [intent_router_node]: dispatching: action='look_left', object='', colour='', shape='', position='', speed='slow'
+[chat_node-7] [0m[INFO] [1790691437.256063023] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_left","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790691437.260647033] [communication_llm_chat_node]: [timing] intent dispatched 0.88s into the LLM call (before the reply finished)[0m
+[intent_router_node-6] [INFO] [1790691437.258575025] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790691437.261935383] [intent_router_node]: Sending MoveToNamedPose -> 'detect_left' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790691437.268826733] [communication_llm_chat_node]: Current pose update: 'detect_right' -> ''[0m
+[chat_node-7] [0m[INFO] [1790691437.273603531] [communication_llm_chat_node]: [timing] LLM main call 0.88s (prompt cache: 6807 tokens read)[0m
+[chat_node-7] [0m[INFO] [1790691438.137688541] [communication_llm_chat_node]: [timing] LLM follow-up call 0.86s[0m
+[speak_action_server-3] [INFO] [1790691438.145107187] [speak_action_server]: Speak: 'Looking left.'
+[speak_action_server-3] [INFO] [1790691440.121648372] [speak_action_server]: [timing] TTS first audio after 0.44s, 1.6s of speech, done 1.97s after the request
+[chat_node-7] [0m[INFO] [1790691441.719068657] [communication_llm_chat_node]: Current pose update: '' -> 'detect_left'[0m
+[intent_router_node-6] [INFO] [1790691441.727341312] [intent_router_node]: MoveToNamedPose completed.
+[speech_input_node-4] [INFO] [1790691446.648452475] [speech_input_node]: [speaker] human voice (cos -0.04, rms 0.100)
+[speech_input_node-4] [INFO] [1790691447.406797605] [speech_input_node]: [timing] parakeet 0.76s for 2.0s audio
+[speech_input_node-4] [INFO] [1790691447.408950698] [speech_input_node]: Heard: 'Now go back home.'
+[chat_node-7] User (voice): Now go back home.
+[intent_router_node-6] [INFO] [1790691447.417572605] [intent_router_node]: Queued intent 'go_home'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790691447.419197175] [intent_router_node]: dispatching: action='go_home', object='', colour='', shape='', position='', speed='slow'
+[chat_node-7] [0m[INFO] [1790691447.419514011] [communication_llm_chat_node]: FAST: matched 'Now go back home.' -> go_home (speed=default); published {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790691447.421947897] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer go_home, question='', fresh=False)[0m
+[intent_router_node-6] [INFO] [1790691447.422335223] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790691447.424824599] [intent_router_node]: Sending MoveToNamedPose -> 'home' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790691447.427361493] [communication_llm_chat_node]: Current pose update: 'detect_left' -> ''[0m
+[speak_action_server-3] [INFO] [1790691447.431973212] [speak_action_server]: Speak: 'Going home.'
+[speak_action_server-3] [INFO] [1790691449.306617430] [speak_action_server]: [timing] TTS first audio after 0.34s, 1.7s of speech, done 1.87s after the request
+[intent_router_node-6] [INFO] [1790691451.960464705] [intent_router_node]: MoveToNamedPose completed.
+[chat_node-7] [0m[INFO] [1790691451.963998517] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[speech_input_node-4] [INFO] [1790691478.347469886] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.015)
+[speech_input_node-4] [INFO] [1790691478.655397410] [speech_input_node]: [timing] omni 0.30s for 1.9s audio (today 110, month 1038)
+[speech_input_node-4] [INFO] [1790691478.657268820] [speech_input_node]: Heard: "I'm getting hungry."

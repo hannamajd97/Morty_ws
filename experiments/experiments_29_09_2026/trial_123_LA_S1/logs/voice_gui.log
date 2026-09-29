@@ -1,0 +1,8 @@
+[speech_input_node-4] [INFO] [1790692097.543606398] [speech_input_node]: [speaker] human voice (cos 0.04, rms 0.045)
+[speech_input_node-4] [INFO] [1790692098.022126646] [speech_input_node]: [timing] omni 0.46s for 6.6s audio (today 114, month 1042)
+[speech_input_node-4] [INFO] [1790692098.026428018] [speech_input_node]: Heard: 'Hi Morty, before we start, tell me everything that is in front of you from left to right.'
+[chat_node-7] User (voice): Hi Morty, before we start, tell me everything that is in front of you from left to right.
+[chat_node-7] [0m[INFO] [1790692100.389536226] [communication_llm_chat_node]: [timing] LLM main call 2.33s[0m
+[chat_node-7] Assistant: I see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C from left to right.
+[speak_action_server-3] [INFO] [1790692100.421727237] [speak_action_server]: Speak: 'I see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C from left to right.'
+[speak_action_server-3] [INFO] [1790692107.237941815] [speak_action_server]: [timing] TTS first audio after 0.48s, 6.5s of speech, done 6.81s after the request

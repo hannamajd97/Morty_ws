@@ -1,0 +1,199 @@
+{
+ "start_wall": 1790684153.3742778,
+ "stop_wall": 1790684174.308189,
+ "stage_times": {
+  "interaction_s": null,
+  "voice_to_transcript_s": 1.307,
+  "understood_by": null,
+  "graspgen_background": null,
+  "plan_background": null,
+  "plan_compute_s": null,
+  "grasp_used": null,
+  "grasp_probes": null,
+  "release_s": null,
+  "human_wait_s": null,
+  "robot_time_s": null,
+  "morty_questions": 0,
+  "your_utterances": 1,
+  "speech_end_to_intent_s": null,
+  "intent_s": null,
+  "choice_s": null,
+  "yolo_s": null,
+  "graspgen_s": null,
+  "graspgen_compute_s": null,
+  "graspgen_wait_s": null,
+  "graspgen_lead_s": null,
+  "verify_compute_s": null,
+  "planning_s": null,
+  "command_to_motion_s": null,
+  "approach_s": null,
+  "grasp_s": null,
+  "wait_destination_s": null,
+  "transport_s": null,
+  "execution_s": null,
+  "click_to_motion_s": null,
+  "background_lead_s": null,
+  "total_s": null,
+  "planner": null,
+  "path": null,
+  "started_by": "voice"
+ },
+ "selection_cycles": [],
+ "executor_cycles": [],
+ "background": [],
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.328,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.888493001461029, \"bbox\": [175.21189880371094, 280.59466552734375, 254.35044860839844, 430.9952697753906], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8320253491401672,"
+  },
+  {
+   "t": 3.001,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8871209621429443, \"bbox\": [175.19029235839844, 280.58966064453125, 254.3433074951172, 431.0517272949219], \"reach_pct\": 80.5, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8436391949653625,"
+  },
+  {
+   "t": 5.405,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8893882036209106, \"bbox\": [175.2277374267578, 280.5550231933594, 254.44667053222656, 431.0822448730469], \"reach_pct\": 81.0, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8417273163795471, "
+  },
+  {
+   "t": 5.869,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 8.092,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8864448070526123, \"bbox\": [175.17727661132812, 280.4857177734375, 254.44863891601562, 431.0420227050781], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8427329659461975,"
+  },
+  {
+   "t": 9.59,
+   "source": "transcript",
+   "text": "How many vitamins tubes do you see and where are they"
+  },
+  {
+   "t": 9.591,
+   "source": "utterance",
+   "text": "{\"text\": \"How many vitamins tubes do you see and where are they\", \"speech_end\": 1790684161.657, \"voiced_ms\": 3000, \"speech_start\": 1790684157.992, \"published\": 1790684162.964}"
+  },
+  {
+   "t": 9.99,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8849588632583618, \"bbox\": [175.1632537841797, 280.5432434082031, 254.37950134277344, 430.98223876953125], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8570365905761719,"
+  },
+  {
+   "t": 10.813,
+   "source": "morty_said",
+   "text": "I see 2 vitamin tubes: a Vitamin B12 on the leftmost side and a Vitamin C on the rightmost side."
+  },
+  {
+   "t": 12.617,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8892856240272522, \"bbox\": [175.22012329101562, 280.47412109375, 254.39450073242188, 431.1001281738281], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8448150753974915, \""
+  },
+  {
+   "t": 15.412,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8893290758132935, \"bbox\": [175.17550659179688, 280.48785400390625, 254.4156494140625, 431.1631164550781], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8516340255737305,"
+  },
+  {
+   "t": 18.498,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8876343369483948, \"bbox\": [175.2152862548828, 280.484130859375, 254.4368896484375, 431.1259765625], \"reach_pct\": 81.0, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8455756902694702, \"bbox"
+  },
+  {
+   "t": 20.931,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "events_gui": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.328,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.888493001461029, \"bbox\": [175.21189880371094, 280.59466552734375, 254.35044860839844, 430.9952697753906], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8320253491401672,"
+  },
+  {
+   "t": 3.001,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8871209621429443, \"bbox\": [175.19029235839844, 280.58966064453125, 254.3433074951172, 431.0517272949219], \"reach_pct\": 80.5, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8436391949653625,"
+  },
+  {
+   "t": 5.405,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8893882036209106, \"bbox\": [175.2277374267578, 280.5550231933594, 254.44667053222656, 431.0822448730469], \"reach_pct\": 81.0, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8417273163795471, "
+  },
+  {
+   "t": 5.869,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 8.092,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8864448070526123, \"bbox\": [175.17727661132812, 280.4857177734375, 254.44863891601562, 431.0420227050781], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8427329659461975,"
+  },
+  {
+   "t": 9.59,
+   "source": "transcript",
+   "text": "How many vitamins tubes do you see and where are they"
+  },
+  {
+   "t": 9.98,
+   "source": "utterance",
+   "text": "{\"text\": \"How many vitamins tubes do you see and where are they\", \"speech_end\": 1790684161.657, \"voiced_ms\": 3000, \"speech_start\": 1790684157.992, \"published\": 1790684162.964}"
+  },
+  {
+   "t": 9.99,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8849588632583618, \"bbox\": [175.1632537841797, 280.5432434082031, 254.37950134277344, 430.98223876953125], \"reach_pct\": 80.8, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8570365905761719,"
+  },
+  {
+   "t": 10.939,
+   "source": "morty_said",
+   "text": "I see 2 vitamin tubes: a Vitamin B12 on the leftmost side and a Vitamin C on the rightmost side."
+  },
+  {
+   "t": 12.617,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8892856240272522, \"bbox\": [175.22012329101562, 280.47412109375, 254.39450073242188, 431.1001281738281], \"reach_pct\": 80.6, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8448150753974915, \""
+  },
+  {
+   "t": 15.412,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8893290758132935, \"bbox\": [175.17550659179688, 280.48785400390625, 254.4156494140625, 431.1631164550781], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8516340255737305,"
+  },
+  {
+   "t": 18.498,
+   "source": "detections",
+   "text": "[{\"label\": \"tape_dispenser\", \"display\": \"tape_dispenser\", \"score\": 0.8876343369483948, \"bbox\": [175.2152862548828, 280.484130859375, 254.4368896484375, 431.1259765625], \"reach_pct\": 81.0, \"reach_state\": \"green\", \"reach_angle_deg\": 25.0, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"red\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.8455756902694702, \"bbox"
+  },
+  {
+   "t": 20.931,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "event_times": {
+  "moved": 2,
+  "from": {
+   "bag": 2
+  },
+  "gui_late_by_s": {
+   "median": 0.389,
+   "max": 0.389
+  },
+  "note": "GUI event times moved to the bag's receive stamps (else the VLA recorder's); stage times rebuilt from them"
+ }
+}

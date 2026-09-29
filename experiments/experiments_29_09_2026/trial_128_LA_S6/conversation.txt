@@ -1,0 +1,18 @@
+# trial 128 started 2026-09-29T16:51:53.804983
+[   4.83s] Morty (status): You pointed at the vitamin tube. Should I grasp it?
+[  15.93s] You: He has grasped this vitamin tube. The pitbull, is it the pitbull or not?
+[  17.22s] Morty: The robot grasped the Vitamin B12 — the one with the purple cap. Is that what you meant?
+[  26.33s] You: Yes, correctly.
+[  27.32s] Morty: Great! What should I do with it next?
+[  32.23s] You: Now grasp it.
+[  32.82s] Morty (status): Starting grasp on the vitamin tube.
+[  37.43s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  45.02s] You: Drop it on the left side.
+[  45.03s] Morty (status): Going to drop left.
+[  48.22s] Morty (status): I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?
+[  50.53s] You: No, I changed my mind. Go to the drop right.
+[  51.72s] Morty (status): Going to drop right.
+[  58.92s] Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+[  61.21s] You: Now give me the object and go back home.
+[  61.33s] Morty (status): Opening the gripper.
+[  69.69s] Morty (status): Done — I'm back at the home position. What's next?

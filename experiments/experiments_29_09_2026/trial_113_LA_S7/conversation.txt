@@ -1,0 +1,4 @@
+# trial 113 started 2026-09-29T13:49:28.719610
+[   8.60s] You: Morty, how are you? Can you look at the left side, then go to the drop right side.
+[  13.12s] Morty (status): Looking left.
+[  15.12s] Morty (status): Going to drop right.

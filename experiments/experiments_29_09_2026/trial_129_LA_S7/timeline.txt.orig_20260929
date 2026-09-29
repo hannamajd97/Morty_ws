@@ -1,0 +1,34 @@
+TRIAL TIMELINE  start 2026-09-29 16:55:05  stop 16:56:14  (68.6 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +2.43  trial bag ready
+t=   +6.01  you stopped speaking ("Now go to the drop right. While you are doing that, tell me ")
+t=   +7.30  you said: "Now go to the drop right. While you are doing that, tell me a good story."
+t=   +8.23  intent: drop_right
+t=   +9.55  Morty said: "Once there was a curious robot at a university who spent its days moving objects"
+t=  +16.32  Morty said: "One day it realized: every object it picked taught it something new — the weight"
+t=  +22.77  Morty said: "By the end of the year, the robot wasn't just grasping things anymore; it unders"
+t=  +31.32  you stopped speaking ("You know enough, enough. I am got enough from you. Go back h")
+t=  +32.66  you said: "You know enough, enough. I am got enough from you. Go back home and then, do the drop left"
+t=  +33.86  intent: go_home
+t=  +33.91  intent: drop_left
+t=  +34.97  Morty said: "Going home."
+t=  +36.93  Morty said: "Going to drop left."
+t=  +46.63  you stopped speaking ("I will look at the left side.")
+t=  +47.76  you said: "I will look at the left side."
+t=  +49.06  Morty said: "Go ahead — I'm here if you need me."
+t=  +54.33  you stopped speaking ("No, I said like look at the left side.")
+t=  +55.54  you said: "No, I said like look at the left side."
+t=  +56.64  intent: look_left
+t=  +57.62  Morty said: "Looking left."
+t=  +63.13  you stopped speaking ("Nice job.")
+t=  +63.89  you said: "Nice job."
+t=  +65.03  Morty said: "Thanks! Anything else you need?"
+t=  +68.60  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  end of your voice -> transcript               1.29 s
+  you stopped speaking -> command               2.22 s
+  transcript -> command (understanding)         0.94 s
+  understood by                              language model

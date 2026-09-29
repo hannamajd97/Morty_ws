@@ -1,0 +1,68 @@
+1
+00:00:04,834 --> 00:00:08,834
+Morty (status): You pointed at the vitamin tube. Should I grasp it?
+
+2
+00:00:15,931 --> 00:00:19,931
+You: He has grasped this vitamin tube. The pitbull, is it the pitbull or not?
+
+3
+00:00:17,220 --> 00:00:21,220
+Morty: The robot grasped the Vitamin B12 — the one with the purple cap. Is that what you meant?
+
+4
+00:00:26,329 --> 00:00:30,329
+You: Yes, correctly.
+
+5
+00:00:27,317 --> 00:00:31,317
+Morty: Great! What should I do with it next?
+
+6
+00:00:32,226 --> 00:00:36,226
+You: Now grasp it.
+
+7
+00:00:32,817 --> 00:00:36,817
+Morty (status): Starting grasp on the vitamin tube.
+
+8
+00:00:37,427 --> 00:00:41,427
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+9
+00:00:45,024 --> 00:00:49,024
+You: Drop it on the left side.
+
+10
+00:00:45,026 --> 00:00:49,026
+Morty (status): Going to drop left.
+
+11
+00:00:48,222 --> 00:00:52,222
+Morty (status): I'm at the drop left position, still holding the vitamin tube. Should I open the gripper?
+
+12
+00:00:50,525 --> 00:00:54,525
+You: No, I changed my mind. Go to the drop right.
+
+13
+00:00:51,723 --> 00:00:55,723
+Morty (status): Going to drop right.
+
+14
+00:00:58,920 --> 00:01:02,920
+Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+
+15
+00:01:01,214 --> 00:01:05,214
+You: Now give me the object and go back home.
+
+16
+00:01:01,334 --> 00:01:05,334
+Morty (status): Opening the gripper.
+
+17
+00:01:09,686 --> 00:01:13,686
+Morty (status): Done — I'm back at the home position. What's next?
+

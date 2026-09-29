@@ -1,0 +1,38 @@
+[gripper_command_adapter-3] [INFO] [1790682569.664130790] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682569.671985964] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790682574.952655319] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682574.959329343] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790682579.494661988] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790682579.495673933] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 26 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[ur_ros2_control_node-7] [WARN] [1790682579.580032071] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1790682579.580181637] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1790682579.580308940] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[move_group-15] [INFO] [1790682579.598370484] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 1 points (followed 0.000000% of requested trajectory)
+[move_group-15] [INFO] [1790682579.612427426] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790682579.612738496] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790682580.081845016] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[gripper_command_adapter-3] [INFO] [1790682580.169819674] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682580.174057628] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790682580.201952064] [moveit.pilz_industrial_motion_planner.trajectory_blender_transition_window]: Start trajectory blending using transition window.
+[move_group-15] [INFO] [1790682580.208386060] [moveit.pilz_industrial_motion_planner.trajectory_blender_transition_window]: Search for start and end point of blending trajectory.
+[move_group-15] [INFO] [1790682580.208479868] [moveit.pilz_industrial_motion_planner.trajectory_blender_transition_window]: Intersection point of first trajectory found, index: 14
+[move_group-15] [INFO] [1790682580.208512857] [moveit.pilz_industrial_motion_planner.trajectory_blender_transition_window]: Intersection point of second trajectory found, index: 2
+[ur_ros2_control_node-7] [INFO] [1790682580.554298989] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682580.554453841] [scaled_joint_trajectory_controller]: Accepted new action goal
+[ur_ros2_control_node-7] [INFO] [1790682584.560871006] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790682585.176595316] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682585.186837182] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682586.247912407] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682586.248608605] [scaled_joint_trajectory_controller]: Accepted new action goal
+[ur_ros2_control_node-7] [INFO] [1790682590.252834363] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790682590.455551220] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682590.461558137] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682591.760983493] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790682591.761828948] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790682595.463020562] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682595.472913932] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790682597.431115963] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790682600.895744068] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682600.899793826] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790682605.845704338] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790682605.849270153] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']

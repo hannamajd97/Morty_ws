@@ -1,0 +1,65 @@
+[speech_input_node-4] [INFO] [1790682684.635709277] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.102)
+[speech_input_node-4] [INFO] [1790682685.236084857] [speech_input_node]: [timing] omni 0.59s for 5.1s audio (today 45, month 973)
+[speech_input_node-4] [INFO] [1790682685.238877281] [speech_input_node]: Heard: 'Morty, look at the right side first, then go home.'
+[chat_node-7] User (voice): Morty, look at the right side first, then go home.
+[chat_node-7] [0m[INFO] [1790682686.124463838] [communication_llm_chat_node]: [timing] pruned 11 stale message(s) from the LLM context (48 -> 37)[0m
+[chat_node-7] [0m[INFO] [1790682687.982061197] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"look_right","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790682687.983748784] [communication_llm_chat_node]: [timing] intent dispatched 1.85s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790682687.989093601] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790682687.991846299] [communication_llm_chat_node]: [timing] intent dispatched 1.86s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790682687.994750102] [communication_llm_chat_node]: [timing] LLM main call 1.87s (prompt cache: 6540 tokens read)[0m
+[chat_node-7] [0m[INFO] [1790682689.420642444] [communication_llm_chat_node]: [timing] LLM follow-up call 1.42s[0m
+[speak_action_server-3] [INFO] [1790682689.432711588] [speak_action_server]: Speak: 'Looking right.'
+[speak_action_server-3] [INFO] [1790682689.466862094] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790682691.360452254] [speak_action_server]: [timing] TTS first audio after 0.35s, 1.6s of speech, done 1.93s after the request
+[speak_action_server-3] [INFO] [1790682691.385264946] [speak_action_server]: Speak: 'Going home.'
+[intent_router_node-6] [INFO] [1790682691.592741917] [intent_router_node]: Queued intent 'look_right'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790682691.606774607] [intent_router_node]: dispatching: action='look_right', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790682691.611291270] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790682691.614386668] [intent_router_node]: Sending MoveToNamedPose -> 'detect_right' (velocity_scaling=0.20)
+[intent_router_node-6] [INFO] [1790682691.627607523] [intent_router_node]: Queued intent 'go_home'; queue size now 1, busy=True
+[chat_node-7] [0m[INFO] [1790682693.006482382] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[speak_action_server-3] [INFO] [1790682693.331294766] [speak_action_server]: [timing] TTS first audio after 0.37s, 1.7s of speech, done 1.94s after the request
+[intent_router_node-6] [INFO] [1790682697.098160437] [intent_router_node]: MoveToNamedPose completed.
+[intent_router_node-6] [INFO] [1790682697.108679792] [intent_router_node]: dispatching: action='go_home', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790682697.113175827] [intent_router_node]: Sending MoveToNamedPose -> 'home' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790682702.879038410] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[intent_router_node-6] [INFO] [1790682703.109592833] [intent_router_node]: MoveToNamedPose completed.
+[speech_input_node-4] [INFO] [1790682703.557115662] [speech_input_node]: [speaker] human voice (cos 0.06, rms 0.102)
+[speech_input_node-4] [INFO] [1790682704.198253381] [speech_input_node]: [timing] omni 0.63s for 4.2s audio (today 46, month 974)
+[speech_input_node-4] [INFO] [1790682704.201737303] [speech_input_node]: Heard: 'After that, I want you to go to the drop right position.'
+[chat_node-7] User (voice): After that, I want you to go to the drop right position.
+[chat_node-7] [0m[INFO] [1790682705.390919916] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (49 -> 40)[0m
+[chat_node-7] [0m[INFO] [1790682707.024862508] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"drop_right","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790682707.026627493] [communication_llm_chat_node]: [timing] intent dispatched 1.63s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790682707.029882383] [communication_llm_chat_node]: [timing] LLM main call 1.63s (prompt cache: 6540 tokens read)[0m
+[chat_node-7] [0m[INFO] [1790682708.551090171] [communication_llm_chat_node]: [timing] LLM follow-up call 1.52s[0m
+[speak_action_server-3] [INFO] [1790682708.560454455] [speak_action_server]: Speak: 'Going to drop right.'
+[chat_node-7] [0m[INFO] [1790682709.992975694] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[intent_router_node-6] [INFO] [1790682710.222434975] [intent_router_node]: Queued intent 'drop_right'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790682710.233261773] [intent_router_node]: dispatching: action='drop_right', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790682710.236622311] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790682710.239434979] [intent_router_node]: Sending MoveToNamedPose -> 'vla_drop_right' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790682710.242479086] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[speak_action_server-3] [INFO] [1790682710.874330084] [speak_action_server]: [timing] TTS first audio after 0.33s, 2.1s of speech, done 2.31s after the request
+[speech_input_node-4] [INFO] [1790682716.645984366] [speech_input_node]: [speaker] human voice (cos 0.01, rms 0.114)
+[speech_input_node-4] [INFO] [1790682717.273060114] [speech_input_node]: [timing] omni 0.62s for 3.4s audio (today 47, month 975)
+[speech_input_node-4] [INFO] [1790682717.276838607] [speech_input_node]: Heard: 'After that, I want you to go back home.'
+[intent_router_node-6] [INFO] [1790682717.520971096] [intent_router_node]: MoveToNamedPose completed.
+[chat_node-7] [0m[INFO] [1790682717.959962806] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[chat_node-7] [0m[INFO] [1790682717.964105123] [communication_llm_chat_node]: Current pose update: '' -> 'vla_drop_right'[0m
+[chat_node-7] User (voice): After that, I want you to go back home.
+[chat_node-7] [0m[INFO] [1790682721.745472762] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (50 -> 41)[0m
+[chat_node-7] [0m[INFO] [1790682723.550295739] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790682723.554649678] [communication_llm_chat_node]: [timing] intent dispatched 1.80s into the LLM call (before the reply finished)[0m
+[intent_router_node-6] [INFO] [1790682723.558111036] [intent_router_node]: Queued intent 'go_home'; queue size now 1, busy=False
+[chat_node-7] [0m[INFO] [1790682723.561566600] [communication_llm_chat_node]: [timing] LLM main call 1.81s (prompt cache: 6540 tokens read)[0m
+[intent_router_node-6] [INFO] [1790682723.573121835] [intent_router_node]: dispatching: action='go_home', object='', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790682723.579707501] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790682723.585080562] [intent_router_node]: Sending MoveToNamedPose -> 'home' (velocity_scaling=0.20)
+[chat_node-7] [0m[INFO] [1790682724.352717186] [communication_llm_chat_node]: Current pose update: 'vla_drop_right' -> ''[0m
+[chat_node-7] [0m[INFO] [1790682724.759309517] [communication_llm_chat_node]: [timing] LLM follow-up call 1.19s[0m
+[speak_action_server-3] [INFO] [1790682724.769211020] [speak_action_server]: Speak: 'Going home.'
+[speak_action_server-3] [INFO] [1790682726.595590051] [speak_action_server]: [timing] TTS first audio after 0.25s, 1.7s of speech, done 1.82s after the request
+[chat_node-7] [0m[INFO] [1790682731.315204162] [communication_llm_chat_node]: Current pose update: '' -> 'home'[0m
+[intent_router_node-6] [INFO] [1790682733.547454983] [intent_router_node]: MoveToNamedPose completed.

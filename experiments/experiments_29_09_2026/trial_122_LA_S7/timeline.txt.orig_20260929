@@ -1,0 +1,25 @@
+TRIAL TIMELINE  start 2026-09-29 16:16:44  stop 16:17:58  (74.0 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t=   +0.00  trial start
+t=   +4.34  trial bag ready
+t=   +5.62  you stopped speaking ("Hello Morty, tell me a story while you are looking at the ri")
+t=   +6.95  you said: "Hello Morty, tell me a story while you are looking at the right side."
+t=   +8.20  intent: look_right
+t=  +10.95  Morty said: "Once upon a time, a curious robot named Morty discovered that the best adventure"
+t=  +22.44  Morty said: "He learned that kindness and patience could unlock doors that strength alone nev"
+t=  +27.15  you stopped speaking ("Whatever about your story, go to the left side. Look at the ")
+t=  +31.74  you said: "Whatever about your story, go to the left side. Look at the left side."
+t=  +32.62  intent: look_left
+t=  +33.63  Morty said: "Looking left."
+t=  +41.16  you stopped speaking ("Now go back home.")
+t=  +42.77  you said: "Now go back home."
+t=  +42.78  intent: go_home
+t=  +42.97  Morty said: "Going home."
+t=  +74.02  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  end of your voice -> transcript               1.33 s
+  you stopped speaking -> command               2.58 s
+  transcript -> command (understanding)         1.25 s
+  understood by                              language model

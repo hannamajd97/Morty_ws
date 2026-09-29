@@ -1,0 +1,12 @@
+[chat_node-7] [0m[INFO] [1790684153.438076726] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790684162.514315043] [speech_input_node]: [speaker] human voice (cos 0.10, rms 0.106)
+[chat_node-7] [0m[INFO] [1790684162.765210457] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speech_input_node-4] [INFO] [1790684162.961323710] [speech_input_node]: [timing] omni 0.44s for 4.5s audio (today 56, month 984)
+[speech_input_node-4] [INFO] [1790684162.964050525] [speech_input_node]: Heard: 'How many vitamins tubes do you see and where are they'
+[chat_node-7] User (voice): How many vitamins tubes do you see and where are they
+[chat_node-7] [0m[INFO] [1790684162.979612573] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (46 -> 36)[0m
+[chat_node-7] [0m[INFO] [1790684164.178233702] [communication_llm_chat_node]: [timing] LLM main call 1.19s (prompt cache: 6540 tokens read)[0m
+[chat_node-7] Assistant: I see 2 vitamin tubes: a Vitamin B12 on the leftmost side and a Vitamin C on the rightmost side.
+[speak_action_server-3] [INFO] [1790684164.186481159] [speak_action_server]: Speak: 'I see 2 vitamin tubes: a Vitamin B12 on the leftmost side and a Vitamin C on the rightmost side.'
+[chat_node-7] [0m[INFO] [1790684170.854538989] [communication_llm_chat_node]: /joint_states has a publisher but no data (robot off / e-stop?) — backing liveness probes off so chat stays responsive.[0m
+[speak_action_server-3] [INFO] [1790684171.434829199] [speak_action_server]: [timing] TTS first audio after 0.47s, 7.0s of speech, done 7.24s after the request

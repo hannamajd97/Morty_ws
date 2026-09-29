@@ -1,0 +1,24 @@
+1
+00:00:08,071 --> 00:00:12,071
+You: Grasp.
+
+2
+00:00:10,272 --> 00:00:14,272
+Morty: Which object do you mean? Say its name or point at it.
+
+3
+00:00:11,592 --> 00:00:15,592
+You: Grasp the banana and put it on the right side.
+
+4
+00:00:11,604 --> 00:00:15,604
+Morty: I don't see a banana on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+
+5
+00:00:16,112 --> 00:00:20,112
+You: Grasp the banana.
+
+6
+00:00:16,114 --> 00:00:20,114
+Morty: I don't see a banana on the table. I can see a Vitamin B12, a tape dispenser, a small bottle, and a Vitamin C.
+

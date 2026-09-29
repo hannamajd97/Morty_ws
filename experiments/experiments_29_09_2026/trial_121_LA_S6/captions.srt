@@ -1,0 +1,72 @@
+1
+00:00:08,650 --> 00:00:12,650
+Morty (status): You pointed at the vitamin tube. Should I grasp it?
+
+2
+00:00:18,047 --> 00:00:22,047
+You: Yes, grasp this vitamin tube.
+
+3
+00:00:36,840 --> 00:00:40,840
+You: Grasp it.
+
+4
+00:00:37,621 --> 00:00:41,621
+Morty (status): Starting grasp on the vitamin tube.
+
+5
+00:00:42,239 --> 00:00:46,239
+Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+
+6
+00:00:49,738 --> 00:00:53,738
+You: Drop it home.
+
+7
+00:00:49,943 --> 00:00:53,943
+Morty (status): Going home.
+
+8
+00:00:56,152 --> 00:01:00,152
+Morty (status): I'm at the home position, still holding the vitamin tube. Should I open the gripper?
+
+9
+00:00:59,431 --> 00:01:03,431
+You: I changed my mind. Go to the drop right.
+
+10
+00:01:00,657 --> 00:01:04,657
+Morty (status): Going to drop right.
+
+11
+00:01:04,834 --> 00:01:08,834
+Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+
+12
+00:01:14,539 --> 00:01:18,539
+You: Yes, open the gripper, give me the object.
+
+13
+00:01:14,740 --> 00:01:18,740
+Morty (status): Opening the gripper.
+
+14
+00:01:18,343 --> 00:01:22,343
+Morty (status): Should I go back home?
+
+15
+00:01:21,740 --> 00:01:25,740
+You: Go back home.
+
+16
+00:01:21,943 --> 00:01:25,943
+Morty (status): Going home.
+
+17
+00:01:27,257 --> 00:01:31,257
+Morty (status): Done — I'm back at the home position. What's next?
+
+18
+00:01:37,845 --> 00:01:41,845
+You: He was the whole time in the video, bro.
+

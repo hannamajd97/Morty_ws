@@ -1,0 +1,258 @@
+{
+  "format": "morty_vla_raw_v2",
+  "episode_id": "trial_122_LA_S7",
+  "episode_index": 122,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_122_LA_S7",
+  "in_trial_dir": true,
+  "trial_id": "122",
+  "task": "look to the right",
+  "task_from": "intent",
+  "outcome": "unknown",
+  "success": null,
+  "intent": "go_home",
+  "cycle_done": "",
+  "note": "outcome: unknown (no human verdict, no executor verdict)",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_29_09_2026/trial_122_LA_S7",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "Hello Morty, tell me a story while you are looking at the right side.",
+  "trial_form_task": "S7: Moving without grasping",
+  "transcripts": [
+    "Hello Morty, tell me a story while you are looking at the right side.",
+    "Whatever about your story, go to the left side. Look at the left side.",
+    "Now go back home."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "t": 8.106953859329224,
+      "stamp": 1790691412.831,
+      "action_intent": "look_right",
+      "object": null,
+      "attributes": null,
+      "transcript": "Hello Morty, tell me a story while you are looking at the right side.",
+      "transcript_stamp": 1790691411.5900335,
+      "instruction": "look to the right"
+    },
+    {
+      "idx": 1,
+      "t": 32.52595376968384,
+      "stamp": 1790691437.25,
+      "action_intent": "look_left",
+      "object": null,
+      "attributes": null,
+      "transcript": "Whatever about your story, go to the left side. Look at the left side.",
+      "transcript_stamp": 1790691436.3750136,
+      "instruction": "look to the left"
+    },
+    {
+      "idx": 2,
+      "t": 42.690953731536865,
+      "stamp": 1790691447.415,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Now go back home.",
+      "transcript_stamp": 1790691447.4153,
+      "instruction": "go back home"
+    }
+  ],
+  "events": {
+    "transcript": [
+      {
+        "t": 6.865987300872803,
+        "stamp": 1790691411.5900335,
+        "text": "Hello Morty, tell me a story while you are looking at the right side."
+      },
+      {
+        "t": 31.650967359542847,
+        "stamp": 1790691436.3750136,
+        "text": "Whatever about your story, go to the left side. Look at the left side."
+      },
+      {
+        "t": 42.691253662109375,
+        "stamp": 1790691447.4153,
+        "text": "Now go back home."
+      }
+    ],
+    "intent": [
+      {
+        "t": 8.106953859329224,
+        "stamp": 1790691412.831,
+        "action_intent": "look_right",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 32.52595376968384,
+        "stamp": 1790691437.25,
+        "action_intent": "look_left",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 42.690953731536865,
+        "stamp": 1790691447.415,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 519,
+  "duration_s": 51.79119920730591,
+  "dropped_ticks": 0,
+  "drop_reasons": {},
+  "started_unix": 1790691404.7240844,
+  "started_ros": 1790691404.7240462,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.5,
+      0.5,
+      0.06
+    ],
+    "rpy": [
+      0.0,
+      -0.5,
+      -0.8
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2
+  },
+  "phase_names": [],
+  "quality": {
+    "ok": true,
+    "issues": [],
+    "num_steps": 519,
+    "task_steps": 437,
+    "idle_steps": 82,
+    "reset_steps": 0,
+    "step_gaps": [],
+    "dt_max_s": 0.19200396537780762,
+    "images": {
+      "exterior": {
+        "age_max_s": 0.20016217799275182,
+        "age_p95_s": 0.12407510770281077,
+        "missing": 0
+      },
+      "wrist": {
+        "age_max_s": 0.18641183199360967,
+        "age_p95_s": 0.053714225806470325,
+        "missing": 0
+      }
+    },
+    "joint_age_max_s": 0.05903057599789463,
+    "tcp_stale_steps": 0,
+    "ur_tcp_missing_steps": 0,
+    "gripper_commands": [],
+    "gripper_state_changes": 0,
+    "n_transcripts": 3,
+    "n_intents": 3,
+    "n_instructions": 3,
+    "n_executor_phases": 0
+  }
+}

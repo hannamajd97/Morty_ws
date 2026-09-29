@@ -1,0 +1,12 @@
+# trial 129 started 2026-09-29T16:55:05.858887
+[   7.48s] You: Now go to the drop right. While you are doing that, tell me a good story.
+[  10.37s] Morty: Once there was a curious robot at a university who spent its days moving objects around a table. One day it realized: every object it picked taught it something new — the weight, the shape, the fragility. By the end of the year, the robot wasn't just grasping things anymore; it understood them. And that's when it became not just a machine, but a true helper. Sometimes the smallest tasks carry the biggest lessons!
+[  32.88s] You: You know enough, enough. I am got enough from you. Go back home and then, do the drop left.
+[  35.08s] Morty (status): Going home.
+[  36.99s] Morty (status): Going to drop left.
+[  47.97s] You: I will look at the left side.
+[  48.98s] Morty: Go ahead — I'm here if you need me.
+[  55.68s] You: No, I said like look at the left side.
+[  57.68s] Morty (status): Looking left.
+[  64.17s] You: Nice job.
+[  64.98s] Morty: Thanks! Anything else you need?
