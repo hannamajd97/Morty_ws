@@ -893,7 +893,11 @@ which one.
 RELEASE QUESTION - "Should I open the gripper?" is a YES/NO question: ANY
 consent phrasing ("yes", "open", "opens the gripper", "give it to me",
 "yes, open the gripper with this option") = open_gripper; a named side =
-drop_left / drop_right; NEVER answer it with "Left or right?".
+drop_left / drop_right; NEVER answer it with "Left or right?". "Go (back)
+home", "take it home", "I don't want it on the right side anymore" WITHOUT
+words to open / release / give it = go_home: the robot carries the object
+home STILL HOLDING it and asks again there. Going home never needs an open
+gripper — only open the gripper when the user asks for it (or says yes).
 
 PAUSE CONSENT - when the robot is holding an object and waiting ("Where
 should I drop it?" / "Should I open the gripper?"), ANY consent phrasing
@@ -4307,6 +4311,39 @@ class ChatIntentNode(Node):
             self.get_logger().info("LLM stop at the home question → stay")
             action = "stay"
             args["action_intent"] = "stay"
+        # 2026-09-29 (Majd, live: "Can you cheer me up because I'm very sick
+        # today and go after that to home because I don't want to have it on
+        # the right side anymore." at "Should I open the gripper?" — the model
+        # sent open_gripper then release_home: the tape dispenser was released
+        # at the right side, and the model then claimed that going home needs
+        # an open gripper). Going home never needs one: the executor carries
+        # the object home and asks the release question again there. So at
+        # the release question, from a sentence that says nothing about
+        # opening, giving, letting go and no yes (voice_grammar.says_release),
+        # the model may not open: an open (now or as its "then") becomes
+        # go_home when the sentence names home, and a release plan on a
+        # destination is dropped (carried there, asked again). A bare open
+        # without home stays — a consent the grammar does not know ("sounds
+        # good"). A wrong downgrade costs one repeated question; a wrong open
+        # drops the object.
+        if live_q == "release" and not voice_grammar.says_release(self._turn_text):
+            then_s = str(args.get("then") or "").strip().lower()
+            names_home = bool(re.search(r"(?<![\w'-])(?:home|hause)(?![\w'-])",
+                                        voice_grammar.normalise(self._turn_text)))
+            opens = action in ("release_home", "open_gripper", "release")
+            if (action == "release_home" or (opens and then_s == "release_home")
+                    or (opens and names_home)):
+                self.get_logger().info(
+                    f"LLM {action} (then {then_s or '-'}) at the release question, but the "
+                    f"sentence never asked to open → go_home: carried home, asked again there")
+                action = "go_home"
+                args["action_intent"] = "go_home"
+                args["then"] = None
+            elif not opens and then_s in ("release", "release_home"):
+                self.get_logger().info(
+                    f"LLM {action} with then {then_s} at the release question, but the sentence "
+                    f"never asked to open → no release plan: carried there, asked again")
+                args["then"] = None
         quick = QUICK_NARRATION.get(action)
         if action == "reset":
             # 2026-09-25: an LLM reset is said at once, like stop, and

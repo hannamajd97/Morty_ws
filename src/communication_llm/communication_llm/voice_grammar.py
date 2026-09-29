@@ -164,6 +164,14 @@ DEST_COMPOUND = _whole(
 # I open the gripper?"): release here, then home — the release_home answer.
 RELEASE_HOME = _whole(r"(?:" + AFF + r" )?(?:now )?" + RELEASE + r" " + _CONN
                       + r"(?:now )?(?:go )?(?:back )?(?:to )?(?:the )?home(?: position)?")
+# 2026-09-29 (Majd, live: "Can you cheer me up ... and go after that to home
+# because I don't want to have it on the right side anymore." at "Should I
+# open the gripper?" — the model opened at the right side, then went home): a
+# WHOLE home phrase at the release question carries the object home STILL
+# HELD (the router's redirect "home"; the executor asks the release question
+# again there). Opening needs its own words — see RELEASE_HOME.
+HOME_CARRY = _whole(r"(?:" + NEG + r" )*(?:just )?(?:(?:take|bring|carry) it )?" + HOME
+                    + r"(?: with it)?")
 # 2026-09-29 (Majd, live: "Drop it in the same place." / "I just want you to
 # open the gripper, give me the object." at "Where should I drop it?" — only
 # left / right / home existed): a whole "here" answer — release where the arm
@@ -314,6 +322,26 @@ def _release_consent(t: str) -> bool:
     return not _CONSENT_BLOCK.search(t[:m.start()] + " " + t[m.end():])
 
 
+# Words that ask for the gripper to open (or say yes to "Should I open the
+# gripper?"): a consent phrase, a yes, or dropping / putting it down, in
+# English or German. Negations are NOT excluded — this only tells whether the
+# sentence speaks about releasing at all (says_release).
+_RELEASE_WORD = re.compile(
+    r"(?<![\w'-])(?:" + AFF + r"|drop(?:s|ped)? it|put it down|let it fall|leave it here"
+    r"|gib|mach (?:es |ihn |sie )?auf|auf ?machen|loslassen|lass (?:es |ihn |sie )?los)(?![\w'-])")
+
+
+def says_release(text: str) -> bool:
+    """2026-09-29 (Majd: "I didn't tell you to open the gripper."): True when
+    the sentence says anything that may mean opening — a consent phrase
+    (_CONSENT_PHRASE), a yes (AFF), "drop it" / "put it down", or the German
+    forms. chat_node keeps the model from turning a sentence WITHOUT any of
+    these into an open-then-home at the release question: it becomes the
+    plain carry home, where the question is asked again."""
+    t = normalise(text)
+    return bool(t) and bool(_CONSENT_PHRASE.search(t) or _RELEASE_WORD.search(t))
+
+
 # 2026-09-28 (Majd, live: "Give me that object." at home with an empty
 # gripper got the model's "The gripper is empty now—there's nothing to give
 # you." three times): a pick whose object is only a pointer word — "give me
@@ -414,6 +442,10 @@ def classify(text: str, question: str = "", fresh: bool = False,
                 m = DEST_SIDE.match(t)
                 if m:
                     return ("answer", "drop_" + _SIDE[m.group(1)])
+                # 2026-09-29: carry it home, ask there — not when a word may
+                # mean opening ("Okay, go home." is left to the model)
+                if HOME_CARRY.match(t) and not says_release(t):
+                    return ("answer", "go_home")
         elif question == "home":
             if YES.match(t) or YES_HOME.match(t):
                 return ("answer", "go_home")
