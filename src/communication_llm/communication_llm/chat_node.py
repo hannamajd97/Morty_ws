@@ -4864,7 +4864,7 @@ class ChatIntentNode(Node):
             now = time.time()
             with self._utt_meta_lock:
                 for entry in reversed(self._utt_meta):
-                    rx, t, _end, start, used = entry
+                    rx, t, _end, start, used = entry[:5]   # [5] = utterance id (09-30)
                     if (t == want and (allow_used or not used) and now - rx <= 10.0
                             and (heard_at is None or rx >= heard_at - 2.0)):
                         entry[4] = True

@@ -59,3 +59,16 @@ def test_utterance_id_lookup_matches_the_meta_of_the_same_text():
     assert cn.ChatIntentNode._utterance_id_for(N, "Yes.", None) == "id-from-speech"
     assert cn.ChatIntentNode._utterance_id_for(N, "No.", None).startswith("voice-")
     assert cn.ChatIntentNode._utterance_id_for(N, "Yes.", time.time()).startswith("typed-")
+
+
+def test_speech_start_reads_the_six_field_meta():
+    """Regression 2026-09-30: the meta gained the utterance id as a 6th field
+    and _speech_start_for still unpacked 5 — every answer to an open question
+    ("Where should I drop it?") crashed the voice thread."""
+    now = time.time()
+
+    class N:
+        _utt_meta_lock = threading.Lock()
+        _utt_meta = [[now, "Drop it on the right side.", now - 0.1, now - 1.6, False, "utt-9"]]
+    assert cn.ChatIntentNode._speech_start_for(N, "Drop it on the right side.", None, now) == now - 1.6
+    assert N._utt_meta[0][4] is True
