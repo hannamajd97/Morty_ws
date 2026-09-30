@@ -131,6 +131,7 @@ def build_blended_trajectory(
     samples_per_segment: int = BLEND_SAMPLES_PER_SEGMENT,
     min_dt_s: float = 1e-4,
     rounding: float = 1.0,
+    stop_at_vias: bool = False,
 ) -> Tuple[List[List[float]], List[float]]:
     """Build ONE dense, S-curve-timed joint path through several poses.
 
@@ -152,6 +153,14 @@ def build_blended_trajectory(
     samples_per_segment:
         Trajectory points generated per segment, excluding the shared
         start point. Via poses land exactly on a sample boundary.
+    stop_at_vias:
+        2026-09-30: straight joint-space lines between the poses and one
+        S-curve PER SEGMENT, so the arm comes to rest on every via — the
+        geometry of separate moves (lift -> home, then home -> drop) in ONE
+        goal. For routes that turn back at the via, where the spline
+        bulged off the straight line (see MoveToNamedPoseServer
+        ._stop_at_via). Same time split by arc length, so the same peak
+        speed; ``rounding`` is ignored.
 
     Returns
     -------
@@ -253,7 +262,7 @@ def build_blended_trajectory(
         # taught lines). The server tries 1.0, 0.5, 0.0 against the
         # collision check before giving up on the via (2026-09-23: the
         # full curve from a grasp dipped the gripper base into the table).
-        r = max(0.0, min(1.0, float(rounding)))
+        r = 0.0 if stop_at_vias else max(0.0, min(1.0, float(rounding)))
 
         def _cr(p0, p1, p2, p3, u):
             u2, u3 = u * u, u * u * u
@@ -288,15 +297,24 @@ def build_blended_trajectory(
             if k == samples_per_segment:
                 q = list(nodes[seg + 1])                    # the via / target itself
             else:
-                want = frac * seg_total
+                # stop_at_vias: samples even in TIME inside the segment, so
+                # the controller's linear steps shrink to ~0 at both ends —
+                # samples even in path length left the step next to the via
+                # at 0.3 rad/s, a turn-around instead of a stop.
+                want = (smoothstep(frac) if stop_at_vias else frac) * seg_total
                 j = 1
                 while j < len(cum) - 1 and cum[j] < want:
                     j += 1
                 span = cum[j] - cum[j - 1]
                 w = (want - cum[j - 1]) / span if span > 0.0 else 1.0
                 q = [(1.0 - w) * a + w * b for a, b in zip(pts[j - 1], pts[j])]
-            phi = phi_a + (phi_b - phi_a) * frac
-            t = total_s * smoothstep_inverse(phi)
+            if stop_at_vias:
+                # this segment's own S-curve (position above): at rest on
+                # both of its ends
+                t = total_s * (phi_a + (phi_b - phi_a) * frac)
+            else:
+                phi = phi_a + (phi_b - phi_a) * frac
+                t = total_s * smoothstep_inverse(phi)
             # fp guard: consecutive phi are far apart at these sample
             # counts, but never emit a non-increasing stamp — the
             # JointTrajectoryController rejects the whole goal for it.
@@ -552,6 +570,35 @@ class MoveToNamedPoseServer(Node):
 
     # ── YAML loading ────────────────────────────────────────────────────
 
+    def _stop_at_via(self, start, target: str) -> bool:
+        """True when the route into ``target`` or out of the pose the arm
+        stands on (nearest listed pose within 0.35 rad, as in
+        _file_via_poses) must stop at its vias: ``stop_at_via: true`` in
+        observation_poses.yaml.
+
+        2026-09-30 (Majd, live: protective stop C157A1 carrying the wooden
+        maze puzzle to vla_drop_left on the new route through home): the
+        route grasp -> home -> vla_drop_left turns back at home (102 deg in
+        joint space), and the spline through home bulged up to 6.5 deg per
+        joint off the straight grasp -> home line, taking the arm and the
+        held object ~4 cm below home's height right beside home — where the
+        stop came. vla_drop_right's route keeps its direction and stays a
+        spline; a pose with this flag gets the old separate-move geometry
+        (straight lines, at rest at home) in one goal."""
+        stops = getattr(self, "_pose_stop", set()) or set()
+        if not stops:
+            return False
+        if target in stops:
+            return True
+        if start is None or len(start) != len(self._joint_names):
+            return False
+        best, best_d = "", 1e9
+        for name, pos in self._poses.items():
+            d = sum((x - y) ** 2 for x, y in zip(start, pos)) ** 0.5
+            if d < best_d:
+                best, best_d = name, d
+        return best in stops and best_d < 0.35
+
     def _file_via_poses(self, target: str) -> list:
         """Route for current -> target from the file: leaving a pose that
         has a via list means passing its vias in reverse; arriving at one
@@ -621,6 +668,7 @@ class MoveToNamedPoseServer(Node):
         # detour, so every client (GUI, executor, router) gets it.
         self._pose_via = {}
         self._pose_direct = set()   # poses that may be reached straight from the grasp (pre-checked, home as fallback)
+        self._pose_stop = set()     # poses whose routes stop at every via (stop_at_via: true)
         self._precheck_cache = {}   # (start joints rounded, path names) -> monotonic time of the last pass
         for label, entry in poses.items():
             if not isinstance(entry, dict):
@@ -636,6 +684,8 @@ class MoveToNamedPoseServer(Node):
                     self._pose_via[str(label)] = [str(v) for v in via]
                 if bool(entry.get("direct_carry", False)):
                     self._pose_direct.add(str(label))
+                if bool(entry.get("stop_at_via", False)):
+                    self._pose_stop.add(str(label))
         self.get_logger().info(
             f"Loaded {len(self._poses)} pose(s) from {path} for collision pre-check."
         )
@@ -1360,18 +1410,26 @@ class MoveToNamedPoseServer(Node):
         # Collision-check the path the arm will REALLY follow (a spline
         # through the vias since 2026-09-23): build it first, then check
         # states sampled along it, all requests pipelined together.
-        rounding_ladder = [1.0, 0.5, 0.0] if n_seg > 1 else [1.0]
+        # stop_at_via poses (see _stop_at_via): straight lines, at rest on
+        # every via, checked as densely as a single named move (10 states
+        # per segment instead of ~3).
+        stop = n_seg > 1 and self._stop_at_via(start, pose_name)
+        rounding_ladder = [0.0] if stop else ([1.0, 0.5, 0.0] if n_seg > 1 else [1.0])
         chosen_rounding = rounding_ladder[0]
+        if stop:
+            self.get_logger().info(
+                f"{path_desc}: stop_at_via — straight lines, the arm stops on {via_poses}")
         try:
             _pos, _ = build_blended_trajectory(
                 start, targets, [segment_duration_s] * n_seg,
-                samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding)
+                samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding,
+                stop_at_vias=stop)
         except Exception as exc:
             return self._fail(goal_handle, f"refusing: could not build the blended path ({exc})")
         if self._collision_check:
             self._publish_phase(goal_handle, "checking_collision", 0.05)
             t_chk = time.monotonic()
-            stride = max(1, self._blend_samples_per_segment // self._blend_collision_waypoints)
+            stride = max(1, self._blend_samples_per_segment // (10 if stop else self._blend_collision_waypoints))
             check_nodes = _pos[::stride] + ([_pos[-1]] if (len(_pos) - 1) % stride else [])
             # 2026-09-23 (Majd: "it needs time before it executes"): each
             # /check_state_validity call costs ~0.4 s on the loaded machine,
@@ -1385,9 +1443,10 @@ class MoveToNamedPoseServer(Node):
                 if chosen_rounding != rounding_ladder[0]:
                     _pos, _ = build_blended_trajectory(
                         start, targets, [segment_duration_s] * n_seg,
-                        samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding)
+                        samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding,
+                        stop_at_vias=stop)
                     check_nodes = _pos[::stride] + ([_pos[-1]] if (len(_pos) - 1) % stride else [])
-                key = (tuple(round(q, 1) for q in start), tuple(path_names), chosen_rounding)
+                key = (tuple(round(q, 1) for q in start), tuple(path_names), chosen_rounding, stop)
                 cached = self._precheck_cache.get(key)
                 if cached is not None and time.monotonic() - cached < 600.0:
                     clean, reason = True, ""
@@ -1439,6 +1498,7 @@ class MoveToNamedPoseServer(Node):
                 targets,
                 durations,
                 samples_per_segment=self._blend_samples_per_segment, rounding=chosen_rounding,
+                stop_at_vias=stop,
             )
         except Exception as exc:
             return self._fail(
