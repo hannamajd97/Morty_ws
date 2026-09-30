@@ -363,12 +363,12 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # microphone (what Morty hears); this one silences what Morty SAYS
         # (/speech/voice_muted — speak_node skips playback, the answer still
         # appears in the chat). Plain buttons like the mic's, labelled by what they do.
-        self.voice_btn = QtWidgets.QPushButton("🗣 voice")
-        self.voice_btn.setCheckable(True)
-        self.voice_btn.setToolTip("Morty's voice (not your microphone). Click to mute / unmute.\n"
+        self.morty_voice_btn = QtWidgets.QPushButton("🗣 voice")
+        self.morty_voice_btn.setCheckable(True)
+        self.morty_voice_btn.setToolTip("Morty's voice (not your microphone). Click to mute / unmute.\n"
                                   "Muted: Morty answers only in the chat below.")
-        self.voice_btn.toggled.connect(self._on_voice_toggle)
-        mic_row.addWidget(self.voice_btn)
+        self.morty_voice_btn.toggled.connect(self._on_voice_toggle)
+        mic_row.addWidget(self.morty_voice_btn)
         # Ubuntu's speaker + microphone sliders, in a small popup (audio_popup).
         self.sound_btn = QtWidgets.QToolButton()
         self.sound_btn.setText("🔊▾")
@@ -377,7 +377,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.sound_btn.clicked.connect(lambda: self._audio_popup.show_under(self.sound_btn))
         mic_row.addWidget(self.sound_btn)
         # Never squeezed below their text: the level bar takes the slack.
-        for b in (self.mute_btn, self.voice_btn, self.sound_btn):
+        for b in (self.mute_btn, self.morty_voice_btn, self.sound_btn):
             b.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.speech_chip = QtWidgets.QLabel("IDLE")
         self.speech_chip.setStyleSheet(
@@ -2406,7 +2406,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
 
     def _on_voice_toggle(self, muted: bool) -> None:
         self.bridge.set_voice_muted(muted)
-        self.voice_btn.setText("🔇 voice" if muted else "🗣 voice")
+        self.morty_voice_btn.setText("🔇 voice" if muted else "🗣 voice")
 
     def _update_mic(self, level: float, state: str, muted: bool) -> None:
         self.mic_bar.setValue(int(max(0.0, min(1.0, level * 3.0)) * 100))
