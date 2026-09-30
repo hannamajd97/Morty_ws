@@ -80,6 +80,15 @@ class CameraPanel(QtWidgets.QLabel):
 CAMERAS = ("RealSense", "Astra")
 
 
+def close_open_popup() -> None:
+    """Close an open drop-down list when its window is moved (2026-09-30,
+    Majd's screenshot): dragging the title bar is not a click outside the
+    list, so Qt left it floating where the window used to be."""
+    w = QtWidgets.QApplication.activePopupWidget()
+    if w is not None:
+        w.close()
+
+
 class CameraWindow(QtWidgets.QWidget):
     """One camera in its own top-level window, with its own RealSense /
     Astra selector (the main panel keeps its own choice)."""
@@ -117,6 +126,10 @@ class CameraWindow(QtWidgets.QWidget):
     def _on_combo(self, _i: int) -> None:
         self._show_camera_name()
         self.camera_changed.emit()
+
+    def moveEvent(self, ev: QtGui.QMoveEvent) -> None:
+        close_open_popup()
+        super().moveEvent(ev)
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         self.closed.emit(self)

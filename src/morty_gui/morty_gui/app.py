@@ -50,7 +50,7 @@ from .ros_bridge import start_bridge
 
 from .config import *  # noqa: F401,F403 — split 2026-08-25
 from .managed_launch import ManagedLaunch
-from .camera_panel import CameraPanel, CameraWindows
+from .camera_panel import CameraPanel, CameraWindows, close_open_popup
 from .graspgen_models import MODELS as GRASPGEN_MODELS, GraspGenModels, log_ready as graspgen_log_ready
 
 from .motion_window import MotionWindow
@@ -3689,6 +3689,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
             else:
                 paint(self.led_play, ORANGE, "pendant program STOPPED — Local mode: press Play ON THE PENDANT "
                                              "(or switch the pendant to Remote and the GUI starts it)")
+
+    def moveEvent(self, ev: QtGui.QMoveEvent) -> None:
+        close_open_popup()          # a list left open must not float behind
+        super().moveEvent(ev)
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         # Default policy: infrastructure survives the GUI (a closed debug
