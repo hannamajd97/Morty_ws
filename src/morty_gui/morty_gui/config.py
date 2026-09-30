@@ -15,6 +15,15 @@ os.environ.setdefault(
     "FASTRTPS_DEFAULT_PROFILES_FILE",
     os.path.expanduser("~/morty_ws/config/fastdds_udp_only.xml"),
 )
+# NumPy's OpenBLAS: ONE thread per process (2026-09-30, Majd: "the system
+# is sticky"). Unset, every Python node gets an 11-thread BLAS pool whose idle
+# workers spin after each small matrix call: the grasp pipeline's pool used
+# ~1 core and ~95,000 context switches/s while idle-waiting, and a depth-frame
+# sized product ran at 450 % CPU and SLOWER than with one thread (58 %). Our
+# matrices are points x 3 — nothing gains from BLAS threads. PyTorch's own
+# CPU threads (MKL / OpenMP, Parakeet, YOLO) are not affected. Same export in
+# morty.sh and the pipeline's run_grasp_pipeline_venv; needs a stack restart.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 # RViz under Wayland/Xwayland + NVIDIA (2026-09-02, SYSTEM_STATE_LOG #300):
 # vsync frame-pacing stalls compound with CPU starvation into the
 # "fps drops until stuck" spiral. Inherited by rviz2 spawned from here.

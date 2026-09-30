@@ -163,6 +163,10 @@ source "$WS_DIR/install/setup.bash"
 # config/fastdds_udp_only.xml and SYSTEM_STATE_LOG #291). Same export lives
 # in morty_gui/config.py and ~/.bashrc so every launch path agrees.
 export FASTRTPS_DEFAULT_PROFILES_FILE="${FASTRTPS_DEFAULT_PROFILES_FILE:-$WS_DIR/config/fastdds_udp_only.xml}"
+# NumPy's OpenBLAS: one thread per process — an unset pool of 11 spinning
+# workers per Python node cost ~1 core in the grasp pipeline alone
+# (2026-09-30; details in src/morty_gui/morty_gui/config.py).
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
 
 # ── Source the right provider based on --debug flag ─────────────────────
 if $USE_DEBUG; then

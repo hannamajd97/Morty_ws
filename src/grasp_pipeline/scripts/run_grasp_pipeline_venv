@@ -32,4 +32,9 @@ export AMENT_PYTHON_EXECUTABLE="${AMENT_PYTHON_EXECUTABLE:-}"
 source /opt/ros/humble/setup.bash
 source "${WS_DIR}/install/setup.bash"
 
+# NumPy's OpenBLAS: one thread (2026-09-30) — its default 11 workers spun
+# after every small matrix call: ~1 core and ~95,000 context switches/s in
+# this process; see src/morty_gui/morty_gui/config.py.
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+
 exec /usr/bin/python3 -m grasp_pipeline.run_grasp_pipeline "$@"
