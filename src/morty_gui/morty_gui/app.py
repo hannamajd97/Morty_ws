@@ -350,7 +350,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         chat_lay.addWidget(self.model_label)
         # Mic strip — the old "Morty mic" window's essentials, embedded.
         mic_row = QtWidgets.QHBoxLayout()
-        self.mute_btn = QtWidgets.QPushButton("🎙 live")
+        self.mute_btn = QtWidgets.QPushButton("🎙 mic on")
         self.mute_btn.setCheckable(True)
         self.mute_btn.setToolTip("Toggle microphone mute (publishes /speech/muted).")
         self.mute_btn.toggled.connect(self._on_mute_toggle)
@@ -362,20 +362,15 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # for Morty, different than mine"): the button above mutes the
         # microphone (what Morty hears); this one silences what Morty SAYS
         # (/speech/voice_muted — speak_node skips playback, the answer still
-        # appears in the chat). Round and purple so the two never look alike.
-        self.voice_btn = QtWidgets.QPushButton("🗣 Morty speaks")
+        # appears in the chat). Plain buttons like the mic's, labelled by what they do.
+        self.voice_btn = QtWidgets.QPushButton("🗣 voice on")
         self.voice_btn.setCheckable(True)
-        self.voice_btn.setToolTip("Mute / unmute Morty's voice (not your microphone).\n"
+        self.voice_btn.setToolTip("Morty's voice (not your microphone). Click to mute / unmute.\n"
                                   "Muted: Morty answers only in the chat below.")
-        self.voice_btn.setStyleSheet(
-            "QPushButton{border:2px solid #8e6cf0;border-radius:12px;padding:3px 10px;"
-            "color:#8e6cf0;font-weight:bold;}"
-            "QPushButton:checked{background:#5b3fb5;color:white;border-color:#5b3fb5;}")
         self.voice_btn.toggled.connect(self._on_voice_toggle)
         mic_row.addWidget(self.voice_btn)
         # Ubuntu's speaker + microphone sliders, in a small popup (audio_popup).
-        self.sound_btn = QtWidgets.QToolButton()
-        self.sound_btn.setText("🔊▾")
+        self.sound_btn = QtWidgets.QPushButton("🎚 volume")
         self.sound_btn.setToolTip("Speaker and microphone volume — the same sliders as Ubuntu's top bar")
         self._audio_popup = AudioPopup(self)
         self.sound_btn.clicked.connect(lambda: self._audio_popup.show_under(self.sound_btn))
@@ -2403,11 +2398,11 @@ class OperatorWindow(QtWidgets.QMainWindow):
             return
         self._mute_clicked_t = time.monotonic()
         self.bridge.set_muted(muted)
-        self.mute_btn.setText("🔇 MUTED" if muted else "🎙 live")
+        self.mute_btn.setText("🔇 mic off" if muted else "🎙 mic on")
 
     def _on_voice_toggle(self, muted: bool) -> None:
         self.bridge.set_voice_muted(muted)
-        self.voice_btn.setText("🤐 Morty silent" if muted else "🗣 Morty speaks")
+        self.voice_btn.setText("🔇 voice off" if muted else "🗣 voice on")
 
     def _update_mic(self, level: float, state: str, muted: bool) -> None:
         self.mic_bar.setValue(int(max(0.0, min(1.0, level * 3.0)) * 100))
@@ -2434,7 +2429,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         if muted != self.mute_btn.isChecked():
             self._mute_suppress = True
             self.mute_btn.setChecked(muted)
-            self.mute_btn.setText("🔇 MUTED" if muted else "🎙 live")
+            self.mute_btn.setText("🔇 mic off" if muted else "🎙 mic on")
             self._mute_suppress = False
         # A speech node that (re)starts comes up LISTENING: /speech/muted is
         # volatile, so it never hears a mute sent before it existed
