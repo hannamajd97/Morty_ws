@@ -92,7 +92,8 @@ from tf2_ros import Buffer, TransformException
 from ur3e_fast_observation.tf_listener_lite import DecimatedTransformListener
 from ur3e_fast_observation.latest_message import LatestMessage, joint_state_stream
 
-from .raw_dataset import ARM_JOINTS, STEP_KEYS, SEGMENT_IDLE, SEGMENT_TASK, SEGMENT_RESET, canonical_instruction
+from .raw_dataset import (ARM_JOINTS, STEP_KEYS, SEGMENT_IDLE, SEGMENT_TASK, SEGMENT_RESET, alignment_verdict,
+                          canonical_instruction)
 from . import labels as _labels
 from .recording_contract import (COMMAND_EVENT_SCHEMA, RAW_FORMAT, SEGMENT_NAMES, parse_stop_arg,
                                  validate_command_event)
@@ -1311,25 +1312,32 @@ class EpisodeRecorder(Node):
         if state_changes and not cmds:
             align.append(f"gripper state changed {state_changes}x but no command event was received (adapter not publishing?)")
         # ---- semantic
-        flags = list(lab.get("flags", []))
-        if not self.instructions:
-            flags.append("no instruction (nothing the robot executed was labelled)")
-        if lab.get("assist"):
-            flags.append(f"{len(lab['assist'])} annotated assistance interval(s) — excluded from training")
+        flags = _labels.review_flags({**lab, "instructions": self.instructions})
+        notes = list(lab.get("notes", []))
         verified = lab["label_source"] == "command_lifecycle" and not flags
         seg = a["segment"].astype(int)
-        integrity_ok, alignment_ok = not integ, not align
-        issues = integ + align + [f"review: {f}" for f in flags]
+        # 2026-09-30: steps outside the timing tolerances are left out of
+        # training (raw_dataset.alignment_verdict); only episode-wide timing
+        # problems block the episode. "details" keeps every check's wording.
+        limits = {"max_image_age_s": self.max_img_age, "max_camera_skew_s": self.max_skew,
+                  "max_gripper_age_s": self.max_gripper_age}
+        av = alignment_verdict(a, seg, {"issues": align, "images": img, "limits": limits})
+        integrity_ok, alignment_ok = not integ, av["ok"]
+        issues = integ + av["issues"] + [f"review: {f}" for f in flags]
         return {"ok": integrity_ok and alignment_ok, "issues": issues,
                 "integrity": {"ok": integrity_ok, "issues": integ, "images_on_disk": on_disk, "drained": drained},
-                "alignment": {"ok": alignment_ok, "issues": align, "images": img, "step_gaps": gaps,
+                "alignment": {"ok": alignment_ok, "issues": av["issues"], "notes": av["notes"],
+                              "details": align, "limits": limits,
+                              "misaligned_steps": av["misaligned_steps"],
+                              "misaligned_task_steps": av["misaligned_task_steps"],
+                              "images": img, "step_gaps": gaps,
                               "dt_max_s": float(dt.max()) if dt.size else 0.0,
                               "joint_age_max_s": float(np.nanmax(a["joint_age"])) if n else None,
                               "gripper_age_max_s": float(gfin.max()) if gfin.size else None,
                               "tcp_stale_steps": tcp_stale, "ur_tcp_missing_steps": ur_missing,
                               "gripper_commands": lags, "gripper_state_changes": state_changes},
                 "semantic": {"label_source": lab["label_source"], "verified": verified,
-                             "review_required": not verified, "flags": flags},
+                             "review_required": not verified, "flags": flags, "notes": notes},
                 "training_eligible": integrity_ok and alignment_ok and verified,
                 "num_steps": n, "task_steps": int((seg == SEGMENT_TASK).sum()),
                 "segments": {name: int((seg == code).sum()) for code, name in SEGMENT_NAMES.items()},

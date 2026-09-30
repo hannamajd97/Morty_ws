@@ -65,9 +65,16 @@ when it did something else.
 - **`meta["quality"]`** has three separate parts:
   - `integrity`: files, images written, steps;
   - `alignment`: camera skew, clock offset, stale gripper, repeated frames;
-  - `semantic`: `label_source`, `verified`, `review_required`, `flags`.
+  - `semantic`: `label_source`, `verified`, `review_required`, `flags`, `notes`.
 - **`training_eligible`** = integrity ok **and** alignment ok **and** labels
   verified by execution evidence.
+- **Flags vs notes** (since the 30 Sep review). A *flag* needs a human look
+  and makes the labels unverified. A *note* records something the evidence
+  already settles:
+  - the executor re-closing the gripper after a completed release, with the
+    arm standing still (labelled as cleanup);
+  - a pick the executor reported **failed before it moved** (nothing to label);
+  - single steps left out for timing (see Alignment).
 
 A green health flag is **not** proof that the demonstration is right. Look at
 the trial before you use it.
@@ -91,7 +98,16 @@ the trial before you use it.
   | `max_camera_skew_s` | 0.35 | skew between the two cameras |
   | `max_gripper_age_s` | 2.0 | age of the gripper sample |
   | `max_clock_offset_s` | 0.5 | the Astra clock offset |
+  | `max_image_age_s` | 0.5 | age of a camera frame (receipt, and capture when the clocks are comparable) |
   | `save_timeout_s` | 20 | image writes must finish within this at stop |
+
+- **Per step, not per episode** (since the 30 Sep review). A step outside
+  `max_image_age_s`, `max_camera_skew_s` or `max_gripper_age_s` is left out
+  of training (`raw_dataset.step_misaligned`); the episode stays eligible.
+  Blocking are only episode-wide problems: step gaps, dropped ticks, a frozen
+  stream, clocks that are not comparable, gripper lag, or bad steps in more
+  than 10 % of the task steps (at least 4). `quality.alignment.details` keeps
+  every check's wording, and `issues` holds only what blocks.
 
 - **Actions.** An action is the change to the next step **within the same
   segment**. The last step of a segment has zero motion. No action crosses
@@ -126,7 +142,15 @@ checks:
 - `metadata.yaml`;
 - that the database exists and is not a Git LFS pointer;
 - sqlite `quick_check`;
-- message counts, required topics and the time window.
+- message counts, required topics and the time window;
+- a clean exit. A recorder killed only **after** its log says "Recording
+  stopped", with every check above passing and nothing missing at the end,
+  is a *warning* ("the data is complete"), not a failure. That happened in
+  trials 140 and 146: rosbag2 hung at exit for 11 s.
+
+Post-processing checks the bag only after `bag_status.json` says
+`state: exited`. The file exists from the start of the recording, so before
+the 30 Sep review a bag could be checked while rosbag2 was still stopping.
 
 ## 2. Operator guide
 
@@ -193,6 +217,14 @@ vla_validate ~/morty_ws/experiments --json /tmp/validation.json
 
 # repaired copies of legacy episodes, OUTSIDE the experiments tree
 vla_validate ~/morty_ws/experiments --repair ~/morty_ws/vla_experiments/repaired
+
+# v3 episodes recorded 30 Sep 2026 carry the stricter verdicts of that day's
+# recorder (every hand-over "needs review", one late frame blocks the episode).
+# Their relabelled copies get today's rules; export from the copies. Name only
+# the trials you keep (the workbook's): the exporters read every episode folder
+# under the root, including retakes left on disk.
+python3 -m vla_experiments.relabel --out ~/morty_ws/vla_experiments/relabelled_30_09 \
+    ~/morty_ws/experiments/experiments_30_09_2026/trial_{143,144,146,150}_*
 
 # the older relabeller: dry run by default; --out writes copies; --apply is refused
 python3 -m vla_experiments.relabel <episode dir>

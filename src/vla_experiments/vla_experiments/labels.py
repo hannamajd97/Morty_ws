@@ -119,9 +119,14 @@ def _motion_window(steps: dict, t_on: float, t_off: float):
     return float(st[max(sel[0] - 1, 0)]), float(st[sel[-1]])
 
 
-def _interval(cmd: dict, ts: List[dict], steps: dict, events: dict, flags: List[str]):
+def _interval(cmd: dict, ts: List[dict], steps: dict, events: dict, flags: List[str],
+              notes: Optional[List[str]] = None):
     """(t_on, t_off, cut) of a command's execution, or None (no evidence).
-    ``cut`` = where an automatic cleanup inside the interval starts."""
+    ``cut`` = where an automatic cleanup inside the interval starts.
+    ``flags`` get what needs a human look; ``notes`` what the evidence
+    settles (2026-09-30: a pick the executor reported FAILED before it moved
+    has nothing to label — trial 144's first attempt, no reachable grasp)."""
+    notes = flags if notes is None else notes
     route = cmd.get("route")
     name = f"command {cmd.get('accepted_action') or cmd.get('action')} ({cmd['command_id'][:8]})"
     if route == "pick":
@@ -136,7 +141,11 @@ def _interval(cmd: dict, ts: List[dict], steps: dict, events: dict, flags: List[
                   if e.get("name") == "motion_start" and _cycle_int(e.get("cycle_id")) == cyc]
             on = ms[0] if ms else None
         if on is None:
-            flags.append(f"{name}: cycle {cyc} never started moving")
+            if cmd.get("terminal") == "failed":
+                notes.append(f"{name}: cycle {cyc} failed before moving "
+                             f"({str(cmd.get('terminal_reason') or '')[:80]}) — no steps to label")
+            else:
+                flags.append(f"{name}: cycle {cyc} never started moving")
             return None
         failed = cmd.get("terminal") == "failed"
         ends = END_PHASES + (("returning_home",) if failed else ())
@@ -182,7 +191,8 @@ def _interval(cmd: dict, ts: List[dict], steps: dict, events: dict, flags: List[
 def _auto_close_cut(cmd: dict, t_on: float, t_off: float, events: dict) -> Optional[float]:
     """An automatic gripper close inside a command that did not ask for one
     (the executor closes after a hand-over on its way home): the task ends
-    there and the rest is cleanup — "open the gripper" must not teach a close."""
+    there and the rest is cleanup — "open the gripper" must not teach a close.
+    Whether that is the routine or needs a look: _routine_close."""
     act = str(cmd.get("accepted_action") or cmd.get("action") or "")
     if act in ("pick", "pick_and_place", "close_gripper", "grasp"):
         return None
@@ -190,6 +200,21 @@ def _auto_close_cut(cmd: dict, t_on: float, t_off: float, events: dict) -> Optio
         if t_on < float(g["stamp"]) < t_off and str(g.get("cmd")) == "close":
             return float(g["stamp"])
     return None
+
+
+def _routine_close(steps: dict, events: dict, t_on: float, cut: float, t_off: float) -> bool:
+    """True when the automatic close at ``cut`` is the executor's release
+    routine (2026-09-30, every hand-over of 30 Sep): the gripper command
+    before it was the release's OPEN — in the same command (open at home →
+    ~2.3 s for the hand → close) or the one before ("open the gripper" at a
+    drop side, then "go back home": the close comes after the arm arrived)
+    — and the arm stands still from the close to the command's end, so the
+    cleanup cut removes no motion. Anything else — a close after a close, or
+    the arm still moving after it — is for a human to look at."""
+    before = [g for g in events.get("gripper_cmd", []) if float(g["stamp"]) < cut]
+    last = max(before, key=lambda g: float(g["stamp"])) if before else None
+    after_release = last is not None and str(last.get("cmd")) == "open"
+    return after_release and _motion_window(steps, cut, t_off) is None
 
 
 def _executed_form(cmd: dict, flags: List[str]) -> None:
@@ -225,6 +250,11 @@ def _instruction_text(cmd: dict) -> tuple:
     attrs = dict(cmd.get("accepted_attributes") or cmd.get("attributes") or {})
     tgt = cmd.get("target") or {}
     obj = tgt.get("label") or cmd.get("object") or None
+    if cmd.get("route") == "named_pose" and cmd.get("holding") is not True:
+        # the router sends a drop as a plain pose move only when the executor
+        # holds nothing (a held object's drop is an executor answer) — the
+        # arm went to the drop pose empty (trial 147, S7)
+        attrs["empty_gripper"] = True
     for k in ("position", "colour", "ordinal", "ordinal_from"):
         if tgt.get(k) and not attrs.get(k):
             attrs[k] = tgt[k]
@@ -243,6 +273,7 @@ def _label_lifecycle(events: dict, steps: dict) -> dict:
     instr = np.full(n, -1.0)
     seg = np.full(n, float(SEGMENT_IDLE))
     flags: List[str] = []
+    notes: List[str] = []     # settled by the evidence — no review needed (2026-09-30)
     cmds = commands_from_events(events.get("command", []))
     ts = _task_states(events)
 
@@ -251,11 +282,13 @@ def _label_lifecycle(events: dict, steps: dict) -> dict:
     for c in cmds:
         if "accepted" not in c or c.get("route") not in EXECUTING_ROUTES:
             continue
-        iv = _interval(c, ts, steps, events, flags)
+        iv = _interval(c, ts, steps, events, flags, notes)
         if iv is None:
             continue
         on, off, reached = iv
         c["end_evidence"] = reached
+        before = [s for s in ts if float(s["stamp"]) <= on]
+        c["holding"] = bool(before[-1].get("holding")) if before else None
         cut = _auto_close_cut(c, on, off, events)
         executed.append((on, off, cut, c))
     executed.sort(key=lambda x: x[0])
@@ -294,7 +327,11 @@ def _label_lifecycle(events: dict, steps: dict) -> dict:
             mc = (st >= cut) & (st < off)
             seg[mc] = SEGMENT_RESET
             instr[mc] = k
-            flags.append(f"'{text}': automatic gripper close at {cut:.2f} labelled as cleanup, not as the command")
+            line = f"'{text}': automatic gripper close at {cut:.2f} labelled as cleanup, not as the command"
+            if _routine_close(steps, events, on, cut, off):
+                notes.append(line + " (the executor's release routine)")
+            else:
+                flags.append(line + " — review: not after a release, or the arm still moved after it")
 
     # 2. holds: a question pause of the executor, outside any execution
     for i, s0 in enumerate(ts):
@@ -366,7 +403,7 @@ def _label_lifecycle(events: dict, steps: dict) -> dict:
         if c.get("state") == "received" and "terminal" not in c:
             pass
     return {"label_source": "command_lifecycle", "instructions": instructions,
-            "instruction_idx": instr, "segment": seg, "flags": flags,
+            "instruction_idx": instr, "segment": seg, "flags": flags, "notes": notes,
             "commands": [_command_summary(c) for c in cmds], "assist": assist}
 
 
@@ -455,17 +492,32 @@ def legacy_findings(events: dict, instructions: List[dict], instr: np.ndarray) -
 
 
 # --------------------------------------------------------------------- API ----
+def review_flags(lab: dict) -> List[str]:
+    """What keeps an episode's labels from being verified: the labeller's
+    flags plus the episode-level ones — shared by the recorder and relabel
+    (2026-09-30: relabel lacked them, so an episode with nothing labelled
+    came out eligible)."""
+    flags = list(lab.get("flags", []))
+    if not lab.get("instructions"):
+        flags.append("no instruction (nothing the robot executed was labelled)")
+    if lab.get("assist"):
+        flags.append(f"{len(lab['assist'])} annotated assistance interval(s) — excluded from training")
+    return flags
+
+
 def label_episode(events: dict, steps: dict, legacy_instructions: Optional[List[dict]] = None) -> dict:
     """Labels for ``steps`` (needs "stamp_ros", optionally "joint_pos") from
     the episode's ``events``. Returns label_source, instructions,
-    instruction_idx, segment, flags, commands and assist spans; the
-    caller writes them into steps.npz / meta.json."""
+    instruction_idx, segment, flags (need review), notes (settled by the
+    evidence), commands and assist spans; the caller writes them into
+    steps.npz / meta.json."""
     if events.get("command"):
         out = _label_lifecycle(events, steps)
         out["format"] = RAW_FORMAT
     else:
         out = _label_legacy(events, steps, list(legacy_instructions or []))
     t0 = float(steps["stamp_ros"][0]) if len(steps["stamp_ros"]) else 0.0
+    out.setdefault("notes", [])
     for ins in out["instructions"]:
         if ins.get("t") is None:
             ins["t"] = ins["stamp"] - t0

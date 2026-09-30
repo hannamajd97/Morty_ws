@@ -193,6 +193,7 @@ def reconstruct_commands(trial: Path, meta: dict) -> Optional[List[dict]]:
             else:
                 c = new(tok.split("+")[0], t)
                 c["attributes"] = {"resume_token": tok}
+            c["_why"] = why
             emit(c, "accepted", t, why, route="executor_answer", cycle_id=(pick or {}).get("cycle_id"))
         elif (m := re.match(r"Point proposal (\d+) \(([^)]*)\): YES", msg)):
             c = new("pick", t)
@@ -255,6 +256,13 @@ def _attach_intents(cmds: Dict[str, dict], meta: dict) -> None:
             fam = ("pick", "pick_and_place")
         cand = [i for i, e in enumerate(intents) if i not in used and e.get("action_intent") in fam
                 and first - 3.0 <= float(e["stamp"]) <= first + 0.2]
+        # 2026-09-30 (trial 137): two answers 72 ms apart — the router's line
+        # names the intent it acted on ("... keep holding): close_gripper",
+        # "'drop_right' names a side"); that one wins over the family's last
+        why = str(c.get("_why") or "")
+        named = [i for i in cand if re.search(r"(?<![\w])'?" + re.escape(str(intents[i].get("action_intent"))) + r"\b", why)]
+        if named:
+            cand = named
         if cand:
             e = intents[cand[-1]]
             used.add(cand[-1])
@@ -410,7 +418,9 @@ def main(argv=None):
             r = validate_trial(t)
             reports.append(r)
             ep, lb = r["episode"], r.get("labels", {})
-            bag = "; ".join(f"{Path(b['bag']).name}: {'ok' if b['ok'] else ' / '.join(b['issues'])}" for b in r["bags"]) or "no bag"
+            bag = "; ".join(f"{Path(b['bag']).name}: "
+                            + ("ok" + (f" (warning: {'; '.join(b['warnings'])})" if b.get("warnings") else "")
+                               if b["ok"] else " / ".join(b["issues"])) for b in r["bags"]) or "no bag"
             print(f"{t.name}: episode={'yes' if ep['episode'] else 'no'}"
                   + (f" ({'ok' if not ep['issues'] else '; '.join(ep['issues'])})" if ep["episode"] else "")
                   + f" | bag: {bag} | labels: {lb.get('status')}")

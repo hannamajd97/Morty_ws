@@ -14,7 +14,9 @@ checks, without ROS:
 * the required topics were recorded with at least one message;
 * the recorded time span is plausible (inside ``window`` = (start, end)
   wall seconds, when given) and the rosbag2 process exited cleanly (the
-  trial's bag_status.json, written by the GUI's BagLink, when present).
+  trial's bag_status.json, written by the GUI's BagLink, when present) —
+  a process killed only AFTER it logged "Recording stopped", with every
+  check above passing, is a warning, not an issue (_finished_before_exit).
 """
 from __future__ import annotations
 
@@ -32,9 +34,25 @@ def _metadata(bag_dir: Path) -> dict:
         return (yaml.safe_load(f) or {}).get("rosbag2_bagfile_information", {})
 
 
+def _finished_before_exit(bag_dir: Path, status: dict, checked: dict) -> bool:
+    """rosbag2 finished writing before its process was stopped the hard way:
+    its log (bag_record.log next to the bag) says "Recording stopped", every
+    database check so far passed, and the last message is no earlier than
+    1 s before the stop request (nothing is missing at the end)."""
+    log = bag_dir.parent / "bag_record.log"
+    try:
+        stopped = "Recording stopped" in log.read_text(errors="replace")
+    except OSError:
+        return False
+    req, end = status.get("stop_requested_unix"), checked.get("end")
+    in_time = req is None or end is None or end >= float(req) - 1.0
+    return stopped and not checked["issues"] and in_time
+
+
 def verify_bag(bag_dir, required_topics: Iterable[str] = (), window: Optional[Tuple[float, float]] = None) -> dict:
     bag_dir = Path(bag_dir)
-    out = {"bag": str(bag_dir), "ok": False, "issues": [], "files": [], "topics": {}, "message_count": 0}
+    out = {"bag": str(bag_dir), "ok": False, "issues": [], "warnings": [], "files": [], "topics": {},
+           "message_count": 0}
     if not (bag_dir / "metadata.yaml").exists():
         out["issues"].append("no metadata.yaml (the recorder did not finish)")
         return out
@@ -104,8 +122,16 @@ def verify_bag(bag_dir, required_topics: Iterable[str] = (), window: Optional[Tu
             st = json.loads(status_p.read_text())
             out["recorder"] = st
             if st.get("exit_code") not in (0, None) or st.get("stop_stage", 1) > 1:
-                out["issues"].append(f"rosbag2 did not exit cleanly (exit code {st.get('exit_code')}, "
-                                     f"stop stage {st.get('stop_stage')})")
+                line = (f"rosbag2 did not exit cleanly (exit code {st.get('exit_code')}, "
+                        f"stop stage {st.get('stop_stage')})")
+                if _finished_before_exit(bag_dir, st, out):
+                    # 2026-09-30 (trials 140, 146): rosbag2 logged "Recording
+                    # stopped" 13 ms after the stop request, its last message
+                    # is at the stop, the database checks pass — only the
+                    # process then hung and the GUI killed it 11 s later.
+                    out["warnings"].append(line + " — after 'Recording stopped'; the data is complete")
+                else:
+                    out["issues"].append(line)
         except ValueError:
             out["issues"].append("bag_status.json unreadable")
     out["ok"] = not out["issues"]

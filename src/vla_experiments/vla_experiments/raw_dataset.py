@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -113,6 +114,11 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
     # pick_and_place texts read "put it on drop_left"
     _d = dest.replace("drop_", "").replace("_side", "")
     side = {"right": "the right side", "left": "the left side", "home": "home"}.get(_d, dest)
+    # 2026-09-30 (trial 135: "pick up the blue vitamin c" for the blue-capped
+    # Multivitamin): "vitamin_c" is the detector's class for EVERY tube, not
+    # the product — it is a vitamin tube; the colour / position say which.
+    if str(obj or "").strip().lower().replace(" ", "_") == "vitamin_c":
+        obj = "vitamin_tube"
     name = (f"{colour} {obj}" if colour and obj else str(obj or "")).replace("_", " ").strip()
     # 2026-09-28 (Majd's trial 082: "The right most vitamin tube." was trained
     # as "pick up the vitamin tube" — with two tubes the instruction must say
@@ -150,6 +156,10 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
     if a in ("pick", "pick_and_place"):
         return f"pick up {thing}" + (f" and put it on {side}" if dest and dest != "home" else "")
     if a in ("drop_right", "drop_left"):
+        # 2026-09-30 (trial 147, S7 "Drop right position." with an empty
+        # gripper): the arm only went to the drop pose — nothing was dropped
+        if attrs.get("empty_gripper"):
+            return f"go to the {a.split('_')[1]} side"
         return f"drop it on the {a.split('_')[1]} side"
     if a == "drop_held":
         return "drop it"
@@ -378,7 +388,76 @@ INCLUDABLE = {"hold": SEGMENT_HOLD, "reset": SEGMENT_RESET, "idle": SEGMENT_IDLE
               "clarify": SEGMENT_CLARIFY, "assist": SEGMENT_ASSIST}
 
 
-def training_segments(ep: "Episode", keep_idle: bool = False, include=()) -> List[Tuple[str, np.ndarray]]:
+# ------------------------------------------------------ step alignment ----
+# 2026-09-30 (the review of 30 Sep): a late frame or a stale gripper sample
+# spoils ONE step, not the demonstration. Before, any such step anywhere —
+# 1 of 462 in trial 146, outside every task — made the whole episode
+# ineligible. Now the steps outside the tolerances are left out of training
+# (training_segments) and only episode-wide timing problems (step gaps,
+# dropped ticks, a frozen stream, incomparable clocks, gripper lag) or too
+# many bad steps inside tasks block an episode. The recorder writes its
+# limits into meta quality.alignment.limits; these are its defaults.
+ALIGN_LIMITS = {"max_image_age_s": 0.5, "max_camera_skew_s": 0.35, "max_gripper_age_s": 2.0}
+# the recorder's wording of the per-step checks (its alignment "issues"
+# before 2026-09-30 mixed them with the episode-wide ones)
+PER_STEP_ISSUE_RE = re.compile(r"^(?:exterior|wrist) image (?:received|CAPTURED) up to "
+                               r"|^cameras up to .* apart|^gripper state up to .* old")
+MAX_BAD_TASK_FRACTION = 0.10
+
+
+def step_misaligned(steps: Dict[str, np.ndarray], alignment: Optional[dict] = None) -> np.ndarray:
+    """(N,) bool — the steps outside the timing tolerances: an image received
+    or (with comparable clocks) captured longer than max_image_age_s before
+    its step, the two cameras' capture stamps more than max_camera_skew_s
+    apart, the gripper sample older than max_gripper_age_s. A missing value
+    is not a violation (missing images are counted by the integrity check)."""
+    alignment = alignment or {}
+    lim = {**ALIGN_LIMITS, **(alignment.get("limits") or {})}
+    images = alignment.get("images") or {}
+    n = len(steps["t"]) if "t" in steps else len(next(iter(steps.values())))
+    bad = np.zeros(n, dtype=bool)
+
+    def over(key, limit, absolute=False):
+        v = steps.get(key)
+        if v is None:
+            return np.zeros(n, dtype=bool)
+        v = np.asarray(v, dtype=float)
+        v = np.abs(v) if absolute else v
+        return np.nan_to_num(v, nan=-np.inf) > limit
+
+    for cam in ("exterior", "wrist"):
+        bad |= over(f"img_age_{cam}", lim["max_image_age_s"])
+        if (images.get(cam) or {}).get("clock_comparable", True):
+            bad |= over(f"img_src_age_{cam}", lim["max_image_age_s"])
+    bad |= over("camera_skew", lim["max_camera_skew_s"], absolute=True)
+    bad |= over("gripper_age", lim["max_gripper_age_s"])
+    return bad
+
+
+def alignment_verdict(steps: Dict[str, np.ndarray], segment: np.ndarray, alignment: dict) -> dict:
+    """The episode's alignment verdict from its steps and the recorder's
+    alignment record: {"ok", "issues" (episode-wide, block training),
+    "notes", "misaligned_steps", "misaligned_task_steps"}. The per-step
+    wording in ``alignment["issues"]`` (PER_STEP_ISSUE_RE) is replaced by the
+    count of steps left out; more than MAX_BAD_TASK_FRACTION of the task
+    steps (at least 4) is an episode-wide issue."""
+    bad = step_misaligned(steps, alignment)
+    task = np.asarray(segment).astype(int) == SEGMENT_TASK
+    n_bad, n_task_bad, n_task = int(bad.sum()), int((bad & task).sum()), int(task.sum())
+    issues = [i for i in (alignment.get("issues") or []) if not PER_STEP_ISSUE_RE.search(i)]
+    notes = []
+    if n_bad:
+        line = (f"{n_bad} step(s) outside the timing tolerances ({n_task_bad} of {n_task} task steps)")
+        if n_task_bad > max(3, MAX_BAD_TASK_FRACTION * n_task):
+            issues.append(line + " — too many to leave out")
+        else:
+            notes.append(line + " — left out of training")
+    return {"ok": not issues, "issues": issues, "notes": notes,
+            "misaligned_steps": n_bad, "misaligned_task_steps": n_task_bad}
+
+
+def training_segments(ep: "Episode", keep_idle: bool = False, include=(),
+                      drop_misaligned: bool = True) -> List[Tuple[str, np.ndarray]]:
     """[(instruction text, step indices)] — one entry per instruction: the
     steps of segment TASK labelled with it, plus the segments named in
     ``include`` (hold / reset / clarify / assist steps attached to that
@@ -386,6 +465,8 @@ def training_segments(ep: "Episode", keep_idle: bool = False, include=()) -> Lis
     an instruction to it). Segmentation by instruction is kept under every
     option; a slice may have gaps where an excluded segment was, and
     ``derive_actions(ep, sel)`` never derives an action across such a gap.
+    ``drop_misaligned`` (default) leaves out the steps outside the timing
+    tolerances (step_misaligned) — they become gaps the same way.
 
     keep_idle=True is the pre-09-24 behaviour (the whole episode under its
     first instruction) and is kept only for an explicit legacy request —
@@ -406,10 +487,13 @@ def training_segments(ep: "Episode", keep_idle: bool = False, include=()) -> Lis
             elif seg[i] == SEGMENT_IDLE:
                 idx[i] = nxt
         codes.add(SEGMENT_IDLE)
+    keep = np.ones(ep.n, dtype=bool)
+    if drop_misaligned:
+        keep = ~step_misaligned(ep.steps, (ep.meta.get("quality") or {}).get("alignment"))
     out = []
     for ins in ep.instructions:
         k = int(ins.get("idx", 0))
-        sel = np.nonzero(np.isin(seg, list(codes)) & (idx == k))[0]
+        sel = np.nonzero(np.isin(seg, list(codes)) & (idx == k) & keep)[0]
         if sel.size >= 2:
             out.append((str(ins.get("instruction") or ep.task), sel))
     return out

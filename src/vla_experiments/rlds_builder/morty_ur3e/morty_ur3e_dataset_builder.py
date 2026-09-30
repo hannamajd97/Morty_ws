@@ -120,7 +120,8 @@ class MortyUr3e(tfds.core.GeneratorBasedBuilder):
         for p in select_episodes(raw, opt["outcomes"], opt["allow_quality"], opt["allow_review"], log=print):
             ep = Episode(p)
             sv = state_vectors(ep)
-            for k, (lang, sel) in enumerate(training_segments(ep, include=opt["include"])):
+            for k, (lang, sel) in enumerate(training_segments(ep, include=opt["include"],
+                                                              drop_misaligned=not opt["allow_quality"])):
                 acts = derive_actions(ep, sel)["eef_delta"]    # never across a gap or another instruction
                 emb = embed([lang])[0].numpy().astype(np.float32) if embed else np.zeros(512, np.float32)
                 steps = []

@@ -341,8 +341,14 @@ def main(work: Path) -> int:
         wait(lambda: (status.get("last_run") or {}).get("run_id") == run2
              and (status.get("last_run") or {}).get("state") in ("complete", "incomplete"), 30, "the second save")
         meta2 = json.loads((trial / "meta.json").read_text())
-        al = " | ".join(meta2["quality"]["alignment"]["issues"])
-        print("     alignment issues:", meta2["quality"]["alignment"]["issues"], flush=True)
+        # every check's wording is in "details" (2026-09-30); "issues" holds
+        # what blocks the episode (here the frozen stream), the late steps are
+        # counted and left out of training
+        align = meta2["quality"]["alignment"]
+        al = " | ".join(align.get("details", align["issues"]))
+        print("     alignment details:", align.get("details"), "| blocking:", align["issues"], flush=True)
+        check(align.get("misaligned_steps", 0) >= 40,
+              f"the late steps are counted ({align.get('misaligned_steps')} of {meta2['num_steps']})")
         check("exterior camera clock" in al or "exterior image CAPTURED" in al,
               "old exterior capture stamps detected (capture age, or the clock not comparable)")
         check("wrist: the same frame reused" in al, "the frozen wrist frame detected")

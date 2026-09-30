@@ -139,6 +139,12 @@ _ACTION_ECHOES = (
     "opening the gripper", "closing the gripper",
     "stopping",
     "picking up", "picking the", "grasping the",
+    # 2026-09-30 (Majd's trial 147: "look and then home" -> the model wrote
+    # "Going to look left, then home." with NO tool call; the list lacked the
+    # wording, so the claim was spoken and nothing moved)
+    "going to look", "going back", "going to the left", "going to the right",
+    "moving to", "moving home", "moving back", "heading ", "turning to",
+    "looking to the", "dropping", "releasing",
 )
 _CLAIM_LEAD_RE = re.compile(
     r"^(?:(?:okay|ok|sure|alright|all right|got it|on it|yes|yep|right|no problem|now)"

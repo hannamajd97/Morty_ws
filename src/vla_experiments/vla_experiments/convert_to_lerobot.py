@@ -42,7 +42,8 @@ def main(argv=None):
     ap.add_argument("--include-unknown", action="store_true", help="also episodes with outcome=unknown")
     ap.add_argument("--include-interrupted", action="store_true", help="also episodes with outcome=interrupted")
     ap.add_argument("--allow-quality-issues", action="store_true",
-                    help="keep episodes the recorder flagged (step gaps, stale poses, gripper lag); default: skip and list them")
+                    help="keep episodes the recorder flagged (step gaps, stale poses, gripper lag) and the single steps "
+                         "outside the timing tolerances; default: skip them and list why")
     ap.add_argument("--allow-review", action="store_true",
                     help="keep episodes whose labels are not verified by execution evidence (every legacy episode) "
                          "or carry review flags; default: skip and list them")
@@ -102,7 +103,8 @@ def main(argv=None):
     for p in eps:
         ep = Episode(p)
         st = state_vectors(ep)[a.state_space]
-        segs = training_segments(ep, keep_idle=a.keep_idle, include=include)
+        segs = training_segments(ep, keep_idle=a.keep_idle, include=include,
+                                 drop_misaligned=not a.allow_quality_issues)
         if not segs:
             print(f"{ep.episode_id}: no task segment (no instruction) — skipped", file=sys.stderr)
             continue

@@ -63,11 +63,23 @@ def wait_ready(trial: Path, timeout_s: float = 90.0) -> dict:
     expected); then say what is true — never "ready" by timeout."""
     t_end = time.time() + timeout_s
     want_bag = any(p.is_dir() and p.name.startswith("bag") for p in trial.iterdir())
+    status_p = trial / "bag_status.json"
     while True:
-        bag_done = (not want_bag) or (trial / "bag_status.json").exists() or (
-            # a trial recorded before bag_status.json existed: the metadata
-            not (trial / "bag_record.log").exists() or any(
-                (p / "metadata.yaml").exists() for p in trial.iterdir() if p.is_dir() and p.name.startswith("bag")))
+        # 2026-09-30 (trial 146): the GUI writes bag_status.json when the
+        # recording STARTS ("recording", then "stopping"); only "exited"
+        # means the rosbag2 process is gone. Checking the bag on the file's
+        # mere existence verified it while rosbag2 was still shutting down,
+        # and its killed exit (-9) came after the "ok".
+        if status_p.exists():
+            try:
+                bag_done = json.loads(status_p.read_text()).get("state") == "exited"
+            except ValueError:
+                bag_done = False          # being rewritten — look again
+        else:
+            bag_done = (not want_bag) or (
+                # a trial recorded before bag_status.json existed: the metadata
+                not (trial / "bag_record.log").exists() or any(
+                    (p / "metadata.yaml").exists() for p in trial.iterdir() if p.is_dir() and p.name.startswith("bag")))
         ep = _episode_state(trial)
         ep_done = ep in (None, "complete", "incomplete", "written", "error")
         if bag_done and ep_done:

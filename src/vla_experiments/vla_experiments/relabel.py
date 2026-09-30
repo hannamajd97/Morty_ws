@@ -30,8 +30,8 @@ from pathlib import Path
 import numpy as np
 
 from .episode_recorder import MOTION_INTENTS, episode_task_instruction
-from .labels import label_episode
-from .raw_dataset import canonical_instruction
+from .labels import label_episode, review_flags
+from .raw_dataset import alignment_verdict, canonical_instruction
 from .recording_contract import RAW_FORMATS_WITH_STEP_LABELS, SEGMENT_NAMES
 
 
@@ -92,10 +92,26 @@ def rebuild(ep_dir: Path, events: dict | None = None) -> tuple:
     q = meta.setdefault("quality", {})
     q["segments"] = {name: int((seg == code).sum()) for code, name in SEGMENT_NAMES.items()}
     q["task_steps"] = q["segments"]["task"]
-    sem = {"label_source": lab["label_source"], "flags": lab["flags"],
-           "verified": lab["label_source"] == "command_lifecycle" and not lab["flags"]}
+    flags = review_flags(lab)
+    sem = {"label_source": lab["label_source"], "flags": flags, "notes": lab.get("notes", []),
+           "verified": lab["label_source"] == "command_lifecycle" and not flags}
     sem["review_required"] = not sem["verified"]
     q["semantic"] = sem
+    # 2026-09-30: the alignment verdict with the same rule as the recorder
+    # (steps outside the tolerances left out, episode-wide problems block);
+    # the recorder's full wording stays in "details".
+    if isinstance(q.get("alignment"), dict):
+        al = q["alignment"]
+        al.setdefault("details", list(al.get("issues") or []))
+        av = alignment_verdict(steps, seg, {**al, "issues": al["details"]})
+        al.update({k: av[k] for k in ("ok", "issues", "notes", "misaligned_steps", "misaligned_task_steps")})
+    if isinstance(q.get("integrity"), dict):
+        integ_ok = bool(q["integrity"].get("ok", True))
+        align_ok = bool((q.get("alignment") or {}).get("ok", True))
+        q["ok"] = integ_ok and align_ok
+        q["issues"] = (list(q["integrity"].get("issues") or []) + list((q.get("alignment") or {}).get("issues") or [])
+                       + [f"review: {f}" for f in flags])
+        q["training_eligible"] = meta["training_eligible"] = integ_ok and align_ok and sem["verified"]
     new = [i["instruction"] + (" [superseded]" if i.get("superseded") else "") for i in lab["instructions"]]
     return meta, steps, old, new
 
