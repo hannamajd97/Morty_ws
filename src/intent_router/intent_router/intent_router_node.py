@@ -2017,9 +2017,15 @@ class IntentRouterNode(Node):
                     "purple": {"purple", "red"},
                 }
                 accept = _alias.get(want, {want})
-                if cap or body:
-                    if cap not in accept and body not in accept:
-                        continue
+                # A known cap decides ALONE (2026-09-30, Majd: "The
+                # multivitamin tube." -> "Picking the blue Vitamin B12"):
+                # the B12 tube has a purple cap on a BLUE body, so "cap or
+                # body" matched it for "blue" as well as the Multi-Mineral
+                # (blue cap), and the first of the two was picked. The body
+                # colour only speaks for objects without a cap colour.
+                seen = cap or body
+                if seen and seen not in accept:
+                    continue
             bbox = det.get("bbox") or [0.0, 0.0, 0.0, 0.0]
             try:
                 x1, y1, x2, y2 = (float(bbox[k]) for k in range(4))
