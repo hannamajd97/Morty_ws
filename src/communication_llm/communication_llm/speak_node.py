@@ -33,6 +33,7 @@ from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 from std_msgs.msg import Bool, String
 
@@ -119,6 +120,16 @@ class SpeakActionServer(Node):
         self._hold_until = 0.0          # monotonic deadline of the hold ...
         self._operator_talking = False  # ... which also ends when the operator stops
         self.create_subscription(String, "/speech/state", self._on_listener_state, 10)
+        # Morty's voice mute (2026-09-30, Majd: a mute for Morty, separate
+        # from the microphone's). Latched both ways, so a restarted speak
+        # node comes up still silent. While muted a Speak goal succeeds
+        # without playing — the answer is still shown in the GUI — and a
+        # sentence already playing stops within one write window.
+        self._voice_muted = False
+        self.create_subscription(
+            Bool, "/speech/voice_muted", self._on_voice_muted,
+            QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
         self._server = ActionServer(
             self,
@@ -148,6 +159,15 @@ class SpeakActionServer(Node):
                 + (f", dropping {queued} queued sentence(s)" if queued else "")
                 + "; new speech waits until they finish.")
         if active:
+            self._tts.stop()
+
+    def _on_voice_muted(self, msg: Bool) -> None:
+        muted = bool(msg.data)
+        if muted == self._voice_muted:
+            return
+        self._voice_muted = muted
+        self.get_logger().info("Morty's voice " + ("MUTED" if muted else "unmuted"))
+        if muted and self._active_goal is not None:
             self._tts.stop()
 
     def _on_listener_state(self, msg: String) -> None:
@@ -310,7 +330,12 @@ class SpeakActionServer(Node):
             def on_phase(phase: str) -> None:
                 self._publish_phase(goal_handle, phase, phase_progress.get(phase, 0.0))
 
-            ok = self._tts.speak_blocking(goal.text, on_phase=on_phase)
+            if self._voice_muted:
+                self.get_logger().info("  (not played: Morty's voice is muted)")
+                on_phase("finished")
+                ok = True
+            else:
+                ok = self._tts.speak_blocking(goal.text, on_phase=on_phase)
 
             result = Speak.Result()
 

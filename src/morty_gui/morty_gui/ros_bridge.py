@@ -379,6 +379,15 @@ class MortyGuiBridge(Node):
             lambda m: setattr(self, "tts_active", bool(m.data)), 10)
         self.create_subscription(Bool, "/speech/muted", self._on_muted, 10)
         self._pub_mute = self.create_publisher(Bool, "/speech/muted", 10)
+        # Morty's VOICE mute (2026-09-30) — separate from the mic mute above:
+        # speak_node plays nothing while it is True. Latched, so a speak node
+        # (re)started later still gets it; the GUI starts unmuted.
+        self.voice_muted = False
+        self._pub_voice_mute = self.create_publisher(
+            Bool, "/speech/voice_muted",
+            QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        self._pub_voice_mute.publish(Bool(data=False))   # the button starts unmuted: say so
 
         # Fast observation replay bridge (pipeline's cached-trajectory node).
         self._pub_fast_replay = self.create_publisher(
@@ -1122,6 +1131,10 @@ class MortyGuiBridge(Node):
 
     def set_muted(self, muted: bool) -> None:
         self._pub_mute.publish(Bool(data=bool(muted)))
+
+    def set_voice_muted(self, muted: bool) -> None:
+        self.voice_muted = bool(muted)
+        self._pub_voice_mute.publish(Bool(data=self.voice_muted))
 
     def chat_alive(self) -> bool:
         return self.count_publishers("/chat/state") > 0

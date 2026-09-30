@@ -43,6 +43,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from .gl_view import CloudGLView
 from .html_viewer import write_view3d_html
+from .audio_popup import AudioPopup
 from .mmhri_window import MMHRIWindow
 from .ros_bridge import start_bridge
 
@@ -357,6 +358,28 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._mute_clicked_t = 0.0      # see _update_mic: re-mute after a speech-node restart
         self._mute_resent_t = 0.0
         mic_row.addWidget(self.mute_btn)
+        # Morty's VOICE mute (2026-09-30, Majd: "a button for mute and unmute
+        # for Morty, different than mine"): the button above mutes the
+        # microphone (what Morty hears); this one silences what Morty SAYS
+        # (/speech/voice_muted — speak_node skips playback, the answer still
+        # appears in the chat). Round and purple so the two never look alike.
+        self.voice_btn = QtWidgets.QPushButton("🗣 Morty speaks")
+        self.voice_btn.setCheckable(True)
+        self.voice_btn.setToolTip("Mute / unmute Morty's voice (not your microphone).\n"
+                                  "Muted: Morty answers only in the chat below.")
+        self.voice_btn.setStyleSheet(
+            "QPushButton{border:2px solid #8e6cf0;border-radius:12px;padding:3px 10px;"
+            "color:#8e6cf0;font-weight:bold;}"
+            "QPushButton:checked{background:#5b3fb5;color:white;border-color:#5b3fb5;}")
+        self.voice_btn.toggled.connect(self._on_voice_toggle)
+        mic_row.addWidget(self.voice_btn)
+        # Ubuntu's speaker + microphone sliders, in a small popup (audio_popup).
+        self.sound_btn = QtWidgets.QToolButton()
+        self.sound_btn.setText("🔊▾")
+        self.sound_btn.setToolTip("Speaker and microphone volume — the same sliders as Ubuntu's top bar")
+        self._audio_popup = AudioPopup(self)
+        self.sound_btn.clicked.connect(lambda: self._audio_popup.show_under(self.sound_btn))
+        mic_row.addWidget(self.sound_btn)
         self.speech_chip = QtWidgets.QLabel("IDLE")
         self.speech_chip.setStyleSheet(
             "background:#333; color:#aaa; padding:3px 10px; border-radius:8px; font-weight:bold;"
@@ -2381,6 +2404,10 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self._mute_clicked_t = time.monotonic()
         self.bridge.set_muted(muted)
         self.mute_btn.setText("🔇 MUTED" if muted else "🎙 live")
+
+    def _on_voice_toggle(self, muted: bool) -> None:
+        self.bridge.set_voice_muted(muted)
+        self.voice_btn.setText("🤐 Morty silent" if muted else "🗣 Morty speaks")
 
     def _update_mic(self, level: float, state: str, muted: bool) -> None:
         self.mic_bar.setValue(int(max(0.0, min(1.0, level * 3.0)) * 100))
