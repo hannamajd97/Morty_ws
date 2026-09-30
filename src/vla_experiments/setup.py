@@ -30,6 +30,7 @@ setup(
             "vla_dataset_info = vla_experiments.raw_dataset:main",
             "vla_view = vla_experiments.episode_viewer:main",
             "vla_relabel = vla_experiments.relabel:main",
+            "vla_validate = vla_experiments.validate:main",
             "vla_joints = vla_experiments.joints_full:main",
             "convert_to_lerobot = vla_experiments.convert_to_lerobot:main",
             "convert_to_rlds = vla_experiments.convert_to_rlds:main",

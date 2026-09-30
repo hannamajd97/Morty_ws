@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import uuid
 from typing import Optional
 
 from PyQt5 import QtCore
@@ -99,10 +100,45 @@ class VlaLink(QtCore.QObject):
         if stale:
             return "stale " + ", ".join(stale)
         self.last_episode = None
+        # 2026-09-30: this run's id — the recorder's status names it once the
+        # episode really opened (ack()); a cached status never counts
+        self.run_id = uuid.uuid4().hex
+        self._bridge.vla_cmd(f"run {self.run_id}")
         if trial_dir:
             self._bridge.vla_cmd(f"hint {trial_dir}")
         self._bridge.vla_cmd(f"trial {fallback_task}")
         return ""
+
+    def ack(self) -> tuple:
+        """("recording", "") once the recorder's status names THIS run as
+        recording, ("refused", reason) when it refused this run, else
+        ("waiting", "")."""
+        if self._bridge is None or not getattr(self, "run_id", ""):
+            return ("refused", "no recorder")
+        st = self._bridge.vla_status() or {}
+        if st.get("run_id") == self.run_id and st.get("recording"):
+            return ("recording", "")
+        last = st.get("last_run") or {}
+        if last.get("run_id") == self.run_id and last.get("state") == "refused":
+            return ("refused", str(last.get("reason") or "refused"))
+        return ("waiting", "")
+
+    def last_run(self) -> dict:
+        """The recorder's verdict on the last run it finished (complete /
+        incomplete / discarded / error) — for this GUI's run only."""
+        st = (self._bridge.vla_status() or {}) if self._bridge is not None else {}
+        last = st.get("last_run") or {}
+        return last if last.get("run_id") == getattr(self, "run_id", None) else {}
+
+    def annotate(self, kind: str, edge: str = "at", note: str = "") -> None:
+        """An operator intervention mark in the running episode."""
+        if self._bridge is not None:
+            self._bridge.vla_cmd(f"annotate {kind} {edge} {note}".strip())
+
+    def camera_check(self, view: str) -> None:
+        """Both cameras' current frames saved for one workspace view."""
+        if self._bridge is not None:
+            self._bridge.vla_cmd(f"camera_check {view}")
 
     def end(self, success: Optional[bool]) -> None:
         """Close the episode. None = no human verdict, let the executor's

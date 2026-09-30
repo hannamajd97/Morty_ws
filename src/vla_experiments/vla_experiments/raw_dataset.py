@@ -48,7 +48,9 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-SEGMENT_IDLE, SEGMENT_TASK, SEGMENT_RESET = 0, 1, 2
+# One source for the codes (recording_contract.py); 0-2 are the v2 codes.
+from .recording_contract import (OUTCOMES, SEGMENT_ASSIST, SEGMENT_CLARIFY, SEGMENT_HOLD,  # noqa: F401
+                                 SEGMENT_IDLE, SEGMENT_NAMES, SEGMENT_RESET, SEGMENT_TASK)
 
 STEP_KEYS = [
     "t",                  # (N,)   seconds since episode start (recorder clock)
@@ -84,7 +86,15 @@ STEP_KEYS = [
     "gripper_cmd_age",    # (N,)   seconds since the last gripper command event
     "instruction_idx",    # (N,)   index into meta["instructions"], -1 = none active
     "phase",              # (N,)   index into meta["phase_names"] (executor phase marks), -1 = none
-    "segment",            # (N,)   SEGMENT_IDLE / SEGMENT_TASK / SEGMENT_RESET
+    "segment",            # (N,)   recording_contract SEGMENT_* (idle/task/reset; v3: hold/clarify/assist)
+    # --- v3 (2026-09-30): alignment evidence and the executor's own phase
+    "img_src_age_exterior",  # (N,) tick minus the frame's capture stamp (valid when the clock is comparable)
+    "img_src_age_wrist",     # (N,)
+    "img_repeat_exterior",   # (N,) 1 = the same frame (source stamp) as the previous step
+    "img_repeat_wrist",      # (N,)
+    "camera_skew",           # (N,) exterior minus wrist capture stamp [s]
+    "gripper_age",           # (N,) seconds since the last gripper joint sample (apart from the arm)
+    "task_phase",            # (N,) index into meta["task_phase_names"] (executor task_state), -1 = none
 ]
 
 V1_STEP_KEYS = STEP_KEYS[:15]
@@ -98,7 +108,11 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
     attrs = attrs or {}
     colour = str(attrs.get("colour") or "").strip()
     dest = str(attrs.get("destination") or "").strip().lower()
-    side = {"right": "the right side", "left": "the left side", "home": "home"}.get(dest, dest)
+    # 2026-09-30: the router and the model say drop_left / drop_right (the
+    # executor's drop_left_side ...); only "left" / "right" were mapped, so
+    # pick_and_place texts read "put it on drop_left"
+    _d = dest.replace("drop_", "").replace("_side", "")
+    side = {"right": "the right side", "left": "the left side", "home": "home"}.get(_d, dest)
     name = (f"{colour} {obj}" if colour and obj else str(obj or "")).replace("_", " ").strip()
     # 2026-09-28 (Majd's trial 082: "The right most vitamin tube." was trained
     # as "pick up the vitamin tube" — with two tubes the instruction must say
@@ -116,6 +130,23 @@ def canonical_instruction(action: str, obj=None, attrs=None, fallback: str = "")
         name = f"{position} {name}"
     thing = f"the {name}" if name else "the object"
     a = (action or "").lower()
+    # 2026-09-30 (recording contract v1): a compound's "then" is part of the
+    # instruction on EVERY action that can carry it (trial 126:
+    # open_gripper + then=release_home was trained as "open the gripper").
+    then = str(attrs.get("then") or "").strip().lower()
+    if dest in ("here", "in_place", "same place", "same_place") and a in ("confirm_drop", "pick_and_place", "place"):
+        base = f"pick up {thing} and put it back down" if a == "pick_and_place" else "put it back down here"
+        return base + (" and go back home" if then == "release_home" else "")
+    if a in ("release", "open_gripper") and then == "release_home":
+        return "open the gripper and go back home"
+    if a == "go_home" and then in ("release", "release_home"):
+        return "bring it home and hand it over"
+    if a in ("drop_right", "drop_left") and then in ("release", "release_home"):
+        return (f"drop it on the {a.split('_')[1]} side and hand it over"
+                + (" and go back home" if then == "release_home" else ""))
+    if a == "pick_and_place" and dest and dest != "home" and then in ("release", "release_home"):
+        return (f"pick up {thing} and put it on {side} and hand it over"
+                + (" and go back home" if then == "release_home" else ""))
     if a in ("pick", "pick_and_place"):
         return f"pick up {thing}" + (f" and put it on {side}" if dest and dest != "home" else "")
     if a in ("drop_right", "drop_left"):
@@ -294,6 +325,18 @@ class Episode:
             return list(ins)
         return [{"idx": 0, "instruction": self.task, "action_intent": self.meta.get("intent", ""), "t": 0.0}]
 
+    @property
+    def label_source(self) -> str:
+        return str(self.meta.get("label_source") or "legacy_intent_arrival")
+
+    @property
+    def review_required(self) -> bool:
+        """True unless the labels rest on recorded execution evidence and the
+        recorder found nothing to review (v3 "semantic"); every legacy
+        episode is unverified."""
+        sem = (self.meta.get("quality") or {}).get("semantic")
+        return True if not isinstance(sem, dict) else bool(sem.get("review_required", True))
+
     def segment_codes(self) -> np.ndarray:
         """SEGMENT_* per step; a v1 episode is all task."""
         seg = self.steps.get("segment")
@@ -306,7 +349,7 @@ class Episode:
 
 def _outcome(meta: dict) -> str:
     o = meta.get("outcome")
-    if o in ("success", "failure", "unknown"):
+    if o in OUTCOMES:
         return o
     s = meta.get("success")                       # v1: bool, default True
     return "unknown" if s is None else ("success" if s else "failure")
@@ -331,21 +374,55 @@ def quality_issues(ep: "Episode") -> List[str]:
     return issues
 
 
-def training_segments(ep: "Episode", keep_idle: bool = False) -> List[Tuple[str, np.ndarray]]:
-    """[(instruction text, step indices)] — one entry per instruction, the
-    steps of segment TASK that belong to it (contiguous runs are kept as
-    one slice; a hold inside the instruction stays). keep_idle=True returns
-    the whole episode under its first instruction, the pre-09-24 behaviour."""
+INCLUDABLE = {"hold": SEGMENT_HOLD, "reset": SEGMENT_RESET, "idle": SEGMENT_IDLE,
+              "clarify": SEGMENT_CLARIFY, "assist": SEGMENT_ASSIST}
+
+
+def training_segments(ep: "Episode", keep_idle: bool = False, include=()) -> List[Tuple[str, np.ndarray]]:
+    """[(instruction text, step indices)] — one entry per instruction: the
+    steps of segment TASK labelled with it, plus the segments named in
+    ``include`` (hold / reset / clarify / assist steps attached to that
+    instruction by the labeller; "idle" attaches the unlabelled steps before
+    an instruction to it). Segmentation by instruction is kept under every
+    option; a slice may have gaps where an excluded segment was, and
+    ``derive_actions(ep, sel)`` never derives an action across such a gap.
+
+    keep_idle=True is the pre-09-24 behaviour (the whole episode under its
+    first instruction) and is kept only for an explicit legacy request —
+    the exporters no longer use it (it was what MORTY_VLA_ALL did)."""
     if keep_idle or "segment" not in ep.steps:
         return [(ep.task, np.arange(ep.n))]
+    unknown = set(include) - set(INCLUDABLE)
+    if unknown:
+        raise ValueError(f"unknown segment(s) {sorted(unknown)}; choose from {sorted(INCLUDABLE)}")
+    codes = {SEGMENT_TASK} | {INCLUDABLE[k] for k in include if k != "idle"}
     seg = ep.segment_codes(); idx = ep.instruction_idx()
+    if "idle" in include:
+        idx = idx.copy()
+        nxt = -1
+        for i in range(ep.n - 1, -1, -1):          # unlabelled idle steps join the next instruction
+            if idx[i] >= 0:
+                nxt = idx[i]
+            elif seg[i] == SEGMENT_IDLE:
+                idx[i] = nxt
+        codes.add(SEGMENT_IDLE)
     out = []
     for ins in ep.instructions:
         k = int(ins.get("idx", 0))
-        sel = np.nonzero((seg == SEGMENT_TASK) & (idx == k))[0]
+        sel = np.nonzero(np.isin(seg, list(codes)) & (idx == k))[0]
         if sel.size >= 2:
             out.append((str(ins.get("instruction") or ep.task), sel))
     return out
+
+
+def contiguous_runs(ep: "Episode", sel: np.ndarray, max_gap_s: float = 0.5) -> List[np.ndarray]:
+    """``sel`` split where steps are not adjacent or further apart in time
+    than ``max_gap_s`` — the pieces within which actions may be derived."""
+    if len(sel) == 0:
+        return []
+    t = ep.steps["t"]
+    cut = np.nonzero((np.diff(sel) != 1) | (np.diff(t[sel]) > max_gap_s))[0] + 1
+    return [r for r in np.split(sel, cut) if len(r)]
 
 
 def find_episode_dirs(root: Path) -> List[Path]:
@@ -383,9 +460,54 @@ def list_episodes(dataset_dir: Path, include_failed: bool = False, include_unkno
     return out
 
 
+def select_episodes(root: Path, outcomes=("success",), allow_quality: bool = False,
+                    allow_review: bool = False, log=None) -> List[Path]:
+    """The episodes an export takes, each rule separate (2026-09-30; before,
+    one switch — MORTY_VLA_ALL — took everything and flattened the labels):
+      outcomes       which meta "outcome" values (success / failure /
+                     unknown / interrupted)
+      allow_quality  keep episodes with recorder-flagged integrity or
+                     alignment issues
+      allow_review   keep episodes whose labels are not verified by execution
+                     evidence (every legacy episode) or carry review flags
+    ``log(text)`` is told why each skipped episode was skipped."""
+    out = []
+    for p in find_episode_dirs(root):
+        try:
+            ep = Episode(p)
+        except Exception as exc:  # noqa: BLE001 — an unreadable episode is reported, not exported
+            if log:
+                log(f"skipping {p.name}: unreadable ({type(exc).__name__}: {exc})")
+            continue
+        if ep.outcome not in outcomes:
+            if log:
+                log(f"skipping {ep.episode_id}: outcome={ep.outcome}")
+            continue
+        q = ep.meta.get("quality") or {}
+        integ = (q.get("integrity") or {}).get("issues", []) + (q.get("alignment") or {}).get("issues", []) \
+            if "integrity" in q else [i for i in quality_issues(ep) if not i.startswith("review:")]
+        if integ and not allow_quality:
+            if log:
+                log(f"skipping {ep.episode_id} (quality): " + "; ".join(integ))
+            continue
+        if ep.review_required and not allow_review:
+            if log:
+                why = (q.get("semantic") or {}).get("flags") or [f"labels: {ep.label_source} (unverified)"]
+                log(f"skipping {ep.episode_id} (needs review): " + "; ".join(why[:3]))
+            continue
+        out.append(p)
+    return out
+
+
 # ------------------------------------------------------------- actions ----
-def derive_actions(ep: Episode) -> Dict[str, np.ndarray]:
+def derive_actions(ep: Episode, sel: Optional[np.ndarray] = None, max_gap_s: float = 0.5) -> Dict[str, np.ndarray]:
     """Derive per-step action targets from consecutive states.
+
+    With ``sel`` (a training slice), the arrays are those of the steps in
+    ``sel`` and "the next step" is the next step OF THE SAME CONTIGUOUS RUN
+    (2026-09-30): the last step of a run — before an excluded gap, another
+    instruction or a time gap > max_gap_s — gets zero motion and its own
+    gripper target instead of the motion to an unrelated frame.
 
     Returns
       joint_abs_next  (N,7)  next-step absolute joint positions + gripper target
@@ -405,6 +527,12 @@ def derive_actions(ep: Episode) -> Dict[str, np.ndarray]:
     have_cmd = np.isfinite(jc).all(axis=1)
 
     nxt_idx = np.minimum(np.arange(n) + 1, n - 1)
+    if sel is not None:
+        # next index only inside the same run of the slice; run ends map to themselves
+        nxt_idx = np.arange(n)
+        for run in contiguous_runs(ep, np.asarray(sel, dtype=int), max_gap_s):
+            nxt_idx[run[:-1]] = run[1:]
+        have_cmd = have_cmd & (nxt_idx != np.arange(n))   # a run end has no command to follow
     joint_next = jp[nxt_idx].copy()
     joint_next[have_cmd] = jc[have_cmd]
 
@@ -431,12 +559,16 @@ def derive_actions(ep: Episode) -> Dict[str, np.ndarray]:
         drot[i] = matrix_to_rpy(R_j @ R_i.T)
     eef_delta = np.concatenate([dpos, drot, grip_target[:, None]], axis=1).astype(np.float32)
 
-    return {
+    out = {
         "joint_abs_next": joint_abs_next,
         "joint_delta": joint_delta,
         "eef_delta": eef_delta,
         "gripper_target": grip_target,
     }
+    if sel is not None:
+        sel = np.asarray(sel, dtype=int)
+        out = {k: v[sel] for k, v in out.items()}
+    return out
 
 
 def state_vectors(ep: Episode) -> Dict[str, np.ndarray]:

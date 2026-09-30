@@ -668,6 +668,12 @@ BAG_TOPICS = [
     "/grasp_executor_lin_llm/interactive_status",
     "/grasp_executor_lin_llm/cycle_done",
     "/grasp_pipeline/point_proposal",                     # 2026-09-28: pointing question open / answered
+    # 2026-09-30 (recording contract v1): the evidence the VLA labels rest on
+    "/robot/command_event",                               # the router's command lifecycle
+    "/grasp_executor_lin_llm/task_state",                 # the executor's phase / question as it changes (latched)
+    "/gripper_controller/command_event",                  # stamped gripper open / close commands
+    "/grasp_pipeline/point_answer",                       # the operator's yes / no to a pointing question
+    "/robot/open_question",                               # the router's open question (latched)
     "/tf",
     "/tf_static",
 ]

@@ -14,6 +14,9 @@ trial folder). In order:
    CSV rows.
 
 Each step is independent; a failure is logged and the next one still runs.
+2026-09-30: and it is REPORTED — every step's verdict goes to
+postprocess_status.json in the trial folder and the exit code is non-zero
+when anything failed; the trial window shows it instead of "saved".
 """
 from __future__ import annotations
 
@@ -28,17 +31,25 @@ def main(argv=None):
         print(__doc__)
         return 2
     trial = Path(argv[0]).expanduser()
+    from vla_experiments.postprocess import write_status
+    rc = 0
     try:
         from vla_experiments.postprocess import main as vla_post
-        vla_post([str(trial)])
+        rc = vla_post([str(trial)]) or 0
     except Exception as exc:  # noqa: BLE001
+        rc = 1
+        write_status(trial, "vla", {"ok": False, "errors": [f"{type(exc).__name__}: {exc}"]})
         print(json.dumps({"vla_postprocess": f"failed: {type(exc).__name__}: {exc}"}), flush=True)
     try:
         from .trial_times import finalize
-        print(json.dumps(finalize(trial)), flush=True)
+        r = finalize(trial)
+        write_status(trial, "trial_times", {"ok": True, "result": r})
+        print(json.dumps(r), flush=True)
     except Exception as exc:  # noqa: BLE001
+        rc = 1
+        write_status(trial, "trial_times", {"ok": False, "errors": [f"{type(exc).__name__}: {exc}"]})
         print(json.dumps({"trial_times": f"failed: {type(exc).__name__}: {exc}"}), flush=True)
-    return 0
+    return rc
 
 
 if __name__ == "__main__":

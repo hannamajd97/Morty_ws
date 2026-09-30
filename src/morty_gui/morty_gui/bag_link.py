@@ -23,6 +23,7 @@ escalation with a log file, so it is reused as is.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import time
@@ -35,10 +36,45 @@ from .managed_launch import ManagedLaunch
 
 
 class BagLink(QtCore.QObject):
+    """2026-09-30: the rosbag2 process's EXIT is recorded — bag_status.json
+    next to the bag gets its exit code and how hard it had to be stopped
+    (1 = SIGINT, 2 = SIGTERM, 3 = SIGKILL); a recorder that dies during the
+    trial is reported through ``died`` at once. bag_check.verify_bag and the
+    post-processing read that file: metadata.yaml alone is no proof."""
+    died = QtCore.pyqtSignal(int)      # exit code of a recorder that ended while the trial ran
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._proc = ManagedLaunch(self)
         self.last_dir: str = ""        # bag folder of the current / last trial
+        self._status_path = ""
+        self._stopping = False
+        self._watch = QtCore.QTimer(self)
+        self._watch.timeout.connect(self._check_exit)
+
+    def _write_status(self, **fields) -> None:
+        if not self._status_path:
+            return
+        try:
+            cur = json.loads(open(self._status_path).read()) if os.path.exists(self._status_path) else {}
+        except ValueError:
+            cur = {}
+        cur.update(fields)
+        tmp = self._status_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(cur, f, indent=2)
+        os.replace(tmp, self._status_path)
+
+    def _check_exit(self) -> None:
+        stage = self._proc.stop_stage()
+        rc = self._proc.reap()
+        if rc is None:
+            return
+        self._watch.stop()
+        self._write_status(state="exited", exit_code=rc, stop_stage=stage,
+                           stopped_by_gui=self._stopping, finished_unix=time.time())
+        if not self._stopping:
+            self.died.emit(int(rc))
 
     def running(self) -> bool:
         return self._proc.running()
@@ -58,24 +94,34 @@ class BagLink(QtCore.QObject):
                          log_path=os.path.join(parent_dir, "bag_record.log"),
                          die_with_parent=True)   # 2026-09-28: a dead GUI must not leave it recording (trial 081)
         self.last_dir = bag_dir
+        self._stopping = False
+        self._status_path = os.path.join(parent_dir, "bag_status.json")
+        self._write_status(state="recording", bag=bag_dir, started_unix=time.time(), topics=list(BAG_TOPICS))
+        self._watch.start(500)
         return bag_dir
 
     def end(self) -> str:
         """Stop and keep. SIGINT makes rosbag2 flush its cache and write
         metadata.yaml; ManagedLaunch escalates if it ever hangs."""
+        self._stopping = True
         if self._proc.running():
+            self._write_status(state="stopping", stop_requested_unix=time.time())
             self._proc.stop()
         return self.last_dir
 
     def abort(self) -> None:
         """Stop and delete (trial discarded). Waits briefly for the recorder
         to exit so the folder is not removed underneath it."""
+        self._stopping = True
         if self._proc.running():
             self._proc.stop()
             for _ in range(50):
                 if not self._proc.running():
                     break
                 time.sleep(0.1)
+        self._watch.stop()
+        if self._status_path and os.path.exists(self._status_path):
+            os.remove(self._status_path)
         if self.last_dir and os.path.isdir(self.last_dir):
             shutil.rmtree(self.last_dir, ignore_errors=True)
         self.last_dir = ""

@@ -162,6 +162,7 @@ class ManagedLaunch(QtCore.QObject):
             self._stop_stage = 2
             self._stop_timer.start(4000)
         else:
+            self._stop_stage = 3       # 2026-09-30: recorded — a SIGKILLed rosbag2 leaves a partial bag
             self._signal(signal.SIGKILL)
 
     def _signal(self, sig) -> None:
@@ -172,6 +173,10 @@ class ManagedLaunch(QtCore.QObject):
             os.killpg(os.getpgid(pid), sig)
         except Exception:
             pass
+
+    def stop_stage(self) -> int:
+        """0 = not stopping, 1 = SIGINT sent, 2 = escalated to SIGTERM, 3 = SIGKILL."""
+        return self._stop_stage
 
     def reap(self) -> Optional[int]:
         """Return the exit code once, when the process has ended."""

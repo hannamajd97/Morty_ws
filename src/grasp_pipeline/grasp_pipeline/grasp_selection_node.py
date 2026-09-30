@@ -2673,6 +2673,9 @@ class YoloLiveSelectGrasp(Node):
                             and bool(self.get_parameter("confirm_pointing").value)
                             and 0 <= int(choice) < len(dets)):
                         verdict = self._confirm_pointed_choice(dets, int(choice), header)
+                        # 2026-09-30: the confirmed proposal names this pick in
+                        # the selection record (recording contract v1)
+                        self._selected_proposal_id = self._point_prop_id if verdict == "yes" else None
                         if verdict != "yes":
                             self._selection_in_progress = False
                             if verdict in ("no", "timeout", "ignored"):
@@ -2704,7 +2707,16 @@ class YoloLiveSelectGrasp(Node):
                             "score": float(sel_det["score"]),
                             "bbox": [int(v) for v in sel_det["bbox"]],
                             "header": header,
+                            # 2026-09-30 (recording contract v1): which instance —
+                            # its index is meaningful only with this detection
+                            # set and image (stamp, frame) — and, for a pointed
+                            # pick, the confirmed proposal
+                            "index": int(self.selected_idx), "n_detections": len(dets),
+                            "display": str(sel_det.get("display", sel_det["label"])),
+                            "proposal_id": (getattr(self, "_selected_proposal_id", None)
+                                            if self._last_selection_source == "pointing" else None),
                         }
+                        self._selected_proposal_id = None
                         self.last_selected_debug_det = {
                             "label": sel["label"],
                             "display": sel["label"],

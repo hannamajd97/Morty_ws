@@ -14,6 +14,7 @@ import json
 import re
 import threading
 import time
+import uuid
 from typing import Optional
 
 import rclpy
@@ -642,6 +643,26 @@ class IntentRouterNode(Node):
         self._open_q_pub.publish(String(data=json.dumps({"question": ""})))
         self.create_subscription(
             String, "/grasp_pipeline/point_proposal", self._on_point_proposal, 10)
+        # 2026-09-30 (recording contract v1, vla_experiments/recording_contract.py):
+        # every command's LIFECYCLE — received, queued / deferred / rejected,
+        # accepted (the executing component took it), cycle, completed /
+        # failed / cancelled — at the moment this node knows it. The VLA
+        # recorder labels steps from the command actually executing instead
+        # of from intent arrival (trial 114: look_right and go_home arrived
+        # 8 ms apart; go_home took the look's motion). Events only; no
+        # routing decision reads them.
+        self._cmd_pub = self.create_publisher(
+            String, "/robot/command_event",
+            QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=100,
+                       reliability=ReliabilityPolicy.RELIABLE))
+        self._cmd_seq = 0
+        self._cmd_boot = round(time.time(), 3)
+        self._cmds: "collections.OrderedDict[str, dict]" = collections.OrderedDict()
+        self._routing_cmd: Optional[dict] = None   # the command _on_intent is routing now
+        self._active_cmd: Optional[dict] = None    # the command _dispatch runs (queue head)
+        self._pick_cmd: Optional[dict] = None      # the command whose grasp cycle runs
+        self._followup_cmd: Optional[dict] = None  # the command behind _followup_plan
+        self._dispatch_narr: Optional[list] = None # lines said while _dispatch runs
         # Lifecycle status for the interactive drop: 'paused' fires when
         # the executor has finished Step 3 (close gripper) and is now
         # blocking on the resume topic; 'resumed:<dest>' fires when we
@@ -706,6 +727,28 @@ class IntentRouterNode(Node):
     # ── intent handling ──────────────────────────────────────────────────
 
     def _on_intent(self, msg: String) -> None:
+        """Entry of /robot/intent: the command's "received" event, then the
+        routing below (_route_intent), then — when no route marked the
+        command at all — a "rejected" event, so a silently dropped intent
+        never looks like an executed one (recording contract v1)."""
+        try:
+            intent = json.loads(msg.data or "")
+        except (TypeError, ValueError):
+            intent = None
+        if not isinstance(intent, dict):
+            self._route_intent(msg)
+            return
+        cmd = self._cmd_from_intent(intent)
+        self._cmd_event(cmd, "received")
+        self._routing_cmd = cmd
+        try:
+            self._route_intent(String(data=json.dumps(intent)))
+        finally:
+            self._routing_cmd = None
+            if cmd.get("state") == "received":
+                self._cmd_event(cmd, "rejected", "dropped by the router without a route")
+
+    def _route_intent(self, msg: String) -> None:
         raw = (msg.data or "").strip()
         if not raw:
             return
@@ -725,7 +768,9 @@ class IntentRouterNode(Node):
         if action in RESET_INTENTS:
             _rattrs = intent.get("object_attributes")
             _src = str(_rattrs.get("source") or "") if isinstance(_rattrs, dict) else ""
+            self._cmd_event(self._routing_cmd, "accepted", route="reset")
             self._handle_reset(_src or "voice")
+            self._cmd_event(self._routing_cmd, "completed", "reset sent to the executor")
             return
 
         # Stop is special: it must execute immediately and clear the queue,
@@ -736,7 +781,9 @@ class IntentRouterNode(Node):
             # path then sends no second abort (see _handle_stop).
             _sattrs = intent.get("object_attributes")
             _ssrc = str(_sattrs.get("source") or "") if isinstance(_sattrs, dict) else ""
+            self._cmd_event(self._routing_cmd, "accepted", route="stop")
             self._stop_path(_ssrc)
+            self._cmd_event(self._routing_cmd, "completed", "stop sent")
             return
 
         # 2026-09-28: the operator confirmed the gripper is empty although
@@ -756,6 +803,7 @@ class IntentRouterNode(Node):
         if action in ("confirm_point", "reject_point"):
             if not self._answer_point(action == "confirm_point", "answer"):
                 self.get_logger().info(f"{action}: no pointing question is open — ignored.")
+                self._cmd_event(self._routing_cmd, "rejected", "no pointing question is open")
             return
         if (self._point_q is not None and action in PICK_INTENTS
                 and self._pick_confirms_point(intent)):
@@ -1135,6 +1183,10 @@ class IntentRouterNode(Node):
                 if plan == "release" and self._followup_plan == "release_home":
                     plan = "release_home"   # never downgrade an earlier "then home"
                 self._followup_plan = plan
+                self._followup_cmd = self._routing_cmd
+                self._cmd_event(self._routing_cmd, "deferred",
+                                "kept for the release pause of the running pick",
+                                parent_id=(self._pick_cmd or {}).get("command_id", ""))
                 self.get_logger().info(
                     f"Follow-up {action!r} noted while the pick is in flight — "
                     f"it answers the release pause when it opens (plan={plan}).")
@@ -1160,6 +1212,7 @@ class IntentRouterNode(Node):
                     # Same action already at the tail — collapse.
                     duplicate = True
             if duplicate:
+                self._cmd_event(self._routing_cmd, "rejected", "duplicate of a running or queued command")
                 self.get_logger().info(
                     f"Dedup: dropping repeat intent {action!r} "
                     "(already running or already queued)."
@@ -1174,6 +1227,7 @@ class IntentRouterNode(Node):
                 return
             self._intent_queue.append(intent)
             queued = len(self._intent_queue)
+        self._cmd_event(self._routing_cmd, "queued", f"position {queued}, router busy={self._busy}")
         self.get_logger().info(
             f"Queued intent {action!r}; queue size now {queued}, busy={self._busy}"
         )
@@ -1198,6 +1252,21 @@ class IntentRouterNode(Node):
         self._try_dispatch_next()
 
     def _dispatch(self, intent: dict) -> None:
+        """Run the queue head (_dispatch_inner). A command that finished
+        synchronously without being accepted was refused by one of the
+        checks (robot not ready, which one?, still holding ...): its
+        "rejected" event carries what was said (recording contract v1)."""
+        cmd = self._cmd_from_intent(intent)
+        self._active_cmd = cmd
+        self._dispatch_narr = []
+        try:
+            self._dispatch_inner(intent)
+        finally:
+            said, self._dispatch_narr = self._dispatch_narr or [], None
+            if cmd.get("state") in ("received", "queued") and not self._busy:
+                self._cmd_event(cmd, "rejected", " / ".join(said) or "refused by the router")
+
+    def _dispatch_inner(self, intent: dict) -> None:
         action = str(intent.get("action_intent") or "").strip().lower()
         self._currently_dispatched_action = action
         obj = str(intent.get("object_intent") or "").strip()
@@ -1605,6 +1674,18 @@ class IntentRouterNode(Node):
             {"drop": chosen_drop, "destination": destination, "then": _then}
             if is_pick_and_place else None)
         self._clarify = None   # 2026-09-29: a committed pick ends any which-one question
+        # 2026-09-30: the pick is committed — its command is accepted, with
+        # the ACCEPTED form (a which-one answer carries the refused
+        # pick_and_place's destination) and the resolved target.
+        self._pick_cmd = self._active_cmd
+        self._cmd_event(
+            self._active_cmd, "accepted", route="pick",
+            action="pick_and_place" if is_pick_and_place else "pick",
+            attributes={k: v for k, v in (attrs if isinstance(attrs, dict) else {}).items() if v not in (None, "")}
+            | ({"destination": destination} if is_pick_and_place and destination else {}),
+            target={"label": self._to_display_label(label), "colour": colour or "",
+                    "position": position or "", "ordinal": ordinal or 0,
+                    "ordinal_from": ordinal_from, "source": "voice"})
 
         # Toggle the executor's vitamin-tube special mode. Only enabled
         # for vitamin_c picks AND only if the operator has opted in via
@@ -2409,6 +2490,72 @@ class IntentRouterNode(Node):
         return (f"I see {count} {plural}. Could you say {choice}, "
                 "or point at the one you want?")
 
+    # ── command lifecycle events (recording contract v1) ─────────────────
+
+    def _cmd_from_intent(self, intent: dict) -> dict:
+        """The command record of an intent — the same record for every event
+        of that command. An intent without a command_id (GUI, a test) gets
+        one here; it travels with the intent through the queue."""
+        cid = str(intent.get("command_id") or "") or uuid.uuid4().hex
+        intent["command_id"] = cid
+        cmd = self._cmds.get(cid)
+        if cmd is None:
+            attrs = intent.get("object_attributes")
+            cmd = {"command_id": cid, "parent_id": "",
+                   "action": str(intent.get("action_intent") or "").strip().lower(),
+                   "object": intent.get("object_intent"),
+                   "attributes": dict(attrs) if isinstance(attrs, dict) else {},
+                   "utterance_id": str(intent.get("utterance_id") or ""),
+                   "utterance": str(intent.get("utterance") or ""),
+                   "plan_id": str(intent.get("plan_id") or ""),
+                   "plan_index": intent.get("plan_index"),
+                   "question": str(intent.get("question") or ""),
+                   "question_id": intent.get("question_id"),
+                   "cycle_id": None, "target": None, "route": "", "state": ""}
+            self._cmds[cid] = cmd
+            while len(self._cmds) > 300:
+                self._cmds.popitem(last=False)
+        return cmd
+
+    def _cmd_event(self, cmd: Optional[dict], state: str, reason: str = "", **extra) -> None:
+        """Publish one lifecycle event of ``cmd`` (None = nothing to report).
+        A command that already reached a terminal state gets no second one."""
+        if not cmd:
+            return
+        terminal = ("completed", "failed", "rejected", "cancelled", "superseded")
+        if cmd.get("state") in terminal and state in terminal:
+            return
+        for k in ("route", "target", "cycle_id", "parent_id", "action", "attributes"):
+            if extra.get(k) not in (None, ""):
+                cmd[k] = extra.pop(k)
+            else:
+                extra.pop(k, None)
+        cmd["state"] = state
+        self._cmd_seq += 1
+        ev = {"schema": "morty.command_event.v1", "event_id": uuid.uuid4().hex,
+              "seq": self._cmd_seq, "source": "intent_router", "boot": self._cmd_boot,
+              "command_id": cmd["command_id"], "parent_id": cmd.get("parent_id", ""),
+              "plan_id": cmd.get("plan_id", ""), "plan_index": cmd.get("plan_index"),
+              "utterance_id": cmd.get("utterance_id", ""), "utterance": cmd.get("utterance", ""),
+              "question": cmd.get("question", ""), "question_id": cmd.get("question_id"),
+              "cycle_id": cmd.get("cycle_id"), "state": state, "action": cmd.get("action", ""),
+              "attributes": cmd.get("attributes") or {}, "target": cmd.get("target"),
+              "route": cmd.get("route", ""), "reason": reason, "stamp": round(time.time(), 4)}
+        ev.update(extra)
+        try:
+            self._cmd_pub.publish(String(data=json.dumps(ev, default=str)))
+        except Exception as exc:  # bookkeeping never breaks routing
+            self.get_logger().debug(f"command event failed: {exc}")
+
+    def _cancel_cmds(self, reason: str, queued: list) -> None:
+        """A stop / reset: the queued intents and the executing commands end."""
+        for it in queued:
+            self._cmd_event(self._cmds.get(str(it.get("command_id") or "")), "cancelled", reason)
+        for c in (self._active_cmd, self._pick_cmd, self._followup_cmd):
+            self._cmd_event(c, "cancelled", reason)
+        self._pick_cmd = None
+        self._followup_cmd = None
+
     def _on_point_proposal(self, msg: String) -> None:
         """2026-09-28 (Majd: "ask like 'you pointed to this object, should I
         grasp it?' … and when the object selected is wrong he should say 'you
@@ -2621,6 +2768,24 @@ class IntentRouterNode(Node):
         self._point_answer_pub.publish(String(data=f"{'yes' if yes else 'no'}|{q['id']}"))
         self.get_logger().info(
             f"Point proposal {q['id']} ({q['label']}): {'YES' if yes else 'NO'} ({how}).")
+        # 2026-09-30: a yes starts the pointed pick — its command (the "yes",
+        # or a plain pick of the same kind) is that pick, target = the
+        # proposal; a no is a completed answer that starts nothing.
+        _c = self._routing_cmd
+        if _c is not None:
+            _c["question"], _c["question_id"] = "point", q["id"]
+        if yes:
+            _plan = plan or {}
+            self._pick_cmd = _c
+            self._cmd_event(
+                _c, "accepted", how, route="pick",
+                action="pick_and_place" if _plan else "pick",
+                attributes={k: v for k, v in (("destination", _plan.get("destination")),
+                                              ("then", _plan.get("then"))) if v},
+                target={"label": q["label"], "position": self._rank_word(q["label"], q.get("bbox")),
+                        "bbox": q.get("bbox"), "proposal_id": q["id"], "source": "pointing"})
+        else:
+            self._cmd_event(_c, "completed", "answered no to the pointing question", route="none")
         self._close_point_question("yes" if yes else "no")
         if yes:
             self._clarify = None
@@ -2652,7 +2817,9 @@ class IntentRouterNode(Node):
             "cycle": cid if phase in ("probing", "approaching") else None,
             "seen": cid,
             "t": time.monotonic(),
+            "cmd": self._routing_cmd,   # 2026-09-30: the command it answers later
         }
+        self._cmd_event(self._routing_cmd, "deferred", "latched for the destination pause")
         self.get_logger().info(
             f"Early destination LATCHED: {action!r} -> {token!r} (phase={phase!r}, "
             f"cycle={self._early_dest['cycle']}, seen={cid})"
@@ -2766,7 +2933,7 @@ class IntentRouterNode(Node):
         cli.call_async(request).add_done_callback(_done)
 
     def _claim_executor_resume(
-        self, dest: str, why: str, *, force: bool = False
+        self, dest: str, why: str, *, force: bool = False, cmd: Optional[dict] = None
     ) -> bool:
         """Publish EXACTLY ONE resume token per open executor pause.
 
@@ -2809,6 +2976,17 @@ class IntentRouterNode(Node):
         if _guard_disarmed:
             self.get_logger().info(f"Resume {dest!r} published ({why}).")
             self._publish_executor_resume(dest)
+            # 2026-09-30: the answer went to the executor's pause. Whether the
+            # executor acted on it is its next task_state phase (recorded).
+            _t = self._live_task() or {}
+            _c = cmd or self._routing_cmd
+            if _c is not None:
+                _c["question"] = _c.get("question") or str(_t.get("question") or "")
+                if _c.get("question_id") in (None, ""):
+                    _c["question_id"] = _t.get("question_id")
+            self._cmd_event(_c, "accepted", why, route="executor_answer", resume_token=dest,
+                            cycle_id=_t.get("cycle_id"),
+                            parent_id=(self._pick_cmd or {}).get("command_id", ""))
             return True
         with self._pause_lock:
             open_now = self._executor_pause_open()
@@ -3154,7 +3332,9 @@ class IntentRouterNode(Node):
                 )
         with self._queue_lock:
             cleared = len(self._intent_queue)
+            _dropped = list(self._intent_queue)
             self._intent_queue.clear()
+        self._cancel_cmds("stop", _dropped)
         if cleared:
             self.get_logger().info(f"Stop received: cleared {cleared} queued intent(s).")
         self._clarify = None   # 2026-09-29: a which-one question and its destination end too
@@ -3202,7 +3382,9 @@ class IntentRouterNode(Node):
                 self.get_logger().warn(f"Reset publish failed: {exc}")
         with self._queue_lock:
             cleared = len(self._intent_queue)
+            _dropped = list(self._intent_queue)
             self._intent_queue.clear()
+        self._cancel_cmds("reset", _dropped)
         self._followup_plan = ""
         self._after_cycle_intent = None   # 2026-09-25: a kept after-cycle move ends here too
         self._home_then = None             # 2026-09-25: and a drop pose waiting for its move home
@@ -3311,12 +3493,16 @@ class IntentRouterNode(Node):
         goal.force_n = float(self._gripper_force)
 
         send_future = self._gripper_client.send_goal_async(goal)
+        _cmd = self._gripper_cmd = self._active_cmd   # 2026-09-30: whose goal this is
 
         def _on_response(fut):
             handle = fut.result()
             if handle is None or not handle.accepted:
+                self._cmd_event(_cmd, "failed", "the gripper rejected the goal", route="gripper")
                 self._narrate("The gripper rejected the command.")
                 return
+            self._cmd_event(_cmd, "accepted", "gripper goal accepted", route="gripper",
+                            target={"gripper": "open" if int(command) == OperateGripper.Goal.OPEN else "close"})
             self._active_gripper_handle = handle
             handle.get_result_async().add_done_callback(self._on_gripper_result)
 
@@ -3334,6 +3520,8 @@ class IntentRouterNode(Node):
             self._mark_busy_done("gripper")
             return
         result = wrapper.result
+        self._cmd_event(getattr(self, "_gripper_cmd", None), "completed" if result.success else "failed",
+                        "" if result.success else str(result.error))
         self.get_logger().info(
             f"Gripper done: success={result.success} width={result.final_width_m:.3f} "
             f"object_detected={result.object_detected}"
@@ -3402,6 +3590,7 @@ class IntentRouterNode(Node):
             pass
 
         send_future = self._named_pose_client.send_goal_async(goal)
+        _cmd = self._named_pose_cmd = self._active_cmd   # 2026-09-30: whose goal this is
         # IN-FLIGHT WATCHDOG (2026-09-02): a named-pose goal that never
         # returns (the motion server wedged on 'home' today) left the
         # router "busy" for minutes — every later "go home" was dropped
@@ -3428,6 +3617,7 @@ class IntentRouterNode(Node):
                 pass
             self._active_named_pose_handle = None
             self._pending_pose_name = ""
+            self._cmd_event(_cmd, "failed", f"no result within {_budget_s:.0f} s (cancelled)")
             self._narrate(
                 "That move is taking too long — I'm giving up on it.")
             self._mark_busy_done("named_pose")
@@ -3439,8 +3629,12 @@ class IntentRouterNode(Node):
         def _on_response(fut):
             handle = fut.result()
             if handle is None or not handle.accepted:
+                self._cmd_event(_cmd, "failed", f"the motion server rejected {pose_name!r}", route="named_pose")
                 self._narrate("The motion server rejected the request.")
                 return
+            # accepted = the goal was taken, NOT that the arm moves yet
+            self._cmd_event(_cmd, "accepted", f"goal {pose_name!r} accepted", route="named_pose",
+                            target={"pose": pose_name, "leg": pose_name})
             self._active_named_pose_handle = handle
             handle.get_result_async().add_done_callback(self._on_named_pose_result)
 
@@ -3506,7 +3700,10 @@ class IntentRouterNode(Node):
                 self.get_logger().info(f"home reached — now {_then[0]!r}")
                 self._send_named_pose(_then[0], "", _then[1])
                 return
+            self._cmd_event(getattr(self, "_named_pose_cmd", None), "completed",
+                            f"reached {self._current_pose_name!r}")
         else:
+            self._cmd_event(getattr(self, "_named_pose_cmd", None), "failed", str(result.error))
             self.get_logger().warn(f"MoveToNamedPose failed: {result.error}")
             self._narrate(f"Could not reach the pose. {result.error}".strip())
             self._pending_pose_name = ""
@@ -3518,6 +3715,9 @@ class IntentRouterNode(Node):
         cycle = int(msg.data)
         if cycle == self._last_cycle_id:
             return
+        # 2026-09-30: the grasp cycle that executes the committed pick
+        if self._pick_cmd is not None and self._pick_cmd.get("cycle_id") in (None, ""):
+            self._cmd_event(self._pick_cmd, "cycle", cycle_id=cycle)
         if cycle < self._last_cycle_id:
             # Cycle ids only ever grow within one pipeline run — a smaller
             # id means the pipeline was restarted. Whatever label lock was
@@ -3676,7 +3876,8 @@ class IntentRouterNode(Node):
                     _cid = 0
                 if latch["cycle"] is None or self._task is None or latch["cycle"] == _cid:
                     self._dest_answer_pending = True
-                    self._claim_executor_resume(latch["token"], "early destination")
+                    self._claim_executor_resume(latch["token"], "early destination",
+                                                cmd=latch.get("cmd"))
                     self._narrate(
                         f"Got the {label.replace('_', ' ')}." if label else "Got it.")
                     return
@@ -3722,7 +3923,8 @@ class IntentRouterNode(Node):
                 # answer the pause instead of asking.
                 plan, self._followup_plan = self._followup_plan, ""
                 token = "release_home" if plan == "release_home" else "release"
-                if self._claim_executor_resume(token, f"follow-up said earlier: {plan}"):
+                _fcmd, self._followup_cmd = self._followup_cmd, None
+                if self._claim_executor_resume(token, f"follow-up said earlier: {plan}", cmd=_fcmd):
                     # 2026-09-25 (review R6): said ONCE, on the executor's
                     # 'releasing' (it used to be said here AND there).
                     self._releasing_line = ("Opening the gripper and going home."
@@ -3944,7 +4146,9 @@ class IntentRouterNode(Node):
         if move == "go_home" and phase == "returning_home":
             self._narrate("I'm already on my way home.")
             return True
-        self._after_cycle_intent = {"action_intent": move, "object_intent": None,
+        self._cmd_event(self._routing_cmd, "deferred", "kept until the running cycle ends")
+        self._after_cycle_intent = {"command_id": (self._routing_cmd or {}).get("command_id", ""),
+                                    "action_intent": move, "object_intent": None,
                                     "object_attributes": None}
         where = {"go_home": "go home", "drop_left": "go to the drop left position",
                  "drop_right": "go to the drop right position"}[move]
@@ -3977,6 +4181,18 @@ class IntentRouterNode(Node):
         if not data:
             return
         outcome = data.split("|", 1)[0].lower()
+        # 2026-09-30: the pick command of THIS cycle ends ("failed|0|..." =
+        # the pipeline gave the label up before any cycle started)
+        _parts = data.split("|")
+        try:
+            _cyc = int(_parts[1]) if len(_parts) > 1 else None
+        except ValueError:
+            _cyc = None
+        _pc = self._pick_cmd
+        if _pc is not None and (_cyc == _pc.get("cycle_id") or (_cyc == 0 and _pc.get("cycle_id") is None)):
+            self._cmd_event(_pc, "completed" if outcome == "done" else "failed",
+                            "|".join(_parts[2:]), cycle_id=_cyc if _cyc else None)
+            self._pick_cmd = None
         self.get_logger().info(f"cycle_done received: {data!r} (outcome={outcome})")
         # 2026-09-25: a move kept for after this cycle (_defer_after_cycle)
         # runs only after a normal end; a failed / stopped / reset cycle
@@ -4395,6 +4611,8 @@ class IntentRouterNode(Node):
                 f"Pick watchdog: no cycle_done within {self._pick_timeout_s}s; "
                 "advancing the queue."
             )
+            self._cmd_event(self._pick_cmd, "failed", f"no cycle_done within {self._pick_timeout_s:.0f} s")
+            self._pick_cmd = None
             self._mark_busy_done("pick")
 
     # ── narration ────────────────────────────────────────────────────────
@@ -4405,6 +4623,8 @@ class IntentRouterNode(Node):
         interrupt_current=True chopped Morty's sentences mid-word whenever
         the executor reached a lifecycle event (Majd, 2026-08-12). Pass
         interrupt=True only for time-critical lines (stop, slip)."""
+        if self._dispatch_narr is not None and text:
+            self._dispatch_narr.append(text)   # 2026-09-30: the reason of a refused command
         if not self._speak_feedback or self._speak_client is None or not text:
             return
         if not self._speak_client.server_is_ready():

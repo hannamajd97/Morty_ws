@@ -93,6 +93,10 @@ What the v2 recorder guarantees (see `raw_dataset.py` for the exact keys):
   age, stale/frozen poses, gripper state lag, missing command events, missing
   instruction. The converters skip flagged episodes unless told otherwise.
 
+> **Since 2026-09-30 (raw v3):** command lifecycle events, execution-based labels, run ids, bag verification,
+> framing check, intervention marks and read-only validation/repair — see [docs/RECORDING.md](docs/RECORDING.md)
+> (operator guide, export options, pilot protocol). The contract is in `vla_experiments/recording_contract.py`.
+
 ## Recording alongside the MMHRI experiments (from the GUI — the normal way)
 
 Open **Experiments ▸** in the GUI. The recorder node is launched with that window (no terminal
@@ -178,14 +182,15 @@ openpi:
 ```bash
 # on the training machine, inside openpi's uv env (lerobot pinned there)
 python -m vla_experiments.convert_to_lerobot --raw <raw dir> --repo-id <user>/morty_ur3e --image-size 256
-#   --include-failed --include-unknown --allow-quality-issues --keep-idle  (whole episode under one task)
+#   --include-failed/--include-unknown/--include-interrupted --allow-quality-issues --allow-review --include-segments hold,reset
 uv run scripts/compute_norm_stats.py --config-name pi0_morty_ur3e_lora   # after adding the config
 ```
 OpenVLA:
 ```bash
 convert_to_rlds --raw <raw dir> --out ~/rlds/morty_ur3e
 cd ~/rlds/morty_ur3e && MORTY_VLA_RAW=<raw dir> tfds build --overwrite   # in the rlds_dataset_builder conda env
-#   MORTY_VLA_ALL=1 keeps failures/unknowns/flagged episodes and exports whole episodes
+#   MORTY_VLA_OUTCOMES / MORTY_VLA_ALLOW_QUALITY / MORTY_VLA_ALLOW_REVIEW / MORTY_VLA_INCLUDE (docs/RECORDING.md §4);
+#   MORTY_VLA_ALL=1 is the legacy alias and keeps instruction segmentation
 ```
 The builder docstring contains the exact `configs.py` entry for OpenVLA.
 

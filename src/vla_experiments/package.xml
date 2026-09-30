@@ -20,6 +20,9 @@
   <exec_depend>tf2_ros_py</exec_depend>
   <exec_depend>ur3e_fast_observation</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>   <!-- bag_check: metadata.yaml -->
+  <test_depend>morty_interfaces</test_depend>   <!-- ROS integration checks (fake action servers) -->
+  <test_depend>intent_router</test_depend>
 
   <test_depend>python3-pytest</test_depend>
 

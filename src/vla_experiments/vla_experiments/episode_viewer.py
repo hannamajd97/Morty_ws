@@ -264,7 +264,7 @@ canvas{width:100%;height:190px;display:block;background:var(--card);border:1px s
 <script>
 const D=__DATA__;
 const $=id=>document.getElementById(id);
-const JN=["shoulder pan","shoulder lift","elbow","wrist 1","wrist 2","wrist 3"],SEG=["idle","task","reset"];
+const JN=["shoulder pan","shoulder lift","elbow","wrist 1","wrist 2","wrist 3"],SEG=["idle","task","reset","hold","clarify","assist"];
 const KIND={you:"you said",command:"command",select:"selection",robot:"robot",gripper:"gripper cmd",phase:"executor",cycle:"cycle",morty:"Morty said"};
 $("title").textContent=D.id+" — "+D.task;
 $("sub").textContent=D.n+" steps at "+D.fps+" Hz, started "+D.started+", outcome "+D.outcome+" · times are seconds on the episode clock (step t)";

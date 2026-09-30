@@ -228,6 +228,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._conv_entries: List[tuple] = []
         self._vla = VlaLink(bridge, self)
         self._bag = BagLink(self)          # one ROS bag per trial (Hamid 2026-09-09)
+        # 2026-09-30: a bag recorder that dies DURING the trial is said at once
+        self._bag.died.connect(lambda rc: self.status.setText(
+            self.status.text() + f"\n⚠ the ROS bag recorder stopped during the trial (exit {rc}) — the bag is incomplete"))
         self._vla_ended = False
 
         central = QtWidgets.QWidget()
@@ -436,10 +439,45 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         btn_row.addWidget(self.excel_last_btn)
         lay.addLayout(btn_row)
 
+        # 2026-09-30 (recording contract v1): operator marks while a trial
+        # records — manual assistance (an interval, excluded from autonomous
+        # training), a rearranged object, a blocked camera, an abort, an
+        # intended hand-over — and the camera framing check (never moves the arm).
+        ann_row = QtWidgets.QHBoxLayout()
+        self.assist_btn = QtWidgets.QPushButton("✋ assist")
+        self.assist_btn.setCheckable(True)
+        self.assist_btn.setToolTip("Press when you help the robot by hand (e.g. put the object into the\n"
+                                   "gripper), press again when you stop. The interval is kept in the\n"
+                                   "recording but excluded from autonomous-grasp training.")
+        self.assist_btn.toggled.connect(lambda on: self._annotate("assist", "start" if on else "end"))
+        ann_row.addWidget(self.assist_btn)
+        self._ann_btns = [self.assist_btn]
+        for kind, text, tip in (("rearranged", "🔄 rearranged", "you moved an object by hand"),
+                                ("camera_blocked", "📷 camera blocked", "an action happened out of view"),
+                                ("abort", "⛔ abort", "you aborted what the robot was doing"),
+                                ("handover", "🤝 hand-over", "the robot is handing the object to your hand (intended)")):
+            b = QtWidgets.QPushButton(text)
+            b.setToolTip(f"Mark now: {tip}")
+            b.clicked.connect(lambda _=False, k=kind: self._annotate(k, "at"))
+            ann_row.addWidget(b)
+            self._ann_btns.append(b)
+        for b in self._ann_btns:
+            b.setEnabled(False)
+        self.framing_btn = QtWidgets.QPushButton("🎯 framing check…")
+        self.framing_btn.setToolTip("Save both cameras' views at home / pickup / left / right / hand-over.\n"
+                                    "You move the arm yourself; this never moves it.")
+        self.framing_btn.clicked.connect(self._open_framing_check)
+        ann_row.addWidget(self.framing_btn)
+        lay.addLayout(ann_row)
+
         self.status = QtWidgets.QLabel("idle — fill the header, then ⏺ Start")
         self.status.setStyleSheet("color:#888;")
         self.status.setWordWrap(True)
         lay.addWidget(self.status)
+        # 2026-09-30: the saved trial's verification (bag, episode, post-processing)
+        self.pp_label = QtWidgets.QLabel("")
+        self.pp_label.setWordWrap(True)
+        lay.addWidget(self.pp_label)
         # 7×3×5 progress grid, counted from the saved trial.json files.
         self.progress_lbl = QtWidgets.QLabel("")
         self.progress_lbl.setStyleSheet("font-family:monospace; color:#888;")
@@ -573,26 +611,41 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         """2026-09-28: switch the status to "speak now" once the bag has
         subscribed to every topic (see _on_start); marks the moment in the
         trial's events ("trial bag ready") so the timeline shows it."""
-        if not self._active or self._bag_ended:
+        if not self._active:
             self._bag_ready_timer.stop()
             return
-        ready = False
-        try:
-            with open(self._bag_log, "rb") as f:
-                ready = b"All requested topics are subscribed" in f.read()
-        except OSError:
-            pass
+        # 2026-09-30: "speak now" needs BOTH recorders' own acknowledgment —
+        # the bag's "All requested topics are subscribed" and the VLA
+        # recorder's status naming THIS run as recording (vla_link.ack).
+        bag_ready = self._bag_ended
+        if not self._bag_ended:
+            try:
+                with open(self._bag_log, "rb") as f:
+                    bag_ready = b"All requested topics are subscribed" in f.read()
+            except OSError:
+                pass
+            if not self._bag.running():
+                bag_ready = False
+        vla_state, vla_why = self._vla.ack() if self._vla_pending else ("recording", "")
         waited = time.monotonic() - self._bag_wait_t0
-        if not ready and waited < 10.0:
+        if (not bag_ready or vla_state == "waiting") and waited < 10.0 and vla_state != "refused":
             return
         self._bag_ready_timer.stop()
+        problems = []
+        if not self._bag_ended and not bag_ready:
+            problems.append("bag start NOT confirmed (check bag_record.log)"
+                            if self._bag.running() else "bag recorder EXITED — no bag for this trial")
+        if self._vla_pending and vla_state != "recording":
+            problems.append(f"VLA episode NOT started ({vla_why or 'no acknowledgment from the recorder'})")
+            for b in self._ann_btns:
+                b.setEnabled(False)
         if self._bridge is not None:
             try:
-                self._bridge.trial_mark("trial", "bag ready" if ready else "bag NOT confirmed after 10 s")
+                self._bridge.trial_mark("trial", "recorders ready" if not problems else "; ".join(problems))
             except Exception:
                 pass
-        self.status.setText(self._bag_go_text if ready else
-                            self._bag_go_text + "  (bag start not confirmed after 10 s — check bag_record.log)")
+        self.status.setText(self._bag_go_text if not problems else
+                            self._bag_go_text + "\n⚠ " + "; ".join(problems))
 
     def _open_excel_window(self) -> None:
         if getattr(self, "_excel_win", None) is None:
@@ -661,6 +714,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                              stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                              start_new_session=True, env=os.environ.copy())
             log.close()
+            self._watch_postprocess(trial_root)
         except Exception as exc:  # never let bookkeeping break the trial window
             print(f"[mmhri] post-processing not started for {trial_root}: {exc}")
 
@@ -798,10 +852,14 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # only if the arm moves (vla_link.py has the reasoning).
         self._vla_ended = False
         vla_note = ""
+        self._vla_pending = False
         if want_vla:
             # The episode is written into this trial's folder (next to bag/).
             why = self._vla.begin(self._fallback_task(), self._trial_root)
             vla_note = " + VLA episode" if not why else f" — VLA episode NOT started ({why})"
+            self._vla_pending = not why       # 2026-09-30: "speak now" waits for its acknowledgment
+            for b in self._ann_btns:
+                b.setEnabled(not why)
         # One ROS bag per trial, inside the trial folder.
         self._bag_ended = True
         bag_note = ""
@@ -812,7 +870,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                 bag_note = " + bag"
         go = (f"⏺ RECORDING trial {tid}{'' if want_mmhri else ' (VLA only)'}"
               f"{vla_note}{bag_note} — speak/click your command now.")
-        if self._bag_ended:
+        if self._bag_ended and not self._vla_pending:
             self.status.setText(go)
         else:
             # 2026-09-28: the bag needs 2-6 s to subscribe to its topics; the
@@ -821,7 +879,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             # waits for the recorder's own "All requested topics are
             # subscribed" line (at most 10 s) — the start-up load spike (late
             # joints, GUI stamps up to 3 s late) is over by then too.
-            self.status.setText(f"⏳ trial {tid}: starting the ROS bag — wait for “speak now”…")
+            self.status.setText(f"⏳ trial {tid}: starting the recorders — wait for “speak now”…")
             self._bag_go_text = go
             self._bag_wait_t0 = time.monotonic()
             self._bag_log = os.path.join(self._trial_root, "bag_record.log")
@@ -1016,6 +1074,81 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             cb.setCurrentIndex(0)
         for cb in self.modifier_boxes.values():
             cb.setChecked(False)
+        self.assist_btn.blockSignals(True)
+        self.assist_btn.setChecked(False)
+        self.assist_btn.blockSignals(False)
+        for b in self._ann_btns:
+            b.setEnabled(False)
+
+    # ── operator marks and the framing check (2026-09-30) ─────────────
+    def _annotate(self, kind: str, edge: str = "at") -> None:
+        """One intervention mark: into the VLA episode and the trial's events."""
+        self._vla.annotate(kind, edge)
+        if self._bridge is not None:
+            try:
+                self._bridge.trial_mark("annotation", f"{kind} {edge}")
+            except Exception:
+                pass
+        self.status.setText(self.status.text().split("\n✎")[0] + f"\n✎ marked: {kind} {edge}")
+
+    def _open_framing_check(self) -> None:
+        """Save both cameras' frames per workspace view; the operator moves
+        the arm (pendant / GUI buttons) — nothing here moves it. Fresh
+        streams are not proof of useful framing; the saved pictures are."""
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Camera framing check")
+        v = QtWidgets.QVBoxLayout(dlg)
+        v.addWidget(QtWidgets.QLabel(
+            "Move the arm to each view yourself, then press its button: both cameras' current\n"
+            "frames are saved (inside the running trial, else vla_experiments/camera_checks/).\n"
+            "Check that the object, the gripper and your hand-over hand are visible in both."))
+        done = QtWidgets.QLabel("")
+        from vla_experiments.episode_recorder import CAMERA_CHECK_VIEWS
+        row = QtWidgets.QHBoxLayout()
+        for view in CAMERA_CHECK_VIEWS:
+            b = QtWidgets.QPushButton(view)
+            b.clicked.connect(lambda _=False, w=view: (self._vla.camera_check(w),
+                                                       done.setText(done.text() + f"  ✔ {w}")))
+            row.addWidget(b)
+        v.addLayout(row)
+        v.addWidget(done)
+        dlg.show()
+
+    def _watch_postprocess(self, trial_root: str) -> None:
+        """Show the saved trial's verification when post-processing ends
+        (postprocess_status.json) — never "verified" on a timeout."""
+        t0 = time.monotonic()
+        name = os.path.basename(trial_root.rstrip("/"))
+        p = os.path.join(trial_root, "postprocess_status.json")
+        self.pp_label.setStyleSheet("color:#888;")
+        self.pp_label.setText(f"⏳ {name}: verifying the bag and the episode…")
+
+        def _check():
+            try:
+                st = json.load(open(p)) if os.path.exists(p) else None
+            except ValueError:
+                st = None
+            if st is not None and "vla" in st and "trial_times" in st:
+                timer.stop()
+                errs = [e for part in ("vla", "trial_times") for e in (st.get(part) or {}).get("errors", [])]
+                ep = ((st.get("vla") or {}).get("ready") or {}).get("episode")
+                if st.get("ok"):
+                    self.pp_label.setStyleSheet("color:#1d7a2c;")
+                    self.pp_label.setText(f"✔ {name}: bag verified, episode {ep or 'none (not kept)'}, "
+                                          "post-processing done")
+                else:
+                    self.pp_label.setStyleSheet("color:#c0392b;")
+                    self.pp_label.setText(f"⚠ {name}: NOT verified — " + "; ".join(errs)[:400])
+            elif time.monotonic() - t0 > 240.0:
+                timer.stop()
+                self.pp_label.setStyleSheet("color:#c0392b;")
+                self.pp_label.setText(f"⚠ {name}: post-processing gave no verdict within 4 min "
+                                      "(see postprocess.log) — NOT verified")
+
+        timer = QtCore.QTimer(self)
+        timer.timeout.connect(_check)
+        timer.start(2000)
+        self._pp_timer = timer
 
     def _modifiers_str(self) -> str:
         """Ticked modifier ids as 'M1;M2' ('' if none) — CSV-safe."""
@@ -1166,6 +1299,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # hence the flag.)
         if not self._vla_ended:
             self._vla_ended = True
+            if self.assist_btn.isChecked():
+                self.assist_btn.setChecked(False)       # sends "assist end" first
             self._vla.end(self._vla_success())
         # The bag also ends at the PRESS: after it only Morty talks.
         if not getattr(self, "_bag_ended", True):

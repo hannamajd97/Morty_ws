@@ -57,8 +57,12 @@ refuse such episodes unless told to keep them.
 """
 from __future__ import annotations
 
+import collections
 import json
+import os
 import queue
+import subprocess
+import uuid
 import re
 import shutil
 import threading
@@ -89,6 +93,9 @@ from ur3e_fast_observation.tf_listener_lite import DecimatedTransformListener
 from ur3e_fast_observation.latest_message import LatestMessage, joint_state_stream
 
 from .raw_dataset import ARM_JOINTS, STEP_KEYS, SEGMENT_IDLE, SEGMENT_TASK, SEGMENT_RESET, canonical_instruction
+from . import labels as _labels
+from .recording_contract import (COMMAND_EVENT_SCHEMA, RAW_FORMAT, SEGMENT_NAMES, parse_stop_arg,
+                                 validate_command_event)
 
 try:
     from ur_msgs.msg import IOStates
@@ -119,7 +126,10 @@ MOTION_INTENTS = ["pick_and_place", "pick", "place", "drop_held", "drop_left", "
 # Should I grasp it?") — no motion of their own and no verdict: the pick
 # they confirm arrives as the pipeline's selection record right after.
 ANSWER_INTENTS = ("confirm_point", "reject_point")
-OUTCOMES = ("success", "failure", "unknown")
+OUTCOMES = ("success", "failure", "unknown", "interrupted")
+MANIFEST = "recording_manifest.json"
+ANNOTATION_KINDS = ("assist", "rearranged", "camera_blocked", "abort", "handover", "note")
+CAMERA_CHECK_VIEWS = ("home", "pickup", "left", "right", "handover")
 
 
 def episode_task_instruction(instructions: list, events: dict) -> str:
@@ -156,6 +166,39 @@ def _quat_rot(q, v):
     return _quat_mul(_quat_mul(q, qv), qc)[:3]
 
 
+def _software_revision() -> dict:
+    """git revision and dirty state of the workspace this recorder runs from."""
+    src = Path(__file__).resolve().parents[2]
+    out = {"repo": str(src)}
+    try:
+        out["commit"] = subprocess.run(["git", "-C", str(src), "rev-parse", "HEAD"], capture_output=True,
+                                       text=True, timeout=5).stdout.strip()
+        dirty = subprocess.run(["git", "-C", str(src), "status", "--porcelain", "--untracked-files=no", "."],
+                               capture_output=True, text=True, timeout=5).stdout.splitlines()
+        out["dirty_files"] = len(dirty)
+        out["dirty"] = bool(dirty)
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = str(exc)
+    return out
+
+
+def _atomic_json(path: Path, obj) -> None:
+    """Write JSON through a temporary file + rename: a crash leaves either
+    the old file or the new one, never half of one (2026-09-30)."""
+    tmp = path.with_name(f".{path.name}.tmp")
+    with open(tmp, "w") as f:
+        json.dump(obj, f, indent=2, default=str)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _atomic_npz(path: Path, arrays: dict) -> None:
+    tmp = path.with_name(f".{path.stem}.tmp.npz")
+    np.savez_compressed(tmp, **arrays)
+    os.replace(tmp, path)
+
+
 class _ImageWriter:
     """Writes JPEGs on its own thread so a slow disk never stalls the tick
     (a stalled executor was one source of the 0.5-2 s step gaps seen in
@@ -165,6 +208,7 @@ class _ImageWriter:
         self._q: "queue.Queue[tuple]" = queue.Queue(maxsize=400)
         self._log = logger
         self.failed = 0
+        self.failed_paths: list = []
         self._t = threading.Thread(target=self._run, name="vla-image-writer", daemon=True)
         self._t.start()
 
@@ -172,7 +216,12 @@ class _ImageWriter:
         try:
             self._q.put_nowait((path, sample, jpeg_q))
         except queue.Full:
-            self.failed += 1
+            self._fail(path, "writer queue full")
+
+    def _fail(self, path: Path, why: str) -> None:
+        self.failed += 1
+        if len(self.failed_paths) < 50:
+            self.failed_paths.append(f"{path.name}: {why}")
 
     def _run(self) -> None:
         while True:
@@ -180,18 +229,30 @@ class _ImageWriter:
             try:
                 if isinstance(sample, _Jpeg):
                     path.write_bytes(sample.data)        # original JPEG, no decode/re-encode
-                else:
-                    cv2.imwrite(str(path), sample, [cv2.IMWRITE_JPEG_QUALITY, jpeg_q])
+                # 2026-09-30: cv2.imwrite reports most failures by returning
+                # False, not by raising — both count now
+                elif not cv2.imwrite(str(path), sample, [cv2.IMWRITE_JPEG_QUALITY, jpeg_q]):
+                    self._fail(path, "cv2.imwrite returned False")
+                    self._log.warn(f"image write failed: {path}")
             except Exception as e:  # noqa: BLE001
-                self.failed += 1
+                self._fail(path, f"{type(e).__name__}: {e}")
                 self._log.warn(f"image write failed: {e}")
             finally:
                 self._q.task_done()
 
-    def drain(self, timeout_s: float = 10.0) -> None:
-        t0 = time.monotonic()
-        while not self._q.empty() and time.monotonic() - t0 < timeout_s:
-            time.sleep(0.02)
+    def drain(self, timeout_s: float = 10.0) -> bool:
+        """Wait until every queued write has FINISHED — including the one the
+        worker is still writing (2026-09-30: it used to return as soon as the
+        queue was empty, while the last image could still be half on disk).
+        False = the timeout expired with writes outstanding."""
+        t_end = time.monotonic() + timeout_s
+        with self._q.all_tasks_done:
+            while self._q.unfinished_tasks:
+                left = t_end - time.monotonic()
+                if left <= 0:
+                    return False
+                self._q.all_tasks_done.wait(left)
+        return True
 
 
 class EpisodeRecorder(Node):
@@ -239,6 +300,16 @@ class EpisodeRecorder(Node):
             ("max_step_gap_s", 0.5),        # quality: a gap between steps longer than this is reported
             ("preflight", True),            # refuse to open an episode while a required stream is stale
             ("jpeg_quality", 95),
+            # 2026-09-30 (recording contract v1): lifecycle / alignment inputs
+            ("command_event_topic", "/robot/command_event"),
+            ("task_state_topic", "/grasp_executor_lin_llm/task_state"),
+            ("point_proposal_topic", "/grasp_pipeline/point_proposal"),
+            ("open_question_topic", "/robot/open_question"),
+            ("utterance_meta_topic", "/speech/utterance_meta"),
+            ("max_camera_skew_s", 0.35),     # quality: exterior vs wrist capture stamps
+            ("max_gripper_age_s", 2.0),      # quality: gripper joint samples older than this
+            ("max_clock_offset_s", 0.5),     # a camera clock further off than this is not comparable
+            ("save_timeout_s", 20.0),        # image writes must finish within this at stop
             ("astra_tf_xyz", [0.0, 0.0, 0.0]),
             ("astra_tf_rpy", [0.0, 0.0, 0.0]),
         ])
@@ -258,6 +329,13 @@ class EpisodeRecorder(Node):
         self.intent_wait_s, self.max_episode_s = float(g("intent_wait_s")), float(g("max_episode_s"))
         self.mmhri_dir = Path(g("mmhri_dir")).expanduser()
         self.astra_tf = {"xyz": list(g("astra_tf_xyz")), "rpy": list(g("astra_tf_rpy"))}
+        self.max_skew, self.max_gripper_age = float(g("max_camera_skew_s")), float(g("max_gripper_age_s"))
+        self.max_clock_offset, self.save_timeout = float(g("max_clock_offset_s")), float(g("save_timeout_s"))
+        # 2026-09-30: what this recorder IS, stored with every run (schema,
+        # parameters, software revision and dirty state)
+        self.provenance = {"raw_format": RAW_FORMAT, "command_event_schema": COMMAND_EVENT_SCHEMA,
+                           "parameters": {p.name: p.value for p in self._parameters.values()},
+                           "software": _software_revision(), "node_started_unix": time.time()}
 
         self.bridge = CvBridge()
         self.lock = threading.Lock()
@@ -270,6 +348,11 @@ class EpisodeRecorder(Node):
         self.ur_tcp = None            # (recv, stamp, frame, pos, quat)
         self.io_grasp = None          # (recv, ros_now, bool)  (IOStates has no header)
         self.gripper_cmd = None       # (recv, stamp, value, dict)
+        self.gripper_recv = None      # monotonic receipt of the last gripper joint sample
+        # camera receipt-minus-source offsets (clock comparability, per camera)
+        self.cam_offsets = {"exterior": collections.deque(maxlen=60), "wrist": collections.deque(maxlen=60)}
+        self.last_task_state = None
+        self.router_question: dict = {}
         self.base_from_ur = None      # static xyzw/xyz of base_frame <- ur_tcp frame, resolved once
         self.bound_to_trial = False; self.confirmed_by = ""; self.q_start = None
         self.task_fallback = ""
@@ -321,6 +404,16 @@ class EpisodeRecorder(Node):
         self.create_subscription(String, g("selection_timing_topic"), self._on_selection_timing, 20)
         self.create_subscription(String, g("interactive_status_topic"), self._on_interactive, 10)
         self.create_subscription(String, "/vla_recorder/cmd", self._on_cmd, 10)
+        # 2026-09-30 (recording contract v1): command lifecycle, the executor's
+        # task state as it changes, pointing questions, utterance ids
+        self.create_subscription(String, g("command_event_topic"), self._on_command_event,
+                                 QoSProfile(depth=100, reliability=QoSReliabilityPolicy.RELIABLE))
+        self.create_subscription(String, g("task_state_topic"), self._on_task_state,
+                                 QoSProfile(depth=10, reliability=QoSReliabilityPolicy.RELIABLE,
+                                            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL))
+        self.create_subscription(String, g("point_proposal_topic"), self._on_point_question, 10)
+        self.create_subscription(String, g("open_question_topic"), self._on_router_question, LATCHED)
+        self.create_subscription(String, g("utterance_meta_topic"), self._on_utterance_meta, 10)
         self.status_pub = self.create_publisher(String, "/vla_recorder/status", LATCHED)
 
         self.recording = False; self.provisional = False
@@ -333,6 +426,13 @@ class EpisodeRecorder(Node):
         self.mmhri_hint_next = ""   # "hint <trial folder>" from the GUI, consumed by the next episode
         self.last_error = ""
         self.last_saved: dict = {}
+        # 2026-09-30: every episode is one RUN with its own id and state:
+        # idle -> recording (provisional) -> saving -> complete | incomplete
+        # | error, or discarded. The GUI sends "run <id>" before "trial" and
+        # waits until the status names that id (an acknowledgment, not a
+        # cached status).
+        self.run_id = ""; self.next_run_id = ""; self.run_state = "idle"
+        self.last_run: dict = {}
         self.create_timer(1.0 / self.fps, self._tick)
         self.create_timer(1.0, self._housekeeping)
         self.get_logger().info(f"VLA recorder ready. dataset={self.dataset_dir} fps={self.fps} auto_mode={self.auto_mode} "
@@ -363,16 +463,24 @@ class EpisodeRecorder(Node):
             bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception:
             return
+        src = _stamp_s(msg.header)
         with self.lock:
-            self.img[cam] = (time.monotonic(), _stamp_s(msg.header), bgr)
+            prev = self.img[cam]
+            self.img[cam] = (time.monotonic(), src, bgr)
+            if prev is None or prev[1] != src:          # a repeated frame says nothing about the clock
+                self.cam_offsets[cam].append(time.time() - src)
 
     def _on_cimg(self, cam, msg):
         # Keep the JPEG bytes as they are (2026-09-09): decoding every frame
         # of both cameras cost this node 52 % of a core while idle, and the
         # episode re-encoded them anyway. The writer thread puts the bytes
         # straight on disk; freshness only needs the timestamps.
+        src = _stamp_s(msg.header)
         with self.lock:
-            self.img[cam] = (time.monotonic(), _stamp_s(msg.header), _Jpeg(bytes(msg.data)))
+            prev = self.img[cam]
+            self.img[cam] = (time.monotonic(), src, _Jpeg(bytes(msg.data)))
+            if prev is None or prev[1] != src:          # receipt - capture of NEW frames (clock comparability)
+                self.cam_offsets[cam].append(time.time() - src)
 
     def _on_info(self, cam, msg):
         if self.info[cam] is None:
@@ -392,6 +500,8 @@ class EpisodeRecorder(Node):
                 vel = np.array([msg.velocity[i] if i < len(msg.velocity) else np.nan for i in idx], dtype=np.float64)
                 grip = self.joints[4] if self.joints else np.nan
                 self.joints = [now, _stamp_s(msg.header), pos, vel, grip]
+            if self.gripper_joint in names:
+                self.gripper_recv = now        # 2026-09-30: gripper freshness, apart from the arm's
             if self.gripper_joint in names and self.joints is not None:
                 gpos = float(msg.position[names.index(self.gripper_joint)])
                 self.joints[4] = float(np.clip(gpos / self.gripper_open, 0.0, 1.0)) if self.gripper_open > 0 else gpos
@@ -451,7 +561,10 @@ class EpisodeRecorder(Node):
         if not self.recording:
             return
         stamp = self._ros_now() if stamp is None else stamp
-        self.events.setdefault(kind, []).append({"t": stamp - self.t0_ros, "stamp": stamp, **data})
+        # "stamp" = when it happened (the source's own time where the message
+        # carries one), "recv" = when this recorder received it (system clock)
+        self.events.setdefault(kind, []).append({"t": stamp - self.t0_ros, "stamp": stamp,
+                                                 "recv": round(time.time(), 4), **data})
 
     def _on_transcript(self, msg):
         self.transcript = msg.data
@@ -488,7 +601,10 @@ class EpisodeRecorder(Node):
                 stamp = st
         except (TypeError, ValueError):
             pass
-        self._event("intent", {"action_intent": action, "object_intent": payload.get("object_intent"),
+        # 2026-09-30: the whole payload (command_id, utterance_id, question …),
+        # kept even when the router later rejects the command
+        self._event("intent", {**{k: v for k, v in payload.items() if k != "stamp"},
+                               "action_intent": action, "object_intent": payload.get("object_intent"),
                                "object_attributes": payload.get("object_attributes")}, stamp)
         if action in self.motion_intents:
             self._add_instruction(payload, action, stamp)
@@ -524,7 +640,8 @@ class EpisodeRecorder(Node):
             stamp = float(rec.get("select") or rec.get("published") or self._ros_now())
         except (TypeError, ValueError):
             stamp = self._ros_now()
-        self._event("selection", {"label": label, "source": source, "cycle_id": rec.get("cycle_id")}, stamp)
+        self._event("selection", {**{k: v for k, v in rec.items() if k not in ("kind", "stamp")},
+                                  "label": label, "source": source, "cycle_id": rec.get("cycle_id")}, stamp)
         if not label:
             return
         # 2026-09-28: the active instruction being a pick of this cycle is
@@ -588,6 +705,134 @@ class EpisodeRecorder(Node):
     def _on_interactive(self, msg):
         self._event("interactive_status", {"status": msg.data})
 
+    # ---------------------------------------- recording contract v1 inputs
+    def _on_command_event(self, msg):
+        """The router's command lifecycle (recording_contract.py). Invalid
+        events are kept too, marked — the evidence is never dropped."""
+        try:
+            e = json.loads(msg.data)
+        except ValueError:
+            return
+        if not isinstance(e, dict):
+            return
+        bad = validate_command_event(e)
+        if bad:
+            e["invalid"] = bad
+        try:
+            stamp = float(e.get("stamp"))
+        except (TypeError, ValueError):
+            stamp = None
+        self._event("command", {k: v for k, v in e.items() if k != "stamp"}, stamp)
+
+    def _on_task_state(self, msg):
+        """Every NEW executor task-state sample, as it happens (the detailed
+        executor marks only arrive at cycle end)."""
+        try:
+            d = json.loads(msg.data)
+        except ValueError:
+            return
+        if not isinstance(d, dict):
+            return
+        key = (d.get("boot"), d.get("seq"))
+        last = self.last_task_state
+        self.last_task_state = d
+        if last is not None and (last.get("boot"), last.get("seq")) == key:
+            return
+        try:
+            stamp = float(d.get("stamp"))
+        except (TypeError, ValueError):
+            stamp = None
+        self._event("task_state", {k: d.get(k) for k in ("boot", "seq", "cycle_id", "phase", "question",
+                                                         "question_id", "holding", "object", "destination")}
+                    | {"last_outcome": (d.get("last") or {}).get("outcome")}, stamp)
+
+    def _on_point_question(self, msg):
+        try:
+            d = json.loads(msg.data)
+        except ValueError:
+            return
+        if isinstance(d, dict):
+            try:
+                stamp = float(d.get("stamp"))
+            except (TypeError, ValueError):
+                stamp = None
+            self._event("point_question", {k: v for k, v in d.items() if k != "stamp"}, stamp)
+
+    def _on_router_question(self, msg):
+        try:
+            d = json.loads(msg.data)
+        except ValueError:
+            return
+        if isinstance(d, dict):
+            self.router_question = d
+            self._event("router_question", d)
+
+    def _on_utterance_meta(self, msg):
+        try:
+            d = json.loads(msg.data)
+        except ValueError:
+            return
+        if isinstance(d, dict):
+            try:
+                stamp = float(d.get("published"))
+            except (TypeError, ValueError):
+                stamp = None
+            self._event("utterance", d, stamp)
+
+    def _annotate(self, rest: str) -> None:
+        """annotate <kind> [start|end|at] [note …] — an operator intervention
+        (manual assistance, a rearranged object, a blocked camera, an abort,
+        an intended hand-over) with its time; assist intervals are excluded
+        from autonomous-grasp training (labels.py)."""
+        parts = rest.split()
+        if not parts or parts[0] not in ANNOTATION_KINDS:
+            self.get_logger().warn(f"annotate: kind must be one of {ANNOTATION_KINDS}")
+            return
+        kind = parts[0]
+        edge = parts[1] if len(parts) > 1 and parts[1] in ("start", "end", "at") else "at"
+        note = " ".join(parts[2:] if len(parts) > 1 and parts[1] in ("start", "end", "at") else parts[1:])
+        if not self.recording:
+            self.get_logger().warn(f"annotation '{kind} {edge}' ignored: no episode is recording")
+            self.last_error = "annotation ignored: not recording"
+            return
+        self._event("annotation", {"kind": kind, "edge": edge, "note": note})
+        self.get_logger().info(f"annotation: {kind} {edge} {note}")
+
+    def _camera_check(self, view: str) -> None:
+        """Save both cameras' current frames for one workspace view (home,
+        pickup, left, right, handover) with their stamps — the operator moves
+        the arm; this never moves anything. Fresh streams are not proof of
+        useful framing: the saved pictures are."""
+        view = view.strip().lower() or "view"
+        base = (self.ep_dir / "camera_check" if self.recording and self.ep_dir else
+                self.dataset_dir.parent / "camera_checks" / time.strftime("%Y%m%d"))
+        base.mkdir(parents=True, exist_ok=True)
+        tag = time.strftime("%H%M%S") + "_" + re.sub(r"[^a-z0-9_]+", "_", view)
+        rec = {"view": view, "unix": time.time(), "files": {}, "run_id": self.run_id}
+        now = time.monotonic()
+        with self.lock:
+            frames = {cam: self.img[cam] for cam in ("exterior", "wrist")}
+        for cam, fr in frames.items():
+            if fr is None:
+                rec["files"][cam] = None
+                continue
+            path = base / f"{tag}_{cam}.jpg"
+            if isinstance(fr[2], _Jpeg):
+                path.write_bytes(fr[2].data)
+            elif not cv2.imwrite(str(path), fr[2]):
+                path = None
+            rec["files"][cam] = {"path": str(path) if path else None, "source_stamp": fr[1],
+                                 "receipt_age_s": round(now - fr[0], 3)}
+        log = base / "camera_check.json"
+        try:
+            items = json.loads(log.read_text()) if log.exists() else []
+        except ValueError:
+            items = []
+        items.append(rec)
+        _atomic_json(log, items)
+        self._event("camera_check", rec)
+        self.get_logger().info(f"camera check '{view}' saved in {base}")
+
     def _on_cmd(self, msg):
         text = msg.data.strip()
         head, _, rest = text.partition(" "); head = head.lower()
@@ -596,23 +841,30 @@ class EpisodeRecorder(Node):
         elif head == "trial":
             self.start_trial_episode(rest.strip())
         elif head == "stop":
-            arg = rest.strip().lower()
-            if arg == "auto":
+            # 2026-09-30: a bare or misspelled argument is NOT a success
+            # (it used to save outcome=success) — recording_contract.parse_stop_arg
+            outcome, note, known = parse_stop_arg(rest)
+            if not known:
+                self.get_logger().warn(f"stop: {note}")
+            if outcome == "auto":
                 # No human verdict: the executor's own word from THIS
                 # episode, else unknown (never "true because nobody said no").
+                # The executor's cycle verdict is execution evidence only —
+                # it does not prove the right object or task.
                 cds = self.events.get("cycle_done", [])
                 if cds:
                     outcome = "success" if cds[-1]["ok"] else "failure"
-                    note = "outcome: executor cycle_done"
+                    note = "outcome: executor cycle_done (execution only, not verified task success)"
                 else:
                     outcome, note = "unknown", "outcome: unknown (no human verdict, no executor verdict)"
-            elif arg in ("fail", "failed", "false", "0"):
-                outcome, note = "failure", "outcome: human"
-            elif arg in ("unknown", "?"):
-                outcome, note = "unknown", "outcome: human said unknown"
-            else:
-                outcome, note = "success", "outcome: human" if arg else "outcome: default (stop without verdict)"
             self.stop_episode(outcome, note=note)
+        elif head == "run":
+            # the id the GUI gives the next run; its status acknowledges it
+            self.next_run_id = rest.strip()[:64]
+        elif head == "annotate":
+            self._annotate(rest.strip())
+        elif head == "camera_check":
+            self._camera_check(rest.strip())
         elif head == "discard":
             self.discard_episode()
         elif head == "task":
@@ -673,7 +925,10 @@ class EpisodeRecorder(Node):
 
     def start_episode(self, task: str, provisional: bool = False):
         if self.recording:
-            self.get_logger().warn("already recording; stop or discard first"); return
+            self.get_logger().warn("already recording; stop or discard first")
+            self.last_error = "not started: already recording"
+            self._refuse(self.last_error)
+            return
         if not task and not (self.task_from_transcript or provisional):
             self.get_logger().error("start needs a task text"); return
         if self.preflight:
@@ -682,6 +937,7 @@ class EpisodeRecorder(Node):
                 self.last_error = "not started: stale " + ", ".join(stale)
                 self.mmhri_hint_next = ""
                 self.get_logger().error(f"episode refused — required streams not fresh: {', '.join(stale)}")
+                self._refuse(self.last_error)
                 self._publish_status()
                 return
         self.last_error = ""
@@ -694,7 +950,9 @@ class EpisodeRecorder(Node):
             self.ep_id = trial_dir.name
             m = re.match(r"trial_(\d+)", trial_dir.name)
             self.ep_index = int(m.group(1)) if m else -1
-            self._remove_episode_files(trial_dir)     # a restarted trial overwrites its own episode
+            # 2026-09-30: a reused trial folder never loses an earlier episode —
+            # it moves to vla_previous/<its run>/ (it used to be deleted)
+            self._preserve_previous(trial_dir)
             self.mmhri_hint = str(trial_dir)
         else:
             self.ep_index = self._next_index()
@@ -711,7 +969,24 @@ class EpisodeRecorder(Node):
         self.provisional = provisional; self.recording = True
         self.bound_to_trial = False; self.confirmed_by = ""; self.q_start = None
         self.task_fallback = ""
-        self.get_logger().info(f"episode {self.ep_id} started{' (provisional)' if provisional else ''} in {self.ep_dir}: '{task}'")
+        self.run_id = self.next_run_id or uuid.uuid4().hex
+        self.next_run_id = ""
+        self.run_state = "recording"
+        self.prev_src = {"exterior": None, "wrist": None}
+        # an interrupted run is recognisable: the manifest says "recording"
+        # until the save writes "complete" / "incomplete"
+        _atomic_json(self.ep_dir / MANIFEST, {"schema": "morty.recording_manifest.v1", "run_id": self.run_id,
+                                              "state": "recording", "episode_id": self.ep_id,
+                                              "started_unix": self.started_unix})
+        self.get_logger().info(f"episode {self.ep_id} (run {self.run_id[:8]}) started"
+                               f"{' (provisional)' if provisional else ''} in {self.ep_dir}: '{task}'")
+
+    def _refuse(self, reason: str) -> None:
+        """A start that did not happen — reported under the run id the GUI
+        asked for, so its wait for an acknowledgment ends with the reason."""
+        if self.next_run_id:
+            self.last_run = {"run_id": self.next_run_id, "state": "refused", "reason": reason}
+        self.next_run_id = ""
 
     def start_trial_episode(self, fallback_task: str):
         """One MMHRI trial = one episode.
@@ -742,50 +1017,94 @@ class EpisodeRecorder(Node):
     def _remove_episode_files(self, d: Path) -> None:
         """Only the recorder's own files — a trial folder also holds bag/, audio, video."""
         shutil.rmtree(d / "images", ignore_errors=True)
-        for name in ("meta.json", "steps.npz"):
+        shutil.rmtree(d / "camera_check", ignore_errors=True)
+        for name in ("meta.json", "steps.npz", MANIFEST):
             try:
                 (d / name).unlink()
             except FileNotFoundError:
                 pass
 
-    def stop_episode(self, outcome: str = "success", note: str = ""):
-        if not self.recording:
+    def _preserve_previous(self, d: Path) -> None:
+        """Move an existing episode of this folder to vla_previous/<run>/."""
+        names = [x for x in ("images", "meta.json", "steps.npz", MANIFEST, "camera_check") if (d / x).exists()]
+        if not names:
             return
+        prev = "unknown"
+        try:
+            prev = json.loads((d / MANIFEST).read_text()).get("run_id") or prev
+        except (OSError, ValueError):
+            pass
+        dst = d / "vla_previous" / f"{time.strftime('%Y%m%d_%H%M%S')}_{prev[:8]}"
+        dst.mkdir(parents=True, exist_ok=True)
+        for x in names:
+            shutil.move(str(d / x), str(dst / x))
+        self.get_logger().warn(f"{d.name} already held an episode — moved to {dst.relative_to(d)} (not deleted)")
+
+    def stop_episode(self, outcome: str = "unknown", note: str = ""):
+        if not self.recording:
+            return                     # a repeated stop changes nothing
         if outcome not in OUTCOMES:
             outcome = "unknown"
         if self.provisional:
             self.get_logger().info(f"episode {self.ep_id} ended unconfirmed (the arm never moved) — discarded")
+            self.last_run = {"run_id": self.run_id, "state": "discarded", "episode_id": self.ep_id,
+                             "reason": "the arm never moved"}
             self.discard_episode(); return
         self.recording = False
+        self.run_state = "saving"
+        self._publish_status()
         n = len(self.rows["t"])
         if n == 0:
             self.get_logger().warn("no frames captured; discarding")
             self._remove_episode_files(self.ep_dir)
             if not self.in_trial_dir:
                 shutil.rmtree(self.ep_dir, ignore_errors=True)
+            self.run_state = "error"
+            self.last_run = {"run_id": self.run_id, "state": "error", "episode_id": self.ep_id,
+                             "reason": "no frames captured"}
             return
-        self.writer.drain()
+        drained = self.writer.drain(self.save_timeout)
         arrays = {k: np.asarray(v, dtype=np.float64) for k, v in self.rows.items()}
-        self._label_steps(arrays)
-        quality = self._quality(arrays)
-        np.savez_compressed(self.ep_dir / "steps.npz", **arrays)
+        lab = self._label_steps(arrays)
+        # A command still executing at the press is an interruption: the
+        # operator's boundary is kept, the outcome is not silently success.
+        # an answer to a pause has no router verdict: the executor reaching
+        # its next pause / idle completes it (labels: end_evidence)
+        done_by_evidence = {i["command_id"] for i in lab["instructions"] if i.get("outcome") == "completed"}
+        open_cmds = [c for c in lab.get("commands", []) if c.get("accepted") and not c.get("terminal")
+                     and c["command_id"] not in done_by_evidence]
+        if open_cmds:
+            if note.startswith("outcome: human") and outcome == "success":
+                lab["flags"].append(f"stopped while {len(open_cmds)} command(s) still executed — human said success")
+            else:
+                note = (note + "; " if note else "") + f"interrupted: {len(open_cmds)} command(s) still executing at stop"
+                outcome = "interrupted" if outcome != "failure" else outcome
+        quality = self._quality(arrays, lab, drained)
+        _atomic_npz(self.ep_dir / "steps.npz", arrays)
         # The language instruction of record: the first motion instruction's
         # canonical text; the raw transcript / trial form stay as fallbacks.
         first = episode_task_instruction(self.instructions, self.events)
         task = first or self.task or self.task_fallback
         task_from = "intent" if first else "transcript" if self.task else "trial form"
         meta = {
-            "format": "morty_vla_raw_v2", "episode_id": self.ep_id, "episode_index": self.ep_index,
+            "format": RAW_FORMAT, "run_id": self.run_id, "label_source": lab["label_source"],
+            "episode_id": self.ep_id, "episode_index": self.ep_index,
             "episode_dir": str(self.ep_dir), "in_trial_dir": self.in_trial_dir,
             "trial_id": (re.match(r"trial_(\d+)", self.ep_id).group(1) if self.in_trial_dir and re.match(r"trial_(\d+)", self.ep_id) else None),
             "task": task, "task_from": task_from,
-            "outcome": outcome, "success": {"success": True, "failure": False, "unknown": None}[outcome],
+            "outcome": outcome, "success": {"success": True, "failure": False}.get(outcome),
+            "outcome_provenance": note,
             "intent": self.intent, "cycle_done": self.cycle_done, "note": note,
             "mmhri_trial_hint": self.mmhri_hint, "bound_to_trial": self.bound_to_trial,
             "confirmed_by": self.confirmed_by,
             "spoken_task": self.task, "trial_form_task": self.task_fallback,
             "transcripts": [e["text"] for e in self.events.get("transcript", [])],
             "instructions": list(self.instructions),
+            # the intents as they ARRIVED (v2 labels), kept as raw evidence
+            "intent_instructions": list(getattr(self, "_intent_instructions", [])),
+            "commands": lab.get("commands", []),
+            "open_commands_at_stop": [c["command_id"] for c in open_cmds],
+            "interventions": self.events.get("annotation", []),
             "events": self.events,
             "fps": self.fps, "num_steps": n, "duration_s": float(arrays["t"][-1] - arrays["t"][0]) if n > 1 else 0.0,
             "dropped_ticks": self.dropped, "drop_reasons": self.drop_reasons, "started_unix": self.started_unix,
@@ -798,20 +1117,42 @@ class EpisodeRecorder(Node):
             "cameras": {"exterior": self.info["exterior"], "wrist": self.info["wrist"]},
             "image_sources": self.img_source,
             "astra_static_tf_base_to_astra_link": self.astra_tf, "step_keys": STEP_KEYS,
-            "segment_codes": {"idle": SEGMENT_IDLE, "task": SEGMENT_TASK, "reset": SEGMENT_RESET},
+            "segment_codes": {name: code for code, name in SEGMENT_NAMES.items()},
             "phase_names": self._phase_names,
+            "task_phase_names": getattr(self, "_task_phase_names", []),
             "quality": quality,
+            "training_eligible": quality["training_eligible"],
+            "provenance": {**self.provenance, "saved_unix": time.time(),
+                           "cameras": {"exterior": self.info["exterior"], "wrist": self.info["wrist"],
+                                       "astra_static_tf": self.astra_tf, "sources": self.img_source}},
         }
-        with open(self.ep_dir / "meta.json", "w") as f:
-            json.dump(meta, f, indent=2)
+        _atomic_json(self.ep_dir / "meta.json", meta)
+        # The manifest comes LAST, after the files it describes are complete.
+        state = "complete" if quality["integrity"]["ok"] else "incomplete"
+        _atomic_json(self.ep_dir / MANIFEST, {
+            "schema": "morty.recording_manifest.v1", "run_id": self.run_id, "state": state,
+            "episode_id": self.ep_id, "started_unix": self.started_unix, "saved_unix": time.time(),
+            "num_steps": n, "files": {k: (self.ep_dir / k).stat().st_size for k in ("steps.npz", "meta.json")},
+            "images": quality["integrity"]["images_on_disk"], "integrity_issues": quality["integrity"]["issues"],
+            "outcome": outcome, "training_eligible": quality["training_eligible"]})
+        self.run_state = state
+        self.last_run = {"run_id": self.run_id, "state": state, "episode_id": self.ep_id,
+                         "episode_dir": str(self.ep_dir), "outcome": outcome,
+                         "integrity_ok": quality["integrity"]["ok"], "alignment_ok": quality["alignment"]["ok"],
+                         "review_required": quality["semantic"]["review_required"],
+                         "training_eligible": quality["training_eligible"]}
         self.last_saved = {"episode_id": self.ep_id, "episode_dir": str(self.ep_dir), "outcome": outcome,
-                           "num_steps": n, "quality_ok": quality["ok"], "issues": quality["issues"]}
+                           "num_steps": n, "quality_ok": quality["ok"], "issues": quality["issues"],
+                           "run_id": self.run_id, "state": state}
         self.get_logger().info(f"episode {self.ep_id} saved: {n} steps, outcome={outcome}, dropped={self.dropped}, "
                                f"instructions={len(self.instructions)} {note}")
         for issue in quality["issues"]:
             self.get_logger().warn(f"quality: {issue}")
 
     def discard_episode(self):
+        if self.recording and self.last_run.get("run_id") != self.run_id:
+            self.last_run = {"run_id": self.run_id, "state": "discarded", "episode_id": self.ep_id}
+        self.run_state = "idle"
         self.recording = False; self.provisional = False
         self.bound_to_trial = False; self.confirmed_by = ""; self.q_start = None
         if self.ep_dir and self.ep_dir.exists():
@@ -822,83 +1163,137 @@ class EpisodeRecorder(Node):
         self.ep_dir = None
 
     # ------------------------------------------------- labels and quality
-    def _label_steps(self, a: dict) -> None:
-        """Per-step instruction index, executor phase and segment, from the
-        stamped events collected during the episode."""
-        st = a["stamp_ros"]; n = len(st)
-        instr = np.full(n, -1.0); phase = np.full(n, -1.0); seg = np.full(n, float(SEGMENT_IDLE))
-        # instruction: active from its intent until the next cycle_done / next instruction
-        cds = sorted(e["stamp"] for e in self.events.get("cycle_done", []))
-        starts = sorted(e["stamp"] for e in self.events.get("executor_phase", []) if e.get("name") == "motion_start")
-        picks = ("pick", "pick_and_place")
-        for k, ins in enumerate(self.instructions):
-            t_on = ins["stamp"]
-            t_off = self.instructions[k + 1]["stamp"] if k + 1 < len(self.instructions) else np.inf
-            # 2026-09-28 (trials 082, 071): a pick replaced by another pick
-            # before the arm moved was refused or clarified ("which tube?" —
-            # then "the rightmost" / "the yellow vitamin c"; only one pick
-            # runs, whatever the names) — its steps stay idle instead of
-            # teaching "pick up the vitamin tube" = stand still.
-            nxt = self.instructions[k + 1] if k + 1 < len(self.instructions) else None
-            ins.pop("superseded", None)
-            if (nxt is not None and ins["action_intent"] in picks and nxt["action_intent"] in picks
-                    and not any(t_on <= s < t_off for s in starts)):
-                ins["superseded"] = True
-                continue
-            ends = [c for c in cds if c > t_on]
-            if ends:
-                t_off = min(t_off, ends[0] + 0.5)      # half a second after the verdict: the arm has stopped
-            m = (st >= t_on) & (st < t_off)
-            instr[m] = k; seg[m] = SEGMENT_TASK
-        # reset: from a failure verdict or an explicit reset_home until the next instruction
-        resets = [e["stamp"] for e in self.events.get("cycle_done", []) if not e["ok"]]
-        resets += [e["stamp"] for e in self.events.get("interactive_status", []) if str(e["status"]).startswith("reset_home")]
-        for r in sorted(resets):
-            nxt = [i["stamp"] for i in self.instructions if i["stamp"] > r]
-            t_off = nxt[0] if nxt else np.inf
-            m = (st >= r) & (st < t_off)
-            seg[m] = SEGMENT_RESET; instr[m] = -1
-        # executor phase: the last phase mark at or before the step
+    def _label_steps(self, a: dict) -> dict:
+        """Per-step instruction, segment and phase — labels.label_episode,
+        the one implementation relabel / validate / the tests use. From the
+        command lifecycle when the router recorded it (v3), else the v2
+        intent-arrival rule, flagged as unverified."""
+        import copy
+        self._intent_instructions = copy.deepcopy(self.instructions)
+        lab = _labels.label_episode(self.events, a, legacy_instructions=copy.deepcopy(self.instructions))
+        self.instructions = lab["instructions"]
+        a["instruction_idx"] = lab["instruction_idx"]; a["segment"] = lab["segment"]
+        st = a["stamp_ros"]
+        # executor phase marks (detailed; they arrive at cycle end) ...
         names: list[str] = []
         marks = sorted(self.events.get("executor_phase", []), key=lambda e: e["stamp"])
         for e in marks:
             if e["name"] not in names:
                 names.append(e["name"])
+        a["phase"] = np.full(len(st), -1.0)
         if marks:
             mstamps = np.array([e["stamp"] for e in marks]); mcode = np.array([names.index(e["name"]) for e in marks])
             idx = np.searchsorted(mstamps, st, side="right") - 1
-            phase = np.where(idx >= 0, mcode[np.maximum(idx, 0)], -1.0).astype(np.float64)
+            a["phase"] = np.where(idx >= 0, mcode[np.maximum(idx, 0)], -1.0).astype(np.float64)
         self._phase_names = names
-        a["instruction_idx"] = instr; a["phase"] = phase; a["segment"] = seg
+        # ... and the task-state phase, recorded as it happened (v3)
+        tnames: list[str] = []
+        tss = sorted(self.events.get("task_state", []), key=lambda e: e["stamp"])
+        for e in tss:
+            if str(e.get("phase")) not in tnames:
+                tnames.append(str(e.get("phase")))
+        a["task_phase"] = np.full(len(st), -1.0)
+        if tss:
+            tst = np.array([e["stamp"] for e in tss]); tcode = np.array([tnames.index(str(e.get("phase"))) for e in tss])
+            idx = np.searchsorted(tst, st, side="right") - 1
+            a["task_phase"] = np.where(idx >= 0, tcode[np.maximum(idx, 0)], -1.0).astype(np.float64)
+        self._task_phase_names = tnames
+        return lab
 
-    def _quality(self, a: dict) -> dict:
-        n = len(a["t"]); issues = []
+    def _quality(self, a: dict, lab: dict, drained: bool) -> dict:
+        """Four separate verdicts (2026-09-30) — readable arrays are not a
+        correct demonstration:
+          integrity  files, images, arrays, finite values (can the run be read?)
+          alignment  timing: step gaps, dropped ticks, image receipt / capture
+                     age, camera skew, repeated frames, clock comparability,
+                     stale poses, gripper freshness and lag
+          semantic   do the labels rest on execution evidence? (the command
+                     lifecycle, no open / overlapping / unresolved commands,
+                     no annotated assistance) — review_required otherwise
+          outcome    in meta "outcome" (human, executor or unknown)
+        "ok" (kept for older readers) = integrity AND alignment only."""
+        n = len(a["t"])
+        # ---- integrity
+        integ = []
+        if not drained:
+            integ.append(f"image writes still pending after {self.save_timeout:.0f} s")
+        if self.writer.failed:
+            integ.append(f"{self.writer.failed} image(s) failed to write: {self.writer.failed_paths[:5]}")
+        on_disk = {}
+        for cam in ("exterior", "wrist"):
+            files = sorted((self.ep_dir / "images" / cam).glob("*.jpg"))
+            on_disk[cam] = len(files)
+            required = self.require_ext if cam == "exterior" else self.require_wrist
+            if required and len(files) != n:
+                integ.append(f"{cam}: {len(files)} images on disk for {n} steps")
+            for f in (files[:1] + files[-1:]) if files else []:
+                if cv2.imread(str(f)) is None:
+                    integ.append(f"{cam}: {f.name} does not decode")
+        lengths = {k: len(v) for k, v in a.items()}
+        if len(set(lengths.values())) > 1:
+            integ.append(f"step arrays of different lengths: {lengths}")
+        if not np.isfinite(a["joint_pos"]).all():
+            integ.append("non-finite joint positions")
+        if n > 1 and (np.diff(a["t"]) <= 0).any():
+            integ.append("step times not increasing")
+        # ---- alignment (the v2 checks, plus capture stamps and skew)
+        align = []
         dt = np.diff(a["t"]) if n > 1 else np.zeros(0)
         gaps = [(int(i) + 1, float(d)) for i, d in enumerate(dt) if d > self.max_step_gap]
         if gaps:
-            issues.append(f"{len(gaps)} step gap(s) > {self.max_step_gap:.1f} s (max {max(d for _, d in gaps):.2f} s)")
+            align.append(f"{len(gaps)} step gap(s) > {self.max_step_gap:.1f} s (max {max(d for _, d in gaps):.2f} s)")
         if self.dropped:
-            issues.append(f"{self.dropped} dropped tick(s): {self.drop_reasons}")
+            align.append(f"{self.dropped} dropped tick(s): {self.drop_reasons}")
         img = {}
         for cam in ("exterior", "wrist"):
-            age = a[f"img_age_{cam}"]
-            fin = age[np.isfinite(age)]
+            age = a[f"img_age_{cam}"]; fin = age[np.isfinite(age)]
+            cap = a.get(f"img_src_age_{cam}", np.full(n, np.nan)); cfin = cap[np.isfinite(cap)]
+            rep = a.get(f"img_repeat_{cam}", np.zeros(n))
+            offs = list(self.cam_offsets[cam])
+            off = float(np.median(offs)) if offs else None
+            comparable = off is not None and abs(off) <= self.max_clock_offset
             img[cam] = {"age_max_s": float(fin.max()) if fin.size else None,
                         "age_p95_s": float(np.percentile(fin, 95)) if fin.size else None,
-                        "missing": int(np.isnan(age).sum())}
+                        "capture_age_p95_s": float(np.percentile(cfin, 95)) if cfin.size and comparable else None,
+                        "capture_age_max_s": float(cfin.max()) if cfin.size and comparable else None,
+                        "repeated_frames": int(np.nansum(rep == 1)),
+                        "clock_offset_s": off, "clock_offset_spread_s": float(np.std(offs)) if offs else None,
+                        "clock_comparable": comparable, "missing": int(np.isnan(age).sum())}
             if fin.size and fin.max() > self.max_img_age:
-                issues.append(f"{cam} image up to {fin.max():.2f} s old")
+                align.append(f"{cam} image received up to {fin.max():.2f} s before its step")
+            if comparable and cfin.size and cfin.max() > self.max_img_age:
+                align.append(f"{cam} image CAPTURED up to {cfin.max():.2f} s before its step")
+            if off is not None and not comparable:
+                align.append(f"{cam} camera clock {off:+.2f} s from the laptop: capture stamps not comparable")
+            # a 10 Hz camera sampled at 10 Hz repeats frames now and then;
+            # only a frame reused for several steps in a row is a frozen stream
+            run = best = 0
+            for r_ in rep:
+                run = run + 1 if r_ == 1 else 0
+                best = max(best, run)
+            img[cam]["longest_repeat_steps"] = int(best)
+            if best >= 4:
+                align.append(f"{cam}: the same frame reused for {best + 1} steps in a row "
+                             f"({(best + 1) / self.fps:.1f} s — frozen stream?)")
+        skew = a.get("camera_skew", np.full(n, np.nan)); sfin = np.abs(skew[np.isfinite(skew)])
+        if sfin.size and sfin.max() > self.max_skew:
+            align.append(f"cameras up to {sfin.max():.2f} s apart (> {self.max_skew:.2f} s) in {int((sfin > self.max_skew).sum())} step(s)")
         tcp_stale = int(np.isnan(a["tcp_pos"][:, 0]).sum())
         if tcp_stale:
-            issues.append(f"ee pose stale/missing in {tcp_stale} step(s)")
+            align.append(f"ee pose stale/missing in {tcp_stale} step(s)")
         ur_missing = int(np.isnan(a["ur_tcp_pos"][:, 0]).sum())
         if ur_missing == n:
-            issues.append("driver TCP pose never received")
+            align.append("driver TCP pose never received")
         moved = float(np.nanmax(np.abs(a["joint_pos"] - a["joint_pos"][0]))) if n else 0.0
         tcp_fin = a["tcp_pos"][np.isfinite(a["tcp_pos"][:, 0])]
         if moved > 0.2 and tcp_fin.shape[0] > 10 and float(tcp_fin.std(axis=0).max()) < 1e-4:
-            issues.append("ee pose frozen while the joints moved")
-        # gripper: every command must be followed by the finger state within 2 s
+            align.append("ee pose frozen while the joints moved")
+        ga = a.get("gripper_age", np.full(n, np.nan))
+        gfin = ga[np.isfinite(ga)]
+        if not gfin.size:
+            align.append("gripper state never received")
+        elif gfin.max() > self.max_gripper_age:
+            align.append(f"gripper state up to {gfin.max():.1f} s old (> {self.max_gripper_age:.1f} s)")
         lags = []
         cmds = self.events.get("gripper_cmd", [])
         for e in cmds:
@@ -909,25 +1304,41 @@ class EpisodeRecorder(Node):
             lag = float(a["stamp_ros"][k] - e["stamp"]) if k >= 0 else None
             lags.append({"t": e["t"], "cmd": e["cmd"], "state_lag_s": lag})
             if lag is None:
-                issues.append(f"gripper state never followed '{e['cmd']}' at t={e['t']:.1f}")
+                align.append(f"gripper state never followed '{e['cmd']}' at t={e['t']:.1f}")
             elif lag > 2.0:
-                issues.append(f"gripper state {lag:.1f} s behind '{e['cmd']}' at t={e['t']:.1f}")
+                align.append(f"gripper state {lag:.1f} s behind '{e['cmd']}' at t={e['t']:.1f}")
         state_changes = int((np.abs(np.diff((a["gripper"] > 0.5).astype(int))) > 0).sum()) if n > 1 else 0
         if state_changes and not cmds:
-            issues.append(f"gripper state changed {state_changes}x but no command event was received (adapter not publishing?)")
+            align.append(f"gripper state changed {state_changes}x but no command event was received (adapter not publishing?)")
+        # ---- semantic
+        flags = list(lab.get("flags", []))
         if not self.instructions:
-            issues.append("no instruction (no motion intent during the episode)")
-        if self.writer.failed:
-            issues.append(f"{self.writer.failed} image(s) failed to write")
-        task_steps = int((a["segment"] == SEGMENT_TASK).sum())
-        return {"ok": not issues, "issues": issues, "num_steps": n, "task_steps": task_steps,
-                "idle_steps": int((a["segment"] == SEGMENT_IDLE).sum()), "reset_steps": int((a["segment"] == SEGMENT_RESET).sum()),
-                "step_gaps": gaps, "dt_max_s": float(dt.max()) if dt.size else 0.0, "images": img,
-                "joint_age_max_s": float(np.nanmax(a["joint_age"])) if n else None,
-                "tcp_stale_steps": tcp_stale, "ur_tcp_missing_steps": ur_missing, "gripper_commands": lags,
-                "gripper_state_changes": state_changes, "n_transcripts": len(self.events.get("transcript", [])),
-                "n_intents": len(self.events.get("intent", [])), "n_instructions": len(self.instructions),
-                "n_executor_phases": len(self.events.get("executor_phase", []))}
+            flags.append("no instruction (nothing the robot executed was labelled)")
+        if lab.get("assist"):
+            flags.append(f"{len(lab['assist'])} annotated assistance interval(s) — excluded from training")
+        verified = lab["label_source"] == "command_lifecycle" and not flags
+        seg = a["segment"].astype(int)
+        integrity_ok, alignment_ok = not integ, not align
+        issues = integ + align + [f"review: {f}" for f in flags]
+        return {"ok": integrity_ok and alignment_ok, "issues": issues,
+                "integrity": {"ok": integrity_ok, "issues": integ, "images_on_disk": on_disk, "drained": drained},
+                "alignment": {"ok": alignment_ok, "issues": align, "images": img, "step_gaps": gaps,
+                              "dt_max_s": float(dt.max()) if dt.size else 0.0,
+                              "joint_age_max_s": float(np.nanmax(a["joint_age"])) if n else None,
+                              "gripper_age_max_s": float(gfin.max()) if gfin.size else None,
+                              "tcp_stale_steps": tcp_stale, "ur_tcp_missing_steps": ur_missing,
+                              "gripper_commands": lags, "gripper_state_changes": state_changes},
+                "semantic": {"label_source": lab["label_source"], "verified": verified,
+                             "review_required": not verified, "flags": flags},
+                "training_eligible": integrity_ok and alignment_ok and verified,
+                "num_steps": n, "task_steps": int((seg == SEGMENT_TASK).sum()),
+                "segments": {name: int((seg == code).sum()) for code, name in SEGMENT_NAMES.items()},
+                "idle_steps": int((seg == SEGMENT_IDLE).sum()), "reset_steps": int((seg == SEGMENT_RESET).sum()),
+                "n_transcripts": len(self.events.get("transcript", [])),
+                "n_intents": len(self.events.get("intent", [])), "n_commands": len(lab.get("commands", [])),
+                "n_instructions": len(self.instructions),
+                "n_executor_phases": len(self.events.get("executor_phase", [])),
+                "n_task_states": len(self.events.get("task_state", []))}
 
     # --------------------------------------------------------------- tick
     def _lookup(self, child):
@@ -1017,6 +1428,17 @@ class EpisodeRecorder(Node):
         r["img_stamp_exterior"].append(ext[1] if ext else np.nan); r["img_stamp_wrist"].append(wri[1] if wri else np.nan)
         r["img_age_exterior"].append(now - ext[0] if ext else np.nan); r["img_age_wrist"].append(now - wri[0] if wri else np.nan)
         r["joint_age"].append(now - joints[0])
+        # 2026-09-30: capture age (tick minus the frame's own stamp; valid
+        # when the camera clock is comparable — see _quality), the frame
+        # reused from the previous step, the two cameras' capture skew and
+        # the gripper's own freshness
+        for cam, fr in (("exterior", ext), ("wrist", wri)):
+            r[f"img_src_age_{cam}"].append(ros_now - fr[1] if fr else np.nan)
+            r[f"img_repeat_{cam}"].append(float(fr is not None and fr[1] == self.prev_src[cam]))
+            self.prev_src[cam] = fr[1] if fr else None
+        r["camera_skew"].append(ext[1] - wri[1] if ext and wri else np.nan)
+        r["gripper_age"].append(now - self.gripper_recv if self.gripper_recv is not None else np.nan)
+        r["task_phase"].append(-1.0)   # labelled at stop
         r["instruction_idx"].append(-1.0); r["phase"].append(-1.0); r["segment"].append(float(SEGMENT_IDLE))  # labelled at stop
 
     def _freshness(self) -> dict:
@@ -1034,7 +1456,9 @@ class EpisodeRecorder(Node):
 
     def _publish_status(self):
         fresh = self._freshness()
-        st = {"recording": self.recording, "provisional": self.provisional, "auto_mode": self.auto_mode,
+        st = {"run_id": self.run_id if self.recording or self.run_state == "saving" else "",
+              "state": self.run_state, "last_run": self.last_run, "next_run_id": self.next_run_id,
+              "recording": self.recording, "provisional": self.provisional, "auto_mode": self.auto_mode,
               "bound": self.bound_to_trial, "confirmed_by": self.confirmed_by,
               "episode": self.ep_index if self.recording else None,
               "episode_id": self.ep_id if self.recording else "",

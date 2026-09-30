@@ -33,6 +33,7 @@ import os
 
 import json
 import time
+import uuid
 import rclpy
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
@@ -526,7 +527,12 @@ class SpeechInputNode(Node):
                 # time (it follows immediately). Recorders stamp messages when
                 # their callback runs — the GUI and the rosbag were measured up
                 # to 3 s late under load — so trial timing reads this instead.
-                "published": round(time.time(), 3)})))
+                "published": round(time.time(), 3),
+                # 2026-09-30 (recording contract v1): the transcript's id —
+                # chat_node copies it into every intent this sentence causes,
+                # so the recorder links command and words without text
+                # matching.
+                "utterance_id": uuid.uuid4().hex})))
         msg = String()
         msg.data = forwarded
         self._pub.publish(msg)

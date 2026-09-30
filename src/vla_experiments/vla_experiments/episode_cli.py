@@ -1,10 +1,14 @@
 """Tiny CLI for the recorder.
 
     vla_episode start "pick up the vitamin c and put it in the box"
-    vla_episode stop            # outcome success
+    vla_episode stop ok         # keep, outcome success (a human verdict)
     vla_episode stop fail       # keep, outcome failure
-    vla_episode stop unknown    # keep, outcome unknown
-    vla_episode stop auto       # the executor's cycle_done verdict, else unknown
+    vla_episode stop unknown    # keep, outcome unknown   (also a bare "stop" since 2026-09-30:
+                                #                          no verdict is never a success)
+    vla_episode stop interrupted
+    vla_episode stop auto       # the executor's cycle_done verdict (execution only), else unknown
+    vla_episode annotate assist start|end [note]   # also rearranged / camera_blocked / abort / handover
+    vla_episode camera_check home|pickup|left|right|handover   # save both cameras' frames (moves nothing)
     vla_episode discard
     vla_episode task "new instruction"
     vla_episode hint <trial folder>  # the next trial episode is written INTO that folder
@@ -26,7 +30,8 @@ LATCHED = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE,
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if not argv or argv[0] not in ("start", "stop", "discard", "task", "hint", "status", "gripper"):
+    if not argv or argv[0] not in ("start", "stop", "discard", "task", "hint", "status", "gripper",
+                                   "annotate", "camera_check"):
         print(__doc__)
         return 2
     rclpy.init()

@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .raw_dataset import Episode, derive_actions, list_episodes, quality_issues, state_vectors, training_segments
+from .raw_dataset import Episode, derive_actions, select_episodes, state_vectors, training_segments
 
 
 def main(argv=None):
@@ -40,11 +40,18 @@ def main(argv=None):
     ap.add_argument("--state-space", choices=["joint7", "pos_euler8"], default="joint7")
     ap.add_argument("--include-failed", action="store_true", help="also episodes with outcome=failure")
     ap.add_argument("--include-unknown", action="store_true", help="also episodes with outcome=unknown")
+    ap.add_argument("--include-interrupted", action="store_true", help="also episodes with outcome=interrupted")
     ap.add_argument("--allow-quality-issues", action="store_true",
                     help="keep episodes the recorder flagged (step gaps, stale poses, gripper lag); default: skip and list them")
+    ap.add_argument("--allow-review", action="store_true",
+                    help="keep episodes whose labels are not verified by execution evidence (every legacy episode) "
+                         "or carry review flags; default: skip and list them")
+    ap.add_argument("--include-segments", default="",
+                    help="comma list of extra segments to export with their instruction: hold, reset, idle, "
+                         "clarify, assist (default: task only)")
     ap.add_argument("--keep-idle", action="store_true",
-                    help="export every step under the first instruction (pre-2026-09-24 behaviour) instead of one "
-                         "training episode per instruction from its task segment only")
+                    help="LEGACY: the whole episode under its first instruction (pre-2026-09-24). Wrong labels for "
+                         "every episode with more than one instruction — only for reproducing old exports")
     ap.add_argument("--push", action="store_true", help="push_to_hub after conversion")
     ap.add_argument("--overwrite", action="store_true")
     a = ap.parse_args(argv)
@@ -56,16 +63,11 @@ def main(argv=None):
               "then run:  python -m vla_experiments.convert_to_lerobot ...", file=sys.stderr)
         return 1
 
-    eps = list_episodes(Path(a.raw).expanduser(), include_failed=a.include_failed, include_unknown=a.include_unknown)
-    if not a.allow_quality_issues:
-        kept = []
-        for p in eps:
-            issues = quality_issues(Episode(p))
-            if issues:
-                print(f"skipping {p.name} (quality): " + "; ".join(issues), file=sys.stderr)
-            else:
-                kept.append(p)
-        eps = kept
+    outcomes = ("success",) + (("failure",) if a.include_failed else ()) + \
+        (("unknown",) if a.include_unknown else ()) + (("interrupted",) if a.include_interrupted else ())
+    include = tuple(x.strip() for x in a.include_segments.split(",") if x.strip())
+    eps = select_episodes(Path(a.raw).expanduser(), outcomes, a.allow_quality_issues, a.allow_review,
+                          log=lambda m: print(m, file=sys.stderr))
     if not eps:
         print("no episodes found", file=sys.stderr)
         return 1
@@ -99,19 +101,19 @@ def main(argv=None):
     total = 0; n_out = 0
     for p in eps:
         ep = Episode(p)
-        acts = derive_actions(ep)[key]
         st = state_vectors(ep)[a.state_space]
-        segs = training_segments(ep, keep_idle=a.keep_idle)
+        segs = training_segments(ep, keep_idle=a.keep_idle, include=include)
         if not segs:
             print(f"{ep.episode_id}: no task segment (no instruction) — skipped", file=sys.stderr)
             continue
         for text, sel in segs:
-            for i in sel:
+            acts = derive_actions(ep, sel)[key]      # never across a gap or another instruction
+            for j, i in enumerate(sel):
                 ds.add_frame({
                     "image": ep.load_image("exterior", int(i), size),
                     "wrist_image": ep.load_image("wrist", int(i), size),
                     "state": st[i].astype(np.float32),
-                    "actions": acts[i].astype(np.float32),
+                    "actions": acts[j].astype(np.float32),
                     "task": text,
                 })
             ds.save_episode()

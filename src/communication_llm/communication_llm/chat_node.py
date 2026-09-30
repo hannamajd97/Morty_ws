@@ -41,6 +41,7 @@ import math
 import os
 import re
 import threading
+import uuid
 from typing import Any
 
 import rclpy
@@ -187,11 +188,20 @@ _HUSH_BY_MERGE = "the operator's sentence went on"
 class _ActCountingPublisher:
     """2026-09-25 (Majd's G1): /robot/intent publisher that counts every
     intent this node dispatches (every publish site at once), for
-    ChatIntentNode._hush_and_merge's "has the previous input acted yet?"."""
+    ChatIntentNode._hush_and_merge's "has the previous input acted yet?".
 
-    def __init__(self, pub, on_publish) -> None:
+    2026-09-30 (recording contract v1, vla_experiments/recording_contract.py):
+    every intent also gets its own ``command_id`` and, from the input being
+    handled (``context()``), the ``utterance_id`` / ``utterance`` that caused
+    it, the question it answers and its place in the utterance's plan
+    (``plan_id`` = the utterance id, ``plan_index`` 0, 1, … for "go home and
+    close the gripper"). The router copies them into its command lifecycle
+    events; readers use named keys, so the fields are additive."""
+
+    def __init__(self, pub, on_publish, context=None) -> None:
         self._pub = pub
         self._on_publish = on_publish
+        self._context = context
 
     def publish(self, msg) -> None:
         self._on_publish()
@@ -202,8 +212,19 @@ class _ActCountingPublisher:
         # trial timing reads this field. Additive: readers use named keys.
         try:
             d = json.loads(msg.data)
-            if isinstance(d, dict) and "stamp" not in d:
-                d["stamp"] = round(time.time(), 3)
+            if isinstance(d, dict):
+                d.setdefault("stamp", round(time.time(), 3))
+                d.setdefault("command_id", uuid.uuid4().hex)
+                ctx = self._context() if self._context else None
+                if ctx:
+                    d.setdefault("utterance_id", ctx.get("utterance_id", ""))
+                    d.setdefault("utterance", ctx.get("text", ""))
+                    if ctx.get("question"):
+                        d.setdefault("question", ctx["question"])
+                        d.setdefault("question_id", ctx.get("question_id"))
+                    d.setdefault("plan_id", ctx.get("utterance_id", ""))
+                    d.setdefault("plan_index", ctx.get("n_intents", 0))
+                    ctx["n_intents"] = ctx.get("n_intents", 0) + 1
                 msg = String(data=json.dumps(d, separators=(",", ":")))
         except (TypeError, ValueError, AttributeError):
             pass
@@ -1086,11 +1107,14 @@ class ChatIntentNode(Node):
         self._prev_input: dict | None = None
         self._turn_text = ""
         self._merged_text = ""
+        # 2026-09-30: the input being handled on THIS thread (voice and typed
+        # input each run on their own thread) — see _ActCountingPublisher.
+        self._utt_local = threading.local()
         self.intent_pub = _ActCountingPublisher(self.create_publisher(
             String,
             str(self.get_parameter("intent_topic").value),
             10,
-        ), self._note_act)
+        ), self._note_act, context=lambda: getattr(self._utt_local, "ctx", None))
         # Growing reply while sentences stream to speech (2026-09-23): the
         # GUI extends the current "Morty:" line from this and never shows a
         # reply sentence as a "(status)" line; /robot/assistant_text still
@@ -2677,6 +2701,10 @@ class ChatIntentNode(Node):
         # a turn that reaches _chat_lock after a later stop/reset is dropped.
         if epoch is None:
             epoch = self._stop_epoch
+        # 2026-09-30 (recording contract v1): this thread's input context —
+        # every intent it publishes carries the utterance's id and text.
+        self._utt_local.ctx = {"utterance_id": self._utterance_id_for(text, typed_at),
+                               "text": text.strip(), "n_intents": 0}
         # Generation gate: if a newer transcript arrived while we were
         # waiting for the chat lock or running the LLM, don't act on this
         # stale input. Latest-wins behaviour for piled-up voice activity.
@@ -3139,6 +3167,12 @@ class ChatIntentNode(Node):
             # an utterance begun up to _FRESH_TOLERANCE_S before the question
             # opened still answers it.
             fresh = start is not None and 0.0 < since <= start + _FRESH_TOLERANCE_S
+        # 2026-09-30: the question this input may answer, for its intents
+        _ctx = getattr(self._utt_local, "ctx", None)
+        if _ctx is not None and question:
+            _ctx["question"] = question
+            _ctx["question_id"] = ((self._router_q.get("id") if question == "point"
+                                    else task.get("question_id")) if fresh else None)
         kind, action = voice_grammar.classify(text, question, fresh, self._voice_ext_dest)
         if kind == "negative" and action == "keep":
             # 2026-09-25 (Majd's I1): a NO to "Where should I drop it?" — the
@@ -4788,8 +4822,21 @@ class ChatIntentNode(Node):
             return
         self._utt_meta_seen = True
         with self._utt_meta_lock:
-            self._utt_meta.append([time.time(), text, end, start, False])
+            self._utt_meta.append([time.time(), text, end, start, False,
+                                   str(d.get("utterance_id") or "")])   # 2026-09-30: [5] = its id
             del self._utt_meta[:-8]
+
+    def _utterance_id_for(self, text: str, typed_at: float | None) -> str:
+        """2026-09-30 (recording contract v1): the speech node's id of this
+        transcript (the newest utterance meta with the same text, ≤ 10 s old);
+        typed input and a transcript without a meta get their own id."""
+        if typed_at is None:
+            now = time.time()
+            with self._utt_meta_lock:
+                for m in reversed(self._utt_meta):
+                    if m[1] == text.strip() and now - m[0] < 10.0 and len(m) > 5 and m[5]:
+                        return m[5]
+        return ("typed-" if typed_at is not None else "voice-") + uuid.uuid4().hex
 
     def _speech_start_for(self, text: str, typed_at: float | None,
                           heard_at: float | None = None,

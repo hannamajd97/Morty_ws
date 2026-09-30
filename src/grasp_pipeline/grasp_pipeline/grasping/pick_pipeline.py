@@ -851,11 +851,20 @@ class PickPipeline:
         try:
             tm = dict(getattr(self, "_tm", {}) or {})
             tm["published"] = _time.time()
+            hdr = sel.get("header")
             rec = {"kind": "selection_cycle",
                    "cycle_id": int(getattr(self._node, "_waiting_cycle_id", -1) or -1),
                    "label": str(sel.get("label", "")),
                    "source": str(getattr(self._node, "_last_selection_source", "") or ""),
                    "n_candidates": int(n_candidates),
+                   # 2026-09-30 (recording contract v1): the selected instance —
+                   # bbox in the image (pixels, frame / stamp below), its index
+                   # in that detection set, the pointing proposal it confirms
+                   "bbox": list(sel.get("bbox") or []),
+                   "index": sel.get("index"), "n_detections": sel.get("n_detections"),
+                   "display": sel.get("display", ""), "proposal_id": sel.get("proposal_id"),
+                   "image_stamp": (float(hdr.stamp.sec) + float(hdr.stamp.nanosec) * 1e-9) if hdr is not None else None,
+                   "image_frame": str(hdr.frame_id) if hdr is not None else "",
                    **tm}
             pub = getattr(self._node, "pub_timing", None)
             if pub is None:
