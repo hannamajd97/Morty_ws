@@ -147,6 +147,17 @@ class CameraWindows(QtCore.QObject):
         self._windows: List[CameraWindow] = []
 
     def open(self, camera: str) -> CameraWindow:
+        """THE camera window (2026-09-30, Majd: "I can open it only one
+        time, not every press a new window"): if it exists it is brought to
+        the front showing ``camera``; otherwise it is created."""
+        if self._windows:
+            w = self._windows[0]
+            if w.camera != camera:
+                w.combo.setCurrentIndex(CAMERAS.index(camera))
+            w.showNormal()
+            w.raise_()
+            w.activateWindow()
+            return w
         # Top-level like the Advanced and MMHRI windows: its own taskbar
         # entry, free to sit on another screen or behind the main window.
         w = CameraWindow(camera)
@@ -170,7 +181,7 @@ class CameraWindows(QtCore.QObject):
 
     def restore(self) -> None:
         """Reopen the windows that were open when the GUI last closed."""
-        for camera in self._settings.value("camera_window/open", [], type=list) or []:
+        for camera in (self._settings.value("camera_window/open", [], type=list) or [])[:1]:
             if camera in CAMERAS:
                 self.open(camera)
 

@@ -529,30 +529,22 @@ class OperatorWindow(QtWidgets.QMainWindow):
         # RealSense-only; MMHRI keeps recording the RealSense stream.
         self.view_combo = QtWidgets.QComboBox()
         self.view_combo.addItems(["view: RealSense", "view: Astra"])
+        # The camera window is an entry of the same list (2026-09-30, Majd:
+        # no separate "window" button; ONE window, never a new copy per
+        # press). Picking it opens — or brings to the front — the single
+        # camera window with the camera the panel is not showing; the list
+        # then goes back to the panel's camera.
+        self.view_combo.insertSeparator(2)
+        self.view_combo.addItem("⧉ open camera window")
+        self._view_idx = 0
         self.view_combo.setToolTip(
             "Picture panel source. Astra = the fixed camera on the shuttle\n"
             "(relayed JPEG, ~10 Hz) — to check what it sees. Clicking an\n"
-            "object works only in the RealSense view.")
-        self.view_combo.currentIndexChanged.connect(
-            lambda i: self.bridge.set_astra_view(i == 1))
+            "object works only in the RealSense view.\n"
+            "'open camera window': the other camera in one extra window\n"
+            "(it has its own RealSense / Astra selector).")
+        self.view_combo.currentIndexChanged.connect(self._on_view_combo)
         sys_lay.addWidget(self.view_combo)
-        # Cameras in their own windows (CameraWindows, 2026-09-24): one
-        # camera in the window, the other stays in the panel.
-        self.cam_win_btn = QtWidgets.QToolButton()
-        self.cam_win_btn.setText("⧉ window")
-        self.cam_win_btn.setToolTip(
-            "Open a camera in its own window; the panel keeps the other one.\n"
-            "Click: the camera the panel is not showing. Arrow: choose the camera\n"
-            "for the window. Each window has its own view selector; clicking\n"
-            "objects works in every RealSense view.")
-        self.cam_win_btn.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
-        _m = QtWidgets.QMenu(self.cam_win_btn)
-        _m.addAction("RealSense in a new window", lambda: self._pop_out_camera("RealSense"))
-        _m.addAction("Astra in a new window", lambda: self._pop_out_camera("Astra"))
-        self.cam_win_btn.setMenu(_m)
-        self.cam_win_btn.clicked.connect(lambda: self._pop_out_camera(
-            "RealSense" if self.view_combo.currentIndex() == 1 else "Astra"))
-        sys_lay.addWidget(self.cam_win_btn)
         sys_lay.addSpacing(24)
         self.pipeline_btn = QtWidgets.QPushButton("Start pipeline")
         self.pipeline_btn.clicked.connect(self._on_pipeline_btn)
@@ -851,13 +843,16 @@ class OperatorWindow(QtWidgets.QMainWindow):
             return
         self._select_object_at(x_px, y_px)
 
-    def _pop_out_camera(self, camera: str) -> None:
-        """That camera in a new window, the other one stays in the panel
-        (Majd, 2026-09-24): if the panel shows the camera being popped out,
-        the panel switches to the other one."""
-        self.cam_windows.open(camera)
-        if (self.view_combo.currentIndex() == 1) == (camera == "Astra"):
-            self.view_combo.setCurrentIndex(0 if camera == "Astra" else 1)
+    def _on_view_combo(self, i: int) -> None:
+        if i in (0, 1):
+            self._view_idx = i
+            self.bridge.set_astra_view(i == 1)
+            return
+        # "open camera window": back to the panel's camera, then the window
+        self.view_combo.blockSignals(True)
+        self.view_combo.setCurrentIndex(self._view_idx)
+        self.view_combo.blockSignals(False)
+        self.cam_windows.open("RealSense" if self._view_idx == 1 else "Astra")
 
     def _select_object_at(self, x_px: float, y_px: float) -> None:
         """Select the object under a RealSense pixel (main panel or a camera window)."""
