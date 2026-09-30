@@ -148,8 +148,21 @@ def apply_gravity_view_filter(
             _up_src = "table-plane"
         elif registration_frame_is_target or str(frame_id) in (
                 "base_link", "base", "world"):
-            up_vec = _np.array([0.0, 0.0, 1.0], dtype=_np.float32)
-            _up_src = "world-frame"
+            # 2026-09-30 (Majd: multi-view picks fail, single view works):
+            # the fused multi-view cloud is in base_link, and this branch
+            # took base +z as up — HORIZONTAL on this rig (the 08-27 TF
+            # fix below never reached it). The filters then read the
+            # 14 cm vitamin tube as 2 cm tall, kept 5 of 188 grasps, all
+            # tilted ("FROM BEHIND"), and none had an IK solution. In
+            # base coordinates the rig's up is known_up_base itself.
+            try:
+                known_up = _np.asarray(
+                    [float(v) for v in node.get_parameter("known_up_base").value],
+                    dtype=_np.float32)
+            except Exception:
+                known_up = _np.array([-0.7071, 0.7071, 0.0], dtype=_np.float32)
+            up_vec = known_up / (float(_np.linalg.norm(known_up)) + 1e-9)
+            _up_src = "rig-up (base_link)"
         else:
             if frame_id:
                 try:
