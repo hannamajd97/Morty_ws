@@ -575,7 +575,18 @@ class YoloLiveSelectGrasp(Node):
         self._executor_cycle_done: bool = False
         self._executor_cycle_status: str = ""
         self._awaiting_executor_cycle_done: bool = False
-        self._cycle_id_counter: int = 0
+        # Cycle ids are unique ACROSS pipeline restarts (2026-09-30, Majd:
+        # "Pick up the small bottle." twice, nothing moved). The counter used
+        # to start at 0 in every pipeline process, but the executor and the
+        # router live on: after a restart the new "cycle 1" equalled the
+        # cycle 1 the executor had just finished, so it skipped it as
+        # "already processed", the pipeline waited for its cycle_done
+        # forever and the router dropped the repeated pick as a duplicate.
+        # Now each run numbers from its start second x 1000 (run 1790785538
+        # -> 1790785538001, ...002): later runs always count higher, so the
+        # id never repeats and never goes backwards (fewer than 1000 cycles
+        # per second of pipeline lifetime — always true).
+        self._cycle_id_counter: int = int(time.time()) * 1000
         self._waiting_cycle_id: int = 0
 
         # The camera of the running pointing session (pointing_camera,
