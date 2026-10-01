@@ -420,6 +420,8 @@ class MotionDispatcher:
             label=target_name,
             timeout_s=timeout_s,
         )
+        # the sweep spreads its frames over this (multi_view, 2026-10-01)
+        handle.duration_s = duration_s
 
         payload = {
             "label": target_name,

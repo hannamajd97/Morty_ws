@@ -408,6 +408,24 @@ class MultiViewRegistrar:
             return []
 
         proc, timeout_s, settle_s = proc_info
+        # 2026-10-01 (Majd: "why it stops after 20 frames"): a frame was
+        # taken at every 4 mm / 0.8 deg of camera motion, so the 20 were used
+        # up 17 s into a 27 s leg — the last third, the most different view,
+        # was never captured, nor the end-of-leg frame (it needs a free
+        # slot). Now at most one frame per planned duration / max_frames, so
+        # they spread over the whole leg; the PTP path (no planned duration)
+        # keeps the motion thresholds alone.
+        # The last slot is kept for the end-of-leg frame: taken at rest, it is
+        # the only sweep frame the TSDF grasp cloud uses (moving frames are
+        # skipped there), and it was never taken once the 20 were used up.
+        planned_s = float(getattr(proc, "duration_s", 0.0) or 0.0)
+        moving_cap = max(1, max_frames - 1) if planned_s > 0.0 else max_frames
+        min_frame_gap_s = planned_s / moving_cap if planned_s > 0.0 else 0.0
+        last_accept_t = -1.0e9
+        if min_frame_gap_s > 0.0:
+            self._node.get_logger().info(
+                f"[continuous] {moving_cap} frames spread over the {planned_s:.0f} s leg "
+                f"(at most one every {min_frame_gap_s:.2f} s) + the end-of-leg frame")
         # Arm is moving from here until the motion process exits: in-motion
         # captures must stay single-frame (multiframe median would smear).
         self._node._sweep_in_motion = True
@@ -433,7 +451,7 @@ class MultiViewRegistrar:
         last_preview_t = 0.0
 
         # ── Poll loop: capture frames while robot moves ──
-        while len(accepted) < max_frames:
+        while len(accepted) < moving_cap:
             elapsed = time.monotonic() - motion_start_time
             if elapsed > timeout_s:
                 self._node.get_logger().warn(
@@ -509,6 +527,11 @@ class MultiViewRegistrar:
                     break
                 time.sleep(capture_poll_interval)
                 continue
+            if time.monotonic() - last_accept_t < min_frame_gap_s:
+                if proc_done:
+                    break
+                time.sleep(capture_poll_interval)
+                continue
 
             # ── Capture a frame ──
             frame_idx = len(accepted) + 1
@@ -569,6 +592,7 @@ class MultiViewRegistrar:
             obs_tf["sweep_phase"] = "moving"
             accepted.append(obs_tf)
             last_accepted_meta = obs_tf
+            last_accept_t = time.monotonic()
             consecutive_rejections = 0
             self._node.get_logger().info(
                 f"[continuous] accepted frame {frame_idx}/{max_frames} "
