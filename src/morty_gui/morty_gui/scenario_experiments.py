@@ -85,6 +85,51 @@ JUDGMENTS = [
 JUDGMENT_CHOICES = ["-", "yes", "no", "n/a"]
 
 
+def _utterance_end(ev, text, t_transcript=None):
+    """speech_end of the utterance that said ``text``. A sentence chat_node
+    MERGED from pieces ("Morty, grasp." + "For me is" + "Vitamin two." ->
+    one transcript, 2026-10-01 trial 180) has no utterance of its own: its
+    end is the end of its LAST piece — the latest utterance whose text ends
+    the sentence, said before the transcript arrived."""
+    text = str(text or "").strip()
+    best = None
+    for _t, _s, _x in ev:
+        if _s != "utterance":
+            continue
+        try:
+            _u = json.loads(_x)
+        except Exception:
+            continue
+        ut, end = str(_u.get("text", "")).strip(), _u.get("speech_end")
+        if not ut or not end:
+            continue
+        if ut == text:
+            return float(end)
+        if (text.endswith(ut) and len(ut) < len(text)
+                and (t_transcript is None or float(end) <= t_transcript + 0.5)):
+            best = float(end)
+    return best
+
+
+def _command_sentence(ev, t_first, first_text, t_until=None):
+    """(time, text) of the first command as finally said: the first
+    transcript continued by the pieces merged onto it ("A" -> "A B" ->
+    "A B C"), up to ``t_until`` (the intent it caused). A transcript that
+    does not continue it ends the sentence."""
+    cur, cur_t = str(first_text or "").strip(), t_first
+    for _t, _s, _x in ev:
+        if _s != "transcript" or _t <= cur_t:
+            continue
+        if t_until is not None and _t > t_until + 0.5:
+            break
+        nxt = str(_x).strip()
+        if nxt.startswith(cur) and len(nxt) > len(cur):
+            cur, cur_t = nxt, _t
+        else:
+            break
+    return cur_t, cur
+
+
 def _first(events, source, after=None):
     for t, src, _txt in events:
         if src == source and (after is None or t > after):
@@ -324,16 +369,8 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
     t_speech_end = None
     if voice_started:
         first_text = next((x for t, s_, x in ev if s_ == "transcript" and t == t_cause_w), None)
-        for t, s_, x in ev:
-            if s_ != "utterance":
-                continue
-            try:
-                u = json.loads(x)
-            except Exception:
-                continue
-            if first_text is not None and str(u.get("text", "")).strip() == str(first_text).strip() and u.get("speech_end"):
-                t_speech_end = float(u["speech_end"])
-                break
+        if first_text is not None:
+            t_speech_end = _utterance_end(ev, first_text, t_cause_w)
     t_pub = float(sel["published"]) if sel and sel.get("published") else None
     graspgen = None; bg_lead = None
     gg_compute = gg_wait = gg_lead = verify_compute = None
@@ -357,19 +394,17 @@ def build_timeline(events, records, t_start_wall, t_stop_wall, mono_to_wall):
     # by pointing, the committed choice) until the arm STARTS MOVING (the
     # executor's motion_start, else — look/drop moves — the first joint
     # motion, an 'arm_motion' event trial_times adds from the joint data).
-    def _speech_end_of(text):
-        for _t, _s, _x in ev:
-            if _s != "utterance":
-                continue
-            try:
-                _u = json.loads(_x)
-            except Exception:
-                continue
-            if str(_u.get("text", "")).strip() == str(text).strip() and _u.get("speech_end"):
-                return float(_u["speech_end"])
-        return None
+    # 2026-10-01 (Majd: "the interaction time isn't correct", trial 180): a
+    # command the voice system cut into pieces ("Morty, grasp." / "For me
+    # is" / "Vitamin two.", merged into one sentence) was "given" at the end
+    # of its FIRST piece — 9.8 s instead of 6.8 s. It is given when the
+    # operator stops saying the whole sentence. A later, separate answer (a
+    # which-one clarification) still counts, as defined on 2026-09-28.
     _first_text = next((x for t, s_, x in ev if s_ == "transcript" and t == t_cmd_w), None) if t_cmd_w is not None else None
-    t_first_end = _speech_end_of(_first_text) if (voice_started and _first_text is not None) else None
+    t_first_end = None
+    if voice_started and _first_text is not None:
+        _sent_t, _sent = _command_sentence(ev, t_cmd_w, _first_text, t_int_w)
+        t_first_end = _utterance_end(ev, _sent, _sent_t)
     t_given = (t_first_end or t_cmd_w) if voice_started else t_choice_w
     t_motion = phases.get("motion_start")
     if t_motion is None and t_given is not None:

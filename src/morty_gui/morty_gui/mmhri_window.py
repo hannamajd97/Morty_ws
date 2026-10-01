@@ -89,7 +89,6 @@ from .scenario_experiments import SCENARIOS as _SCENARIO_TUPLES
 from .scenario_experiments import MODIFIERS
 SCENARIOS = [f"{sid}: {txt}" for sid, txt in _SCENARIO_TUPLES]
 LAYOUTS = ["Layout A", "Layout B", "Layout C"]
-REPS_PER_CELL = 5
 LEVELS = [
     "L1 single-step, explicit",
     "L2 single-step, deictic/multimodal",
@@ -210,8 +209,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.resize(560, 720)
         os.makedirs(MMHRI_DIR, exist_ok=True)
         self._active = False
-        # One trial = one save (2026-09-25): see _on_stop_clicked / _on_stop_save_final.
+        # One trial = one save (2026-09-25): see _on_stop_clicked / _on_save.
         self._stop_pressed = False
+        self._stopped = False      # 2026-10-01: ⏹ ended the recording, 💾 not yet pressed
         self._saved = False
         self._cancelled = False
         self._rec_header: Dict[str, str] = {}
@@ -399,10 +399,21 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "  execution:     grasp poses → robot finished moving"
         )
         out_form.addRow("Where the time went:", self.stage_lbl)
-        self.notes = QtWidgets.QLineEdit()
+        # 2026-10-01 (Majd: "make the failure / notes field bigger than one
+        # line"): several lines; the CSV quotes line breaks.
+        self.notes = QtWidgets.QPlainTextEdit()
+        self.notes.setFixedHeight(66)
+        self.notes.setPlaceholderText("what went wrong, anything unusual …")
         out_form.addRow("Failure / Notes:", self.notes)
         lay.addWidget(out_box)
 
+        # 2026-10-01 (Majd): ⏹ Stop and 💾 Save are separate — "I need time to
+        # fill the tables to make sure I'm doing everything correctly". Stop
+        # ends the recording (VLA episode, bag, audio, video); the form stays
+        # open; Save writes trial.json + the CSV rows from the form as it is
+        # THEN. Button order as asked:
+        #   Start trial · Stop · Save · discard · Send last trial · delete
+        #   fix trial · Excel export · hand-over · framing check
         btn_row = QtWidgets.QHBoxLayout()
         self.start_btn = QtWidgets.QPushButton("⏺ Start trial")
         self.start_btn.setStyleSheet(
@@ -410,33 +421,33 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         )
         self.start_btn.clicked.connect(self._on_start)
         btn_row.addWidget(self.start_btn)
-        self.stop_btn = QtWidgets.QPushButton("⏹ Stop && save")
+        self.stop_btn = QtWidgets.QPushButton("⏹ Stop")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._on_stop_clicked)
         btn_row.addWidget(self.stop_btn)
+        self.save_btn = QtWidgets.QPushButton("💾 Save")
+        self.save_btn.setEnabled(False)
+        self.save_btn.clicked.connect(self._on_save)
+        btn_row.addWidget(self.save_btn)
         self.discard_btn = QtWidgets.QPushButton("✖ discard")
         self.discard_btn.setEnabled(False)
         self.discard_btn.clicked.connect(self._on_discard)
         btn_row.addWidget(self.discard_btn)
-        # Delete = erase a trial FROM THE RECORDS (Majd 2026-09-03): its
-        # folder if any, its rows in both CSVs (modifiers included), the
-        # number free again. Discard only aborts the running one.
-        self.delete_btn = QtWidgets.QPushButton("🗑 delete")
-        self.delete_btn.clicked.connect(self._on_delete)
-        btn_row.addWidget(self.delete_btn)
-        # 2026-09-28 (Majd): pick trials and send them to the Excel workbook
-        # (excel_window.ExcelExportWindow; refreshed after every trial).
-        self.excel_btn = QtWidgets.QPushButton("📊 Excel export")
-        self.excel_btn.setToolTip("Choose trials and send everything recorded about them to\n"
-                                  "experiments/MMHRI_experiments.xlsx")
-        self.excel_btn.clicked.connect(self._open_excel_window)
-        btn_row.addWidget(self.excel_btn)
         # 2026-09-28 (Majd: "a button just for fast sending the last record")
         self.excel_last_btn = QtWidgets.QPushButton("📊 Send last trial")
         self.excel_last_btn.setToolTip("Adds the trial you saved last to the Excel file (only if it is not in it yet;\n"
                                        "nothing already in the file changes). Waits for its final times first.")
         self.excel_last_btn.clicked.connect(self._send_last_trial)
         btn_row.addWidget(self.excel_last_btn)
+        # Delete = erase a trial FROM THE RECORDS (Majd 2026-09-03): its
+        # folder if any, its rows in both CSVs (modifiers included), the
+        # number free again. Discard only aborts the running one.
+        self.delete_btn = QtWidgets.QPushButton("🗑 delete")
+        self.delete_btn.clicked.connect(self._on_delete)
+        btn_row.addWidget(self.delete_btn)
+        lay.addLayout(btn_row)
+
+        ann_row = QtWidgets.QHBoxLayout()
         # 2026-10-01 (Majd: "after Stop & save I forget to change S1/S2… or
         # to fill the fields correctly"): correct a SAVED trial's form —
         # folder name, trial.json, VLA outcome, CSVs, Excel row (fix_trial).
@@ -445,33 +456,24 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                                 "destination, the yes/no answers, notes — everywhere it is stored\n"
                                 "(folder name, trial.json, VLA outcome, CSV rows, Excel row).")
         self.fix_btn.clicked.connect(self._open_fix_trial)
-        btn_row.addWidget(self.fix_btn)
-        lay.addLayout(btn_row)
-
-        # 2026-09-30 (recording contract v1): operator marks while a trial
-        # records — manual assistance (an interval, excluded from autonomous
-        # training), a rearranged object, a blocked camera, an abort, an
-        # intended hand-over — and the camera framing check (never moves the arm).
-        ann_row = QtWidgets.QHBoxLayout()
-        self.assist_btn = QtWidgets.QPushButton("✋ assist")
-        self.assist_btn.setCheckable(True)
-        self.assist_btn.setToolTip("Press when you help the robot by hand (e.g. put the object into the\n"
-                                   "gripper), press again when you stop. The interval is kept in the\n"
-                                   "recording but excluded from autonomous-grasp training.")
-        self.assist_btn.toggled.connect(lambda on: self._annotate("assist", "start" if on else "end"))
-        ann_row.addWidget(self.assist_btn)
-        self._ann_btns = [self.assist_btn]
-        for kind, text, tip in (("rearranged", "🔄 rearranged", "you moved an object by hand"),
-                                ("camera_blocked", "📷 camera blocked", "an action happened out of view"),
-                                ("abort", "⛔ abort", "you aborted what the robot was doing"),
-                                ("handover", "🤝 hand-over", "the robot is handing the object to your hand (intended)")):
-            b = QtWidgets.QPushButton(text)
-            b.setToolTip(f"Mark now: {tip}")
-            b.clicked.connect(lambda _=False, k=kind: self._annotate(k, "at"))
-            ann_row.addWidget(b)
-            self._ann_btns.append(b)
-        for b in self._ann_btns:
-            b.setEnabled(False)
+        ann_row.addWidget(self.fix_btn)
+        # 2026-09-28 (Majd): pick trials and send them to the Excel workbook
+        # (excel_window.ExcelExportWindow; refreshed after every trial).
+        self.excel_btn = QtWidgets.QPushButton("📊 Excel export")
+        self.excel_btn.setToolTip("Choose trials and send everything recorded about them to\n"
+                                  "experiments/MMHRI_experiments.xlsx")
+        self.excel_btn.clicked.connect(self._open_excel_window)
+        ann_row.addWidget(self.excel_btn)
+        # The operator mark kept on 2026-10-01 (assist / rearranged / camera
+        # blocked / abort removed at Majd's request): an intended hand-over,
+        # into the VLA episode's annotations — and the framing check (never
+        # moves the arm).
+        self.handover_btn = QtWidgets.QPushButton("🤝 hand-over")
+        self.handover_btn.setToolTip("Mark now: the robot is handing the object to your hand (intended)")
+        self.handover_btn.clicked.connect(lambda _=False: self._annotate("handover", "at"))
+        self.handover_btn.setEnabled(False)
+        ann_row.addWidget(self.handover_btn)
+        self._ann_btns = [self.handover_btn]
         self.framing_btn = QtWidgets.QPushButton("🎯 framing check…")
         self.framing_btn.setToolTip("Save both cameras' views at home / pickup / left / right / hand-over.\n"
                                     "You move the arm yourself; this never moves it.")
@@ -541,9 +543,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "t=0 of the trial. Starts camera+audio recording and the\n"
             "event logger. Fill the header fields FIRST.")
         self.stop_btn.setToolTip(
-            "Ends the trial: waits for Morty to finish speaking, then\n"
-            "saves video/audio/events/CSV row. Fill the outcome\n"
-            "dropdowns before or right after.")
+            "Ends the recording: waits for Morty to finish speaking; video,\n"
+            "audio, bag and VLA episode end. Nothing is saved yet — check the\n"
+            "form, then 💾 Save.")
+        self.save_btn.setToolTip(
+            "Saves the STOPPED trial with the form as it is now: trial.json,\n"
+            "the CSV rows, the VLA outcome ('Full Task Success?'), then the\n"
+            "post-processing. The next trial can start after Save or discard.")
         self.discard_btn.setToolTip(
             "Abort the RUNNING trial: nothing is saved, the trial number is\n"
             "reused. (A folder already opened stays — use delete.)")
@@ -757,6 +763,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         here; no trial.json is written (the trial was not stopped by ⏹), so
         the folder stays marked incomplete. A GUI crash is covered by
         die_with_parent_preexec on both recorders."""
+        if getattr(self, "_stopped", False) and not self._saved and not self._cancelled:
+            self._on_save()              # 2026-10-01: a stopped trial is not lost with the window
+            return
         if not getattr(self, "_active", False):
             return
         self._cancelled = True           # a ⏹ chain still waiting must not save it
@@ -793,6 +802,12 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         return True if v == "yes" else False if v == "no" else None
 
     def _on_start(self) -> None:
+        if getattr(self, "_stopped", False) and not self._saved and not self._cancelled:
+            self.status.setText("✖ the stopped trial is not saved yet — 💾 Save or ✖ discard it first")
+            return
+        self._on_start_inner()
+
+    def _on_start_inner(self) -> None:
         tid = self.trial_id.text().strip() or self._next_trial_id()
         # Folder = number + layout + scenario (Majd 2026-09-03: "atm we
         # have only the trial number in the folder"), e.g. trial_008_LA_S1.
@@ -837,7 +852,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # had moved on to the next trial. Outcome fields stay live until ⏹.
         self._rec_header = {"tid": tid, "layout": self.layout_edit.currentText().strip(),
                             "scenario": self.scenario.currentText(), "level": self.level.currentText()}
-        self._stop_pressed = self._saved = self._cancelled = False
+        self._stop_pressed = self._saved = self._cancelled = self._stopped = False
         # Locked while it records: the record keeps these values, and a
         # combo box changed by a stray mouse wheel no longer disagrees with
         # the folder name (5 saved trials did, 2026-09-25).
@@ -1093,6 +1108,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             w.setEnabled(True)
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        self.save_btn.setEnabled(False)
         self.discard_btn.setEnabled(False)
         self.delete_btn.setEnabled(True)
         self.trial_id.setText(self._next_trial_id())
@@ -1104,9 +1120,6 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             cb.setCurrentIndex(0)
         for cb in self.modifier_boxes.values():
             cb.setChecked(False)
-        self.assist_btn.blockSignals(True)
-        self.assist_btn.setChecked(False)
-        self.assist_btn.blockSignals(False)
         for b in self._ann_btns:
             b.setEnabled(False)
 
@@ -1319,18 +1332,17 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             return
         self._stop_pressed = True
         self.stop_btn.setEnabled(False)
-        self._on_stop_save()
+        self._on_stop()
 
-    def _on_stop_save(self) -> None:
+    def _on_stop(self) -> None:
         if self._cancelled:              # 🗑 pressed while ⏹ waited for Morty
             return
         # The VLA episode ends at the PRESS — the speech tail below is
         # Morty talking, not the robot acting. (Re-entered by timers,
-        # hence the flag.)
+        # hence the flag.) Its outcome is the form's verdict NOW; a verdict
+        # filled in before 💾 Save replaces it then (_apply_vla_verdict).
         if not self._vla_ended:
             self._vla_ended = True
-            if self.assist_btn.isChecked():
-                self.assist_btn.setChecked(False)       # sends "assist end" first
             self._vla.end(self._vla_success())
         # The bag also ends at the PRESS: after it only Morty talks.
         if not getattr(self, "_bag_ended", True):
@@ -1349,29 +1361,57 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         if speaking and deadline is None:
             self._stop_speech_deadline = _time.time() + 20.0
             self.status.setText("⏳ waiting for Morty to finish speaking…")
-            _QtCore.QTimer.singleShot(300, self._on_stop_save)
+            _QtCore.QTimer.singleShot(300, self._on_stop)
             return
         if deadline is not None:
             if speaking and _time.time() < deadline:
-                _QtCore.QTimer.singleShot(300, self._on_stop_save)
+                _QtCore.QTimer.singleShot(300, self._on_stop)
                 return
             self._stop_speech_deadline = None
             if not speaking:
                 # tail: let the last audio buffer play out
-                _QtCore.QTimer.singleShot(
-                    800, lambda: self._on_stop_save_final())
+                _QtCore.QTimer.singleShot(800, lambda: self._on_stop_final())
                 return
-        self._on_stop_save_final()
+        self._on_stop_final()
 
-    def _on_stop_save_final(self) -> None:
-        if self._saved or self._cancelled:
+    def _on_stop_final(self) -> None:
+        """The recording ends (2026-10-01: Stop and Save are separate): the
+        recorders close, the stage times are measured, the video is muxed —
+        and the form stays open until 💾 Save (or ✖ discard)."""
+        if self._stopped or self._cancelled:
             return
-        self._saved = True
+        self._stopped = True
         self._finish_recorders()
-        stage_times = self._harvest_stage_times()
+        self._stage_times = self._harvest_stage_times()
         if self._trial_dir:
             self._mux_trial_video()
             self._save_log_slices()
+        for b in self._ann_btns:
+            b.setEnabled(False)
+        tid = self._rec_header.get("tid") or self.trial_id.text().strip()
+        if not self._trial_dir:
+            # VLA-only trial: none of the MMHRI record is written — nothing to save.
+            self._saved = True
+            self.status.setText(
+                f"✔ trial {tid} ended (no MMHRI evidence) → {self._trial_root}\n"
+                "the VLA episode and the bag are in that folder (the vla-rec LED shows whether the episode was kept)")
+            self._start_postprocess(self._trial_root)
+            self._reset_buttons()
+            return
+        self.save_btn.setEnabled(True)
+        self.discard_btn.setEnabled(True)
+        self.start_btn.setEnabled(False)
+        self.status.setText(
+            f"⏹ trial {tid} stopped — check the form (outcome answers, notes, target …), "
+            "then 💾 Save. ✖ discard drops it.")
+
+    def _on_save(self) -> None:
+        """💾 Save (2026-10-01): the stopped trial, with the form as it is now."""
+        if not self._stopped or self._saved or self._cancelled:
+            return
+        self._saved = True
+        self.save_btn.setEnabled(False)
+        stage_times = getattr(self, "_stage_times", {}) or {}
         hdr = self._rec_header
         tid = hdr.get("tid") or self.trial_id.text().strip()
         row = {
@@ -1389,7 +1429,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "Full Task Success?": self.chips["full"].currentText(),
             "Interaction Time (s)": self.t_interact.text().strip(),
             "Total Time (s)": self.t_total.text().strip(),
-            "Failure Category / Notes": self.notes.text().strip(),
+            "Failure Category / Notes": self.notes.toPlainText().strip(),
             "Modifiers": self._modifiers_str(),
         }
         meta = {
@@ -1400,14 +1440,6 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "Level": hdr.get("level") or self.level.currentText(),
             "Stage Times": stage_times,
         }
-        if not self._trial_dir:
-            # VLA-only trial: none of the MMHRI record is written.
-            self.status.setText(
-                f"✔ trial {tid} ended (no MMHRI evidence) → {self._trial_root}\n"
-                "the VLA episode and the bag are in that folder (the vla-rec LED shows whether the episode was kept)")
-            self._start_postprocess(self._trial_root)
-            self._reset_buttons()
-            return
         with open(os.path.join(self._trial_dir, "trial.json"), "w") as f:
             json.dump({**meta, **row, "bag": self._bag.last_dir,
                        "vla_episode": self._vla.last_episode}, f, indent=2)
@@ -1426,6 +1458,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                           _st.get("graspgen_s", ""),
                           _st.get("execution_s", ""),
                           _st.get("total_s", "")])
+        self._apply_vla_verdict(self._trial_root, row["Full Task Success?"])
         # what was saved, at a glance — a wrong field is fixed with ✎ fix trial
         _short = lambda v: (v or "—").strip() or "—"  # noqa: E731
         self.status.setText(
@@ -1439,6 +1472,32 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self._reset_buttons()
         self._refresh_progress()
         self._refresh_excel_window()
+
+    def _apply_vla_verdict(self, folder: str, answer: str) -> None:
+        """The VLA episode ended at ⏹ with the verdict the form had THEN;
+        "Full Task Success?" filled in before 💾 Save is the human verdict —
+        written into the episode (fix_trial.set_vla_outcome) once the
+        recorder has saved it (its manifest complete, at most 60 s)."""
+        if answer.strip().lower() not in ("yes", "no") or not folder:
+            return
+
+        def work():
+            from .fix_trial import set_vla_outcome
+            man = os.path.join(folder, "recording_manifest.json")
+            for _ in range(120):
+                try:
+                    with open(man) as f:
+                        if json.load(f).get("state") in ("complete", "incomplete"):
+                            break
+                except (OSError, ValueError):
+                    pass
+                time.sleep(0.5)
+            try:
+                set_vla_outcome(folder, answer, "outcome: human (given at 💾 Save)")
+            except Exception:  # noqa: BLE001 — the trial itself is saved; ✎ fix trial can redo it
+                pass
+        import threading as _threading
+        _threading.Thread(target=work, daemon=True).start()
 
     def _refresh_progress(self) -> None:
         """Count saved trials per scenario × layout from trial.json files."""
@@ -1458,16 +1517,15 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                     continue
         except OSError:
             pass
-        lines = ["       " + "   ".join(f"L{c[-1]}" for c in LAYOUTS)]
+        # 2026-10-01 (Majd): only what is DONE — no "/5" per cell, no goal.
+        lines = ["        " + "  ".join(f"{'L' + c[-1]:>3}" for c in LAYOUTS)]
         total = 0
         for s in SCENARIOS:
             sid = s.split(":")[0]
             row = [counts.get((sid, c[-1]), 0) for c in LAYOUTS]
             total += sum(row)
-            lines.append(
-                f"{sid + chr(58):<5}  " + "  ".join(f"{n}/{REPS_PER_CELL}" for n in row))
-        goal = len(SCENARIOS) * len(LAYOUTS) * REPS_PER_CELL
-        lines.append(f"total: {total}/{goal}")
+            lines.append(f"{sid + chr(58):<6}  " + "  ".join(f"{n:>3}" for n in row))
+        lines.append(f"total done: {total}")
         self.progress_lbl.setText("\n".join(lines))
 
     @staticmethod

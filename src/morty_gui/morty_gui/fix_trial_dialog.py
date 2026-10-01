@@ -68,7 +68,8 @@ class FixTrialDialog(QtWidgets.QDialog):
             cb = QtWidgets.QComboBox()
             cb.addItems(["", "yes", "no"])
             self.w[k] = cb
-        self.w["Failure Category / Notes"] = QtWidgets.QLineEdit()
+        self.w["Failure Category / Notes"] = QtWidgets.QPlainTextEdit()
+        self.w["Failure Category / Notes"].setFixedHeight(66)
         for k in EDITABLE:
             form.addRow(k.replace("Failure Category / Notes", "Failure / Notes") + ":", self.w[k])
         lay.addLayout(form)
@@ -96,6 +97,8 @@ class FixTrialDialog(QtWidgets.QDialog):
                 wd.currentTextChanged.connect(lambda _t: self._show_changes())
             elif isinstance(wd, QtWidgets.QLineEdit):
                 wd.textChanged.connect(lambda _t: self._show_changes())
+            elif isinstance(wd, QtWidgets.QPlainTextEdit):
+                wd.textChanged.connect(self._show_changes)
         for cb in self.mod_boxes.values():
             cb.toggled.connect(lambda _on: self._show_changes())
         if current in folders:
@@ -116,6 +119,8 @@ class FixTrialDialog(QtWidgets.QDialog):
             sid = v.split(":")[0].strip()
             idx = next((i for i, s in enumerate(SCENARIOS) if s.split(":")[0] == sid), -1)
             wd.setCurrentIndex(max(idx, 0))
+        elif isinstance(wd, QtWidgets.QPlainTextEdit):
+            wd.setPlainText(v)
         elif isinstance(wd, QtWidgets.QComboBox):
             if wd.isEditable():
                 wd.setCurrentText(v)
@@ -131,6 +136,8 @@ class FixTrialDialog(QtWidgets.QDialog):
             return ";".join(mid for mid, cb in self.mod_boxes.items() if cb.isChecked())
         if isinstance(wd, QtWidgets.QComboBox):
             return wd.currentText().strip()
+        if isinstance(wd, QtWidgets.QPlainTextEdit):
+            return wd.toPlainText().strip()
         return wd.text().strip()
 
     def _load(self) -> None:

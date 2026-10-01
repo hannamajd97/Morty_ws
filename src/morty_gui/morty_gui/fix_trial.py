@@ -91,6 +91,34 @@ def outcome_of(answer: str) -> Tuple[str, Optional[bool]]:
     return {"yes": ("success", True), "no": ("failure", False)}.get(answer.strip().lower(), ("unknown", None))
 
 
+def set_vla_outcome(folder, answer: str, note: str) -> Optional[str]:
+    """The VLA episode in ``folder`` takes the human verdict ``answer``
+    ("Full Task Success?": yes / no / empty): meta.json outcome, success,
+    provenance + a correction record, and the manifest's outcome. Returns
+    "old -> new", or None (no episode, or nothing to change). Used by
+    fix_trial and by the trial window's 💾 Save (2026-10-01)."""
+    folder = Path(folder)
+    mp = folder / "meta.json"
+    if not mp.exists():
+        return None
+    outcome, success = outcome_of(answer)
+    m = json.loads(mp.read_text())
+    was = m.get("outcome")
+    if was == outcome:
+        return None
+    m["outcome"], m["success"] = outcome, success
+    m["outcome_provenance"] = m["note"] = note
+    m.setdefault("outcome_corrections", []).append(
+        {"at": time.time(), "was": was, "now": outcome, "answer": answer})
+    _atomic_write(mp, json.dumps(m, indent=2, default=str))
+    man_p = folder / "recording_manifest.json"
+    if man_p.exists():
+        man = json.loads(man_p.read_text())
+        man["outcome"] = outcome
+        _atomic_write(man_p, json.dumps(man, indent=2))
+    return f"{was} -> {outcome}"
+
+
 def _atomic_write(p: Path, text: str) -> None:
     tmp = p.with_name("." + p.name + ".fix_tmp")
     tmp.write_text(text)
@@ -161,21 +189,10 @@ def fix_trial(folder, new: Dict[str, str], dry_run: bool = False, xlsx: str = xl
     out.append("trial.json")
 
     # 4. the VLA episode's outcome follows "Full Task Success?"
-    if "Full Task Success?" in ch and (new_dir / "meta.json").exists():
-        outcome, success = outcome_of(ch["Full Task Success?"][1])
-        m = json.loads((new_dir / "meta.json").read_text())
-        was = m.get("outcome")
-        m["outcome"], m["success"] = outcome, success
-        m["outcome_provenance"] = m["note"] = "outcome: human (corrected in the trial window)"
-        m.setdefault("outcome_corrections", []).append(
-            {"at": time.time(), "was": was, "now": outcome, "answer": ch["Full Task Success?"][1]})
-        _atomic_write(new_dir / "meta.json", json.dumps(m, indent=2, default=str))
-        mp = new_dir / "recording_manifest.json"
-        if mp.exists():
-            man = json.loads(mp.read_text())
-            man["outcome"] = outcome
-            _atomic_write(mp, json.dumps(man, indent=2))
-        out.append(f"VLA episode outcome {was} -> {outcome}")
+    if "Full Task Success?" in ch:
+        done = set_vla_outcome(new_dir, ch["Full Task Success?"][1], "outcome: human (corrected in the trial window)")
+        if done:
+            out.append(f"VLA episode outcome {done}")
 
     # 5. the CSVs (form row: Trial ID + the OLD command; meta row: Trial ID + Date)
     cmd_old = ch.get("Command Used", (tj.get("Command Used", ""), None))[0]
