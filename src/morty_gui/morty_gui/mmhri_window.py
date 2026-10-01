@@ -681,10 +681,14 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         return max(cands, key=lambda p: os.path.getmtime(os.path.join(p, "trial.json"))) if cands else ""
 
     def _send_last_trial(self) -> None:
+        self._send_to_excel(self._last_trial_folder())
+
+    def _send_to_excel(self, folder: str) -> None:
+        """One saved trial -> the workbook (📊 send last trial, and ✎ fix
+        trial's "send it now" for a trial that had no Excel row)."""
         if getattr(self, "_active", False):
             self.status.setText("✖ not while a trial is recording")
             return
-        folder = self._last_trial_folder()
         if not folder:
             self.status.setText("✖ no saved trial to send")
             return
@@ -694,6 +698,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self._excel_sender.progress.connect(lambda t: self.status.setText(t))
             self._excel_sender.finished.connect(self._on_last_trial_sent)
         if self._excel_sender.running:
+            self.status.setText(f"✖ an Excel send is still running — send {os.path.basename(folder)} again when it ends")
             return
         self.excel_last_btn.setEnabled(False)
         self.status.setText(f"⏳ sending {os.path.basename(folder)} to Excel …")
@@ -709,6 +714,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         from .fix_trial_dialog import FixTrialDialog
         dlg = FixTrialDialog(cands[:80], self._last_trial_folder(), self)
         dlg.fixed.connect(self._on_trial_fixed)
+        dlg.send_requested.connect(self._send_to_excel)
         dlg.show()
 
     def _on_trial_fixed(self, folder: str) -> None:

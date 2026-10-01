@@ -49,6 +49,10 @@ YESNO = ["User Intent understood correctly?", "Object Detected?", "Correct Objec
 EDITABLE = ["Scene Layout", "Scenario", "Modifiers", "Command Used", "Intended Target",
             "Intended Destination"] + YESNO + ["Failure Category / Notes"]
 NAME_RE = re.compile(r"(trial_\d+_)L([A-Z])_(S\d+)")
+# 2026-10-01 (trial 188: Majd corrected the layout of a trial he had not
+# sent yet and looked for it in Excel): the dry run and the result say
+# whether the trial HAS an Excel row; the dialog offers to send it if not.
+NOT_IN_EXCEL = "Excel: NOT in the Excel file yet"
 TEXT_SUFFIXES = (".json", ".html", ".txt", ".srt", ".csv", ".log")
 
 
@@ -153,6 +157,11 @@ def fix_trial(folder, new: Dict[str, str], dry_run: bool = False, xlsx: str = xl
     if dry_run:
         if "Full Task Success?" in ch and ep_meta:
             out.append(f"VLA episode outcome -> {outcome_of(ch['Full Task Success?'][1])[0]}")
+        if xl.in_workbook(str(folder), xl.workbook_keys(xlsx)):
+            out.append("Excel: its row is corrected too")
+        else:
+            out.append(f"{NOT_IN_EXCEL} — only the folder, trial.json and the CSVs change; "
+                       "send it to Excel afterwards (it then carries the corrected values)")
         return out + ["dry run — nothing changed"]
 
     # 1. backups of everything rewritten below
@@ -207,11 +216,25 @@ def fix_trial(folder, new: Dict[str, str], dry_run: bool = False, xlsx: str = xl
     out.append(f"mmhri_experiments.csv: {n1} value(s); mmhri_meta.csv: {n2} value(s)")
 
     # 6. the workbook, if the trial is in it
-    if Path(xlsx).exists():
+    if not Path(xlsx).exists():
+        out.append(f"{NOT_IN_EXCEL} (there is no Excel file)")
+    else:
         out += _fix_workbook(Path(xlsx), tid, date, old_name, new_name, ch,
                              outcome_of(ch["Full Task Success?"][1])[0]
                              if "Full Task Success?" in ch and (new_dir / "meta.json").exists() else None)
     return out
+
+
+def _cell_text(v) -> str:
+    """A Trial ID / Date cell as the trial.json writes it: LibreOffice may
+    have turned '2026-10-01' into a date and '188' into a number."""
+    if isinstance(v, _dt.datetime):
+        v = v.date()
+    if isinstance(v, _dt.date):
+        return v.isoformat()
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    return "" if v is None else str(v).strip()
 
 
 def _fix_workbook(x: Path, tid, date, old_name, new_name, ch, vla_outcome) -> List[str]:
@@ -221,7 +244,7 @@ def _fix_workbook(x: Path, tid, date, old_name, new_name, ch, vla_outcome) -> Li
     ws = wb["Experiments"]
     h = xl._header_map(ws, 1)
     for r in range(2, ws.max_row + 1):
-        if not (str(ws.cell(r, h["Trial ID"]).value) == tid and str(ws.cell(r, h["Date"]).value) == date):
+        if not (_cell_text(ws.cell(r, h["Trial ID"]).value) == tid and _cell_text(ws.cell(r, h["Date"]).value) == date):
             continue
         for k, (_o, v) in ch.items():
             if k == "Scenario":
@@ -254,7 +277,7 @@ def _fix_workbook(x: Path, tid, date, old_name, new_name, ch, vla_outcome) -> Li
         ws = wb["Stage times"]
         h = xl._header_map(ws, 2)
         for r in range(3, ws.max_row + 1):
-            if str(ws.cell(r, h["Trial ID"]).value) == tid and str(ws.cell(r, h["Date"]).value) == date:
+            if _cell_text(ws.cell(r, h["Trial ID"]).value) == tid and _cell_text(ws.cell(r, h["Date"]).value) == date:
                 ws.cell(r, h["Scenario ID"]).value = ch["Scenario"][1].split(":")[0].strip()
                 out.append(f"workbook Stage times row {r}")
                 touched = True
@@ -266,7 +289,8 @@ def _fix_workbook(x: Path, tid, date, old_name, new_name, ch, vla_outcome) -> Li
                 ws.cell(r, 1).value = v[: -len(old_name)] + new_name
                 touched = True
     if not touched:
-        return ["workbook: the trial is not in it (send it with 📊 when ready)"]
+        return [f"{NOT_IN_EXCEL} — nothing to correct there; send it to Excel "
+                "(it then carries the corrected values)"]
     tmp = x.with_name(".fix_" + x.name)
     wb.save(tmp)
     if xl._lock_path(str(x)).exists():

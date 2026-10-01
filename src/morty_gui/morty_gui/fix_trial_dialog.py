@@ -15,7 +15,7 @@ from typing import Dict, List
 
 from PyQt5 import QtCore, QtWidgets
 
-from .fix_trial import EDITABLE, YESNO, changes_for, fix_trial, read_form
+from .fix_trial import EDITABLE, NOT_IN_EXCEL, YESNO, changes_for, fix_trial, read_form
 from .mmhri_window import LAYOUTS, MODIFIERS, OBJECTS, SCENARIOS
 
 CHANGED_STYLE = "background:#fff3b0;"
@@ -23,6 +23,7 @@ CHANGED_STYLE = "background:#fff3b0;"
 
 class FixTrialDialog(QtWidgets.QDialog):
     fixed = QtCore.pyqtSignal(str)            # the trial folder after the fix
+    send_requested = QtCore.pyqtSignal(str)   # "send it to Excel now" (it had no row)
     _done = QtCore.pyqtSignal(object)         # worker -> GUI thread
 
     def __init__(self, folders: List[str], current: str = "", parent=None) -> None:
@@ -190,8 +191,7 @@ class FixTrialDialog(QtWidgets.QDialog):
         box = QtWidgets.QMessageBox(self)
         box.setWindowTitle("Fix trial — confirm")
         box.setText("\n".join(preview[:-1]))
-        box.setInformativeText("The trial's folder, trial.json, CSV rows and its Excel row (if sent) are "
-                               "corrected; backups go to ~/morty_ws/backups/.")
+        box.setInformativeText("Backups of every rewritten file go to ~/morty_ws/backups/.")
         box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel)
         box.setDefaultButton(QtWidgets.QMessageBox.Yes)
         if box.exec_() != QtWidgets.QMessageBox.Yes:
@@ -223,3 +223,12 @@ class FixTrialDialog(QtWidgets.QDialog):
         self._load()
         self.diff.setText("✔ corrected:\n" + "\n".join("  " + ln for ln in lines))
         self.fixed.emit(new_f)
+        if any(ln.startswith(NOT_IN_EXCEL) for ln in lines):
+            ask = QtWidgets.QMessageBox.question(
+                self, "Fix trial — Excel",
+                f"{os.path.basename(new_f)} is not in the Excel file yet, so there was no row to correct.\n\n"
+                "Send it to Excel now? Its row then has the corrected values.",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes)
+            if ask == QtWidgets.QMessageBox.Yes:
+                self.send_requested.emit(new_f)
+                self.diff.setText(self.diff.text() + "\n  → sending it to Excel (see the trial window's status line)")
