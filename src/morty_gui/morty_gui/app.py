@@ -416,7 +416,8 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.db_label.setStyleSheet("font-family: monospace; color:#888; min-width:64px;")
         self.db_label.setToolTip(
             "Live mic level in dBFS. Speech typically lands around −30…−10 dB; "
-            "below the STT threshold (−32 dB ≈ rms 0.025) nothing is transcribed."
+            "below the speech gate (Advanced → Voice filters → Min speech RMS, default "
+            "0.012 ≈ −38 dB) nothing is transcribed — the number turns green above it."
         )
         mic_row.addWidget(self.db_label)
         chat_lay.addLayout(mic_row)
@@ -2766,7 +2767,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
             return
         if self._software_stop_latched:
             self.statusBar().showMessage(
-                "Software stop is latched — click RE-ARM before moving."
+                "Software stop is latched — press ⛔ Release E-Stop before moving."
             )
             return
         if self._move_proc is not None or self._fast_pending is not None:

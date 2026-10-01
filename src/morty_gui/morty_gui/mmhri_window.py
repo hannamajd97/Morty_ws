@@ -245,8 +245,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.folder_edit.setToolTip("Sub-folder of ~/morty_ws/experiments that receives this session's trials\n"
                                     "(video, audio, clouds, grasps, events, timeline, bag/). Proposed from today's\n"
                                     "date; type another name to change it. The campaign CSVs stay in experiments/mmhri/.\n"
-                                    f"VLA episodes are one training dataset and always go to\n{VLA_DATASET_DIR}/episode_NNN;\n"
-                                    "each trial's trial.json names its episode, each episode's meta.json names its trial.")
+                                    "The trial's VLA episode (images/, steps.npz, meta.json) and its ROS bag (bag/)\n"
+                                    "are written INTO the trial folder.")
         self.folder_edit.textEdited.connect(lambda _t: setattr(self, "_folder_edited", True))
         folder_row.addWidget(self.folder_edit, stretch=1)
         self.folder_hint = QtWidgets.QLabel()
@@ -340,8 +340,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "ros2 bag record for the span of the trial: both cameras\n"
             "(compressed), joints, TCP pose, gripper I/O, controller state,\n"
             "transcript, intents, detections, executor status, /tf.\n"
-            "In the trial folder (bag/), or vla_experiments/bags/ for a\n"
-            "VLA-only trial. ~2.5 MB/s.")
+            "Written into the trial folder (bag/). ~2.5 MB/s.")
         rec_lay.addWidget(self.rec_mmhri)
         rec_lay.addWidget(self.rec_vla)
         rec_lay.addWidget(self.rec_bag)
@@ -392,11 +391,12 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.stage_lbl = QtWidgets.QLabel("auto — filled at ⏹ Stop")
         self.stage_lbl.setStyleSheet("font-family:monospace; color:#2a6;")
         self.stage_lbl.setToolTip(
-            "The Total Time split into the 4 pipeline stages:\n"
-            "  understanding: your words → intent extracted (LLM)\n"
-            "  find object:   intent → object chosen in YOLO\n"
-            "  grasp gen:     object cloud → grasp poses (GraspGen)\n"
-            "  execution:     grasp poses → robot finished moving"
+            "Where the trial's time went, measured at ⏹ Stop (final values after post-processing):\n"
+            "  command → arm moves: the Interaction Time (end of your sentence → arm starts moving)\n"
+            "  understanding:  your words → command extracted (grammar or language model)\n"
+            "  object chosen:  command → object committed (incl. a which-one question)\n"
+            "  candidates:     object chosen → grasp poses published (GraspGen)\n"
+            "  execution:      motion start → robot finished (incl. waiting for your answers)"
         )
         out_form.addRow("Where the time went:", self.stage_lbl)
         # 2026-10-01 (Majd: "make the failure / notes field bigger than one
@@ -498,7 +498,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         # stop my mouse on everything it should explain what it does").
         self.trial_id.setToolTip(
             "Unique number of THIS run. Auto-increments; one folder\n"
-            "experiments/mmhri/trial_NNN_LX_SN/ is created per trial\n"
+            "<session folder>/trial_NNN_LX_SN/ is created per trial\n"
             "(layout + scenario in the name, e.g. trial_008_LA_S1).")
         self.layout_edit.setToolTip(
             "Which physical arrangement of the objects is on the table\n"
@@ -534,8 +534,9 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             if _k in self.chips:
                 self.chips[_k].setToolTip(_doc)
         self.t_interact.setToolTip(
-            "Measured automatically: your command -> object selection\n"
-            "published (the human-interaction part of the trial).")
+            "Measured automatically: from the moment your command was given (the end\n"
+            "of the whole sentence you said; a click or a pointed choice: when the object\n"
+            "was chosen) until the arm starts moving. A which-one question in between counts.")
         self.notes.setToolTip(
             "Free text: why it failed / anything unusual\n"
             "(goes into the CSV's last column).")
@@ -551,8 +552,8 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             "the CSV rows, the VLA outcome ('Full Task Success?'), then the\n"
             "post-processing. The next trial can start after Save or discard.")
         self.discard_btn.setToolTip(
-            "Abort the RUNNING trial: nothing is saved, the trial number is\n"
-            "reused. (A folder already opened stays — use delete.)")
+            "Abort the running (or stopped, unsaved) trial: nothing is saved.\n"
+            "Its folder stays on disk — 🗑 delete removes it and frees the number.")
         self.delete_btn.setToolTip(
             "While a trial RECORDS: stop it and erase everything it recorded\n"
             "(audio, video, bag, VLA images) — nothing is saved, the number is reused.\n"
@@ -593,7 +594,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
     def _refresh_folder_label(self) -> None:
         if not getattr(self, "_folder_edited", False):
             self.folder_edit.setText(os.path.basename(day_dir()))
-        self.folder_hint.setText("/ trial_NNN_LX_SN/      VLA → vla_experiments/datasets/morty_ur3e/")
+        self.folder_hint.setText("/ trial_NNN_LX_SN/   (VLA episode + bag inside the trial folder)")
 
     def session_dir(self) -> str:
         """~/morty_ws/experiments/<name typed or today's>."""
@@ -1394,7 +1395,7 @@ class MMHRIWindow(QtWidgets.QMainWindow):
             self._saved = True
             self.status.setText(
                 f"✔ trial {tid} ended (no MMHRI evidence) → {self._trial_root}\n"
-                "the VLA episode and the bag are in that folder (the vla-rec LED shows whether the episode was kept)")
+                "the VLA episode and the bag are in that folder (a trial in which the arm never moved keeps no episode)")
             self._start_postprocess(self._trial_root)
             self._reset_buttons()
             return
