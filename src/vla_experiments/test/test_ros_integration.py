@@ -25,5 +25,9 @@ def test_router_pick_lifecycle():
     _run("ros_integration_router_pick.py")
 
 
+def test_router_which_one_question():
+    _run("ros_integration_which.py")
+
+
 def test_recording_lifecycle_end_to_end(tmp_path):
     _run("ros_integration_lifecycle.py", str(tmp_path / "work"))

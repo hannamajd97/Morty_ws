@@ -361,6 +361,34 @@ def match_deictic_pick(text: str) -> bool:
     return bool(DEICTIC_PICK.match(normalise(text)))
 
 
+# 2026-10-01 (Majd, live: "I see three vitamin tubes. Could you say leftmost,
+# middle or rightmost …?" -> "The middle one." -> the model asked again, then
+# "Middle." -> it asked about colours): the answer to the router's which-one
+# question, when the WHOLE utterance is a position or a cap colour —
+# "[fillers] [yes|no|i mean|give me|take] [the] [one] [on|in|at the] WORD
+# [one|tube|vitamin tube|cap|cup|side] [please]". Anything else is the LLM's.
+WHICH_POSITION = {"left": "leftmost", "leftmost": "leftmost", "right": "rightmost",
+                  "rightmost": "rightmost", "middle": "middle", "center": "middle", "centre": "middle"}
+WHICH_COLOUR = {"red": "red", "pink": "red", "purple": "purple", "blue": "blue",
+                "yellow": "yellow", "orange": "orange"}
+_WHICH_ANSWER = re.compile(
+    r"^(?:(?:" + FILL + r"|yes|yeah|no|i mean|give me|take|grab|pick) )*"
+    r"(?:the )?(?:one )?(?:(?:on|in|at) the )?"
+    r"(?P<w>" + "|".join(sorted(WHICH_POSITION, key=len, reverse=True))
+    + "|" + "|".join(WHICH_COLOUR) + r")"
+    r"(?: (?:one|tube|vitamin tube|cap|cup|side))?(?: " + FILL + r")*$")
+
+
+def match_which_answer(text: str) -> dict | None:
+    """2026-10-01: {"position": leftmost|middle|rightmost} or {"colour": …}
+    when the WHOLE utterance answers "which one?" (see _WHICH_ANSWER)."""
+    m = _WHICH_ANSWER.match(normalise(text))
+    if not m:
+        return None
+    w = m.group("w")
+    return {"position": WHICH_POSITION[w]} if w in WHICH_POSITION else {"colour": WHICH_COLOUR[w]}
+
+
 def match_pick(text: str) -> tuple[str, str | None] | None:
     """2026-09-25 (Majd's B1: "picks via the LLM took 1.3-2.8 s"): (label,
     colour|None) when the WHOLE utterance is a plain pick of a known object —

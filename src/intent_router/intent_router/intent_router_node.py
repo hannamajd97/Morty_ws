@@ -2719,6 +2719,35 @@ class IntentRouterNode(Node):
             self.get_logger().info(
                 f"pick_and_place with then={then!r}: the release pause will be answered on arrival.")
 
+    # 2026-10-01 (Majd, live: "Could you say leftmost, middle or rightmost?" ->
+    # "The middle one." went to the model, which asked again): the which-one
+    # question is published on /robot/open_question like the pointing
+    # question, so chat_node answers a bare "the middle one" / "the blue one"
+    # instantly (voice_grammar.match_which_answer). Every place that opens
+    # or ends the question assigns self._clarify — this setter publishes.
+    # The pointing question keeps the channel while it is open.
+    @property
+    def _clarify(self) -> Optional[tuple]:
+        return self.__dict__.get("_clarify_ctx")
+
+    @_clarify.setter
+    def _clarify(self, ctx: Optional[tuple]) -> None:
+        old = self.__dict__.get("_clarify_ctx")
+        self.__dict__["_clarify_ctx"] = ctx
+        if (ctx is None) == (old is None) and (ctx is None or ctx[:2] == old[:2]):
+            return
+        if ctx is not None:
+            self._publish_which_question()
+        elif self.__dict__.get("_point_q") is None and getattr(self, "_open_q_pub", None) is not None:
+            self._open_q_pub.publish(String(data=json.dumps({"question": "", "closed": "which"})))
+
+    def _publish_which_question(self) -> None:
+        ctx = self.__dict__.get("_clarify_ctx")
+        if ctx is None or self.__dict__.get("_point_q") is not None or getattr(self, "_open_q_pub", None) is None:
+            return
+        self._open_q_pub.publish(String(data=json.dumps({
+            "question": "which", "object": ctx[0], "since": round(time.time(), 3)})))
+
     def _clarify_plan_for(self, label: str) -> Optional[dict]:
         """2026-09-29 (Majd, live: "Pick up the vitamin tube and put it on the
         left side." -> which one? -> pointed, yes -> "Where should I drop
@@ -2805,6 +2834,7 @@ class IntentRouterNode(Node):
         self._open_q_pub.publish(String(data=json.dumps({
             "question": "", "id": q["id"] if q else 0, "closed": state})))
         self.get_logger().info(f"Point question {q['id'] if q else '-'} closed: {state}.")
+        self._publish_which_question()     # 2026-10-01: a which-one question still open is open again
 
     def _latch_destination(self, token: str, action: str) -> None:
         """2026-09-25: keep ``token`` for the destination pause of this pick

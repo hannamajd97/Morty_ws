@@ -772,6 +772,11 @@ vitamin tubes." With nothing detected: "I don't see a mouse on the table."
 
 QUALIFIERS - if the user says "leftmost", "rightmost", "left", "right",
 "middle", "biggest", "smallest", put it in object_attributes.position.
+A position the user SAYS always goes into position — never turn it into a
+colour or a product, even if the Scene tells you which product is there
+(the robot resolves "middle" itself, among the objects of that kind). The
+Scene's positions are counted the same way: "(middle of the 3 vitamin
+tubes)" is the one the user means by "the middle vitamin tube".
 If they COUNT ("the second tube", "third one from the right"), set
 ordinal (1-based) and ordinal_from ("left" unless they say from the
 right). If they name a COLOUR ("the red one"), set colour - it also
@@ -3119,14 +3124,16 @@ class ChatIntentNode(Node):
                 self.chat_agent.messages.append({"type": "function_call_output", "call_id": c.call_id,
                                                  "output": json.dumps({"status": self._instant_result(c.arguments)})})
 
-    def _fire_fast_pick(self, label: str, colour: str | None, text: str) -> None:
+    def _fire_fast_pick(self, label: str, colour: str | None, text: str,
+                        attrs: dict | None = None) -> None:
         """The FAST-PICK publish (2026-08-26), factored out 2026-09-25 so the
         minimal layer's instant whole-sentence pick (Majd's B1) sends the
-        byte-identical payload. SILENCE — the router narrates the start."""
+        byte-identical payload. SILENCE — the router narrates the start.
+        ``attrs`` (2026-10-01): the qualifier of a which-one answer."""
         payload = {
             "action_intent": "pick",
             "object_intent": label,
-            "object_attributes": {"colour": colour} if colour else None,
+            "object_attributes": attrs or ({"colour": colour} if colour else None),
         }
         intent_json = json.dumps(payload, separators=(",", ":"))
         self.intent_pub.publish(String(data=intent_json))
@@ -3239,6 +3246,21 @@ class ChatIntentNode(Node):
                 f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR "
                 f"{kind} {action}, question={question!r}, fresh={fresh})")
             return
+        rq = self._router_q or {}
+        if (rq.get("question") == "which" and not question and not task.get("holding")
+                and time.time() - float(rq.get("since") or 0.0) < 120.0):
+            # 2026-10-01 (Majd, live: "The middle one." / "Middle." after the
+            # router's "leftmost, middle or rightmost?" went to the model,
+            # which asked again): a WHOLE position / colour answer is the
+            # qualified pick of the asked kind at once; the router carries a
+            # refused pick_and_place's destination on.
+            ans = voice_grammar.match_which_answer(text)
+            if ans is not None and rq.get("object"):
+                self._fire_fast_pick(str(rq["object"]), None, text, attrs=ans)
+                self.get_logger().info(
+                    f"[timing] handled in {time.monotonic() - t0:.2f}s (route=GRAMMAR which-answer "
+                    f"{rq['object']} {ans})")
+                return
         if (not question and not task.get("holding") and not self._held_object_label
                 and voice_grammar.match_deictic_pick(text)):
             self._ask_which_object(text)
@@ -3707,6 +3729,13 @@ class ChatIntentNode(Node):
         q = str(t.get("question") or "")
         qtext = self._QUESTION_WORDS.get(q, "No question is open")
         rq = self._router_q
+        if not q and rq.get("question") == "which":
+            # 2026-10-01: the router's which-one question (no cycle runs yet)
+            obj_w = str(rq.get("object") or "object").replace("_", " ")
+            qtext = (f'OPEN QUESTION: the robot asked WHICH {obj_w} (several are visible; nothing '
+                     f"moves until answered) — a position (leftmost / middle / rightmost, counted "
+                     f"among the {obj_w}s as in the Scene), a colour or a product name answers it: "
+                     f"emit the pick of the {obj_w} with that qualifier")
         if not q and rq.get("question") == "point":
             # 2026-09-28: the router's pointing question (no cycle runs yet)
             obj_p = str(rq.get("object") or "object").replace("_", " ")
@@ -5259,8 +5288,8 @@ class ChatIntentNode(Node):
         """Return a one-line description of currently visible objects, or "" if stale.
 
         Includes positional descriptors (leftmost/middle/rightmost) computed
-        from bbox x-centres so the LLM can use them when the user says e.g.
-        "pick the leftmost vitamin tube".
+        from bbox x-centres AMONG OBJECTS OF THE SAME KIND (2026-10-01) so the
+        LLM can use them when the user says e.g. "pick the leftmost vitamin tube".
         """
         if not self._scene_awareness:
             return ""
@@ -5291,8 +5320,35 @@ class ChatIntentNode(Node):
         label_counts = Counter(
             (d.get("label") or d.get("display") or "object") for d in ordered
         )
+        # 2026-10-01 (Majd: "Give me the middle vitamin tube." -> "Picking the
+        # red Vitamin B12"): positions were counted over ALL objects, so with
+        # a small bottle on the left the B12 AND the Multivitamin were both
+        # "(middle)" and the model guessed by colour. They are now counted
+        # among objects of the SAME kind, left to right in the camera
+        # picture — exactly how intent_router resolves position=middle.
+        groups: dict = {}
+        for det in ordered:
+            groups.setdefault(det.get("label") or det.get("display") or "object", []).append(det)
+
+        def _kind_position(det: dict, kind_label: str) -> str:
+            same = groups.get(kind_label, [])
+            k, m = same.index(det), len(same)
+            kind = f"the {m} {kind_label.replace('_', ' ')}s"
+            if m == 1:
+                return ""
+            if m == 2:
+                return f"{'left' if k == 0 else 'right'} of {kind}"
+            if k == 0:
+                return f"leftmost of {kind}"
+            if k == m - 1:
+                return f"rightmost of {kind}"
+            if m == 3:
+                return f"middle of {kind}"
+            nth = {1: "2nd", 2: "3rd"}.get(k, f"{k + 1}th")
+            return f"{nth} from the left of {kind}"
+
         parts: list[str] = []
-        for i, det in enumerate(ordered):
+        for det in ordered:
             label = det.get("label") or det.get("display") or "object"
             # 2026-08-25 (Majd: "don't know what is the vitamin B!"):
             # the LLM can only know WHICH tube is which product if the
@@ -5307,19 +5363,8 @@ class ChatIntentNode(Node):
                 }.get(cap)
                 label = (f"{label} [{cap} cap = {product}]"
                          if product else f"{label} [{cap} cap]")
-            if n == 1:
-                parts.append(label)
-            elif n == 2:
-                pos = "left" if i == 0 else "right"
-                parts.append(f"{label} ({pos})")
-            else:
-                if i == 0:
-                    pos = "leftmost"
-                elif i == n - 1:
-                    pos = "rightmost"
-                else:
-                    pos = "middle"
-                parts.append(f"{label} ({pos})")
+            pos = _kind_position(det, det.get("label") or det.get("display") or "object")
+            parts.append(f"{label} ({pos})" if pos else label)
         # Tail-annotate the summary with a duplicate-count callout. This
         # is the unambiguous signal the LLM uses to trigger the multi-
         # instance disambiguation rule (it can't be confused by the
@@ -5327,7 +5372,8 @@ class ChatIntentNode(Node):
         dupes = [
             f"{c}× {lbl}" for lbl, c in label_counts.items() if c >= 2
         ]
-        summary = "Scene currently shows: " + ", ".join(parts) + "."
+        summary = ("Scene currently shows (left to right as in the camera picture; a position "
+                   "is counted among objects of the same kind): " + ", ".join(parts) + ".")
         if dupes:
             summary += " MULTIPLE INSTANCES: " + ", ".join(dupes) + "."
         return summary
