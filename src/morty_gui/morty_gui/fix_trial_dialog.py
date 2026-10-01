@@ -28,7 +28,7 @@ class FixTrialDialog(QtWidgets.QDialog):
     def __init__(self, folders: List[str], current: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("✎ Fix a saved trial")
-        self.setMinimumWidth(620)
+        self.setMinimumWidth(820)
         self._folders = folders
         self._loaded: Dict[str, str] = {}
         lay = QtWidgets.QVBoxLayout(self)
@@ -53,6 +53,7 @@ class FixTrialDialog(QtWidgets.QDialog):
         self.mod_boxes: Dict[str, QtWidgets.QCheckBox] = {}
         for mid, mtxt, _old, _integrated in MODIFIERS:
             cb = QtWidgets.QCheckBox(f"{mid} {mtxt.split(' — ')[0]}")
+            cb.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)   # never cut
             self.mod_boxes[mid] = cb
             ml.addWidget(cb)
         ml.addStretch(1)
@@ -71,7 +72,8 @@ class FixTrialDialog(QtWidgets.QDialog):
         self.w["Failure Category / Notes"] = QtWidgets.QPlainTextEdit()
         self.w["Failure Category / Notes"].setFixedHeight(66)
         for k in EDITABLE:
-            form.addRow(k.replace("Failure Category / Notes", "Failure / Notes") + ":", self.w[k])
+            label = k.replace("Failure Category / Notes", "Failure / Notes")
+            form.addRow(label if label.endswith("?") else label + ":", self.w[k])
         lay.addLayout(form)
 
         self.diff = QtWidgets.QLabel("")
