@@ -65,6 +65,7 @@ from . import llm_service as _llm_service
 from . import voice_grammar
 from .llm_service import INTENT_TOOL, LLMService, StopStream, extract_intent, intent_to_json
 from .llm_service import _AdaptedFunctionCall
+from .people_memory import PEOPLE_TOOL, PeopleMemory
 
 
 PICK_INTENTS = {"pick", "pickup", "pick_up", "pick up", "grasp", "take", "grab"}
@@ -245,7 +246,7 @@ class _ActCountingPublisher:
 # question, and a GWDG stream that neither spoke nor dispatched after 3 s is
 # re-answered by Claude (EXT-GWDG-STALL).
 _VOICE_PARAMS = ("voice_fast_layers", "voice_ext_dest", "story_yields_to_question",
-                 "gwdg_stall_s")
+                 "gwdg_stall_s", "people_memory")
 # Actions whose quick line the router speaks after the executor accepted the
 # answer ("Going to drop right." on resumed:) while a pick is in flight.
 _DEST_ACTIONS = {"drop_right", "drop_left", "confirm_drop", "go_home"}
@@ -819,12 +820,35 @@ is only for explicit shutdown requests. If the system is already
 running, start_all is harmless — the readiness announcement will simply
 confirm "the system is running and we are ready to grasp."
 
-NO ALIAS FEATURE - you CANNOT "remember that X means Y" and must never
-offer to. Utterances like "class for me is a vitamin tube", "cross for
+NO ALIAS FEATURE - you CANNOT "remember that X means Y" (word meanings) and
+must never offer to — remembering PEOPLE is a different thing (PEOPLE below). Utterances like "class for me is a vitamin tube", "cross for
 me the small bottle", "grass/cast/casform for me ..." are SPEECH
 RECOGNITION ERRORS for "grasp for me ..." — treat them as pick commands
 for the named object, never as definitions. If the user says you
 misheard, apologize in 5 words max and emit the pick intent.
+
+PEOPLE - a "PERSON:" message tells you each turn who you are talking to and
+what it allows; follow it exactly, and use only what it says (never invent
+memories). Robot actions always come first: never ask about the person
+instead of doing a requested action, and never while a robot question is open.
+* NAME - when PERSON says ASK THEIR NAME now: ask "What's your name?" once.
+  When they tell you, SPELL IT BACK in capital letters separated by commas
+  and ask if it is right: "Majd — M, A, J, D. Is that correct?" If they
+  correct you (a new spelling, letters, "no, with an H"), use THEIR spelling
+  and spell it back again. Only after they confirm, call person_memory
+  identify with the confirmed name.
+* KNOWN - identify returns known: say "Oh okay, we have chatted before,
+  <name>!" (you may add one thing you remember about them).
+* NEW - identify returns new: ask once "Would you like me to remember your
+  preferences?" Call person_memory save ONLY after they say yes; on no call
+  decline and never ask again in this conversation.
+* REMEMBER - when a saved person tells you a habit or preference (when they
+  take their vitamins, which object they like), call person_memory remember
+  with one short third-person sentence. Picks are recorded automatically.
+* QUESTION - only when PERSON says "PERSONAL QUESTION: allowed now": you may
+  end your reply with ONE short question about their habits with the objects
+  ("When do you like to get your vitamin tube?").
+* "Forget me" -> person_memory forget. "Bye" / they leave -> goodbye.
 
 DISAMBIGUATION ANSWERS - when the robot asked "leftmost or rightmost?",
 map the user's answer to a position qualifier: leftmost/left -> leftmost,
@@ -1434,6 +1458,20 @@ class ChatIntentNode(Node):
         # question is spoken after it (the speak server queues it).
         self.declare_parameter("story_yields_to_question", False)
         self.declare_parameter("gwdg_stall_s", 3.0)
+        # 2026-10-01 (Majd): Morty remembers people — see people_memory.py.
+        # people_memory switches it live (off: no name questions, nothing
+        # stored, the tool answers "off"); the store is outside the repo.
+        self.declare_parameter("people_memory", True)
+        self.declare_parameter("people_file", "~/.morty/people.json")
+        self.declare_parameter("people_session_timeout_s", 600.0)
+        self._people_on = True
+        self._people_offered: dict = {}
+        self._people = PeopleMemory(
+            str(self.get_parameter("people_file").value),
+            session_timeout_s=float(self.get_parameter("people_session_timeout_s").value),
+            log=lambda m: self.get_logger().info(m))
+        self._cycle_seen: dict = {}       # cycle_id -> (object, destination) while it ran
+        self._last_recorded_cycle = None  # (boot, cycle_id) of the last pick recorded
         self._voice_fast_layers = "minimal"
         self._voice_ext_dest = True
         self._story_yields = False
@@ -1595,7 +1633,7 @@ class ChatIntentNode(Node):
                 "directly fire ExecuteGrasp without grasp_pipeline.)"
             )
 
-        self.chat_agent = LLMService(tools=[INTENT_TOOL])
+        self.chat_agent = LLMService(tools=[INTENT_TOOL, PEOPLE_TOOL])
         self.chat_agent.add_developer_message(
             f"{SYSTEM_PROMPT}\n\nYou are currently running with model: {self.model}."
         )
@@ -1696,6 +1734,8 @@ class ChatIntentNode(Node):
             self._voice_ext_dest = bool(value)
         elif name == "story_yields_to_question":
             self._story_yields = bool(value)
+        elif name == "people_memory":
+            self._people_on = bool(value)
         elif name == "gwdg_stall_s":
             try:
                 v = float(value)
@@ -2285,7 +2325,10 @@ class ChatIntentNode(Node):
         every tool call gets its output, the dispatched one or 'not
         executed' — say nothing more, and leave the next turn a note."""
         for item in getattr(response, "output", []) or []:
-            if getattr(item, "type", None) == "function_call" and item.name == "intent_extractor":
+            if getattr(item, "type", None) == "function_call" and item.name == "person_memory":
+                self.chat_agent.add_function_call_output(
+                    item, json.dumps({"status": "not executed: the operator interrupted this answer"}))
+            elif getattr(item, "type", None) == "function_call" and item.name == "intent_extractor":
                 early = (self._early_dispatched.pop(item.call_id, None)
                          if getattr(self, "_early_dispatched", None) else None)
                 self.chat_agent.add_function_call_output(
@@ -2711,6 +2754,8 @@ class ChatIntentNode(Node):
         # every intent it publishes carries the utterance's id and text.
         self._utt_local.ctx = {"utterance_id": self._utterance_id_for(text, typed_at),
                                "text": text.strip(), "n_intents": 0}
+        if self._people_on:
+            self._people.touch()     # 2026-10-01: a long silence ends the conversation
         # Generation gate: if a newer transcript arrived while we were
         # waiting for the chat lock or running the LLM, don't act on this
         # stale input. Latest-wins behaviour for piled-up voice activity.
@@ -3690,6 +3735,12 @@ class ChatIntentNode(Node):
         # _intent_fired_this_turn=True if the LLM extracted an action; we
         # use that below to skip the slow final-reply TTS.
         self._intent_fired_this_turn = False
+        if self._people_on and self._people.take_fresh_history() and len(self.chat_agent.messages) > 1:
+            # 2026-10-01: a new conversation (long silence, or goodbye) — the
+            # next person must not inherit the last one's name from the chat.
+            n = len(self.chat_agent.messages) - 1
+            self.chat_agent.messages = self.chat_agent.messages[:1]
+            self.get_logger().info(f"[people] new conversation: chat history cleared ({n} message(s))")
         # Per-turn buffer of (action, quick_narration_text) tuples. We
         # collect these as the LLM emits intents and decide AT THE END
         # whether to speak them — so a single-intent turn still gets
@@ -3762,6 +3813,13 @@ class ChatIntentNode(Node):
             )
 
         self._add_robot_context()
+        # 2026-10-01: who Morty is talking to (people_memory.py) — last, with
+        # what it allows this turn (the name, consent, a personal question).
+        self._people_offered = {}
+        if self._people_on:
+            self._people.heard(user_text)
+            _pctx, self._people_offered = self._people.context(self._robot_idle())
+            self.chat_agent.add_developer_message(_pctx)
         if self._interrupt_note:
             self.chat_agent.add_developer_message(self._interrupt_note)
             self._interrupt_note = ""
@@ -3809,12 +3867,18 @@ class ChatIntentNode(Node):
                 item
                 for item in response.output
                 if getattr(item, "type", None) == "function_call"
-                and item.name == "intent_extractor"
+                and item.name in ("intent_extractor", "person_memory")
             ]
             if not calls:
                 break
             only_unclear = True
             for call in calls:
+                if call.name == "person_memory":
+                    # 2026-10-01: no robot action; its answer (known or new,
+                    # saved or refused) goes back for the follow-up reply.
+                    only_unclear = False
+                    self._handle_person_call(call)
+                    continue
                 if self._call_action(call) != "unclear":
                     only_unclear = False
                 early = self._early_dispatched.pop(call.call_id, None) if getattr(self, "_early_dispatched", None) else None
@@ -3856,6 +3920,11 @@ class ChatIntentNode(Node):
             self._finish_interrupted_turn(response)
             return
         assistant_text = getattr(response, "output_text", "")
+        if self._people_on:
+            _said = " ".join(getattr(self, "_streamed", []) or []) + " " + (assistant_text or "")
+            self._people.said(_said)
+            if any(self._people_offered.values()):
+                self._people.note_reply(_said, self._people_offered)
         if (not self._real_intent and not self._unclear_turn and assistant_text
                 and _UNCLEAR_SENTENCE_RE.search(assistant_text.replace("’", "'"))):
             # 2026-09-25 (review M4): the model said "I didn't catch that" in
@@ -4204,6 +4273,63 @@ class ChatIntentNode(Node):
             return str((json.loads(item.arguments) or {}).get("action_intent") or "").strip()
         except Exception:
             return ""
+
+    def _handle_person_call(self, call: Any) -> None:
+        """2026-10-01: one person_memory call (people_memory.PeopleMemory
+        decides consent from the sentence itself, not from the model)."""
+        try:
+            args = json.loads(call.arguments or "{}")
+        except Exception:
+            args = {}
+        if not self._people_on:
+            out = {"ok": False, "error": "people memory is switched off — store nothing, ask nothing"}
+        else:
+            text = str(self._turn_text or (getattr(self._utt_local, "ctx", None) or {}).get("text") or "")
+            try:
+                out = self._people.handle(args if isinstance(args, dict) else {}, text)
+            except Exception as exc:  # noqa: BLE001 — never lose the turn over the store
+                out = {"ok": False, "error": f"people memory failed: {exc}"}
+        self.get_logger().info(f"person_memory {args} -> {out}")
+        self.chat_agent.add_function_call_output(call, json.dumps(out, ensure_ascii=False))
+
+    def _robot_idle(self) -> bool:
+        """2026-10-01: no pick running, no robot question open, no pick of
+        ours pending — the only time Morty may ask about the person."""
+        t = self._live_task()
+        if t is not None and (str(t.get("phase") or "idle") != "idle" or str(t.get("question") or "")):
+            return False
+        if (self._router_q or {}).get("question"):
+            return False
+        try:
+            if self._plain_pick_pending():
+                return False
+        except Exception:  # noqa: BLE001
+            pass
+        return True
+
+    def _note_pick_for_person(self, d: dict, phase: str, first: bool) -> None:
+        """2026-10-01: a pick that FINISHED goes to the person Morty is
+        talking to (people_memory.record_pick). The task state names the
+        object and destination while the cycle runs; its ``last`` block
+        says how cycle N ended."""
+        try:
+            cid = int(d.get("cycle_id") or 0)
+            if cid and phase not in ("", "idle") and d.get("object"):
+                obj = str(d.get("object") or "")
+                dest = str(d.get("destination") or "") or self._cycle_seen.get(cid, ("", ""))[1]
+                self._cycle_seen[cid] = (obj, dest)
+            last = d.get("last") if isinstance(d.get("last"), dict) else {}
+            lid = int(last.get("cycle_id") or 0)
+            key = (d.get("boot"), lid)
+            if not lid or key == self._last_recorded_cycle:
+                return
+            self._last_recorded_cycle = key
+            if first or not self._people_on:
+                return               # the latched sample at start-up is an old pick
+            obj, dest = self._cycle_seen.pop(lid, ("", ""))
+            self._people.record_pick(obj, dest, str(last.get("outcome") or ""))
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().debug(f"pick for person not recorded: {exc}")
 
     def _note_intent_sent(self, action: str) -> None:
         """2026-09-25: remember when this node last sent a pick (C7: a
@@ -4810,6 +4936,7 @@ class ChatIntentNode(Node):
         if label != self._held_object_label:
             self.get_logger().info(f"Held-object update (task state): {self._held_object_label!r} -> {label!r}")
         self._held_object_label = label
+        self._note_pick_for_person(d, phase, first)
         if first:
             self.get_logger().info(f"Task state adopted: phase={phase!r} question={q!r}")
         if new_question and self._story_yields and self._talk_seq == self._answer_seq:
