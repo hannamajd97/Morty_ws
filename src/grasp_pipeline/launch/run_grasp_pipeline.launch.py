@@ -232,7 +232,7 @@ def generate_launch_description():
         DeclareLaunchArgument("registration_continuous_observation_min_camera_translation_m", default_value="0.004"),
         DeclareLaunchArgument("registration_continuous_observation_min_camera_rotation_deg", default_value="0.8"),
         DeclareLaunchArgument("registration_continuous_observation_poll_period_s", default_value="0.15"),
-        DeclareLaunchArgument("registration_continuous_observation_max_frames", default_value="20"),
+        DeclareLaunchArgument("registration_continuous_observation_max_frames", default_value="50"),
         # Default false (2026-08-07, Majd): a sweep visits ONE direction —
         # force_direction if given, else the framing-aware selector's choice.
         # Pass :=true to restore the old visit-all-three behaviour.

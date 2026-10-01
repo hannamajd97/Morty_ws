@@ -244,6 +244,26 @@ class PickPipeline:
         registration_frame_is_target = bool(reg["registration_frame_is_target"])
         cloud_frame_id = str(reg.get("frame_id", "") or "")
 
+        if registration_frame_is_target and not background:
+            # 2026-10-01 (Majd: "do we use the curve execution also for the
+            # multiview?"): the executor is the same for both — curve, then
+            # the blend, then the straight line — but after a sweep it planned
+            # from where the sweep ENDED (detect_right, 10-01 15:36: joints
+            # [103 -172 -3 96 99 42] deg), not from home like every single
+            # view; from there the approaches crossed singularities and
+            # swung into other joint branches. Back to the seed pose first.
+            seed = str(self._node.get_parameter("registration_initial_named_target").value).strip()
+            if seed:
+                _t_back = _time.monotonic()
+                if self._node._move_to_registration_target(seed):
+                    self._node._registration_prepositioned_for_selection = True
+                    self._node.get_logger().info(
+                        f"[registration] back at '{seed}' after the sweep "
+                        f"({_time.monotonic() - _t_back:.1f} s) — the grasp is planned from there, as in single view")
+                else:
+                    self._node.get_logger().warn(
+                        f"[registration] could not return to '{seed}' after the sweep — "
+                        "the executor plans from the current pose")
         if registration_frame_is_target:
             plane_n = None
             plane_p = None

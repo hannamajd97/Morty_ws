@@ -622,7 +622,9 @@ def declare_all_parameters(node: "Node") -> None:
     node.declare_parameter("registration_continuous_observation_min_camera_translation_m", 0.004)
     node.declare_parameter("registration_continuous_observation_min_camera_rotation_deg", 0.8)
     node.declare_parameter("registration_continuous_observation_poll_period_s", 0.15)
-    node.declare_parameter("registration_continuous_observation_max_frames", 20)
+    # 2026-10-01 (Majd): 50 — spread over the leg since 86248660, so the
+    # count is the density of views along the sweep, not when it stops.
+    node.declare_parameter("registration_continuous_observation_max_frames", 50)
     node.declare_parameter("registration_continuous_observation_sweep_all_directions", True)
     node.declare_parameter("registration_continuous_observation_sweep_all_alpha", 1.0)
     node.declare_parameter("registration_continuous_observation_sweep_all_return_to_seed", True)
