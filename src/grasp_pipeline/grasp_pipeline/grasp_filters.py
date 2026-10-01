@@ -60,6 +60,10 @@ def orientation_census(grasps, up_vec, log_info, tag: str) -> None:
         pass
 
 
+# The wrist camera's optical frame — the frame buffer's colour frame.
+CAMERA_OPTICAL_FRAME = "camera_color_optical_frame"
+
+
 def apply_gravity_view_filter(
     node,
     grasps,
@@ -427,6 +431,35 @@ def apply_gravity_view_filter(
     except Exception as e:
         log_warn(f"palm-canonicalize error: {e}")
 
+    # ── the camera's line of sight to the object (both stages below) ──
+    # In the camera's own frame the camera sits at the origin, so the line
+    # is the centroid direction. 2026-10-01 (Majd: multi-view "fails always
+    # to move to the grasp"): the fused multi-view cloud is in base_link,
+    # where the origin is the ROBOT BASE — both stages were simply skipped
+    # there, so the 40 grasps came from every side (viewer: "best grasp
+    # FROM BEHIND"), the executor probed only its first 10 (first-batch
+    # rule, Majd 2026-09-11) and all 10 were unreachable. In base_link the
+    # line starts at the camera's real position (TF); without TF it starts
+    # at the robot base, still the side the arm comes from.
+    view_dir = centroid / (float(_np.linalg.norm(centroid)) + 1e-9)
+    view_src = "camera at origin"
+    if registration_frame_is_target:
+        view_src = "robot base (no camera TF)"
+        try:
+            import rclpy.time as _rt
+            tr = node.tf_buffer.lookup_transform(
+                str(frame_id), CAMERA_OPTICAL_FRAME, _rt.Time())
+            cam = _np.array([tr.transform.translation.x, tr.transform.translation.y,
+                             tr.transform.translation.z], dtype=_np.float32)
+            line = centroid - cam
+            if float(_np.linalg.norm(line)) > 1e-3:
+                view_dir = line / float(_np.linalg.norm(line))
+                view_src = f"camera at {_np.round(cam, 3).tolist()} (TF)"
+        except Exception as exc:  # noqa: BLE001
+            log_warn(f"camera TF for the line of sight failed ({exc}); using the robot base")
+    log_info(f"line of sight [{view_src}] = "
+             f"[{view_dir[0]:+.2f} {view_dir[1]:+.2f} {view_dir[2]:+.2f}]")
+
     # ── thesis stage 1: from-behind (camera rule, Majd 2026-08-24) ───
     # "dismiss those who are from behind — I don't care how."
     # Only valid when the cloud is in the CAMERA's own frame: the camera
@@ -437,8 +470,7 @@ def apply_gravity_view_filter(
     # hemisphere dies. min_dot -0.15 tolerates noise around sideways.
     try:
         fb_min = float(node.get_parameter("from_behind_min_dot").value)
-        if fb_min > -1.0 and not registration_frame_is_target and grasps:
-            view_dir = centroid / (float(_np.linalg.norm(centroid)) + 1e-9)
+        if fb_min > -1.0 and grasps:
             kept = []
             for g in grasps:
                 a, _fx, _t = _pose(g)
@@ -491,8 +523,7 @@ def apply_gravity_view_filter(
     # 20-reject probe marathon that made grasping slow.
     try:
         fw = float(node.get_parameter("front_approach_weight").value)
-        if fw > 0.0 and not registration_frame_is_target and grasps:
-            view_dir = centroid / (float(_np.linalg.norm(centroid)) + 1e-9)
+        if fw > 0.0 and grasps:
             rescored = []
             dots = []
             for g in grasps:
