@@ -532,6 +532,12 @@ class MortyGuiBridge(Node):
         # point cloud" switch sets pointcloud.enable on the running camera.
         self._cam_get_cli = self.create_client(GetParameters, "/camera/camera/get_parameters")
         self._cam_set_cli = self.create_client(SetParameters, "/camera/camera/set_parameters")
+        # The chat node (2026-10-01): the Advanced "Remember people" switch
+        # sets people_memory on it live (communication_llm/people_memory.py).
+        self._chat_get_cli = self.create_client(
+            GetParameters, "/communication_llm_chat_node/get_parameters")
+        self._chat_set_cli = self.create_client(
+            SetParameters, "/communication_llm_chat_node/set_parameters")
         self._exec_set_cli = self.create_client(
             SetParameters, "/grasp_executor_lin_llm/set_parameters"
         )
@@ -1334,6 +1340,26 @@ class MortyGuiBridge(Node):
             parameters=[Parameter(name="pointcloud.enable", value=self._py_to_pv(bool(on)))]))
         self.get_logger().info(f"RealSense pointcloud.enable -> {bool(on)}")
         return True
+
+    def chat_node_available(self) -> bool:
+        """The chat node's parameter service is up (it runs with voice)."""
+        return self._chat_set_cli.service_is_ready()
+
+    def set_people_memory(self, on: bool) -> bool:
+        """people_memory on the running chat node (async; read it back with
+        people_memory()). False when the chat node is not up."""
+        if not self._chat_set_cli.service_is_ready():
+            if not self._chat_set_cli.wait_for_service(timeout_sec=0.5):
+                return False
+        self._chat_set_cli.call_async(SetParameters.Request(
+            parameters=[Parameter(name="people_memory", value=self._py_to_pv(bool(on)))]))
+        self.get_logger().info(f"chat node people_memory -> {bool(on)}")
+        return True
+
+    def people_memory(self) -> Optional[bool]:
+        """The chat node's people_memory, read back (None: no answer)."""
+        vals = self._get_params_sync(self._chat_get_cli, ["people_memory"], "Chat node")
+        return None if not vals or vals.get("people_memory") is None else bool(vals["people_memory"])
 
     def camera_pointcloud(self) -> Optional[bool]:
         """The camera's own pointcloud.enable, read back (None: no answer)."""

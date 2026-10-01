@@ -219,6 +219,28 @@ class OperatorWindow(QtWidgets.QMainWindow):
         for _w in (self.vf_min_rms, self.vf_silence,
                    self.vf_max_utt, self.vf_min_chars):
             _w.valueChanged.connect(self._mark_vf_stale)
+        # Remember people (2026-10-01, Majd: "make a switcher inside of the
+        # GUI as well"): the chat node's people_memory — Morty asks the name,
+        # spells it back, keeps preferences and picks only after a yes
+        # (communication_llm/people_memory.py). Applied to the running chat
+        # node at once and read back, remembered, and re-applied whenever
+        # the chat node (re)starts — the GUI's choice is the one that holds.
+        self.cb_people = QtWidgets.QCheckBox(
+            "Remember people  (ask the name, keep preferences and picks — only after a yes)")
+        self.cb_people.setChecked(
+            QtCore.QSettings("morty", "morty_gui").value("people_memory", True, type=bool))
+        self.cb_people.setToolTip(
+            "On: when the robot is idle Morty asks your name, spells it back, greets people he\n"
+            "knows ('we have chatted before'), and — only after you agree — remembers your\n"
+            "preferences and what he picked for you (~/.morty/people.json, not in git).\n"
+            "Off: no name questions, nothing stored. Switch it off for trials if the\n"
+            "questions should not appear in the recordings.")
+        self.cb_people.toggled.connect(self._on_people_toggled)
+        vf.addRow("", self.cb_people)
+        self.people_status = QtWidgets.QLabel("")
+        self.people_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
+        vf.addRow("", self.people_status)
+        self._chat_up = False
         self.adv_tabs.addTab(voice_tab, "Voice filters")
         # Detection tab (Majd 2026-09-15: "a button if I would like to apply
         # the unknown-object thing or not; if not, use the trained YOLO as
@@ -1876,6 +1898,27 @@ class OperatorWindow(QtWidgets.QMainWindow):
                                      ORANGE)
         else:
             MotionWindow._set_status(self.pointing_cam_status, f"{name[want]} — the pipeline confirms", GREEN)
+
+    def _on_people_toggled(self, on: bool) -> None:
+        QtCore.QSettings("morty", "morty_gui").setValue("people_memory", bool(on))
+        if not self.bridge.set_people_memory(bool(on)):
+            MotionWindow._set_status(self.people_status,
+                                     "saved — applied when the voice system next starts", GREY)
+            return
+        MotionWindow._set_status(self.people_status, "sending…", GREY)
+        QtCore.QTimer.singleShot(600, self._read_back_people)
+
+    def _read_back_people(self) -> None:
+        state = self.bridge.people_memory()
+        want = self.cb_people.isChecked()
+        if state is None:
+            MotionWindow._set_status(self.people_status,
+                                     "the voice node did not answer — restart voice if it is older than today", ORANGE)
+        elif state == want:
+            MotionWindow._set_status(self.people_status,
+                                     "on — the voice node confirms" if state else "off — the voice node confirms", GREEN)
+        else:
+            MotionWindow._set_status(self.people_status, f"the voice node still says {'on' if state else 'off'}", RED)
 
     def _read_back_rs_cloud(self) -> None:
         state = self.bridge.camera_pointcloud()
@@ -3599,6 +3642,13 @@ class OperatorWindow(QtWidgets.QMainWindow):
             if self.bridge.set_camera_pointcloud(True):
                 QtCore.QTimer.singleShot(2000, self._read_back_rs_cloud)
         self._rs_cam_alive = alive
+        # The chat node came (back) up: it starts with people_memory on —
+        # give it the GUI's choice (2026-10-01).
+        chat_up = self.bridge.chat_node_available()
+        if chat_up and not self._chat_up:
+            if self.bridge.set_people_memory(self.cb_people.isChecked()):
+                QtCore.QTimer.singleShot(1500, self._read_back_people)
+        self._chat_up = chat_up
         if upd.get("camera_alive"):
             paint(self.led_camera, GREEN, "RealSense (wrist) frames flowing")
         elif self.cb_camera.isChecked() and self._driver.running():
