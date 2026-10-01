@@ -437,6 +437,15 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                                        "nothing already in the file changes). Waits for its final times first.")
         self.excel_last_btn.clicked.connect(self._send_last_trial)
         btn_row.addWidget(self.excel_last_btn)
+        # 2026-10-01 (Majd: "after Stop & save I forget to change S1/S2… or
+        # to fill the fields correctly"): correct a SAVED trial's form —
+        # folder name, trial.json, VLA outcome, CSVs, Excel row (fix_trial).
+        self.fix_btn = QtWidgets.QPushButton("✎ fix trial")
+        self.fix_btn.setToolTip("Correct a saved trial afterwards: scenario, layout, modifiers, target,\n"
+                                "destination, the yes/no answers, notes — everywhere it is stored\n"
+                                "(folder name, trial.json, VLA outcome, CSV rows, Excel row).")
+        self.fix_btn.clicked.connect(self._open_fix_trial)
+        btn_row.addWidget(self.fix_btn)
         lay.addLayout(btn_row)
 
         # 2026-09-30 (recording contract v1): operator marks while a trial
@@ -682,6 +691,27 @@ class MMHRIWindow(QtWidgets.QMainWindow):
         self.excel_last_btn.setEnabled(False)
         self.status.setText(f"⏳ sending {os.path.basename(folder)} to Excel …")
         self._excel_sender.send([folder])
+
+    def _open_fix_trial(self) -> None:
+        """✎ fix trial: the saved trials, newest first; the last saved one shown."""
+        cands = [p for p in all_trial_dirs() if os.path.exists(os.path.join(p, "trial.json"))]
+        cands.sort(key=lambda p: os.path.getmtime(os.path.join(p, "trial.json")), reverse=True)
+        if not cands:
+            self.status.setText("✖ no saved trial to fix")
+            return
+        from .fix_trial_dialog import FixTrialDialog
+        dlg = FixTrialDialog(cands[:80], self._last_trial_folder(), self)
+        dlg.fixed.connect(self._on_trial_fixed)
+        dlg.show()
+
+    def _on_trial_fixed(self, folder: str) -> None:
+        old = getattr(self, "_last_saved_trial", "")
+        if old and not os.path.exists(old) and os.path.basename(folder).split("_")[1:2] == \
+                os.path.basename(old).split("_")[1:2]:
+            self._last_saved_trial = folder          # the folder was renamed
+        self.status.setText(f"✎ corrected: {os.path.basename(folder)}")
+        self._refresh_progress()
+        self._refresh_excel_window()
 
     def _on_last_trial_sent(self, res: dict) -> None:
         from .excel_window import ExcelSender
@@ -1396,9 +1426,13 @@ class MMHRIWindow(QtWidgets.QMainWindow):
                           _st.get("graspgen_s", ""),
                           _st.get("execution_s", ""),
                           _st.get("total_s", "")])
+        # what was saved, at a glance — a wrong field is fixed with ✎ fix trial
+        _short = lambda v: (v or "—").strip() or "—"  # noqa: E731
         self.status.setText(
-            f"✔ trial {tid} saved → {self._trial_dir}\n"
-            "row appended to mmhri_experiments.csv"
+            f"✔ trial {tid} saved: {_short(row['Scene Layout'])} · {meta['Scenario'].split(':')[0]} · "
+            f"target {_short(row['Intended Target'])} · destination {_short(row['Intended Destination'])} · "
+            f"full success {_short(row['Full Task Success?'])}\n"
+            f"→ {os.path.basename(self._trial_dir)} — something wrong? ✎ fix trial"
         )
         self._last_saved_trial = self._trial_root
         self._start_postprocess(self._trial_root)
