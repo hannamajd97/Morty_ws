@@ -1,0 +1,44 @@
+1
+00:00:04,393 --> 00:00:08,393
+You: Grasp for me the wooden maze puzzle.
+
+2
+00:00:06,489 --> 00:00:10,489
+Morty (status): Starting grasp on the wooden maze puzzle.
+
+3
+00:00:11,890 --> 00:00:15,890
+Morty (status): Got the wooden maze puzzle. Where should I drop it? Left, right, or home?
+
+4
+00:00:23,743 --> 00:00:27,743
+You: Give it to me on the drop right position.
+
+5
+00:00:24,798 --> 00:00:28,798
+Morty: Left or right?
+
+6
+00:00:31,387 --> 00:00:35,387
+You: on the drop right position
+
+7
+00:00:31,591 --> 00:00:35,591
+Morty (status): Going to drop right.
+
+8
+00:00:36,599 --> 00:00:40,599
+Morty (status): I'm at the drop right position, still holding the wooden maze puzzle. Should I open the gripper?
+
+9
+00:00:46,194 --> 00:00:50,194
+You: Yes, open the grippers and go back home.
+
+10
+00:00:47,289 --> 00:00:51,289
+Morty (status): Opening the gripper.
+
+11
+00:00:55,394 --> 00:00:59,394
+Morty (status): Done — I'm back at the home position. What's next?
+

@@ -1,0 +1,300 @@
+{
+ "timings": {
+  "intent_s": 1.324,
+  "yolo_s": 0.029,
+  "graspgen_s": 0.0,
+  "execution_s": 41.439,
+  "total_s": 55.942,
+  "interaction_s": 15.695,
+  "voice_to_transcript_s": 1.192,
+  "understood_by": "language model",
+  "graspgen_background": "yes",
+  "plan_background": "yes",
+  "plan_compute_s": 1.784,
+  "grasp_used": "2 of 21",
+  "grasp_probes": 1,
+  "release_s": 53.808,
+  "human_wait_s": 22.236,
+  "robot_time_s": 33.706,
+  "morty_questions": 5,
+  "your_utterances": 5,
+  "speech_end_to_intent_s": 2.494,
+  "choice_s": 1.022,
+  "graspgen_compute_s": 1.825,
+  "graspgen_wait_s": 0.0,
+  "graspgen_lead_s": 387.482,
+  "verify_compute_s": 1.784,
+  "planning_s": 0.145,
+  "command_to_motion_s": 14.503,
+  "approach_s": 2.595,
+  "grasp_s": 1.032,
+  "wait_destination_s": 8.258,
+  "click_to_motion_s": 0.181,
+  "background_lead_s": 387.482,
+  "planner": "curve",
+  "path": "precomputed",
+  "started_by": "voice"
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 0.442,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9210270047187805, \"bbox\": [0.5951194763183594, 268.9658203125, 78.40913391113281, 425.2637939453125], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.916184902191"
+  },
+  {
+   "t": 2.215,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9228898286819458, \"bbox\": [0.6058006286621094, 268.98638916015625, 78.44754791259766, 425.30218505859375], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9157135"
+  },
+  {
+   "t": 3.259,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.618,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9223193526268005, \"bbox\": [0.5913276672363281, 268.91253662109375, 78.36009216308594, 425.2578125], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.91603201627731"
+  },
+  {
+   "t": 5.929,
+   "source": "transcript",
+   "text": "Morty, give me the vitamin."
+  },
+  {
+   "t": 5.939,
+   "source": "utterance",
+   "text": "{\"text\": \"Morty, give me the vitamin.\", \"speech_end\": 1790781309.838, \"voiced_ms\": 1300, \"speech_start\": 1790781308.143, \"published\": 1790781311.03}"
+  },
+  {
+   "t": 7.104,
+   "source": "morty_said",
+   "text": "Which vitamin do you mean\u2014the Vitamin B12 with the purple cap, or the Multivitamin with the blue cap?"
+  },
+  {
+   "t": 7.388,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9241717457771301, \"bbox\": [0.5831069946289062, 268.9307556152344, 78.42887878417969, 425.32720947265625], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.91689497"
+  },
+  {
+   "t": 9.377,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9186010956764221, \"bbox\": [0.5975723266601562, 268.95654296875, 78.3350601196289, 425.2218017578125], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.916251420974"
+  },
+  {
+   "t": 10.817,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9157984852790833, \"bbox\": [185.03451538085938, 222.72891235351562, 242.39950561523438, 379.050537109375], \"reach_pct\": 85.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 0.2, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.91536"
+  },
+  {
+   "t": 11.922,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9256932139396667, \"bbox\": [0.5781974792480469, 268.92877197265625, 78.49143981933594, 425.34405517578125], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9166090"
+  },
+  {
+   "t": 14.117,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9196344017982483, \"bbox\": [0.5647850036621094, 268.9425048828125, 78.21733093261719, 425.253662109375], \"reach_pct\": 81.0, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9163115620"
+  },
+  {
+   "t": 16.533,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.920283854007721, \"bbox\": [0.6012229919433594, 268.8832702636719, 78.29255676269531, 425.20892333984375], \"reach_pct\": 81.0, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.916385233"
+  },
+  {
+   "t": 17.861,
+   "source": "transcript",
+   "text": "Give me the ones that have a blue cup."
+  },
+  {
+   "t": 17.882,
+   "source": "utterance",
+   "text": "{\"text\": \"Give me the ones that have a blue cup.\", \"speech_end\": 1790781321.836, \"voiced_ms\": 1800, \"speech_start\": 1790781319.345, \"published\": 1790781323.006}"
+  },
+  {
+   "t": 17.901,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.919928789138794, \"bbox\": [0.5827980041503906, 268.9744873046875, 78.36895751953125, 425.2257080078125], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9163620471"
+  },
+  {
+   "t": 19.075,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9214419722557068, \"bbox\": [0.586517333984375, 268.9344787597656, 78.37580108642578, 425.26641845703125], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.916011393"
+  },
+  {
+   "t": 19.189,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"vitamin_c\",\"object_attributes\":{\"colour\":\"blue\",\"shape\":null,\"position\":null,\"ordinal\":null,\"ordinal_from\":null,\"speed\":null,\"destination\":null,\"then\":null},\"stamp\":1790781324.33}"
+  },
+  {
+   "t": 19.317,
+   "source": "morty_said",
+   "text": "Picking the blue Multivitamin."
+  },
+  {
+   "t": 20.086,
+   "source": "selection_cycle_id",
+   "text": "7"
+  },
+  {
+   "t": 20.228,
+   "source": "cand_status",
+   "text": "grasp 2/21: FEASIBLE (verified in the background via the curve) \u2014 executing this one"
+  },
+  {
+   "t": 20.366,
+   "source": "grasp_poses",
+   "text": "21 kept"
+  },
+  {
+   "t": 21.97,
+   "source": "morty_said",
+   "text": "Starting grasp on the vitamin tube."
+  },
+  {
+   "t": 22.475,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9247239232063293, \"bbox\": [0.6006393432617188, 268.9471740722656, 78.45207214355469, 425.21270751953125], \"reach_pct\": 84.1, \"reach_state\": \"green\", \"reach_angle_deg\": 21.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.91705286"
+  },
+  {
+   "t": 25.198,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 25.256,
+   "source": "morty_said",
+   "text": "Got the vitamin tube. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 33.475,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790781338.638}"
+  },
+  {
+   "t": 33.485,
+   "source": "transcript",
+   "text": "Drop it on the right side."
+  },
+  {
+   "t": 33.495,
+   "source": "utterance",
+   "text": "{\"text\": \"Drop it on the right side.\", \"speech_end\": 1790781337.355, \"voiced_ms\": 1100, \"speech_start\": 1790781336.035, \"published\": 1790781338.634}"
+  },
+  {
+   "t": 33.574,
+   "source": "robot_status",
+   "text": "resumed:vla_drop_right"
+  },
+  {
+   "t": 33.634,
+   "source": "morty_said",
+   "text": "Going to drop right."
+  },
+  {
+   "t": 39.074,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 39.116,
+   "source": "morty_said",
+   "text": "I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?"
+  },
+  {
+   "t": 44.853,
+   "source": "transcript",
+   "text": "I changed my mind, go back home."
+  },
+  {
+   "t": 44.865,
+   "source": "utterance",
+   "text": "{\"text\": \"I changed my mind, go back home.\", \"speech_end\": 1790781348.818, \"voiced_ms\": 1900, \"speech_start\": 1790781346.465, \"published\": 1790781349.996}"
+  },
+  {
+   "t": 45.876,
+   "source": "intent",
+   "text": "{\"action_intent\":\"go_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790781351.02}"
+  },
+  {
+   "t": 45.955,
+   "source": "robot_status",
+   "text": "redirect:home"
+  },
+  {
+   "t": 50.133,
+   "source": "robot_status",
+   "text": "resumed:home"
+  },
+  {
+   "t": 50.194,
+   "source": "morty_said",
+   "text": "I'm at the home position, still holding the vitamin tube. Should I open the gripper?"
+  },
+  {
+   "t": 50.285,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 57.764,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 57.842,
+   "source": "intent",
+   "text": "{\"action_intent\":\"open_gripper\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790781362.933}"
+  },
+  {
+   "t": 57.852,
+   "source": "transcript",
+   "text": "Yes, give me the object."
+  },
+  {
+   "t": 57.867,
+   "source": "utterance",
+   "text": "{\"text\": \"Yes, give me the object.\", \"speech_end\": 1790781361.808, \"voiced_ms\": 1000, \"speech_start\": 1790781360.629, \"published\": 1790781362.93}"
+  },
+  {
+   "t": 57.979,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 58.38,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 61.812,
+   "source": "cycle_done",
+   "text": "done|7"
+  },
+  {
+   "t": 61.915,
+   "source": "morty_said",
+   "text": "I'm at the home position. What's next?"
+  },
+  {
+   "t": 62.765,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9148499965667725, \"bbox\": [185.0429229736328, 223.25881958007812, 242.01382446289062, 378.99822998046875], \"reach_pct\": 85.1, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.9, \"reach_closer_cm\": 0.1, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9085"
+  },
+  {
+   "t": 64.712,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9139788746833801, \"bbox\": [185.11990356445312, 223.302978515625, 242.0087432861328, 378.9989929199219], \"reach_pct\": 85.4, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.9, \"reach_closer_cm\": 0.3, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.9061998"
+  },
+  {
+   "t": 65.06,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

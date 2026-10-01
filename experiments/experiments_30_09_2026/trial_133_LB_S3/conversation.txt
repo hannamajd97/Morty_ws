@@ -1,0 +1,12 @@
+# trial 133 started 2026-09-30T16:43:26.774350
+[   4.39s] You: Grasp for me the wooden maze puzzle.
+[   6.49s] Morty (status): Starting grasp on the wooden maze puzzle.
+[  11.89s] Morty (status): Got the wooden maze puzzle. Where should I drop it? Left, right, or home?
+[  23.74s] You: Give it to me on the drop right position.
+[  24.80s] Morty: Left or right?
+[  31.39s] You: on the drop right position
+[  31.59s] Morty (status): Going to drop right.
+[  36.60s] Morty (status): I'm at the drop right position, still holding the wooden maze puzzle. Should I open the gripper?
+[  46.19s] You: Yes, open the grippers and go back home.
+[  47.29s] Morty (status): Opening the gripper.
+[  55.39s] Morty (status): Done — I'm back at the home position. What's next?

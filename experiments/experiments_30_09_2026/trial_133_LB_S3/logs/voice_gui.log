@@ -1,0 +1,87 @@
+[speech_input_node-4] [INFO] [1790779410.584082162] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.068)
+[speech_input_node-4] [INFO] [1790779410.912346936] [speech_input_node]: [timing] omni 0.32s for 2.9s audio (today 20, month 1142)
+[speech_input_node-4] [INFO] [1790779410.919155859] [speech_input_node]: Heard: 'Grasp for me the wooden maze puzzle.'
+[chat_node-7] User (voice): Grasp for me the wooden maze puzzle.
+[chat_node-7] [0m[INFO] [1790779410.945371697] [communication_llm_chat_node]: FAST-PICK: 'Grasp for me the wooden maze puzzle.' -> wooden_maze_puzzle; published {"action_intent":"pick","object_intent":"wooden_maze_puzzle","object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790779410.947158296] [communication_llm_chat_node]: [timing] handled in 0.02s (route=GRAMMAR pick wooden_maze_puzzle)[0m
+[intent_router_node-6] [INFO] [1790779410.953823835] [intent_router_node]: Queued intent 'pick'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790779410.967540612] [intent_router_node]: dispatching: action='pick', object='wooden_maze_puzzle', colour='', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790779410.983597371] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790779411.031646771] [intent_router_node]: Voice pick: execution gate OPENED (auto-execute checkbox applies to GUI clicks only).
+[chat_node-7] [0m[INFO] [1790779411.045726963] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[intent_router_node-6] [INFO] [1790779411.098949876] [intent_router_node]: Set auto_select_label='wooden_maze_puzzle' on /yolo_live_select_grasp.
+[intent_router_node-6] [INFO] [1790779411.327935929] [intent_router_node]: Set wait_for_destination=True on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790779411.337825710] [intent_router_node]: Set vitamin_mode_active=False on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790779411.343723606] [intent_router_node]: Set task_object_label='wooden_maze_puzzle' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790779412.927784887] [intent_router_node]: cycle_id=5 (target='wooden maze puzzle') — narrating start
+[speak_action_server-3] [INFO] [1790779412.945332195] [speak_action_server]: Speak: 'Starting grasp on the wooden maze puzzle.'
+[intent_router_node-6] [INFO] [1790779413.375724710] [intent_router_node]: task_state: cycle 5 phase='probing' question='' holding=False object='wooden_maze_puzzle'
+[chat_node-7] [0m[INFO] [1790779413.377236119] [communication_llm_chat_node]: Cycle state: BUSY — pick running[0m
+[intent_router_node-6] [INFO] [1790779413.390292261] [intent_router_node]: task_state: cycle 5 phase='approaching' question='' holding=False object='wooden_maze_puzzle'
+[speak_action_server-3] [INFO] [1790779416.417803560] [speak_action_server]: [timing] TTS first audio after 0.68s, 3.1s of speech, done 3.47s after the request
+[chat_node-7] [0m[INFO] [1790779417.169884291] [communication_llm_chat_node]: Held-object update (task state): '' -> 'wooden_maze_puzzle'[0m
+[intent_router_node-6] [INFO] [1790779417.178387479] [intent_router_node]: Held-object memory: 'wooden_maze_puzzle'
+[chat_node-7] [0m[INFO] [1790779418.373038364] [communication_llm_chat_node]: Cycle state: HOLDING the object at the grasp pose — waiting for a drop destination[0m
+[intent_router_node-6] [INFO] [1790779418.373109619] [intent_router_node]: task_state: cycle 5 phase='awaiting_destination' question='destination' holding=True object='wooden_maze_puzzle'
+[speak_action_server-3] [INFO] [1790779418.385212859] [speak_action_server]: Speak: 'Got the wooden maze puzzle. Where should I drop it? Left, right, or home?'
+[speak_action_server-3] [INFO] [1790779423.091101989] [speak_action_server]: [timing] TTS first audio after 0.31s, 4.6s of speech, done 4.70s after the request
+[speech_input_node-4] [INFO] [1790779428.930790291] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.054)
+[speech_input_node-4] [INFO] [1790779430.365604493] [speech_input_node]: [timing] omni 1.43s for 3.6s audio (today 21, month 1143)
+[speech_input_node-4] [INFO] [1790779430.366929711] [speech_input_node]: Heard: 'Give it to me on the drop right position.'
+[chat_node-7] User (voice): Give it to me on the drop right position.
+[chat_node-7] [0m[INFO] [1790779430.390984673] [communication_llm_chat_node]: [timing] pruned 11 stale message(s) from the LLM context (46 -> 35)[0m
+[chat_node-7] [0m[INFO] [1790779431.394484246] [communication_llm_chat_node]: [timing] LLM main call 1.00s (prompt cache: 6946 tokens read)[0m
+[chat_node-7] Assistant: Left or right?
+[speak_action_server-3] [INFO] [1790779431.409616377] [speak_action_server]: Speak: 'Left or right?'
+[speak_action_server-3] [INFO] [1790779433.216068700] [speak_action_server]: [timing] TTS first audio after 0.21s, 1.9s of speech, done 1.80s after the request
+[speech_input_node-4] [INFO] [1790779437.545798147] [speech_input_node]: [speaker] human voice (cos -0.02, rms 0.049)
+[speech_input_node-4] [INFO] [1790779437.994259680] [speech_input_node]: [timing] omni 0.45s for 2.7s audio (today 22, month 1144)
+[speech_input_node-4] [INFO] [1790779437.995351459] [speech_input_node]: Heard: 'on the drop right position'
+[chat_node-7] User (voice): on the drop right position
+[chat_node-7] [0m[INFO] [1790779438.002852611] [communication_llm_chat_node]: FAST: matched 'on the drop right position' -> drop_right (speed=default); published {"action_intent":"drop_right","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790779438.005391898] [communication_llm_chat_node]: Withholding pre-emptive narration 'Going to drop right.' for 'drop_right' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790779438.007108284] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer drop_right, question='destination', fresh=True)[0m
+[intent_router_node-6] [INFO] [1790779438.007969015] [intent_router_node]: Resume 'drop_right' published (bypass queue (pick paused): plain 'drop_right').
+[intent_router_node-6] [INFO] [1790779438.035953036] [intent_router_node]: task_state: cycle 5 phase='awaiting_destination' question='' holding=True object='wooden_maze_puzzle'
+[chat_node-7] [0m[INFO] [1790779438.036175973] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting destination)[0m
+[chat_node-7] [0m[INFO] [1790779438.038931206] [communication_llm_chat_node]: Cycle state: BUSY — pick running (carrying)[0m
+[intent_router_node-6] [INFO] [1790779438.040023058] [intent_router_node]: task_state: cycle 5 phase='carrying' question='' holding=True object='wooden_maze_puzzle'
+[speak_action_server-3] [INFO] [1790779438.047652563] [speak_action_server]: Speak: 'Going to drop right.'
+[speak_action_server-3] [INFO] [1790779440.296702998] [speak_action_server]: [timing] TTS first audio after 0.25s, 2.1s of speech, done 2.25s after the request
+[chat_node-7] [0m[INFO] [1790779443.129988761] [communication_llm_chat_node]: Current pose update: '' -> 'vla_drop_right'[0m
+[chat_node-7] [0m[INFO] [1790779443.131992370] [communication_llm_chat_node]: Cycle state: HOLDING at the drop pose — waiting for release confirmation[0m
+[intent_router_node-6] [INFO] [1790779443.132014373] [intent_router_node]: task_state: cycle 5 phase='awaiting_release' question='release' holding=True object='wooden_maze_puzzle'
+[speak_action_server-3] [INFO] [1790779443.136707687] [speak_action_server]: Speak: "I'm at the drop right position, still holding the wooden maze puzzle. Should I open the gripper?"
+[speak_action_server-3] [INFO] [1790779449.062457211] [speak_action_server]: [timing] TTS first audio after 0.33s, 5.7s of speech, done 5.92s after the request
+[speech_input_node-4] [INFO] [1790779452.166109669] [speech_input_node]: [speaker] human voice (cos 0.06, rms 0.124)
+[speech_input_node-4] [INFO] [1790779452.670854995] [speech_input_node]: [timing] omni 0.50s for 3.3s audio (today 23, month 1145)
+[speech_input_node-4] [INFO] [1790779452.671551787] [speech_input_node]: Heard: 'Yes, open the grippers and go back home.'
+[chat_node-7] User (voice): Yes, open the grippers and go back home.
+[chat_node-7] [0m[INFO] [1790779452.676921480] [communication_llm_chat_node]: [timing] pruned 13 stale message(s) from the LLM context (46 -> 33)[0m
+[chat_node-7] [0m[INFO] [1790779453.830065792] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"release_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790779453.831158134] [communication_llm_chat_node]: [timing] intent dispatched 1.15s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790779453.832220547] [communication_llm_chat_node]: [timing] LLM main call 1.15s (prompt cache: 6946 tokens read)[0m
+[intent_router_node-6] [INFO] [1790779453.837192307] [intent_router_node]: Resume 'release_home' published (release pause: compound release_home).
+[chat_node-7] [0m[INFO] [1790779453.844166326] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting release)[0m
+[intent_router_node-6] [INFO] [1790779453.844274443] [intent_router_node]: task_state: cycle 5 phase='awaiting_release' question='' holding=True object='wooden_maze_puzzle'
+[chat_node-7] [0m[INFO] [1790779453.846203780] [communication_llm_chat_node]: Cycle state: BUSY — pick running (releasing)[0m
+[intent_router_node-6] [INFO] [1790779453.847552285] [intent_router_node]: task_state: cycle 5 phase='releasing' question='' holding=True object='wooden_maze_puzzle'
+[speak_action_server-3] [INFO] [1790779453.850868205] [speak_action_server]: Speak: 'Opening the gripper.'
+[chat_node-7] [0m[INFO] [1790779454.099548807] [communication_llm_chat_node]: Held-object update (task state): 'wooden_maze_puzzle' -> ''[0m
+[intent_router_node-6] [INFO] [1790779454.101283467] [intent_router_node]: Held-object memory: ''
+[chat_node-7] [0m[INFO] [1790779454.802514363] [communication_llm_chat_node]: [timing] LLM follow-up call 0.97s[0m
+[chat_node-7] [0m[INFO] [1790779454.804012260] [communication_llm_chat_node]: Withholding end-of-turn TTS: narration for ['release_home'] is driven by intent_router confirmation, not by intent.[0m
+[speak_action_server-3] [INFO] [1790779456.040453194] [speak_action_server]: [timing] TTS first audio after 0.19s, 2.0s of speech, done 2.19s after the request
+[intent_router_node-6] [INFO] [1790779456.468766876] [intent_router_node]: task_state: cycle 5 phase='returning_home' question='' holding=False object='wooden_maze_puzzle'
+[chat_node-7] [0m[INFO] [1790779456.469164231] [communication_llm_chat_node]: Cycle state: moving to home[0m
+[chat_node-7] [0m[INFO] [1790779460.554104939] [communication_llm_chat_node]: Current pose update: 'vla_drop_right' -> 'home'[0m
+[chat_node-7] [0m[INFO] [1790779461.920234634] [communication_llm_chat_node]: Cycle state: IDLE — last pick finished[0m
+[intent_router_node-6] [INFO] [1790779461.921242359] [intent_router_node]: task_state: cycle 5 phase='idle' question='' holding=False object=''
+[intent_router_node-6] [INFO] [1790779461.927798125] [intent_router_node]: cycle_done received: 'done|5' (outcome=done)
+[intent_router_node-6] [INFO] [1790779461.933697386] [intent_router_node]: Grasp cycle completed successfully.
+[speak_action_server-3] [INFO] [1790779461.939229795] [speak_action_server]: Speak: "Done — I'm back at the home position. What's next?"
+[intent_router_node-6] [INFO] [1790779461.945732636] [intent_router_node]: Set task_object_label='' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790779461.958610670] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[intent_router_node-6] [INFO] [1790779461.989762706] [intent_router_node]: Selected detection: label='wooden_maze_puzzle' (updating _last_target_label for narration).
+[intent_router_node-6] [INFO] [1790779462.008341870] [intent_router_node]: Set task_object_label='wooden_maze_puzzle' on grasp_executor_lin_llm.
+[speak_action_server-3] [INFO] [1790779465.455292540] [speak_action_server]: [timing] TTS first audio after 0.32s, 3.5s of speech, done 3.51s after the request

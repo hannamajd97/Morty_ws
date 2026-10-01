@@ -1,0 +1,403 @@
+{
+ "timings": {
+  "interaction_s": 3.806,
+  "voice_to_transcript_s": 1.174,
+  "understood_by": "instant rule",
+  "graspgen_background": "yes",
+  "plan_background": "yes",
+  "plan_compute_s": 0.56,
+  "grasp_used": "1 of 6",
+  "grasp_probes": 1,
+  "release_s": 44.711,
+  "human_wait_s": 30.328,
+  "robot_time_s": 20.671,
+  "morty_questions": 4,
+  "your_utterances": 4,
+  "speech_end_to_intent_s": 1.188,
+  "intent_s": 0.014,
+  "choice_s": 1.388,
+  "yolo_s": 0.293,
+  "graspgen_s": 0.0,
+  "graspgen_compute_s": 2.743,
+  "graspgen_wait_s": 0.0,
+  "graspgen_lead_s": 18.103,
+  "verify_compute_s": 0.56,
+  "planning_s": 0.181,
+  "command_to_motion_s": 2.632,
+  "approach_s": 2.559,
+  "grasp_s": 1.057,
+  "wait_destination_s": 19.666,
+  "transport_s": null,
+  "execution_s": 48.367,
+  "click_to_motion_s": 1.23,
+  "background_lead_s": 18.103,
+  "total_s": 50.999,
+  "planner": "",
+  "path": "precomputed",
+  "started_by": "voice"
+ },
+ "events": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.878,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9063905477523804, \"bbox\": [176.6807403564453, 226.36669921875, 239.73074340820312, 384.19287109375], \"reach_pct\": 87.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 1.8, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.84247130"
+  },
+  {
+   "t": 3.412,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9055113196372986, \"bbox\": [176.70587158203125, 226.31710815429688, 239.824951171875, 384.1342468261719], \"reach_pct\": 86.9, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 1.6, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8302"
+  },
+  {
+   "t": 4.328,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"wooden_maze_puzzle\",\"object_attributes\":null,\"stamp\":1790779410.934}"
+  },
+  {
+   "t": 4.338,
+   "source": "transcript",
+   "text": "Grasp for me the wooden maze puzzle."
+  },
+  {
+   "t": 4.349,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp for me the wooden maze puzzle.\", \"speech_end\": 1790779409.746, \"voiced_ms\": 1700, \"speech_start\": 1790779407.643, \"published\": 1790779410.92}"
+  },
+  {
+   "t": 4.78,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.688,
+   "source": "selection_cycle_id",
+   "text": "5"
+  },
+  {
+   "t": 6.151,
+   "source": "grasp_poses",
+   "text": "6 kept"
+  },
+  {
+   "t": 6.373,
+   "source": "morty_said",
+   "text": "Starting grasp on the wooden maze puzzle."
+  },
+  {
+   "t": 6.652,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9056834578514099, \"bbox\": [176.66055297851562, 226.40936279296875, 239.74368286132812, 384.26715087890625], \"reach_pct\": 87.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 1.8, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8"
+  },
+  {
+   "t": 6.784,
+   "source": "cand_status",
+   "text": "grasp 1/6: FEASIBLE (verified in the background via the curve) \u2014 executing this one"
+  },
+  {
+   "t": 11.748,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 11.811,
+   "source": "morty_said",
+   "text": "Got the wooden maze puzzle. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 23.72,
+   "source": "transcript",
+   "text": "Give it to me on the drop right position."
+  },
+  {
+   "t": 23.73,
+   "source": "utterance",
+   "text": "{\"text\": \"Give it to me on the drop right position.\", \"speech_end\": 1790779428.084, \"voiced_ms\": 2400, \"speech_start\": 1790779425.246, \"published\": 1790779430.367}"
+  },
+  {
+   "t": 24.776,
+   "source": "morty_said",
+   "text": "Left or right?"
+  },
+  {
+   "t": 31.363,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790779437.999}"
+  },
+  {
+   "t": 31.373,
+   "source": "transcript",
+   "text": "on the drop right position"
+  },
+  {
+   "t": 31.384,
+   "source": "utterance",
+   "text": "{\"text\": \"on the drop right position\", \"speech_end\": 1790779436.724, \"voiced_ms\": 1600, \"speech_start\": 1790779434.815, \"published\": 1790779437.996}"
+  },
+  {
+   "t": 31.466,
+   "source": "robot_status",
+   "text": "resumed:vla_drop_right"
+  },
+  {
+   "t": 31.528,
+   "source": "morty_said",
+   "text": "Going to drop right."
+  },
+  {
+   "t": 36.444,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 36.501,
+   "source": "morty_said",
+   "text": "I'm at the drop right position, still holding the wooden maze puzzle. Should I open the gripper?"
+  },
+  {
+   "t": 46.123,
+   "source": "transcript",
+   "text": "Yes, open the grippers and go back home."
+  },
+  {
+   "t": 46.133,
+   "source": "utterance",
+   "text": "{\"text\": \"Yes, open the grippers and go back home.\", \"speech_end\": 1790779451.341, \"voiced_ms\": 2200, \"speech_start\": 1790779448.923, \"published\": 1790779452.672}"
+  },
+  {
+   "t": 47.151,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 47.204,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 47.214,
+   "source": "intent",
+   "text": "{\"action_intent\":\"release_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790779453.829}"
+  },
+  {
+   "t": 47.772,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 55.347,
+   "source": "morty_said",
+   "text": "Done \u2014 I'm back at the home position. What's next?"
+  },
+  {
+   "t": 55.368,
+   "source": "cycle_done",
+   "text": "done|5"
+  },
+  {
+   "t": 56.438,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.909922182559967, \"bbox\": [0.4369964599609375, 269.38726806640625, 78.65103912353516, 425.82958984375], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8164998292922974, \"bbox"
+  },
+  {
+   "t": 58.962,
+   "source": "trial",
+   "text": "stop"
+  }
+ ],
+ "events_exact": [
+  {
+   "t": 0.0,
+   "source": "trial",
+   "text": "start"
+  },
+  {
+   "t": 1.878,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9063905477523804, \"bbox\": [176.6807403564453, 226.36669921875, 239.73074340820312, 384.19287109375], \"reach_pct\": 87.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 1.8, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.84247130"
+  },
+  {
+   "t": 3.412,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9055113196372986, \"bbox\": [176.70587158203125, 226.31710815429688, 239.824951171875, 384.1342468261719], \"reach_pct\": 86.9, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 1.6, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8302"
+  },
+  {
+   "t": 4.175,
+   "source": "transcript",
+   "text": "Grasp for me the wooden maze puzzle."
+  },
+  {
+   "t": 4.177,
+   "source": "utterance",
+   "text": "{\"text\": \"Grasp for me the wooden maze puzzle.\", \"speech_end\": 1790779409.746, \"voiced_ms\": 1700, \"speech_start\": 1790779407.643, \"published\": 1790779410.92}"
+  },
+  {
+   "t": 4.189,
+   "source": "intent",
+   "text": "{\"action_intent\":\"pick\",\"object_intent\":\"wooden_maze_puzzle\",\"object_attributes\":null,\"stamp\":1790779410.934}"
+  },
+  {
+   "t": 4.78,
+   "source": "trial",
+   "text": "bag ready"
+  },
+  {
+   "t": 5.578,
+   "source": "selection_cycle_id",
+   "text": "5"
+  },
+  {
+   "t": 6.151,
+   "source": "grasp_poses",
+   "text": "6 kept"
+  },
+  {
+   "t": 6.201,
+   "source": "morty_said",
+   "text": "Starting grasp on the wooden maze puzzle."
+  },
+  {
+   "t": 6.652,
+   "source": "detections",
+   "text": "[{\"label\": \"wooden_maze_puzzle\", \"display\": \"wooden_maze_puzzle\", \"score\": 0.9056834578514099, \"bbox\": [176.66055297851562, 226.40936279296875, 239.74368286132812, 384.26715087890625], \"reach_pct\": 87.2, \"reach_state\": \"orange\", \"reach_angle_deg\": 21.8, \"reach_closer_cm\": 1.8, \"source\": \"ys\", \"colour\": \"yellow\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube 2\", \"score\": 0.8"
+  },
+  {
+   "t": 6.784,
+   "source": "cand_status",
+   "text": "grasp 1/6: FEASIBLE (verified in the background via the curve) \u2014 executing this one"
+  },
+  {
+   "t": 6.867,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 10.621,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 11.625,
+   "source": "robot_status",
+   "text": "paused"
+  },
+  {
+   "t": 11.641,
+   "source": "morty_said",
+   "text": "Got the wooden maze puzzle. Where should I drop it? Left, right, or home?"
+  },
+  {
+   "t": 23.622,
+   "source": "transcript",
+   "text": "Give it to me on the drop right position."
+  },
+  {
+   "t": 23.623,
+   "source": "utterance",
+   "text": "{\"text\": \"Give it to me on the drop right position.\", \"speech_end\": 1790779428.084, \"voiced_ms\": 2400, \"speech_start\": 1790779425.246, \"published\": 1790779430.367}"
+  },
+  {
+   "t": 24.665,
+   "source": "morty_said",
+   "text": "Left or right?"
+  },
+  {
+   "t": 31.251,
+   "source": "utterance",
+   "text": "{\"text\": \"on the drop right position\", \"speech_end\": 1790779436.724, \"voiced_ms\": 1600, \"speech_start\": 1790779434.815, \"published\": 1790779437.996}"
+  },
+  {
+   "t": 31.251,
+   "source": "transcript",
+   "text": "on the drop right position"
+  },
+  {
+   "t": 31.254,
+   "source": "intent",
+   "text": "{\"action_intent\":\"drop_right\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790779437.999}"
+  },
+  {
+   "t": 31.291,
+   "source": "robot_status",
+   "text": "resumed:vla_drop_right"
+  },
+  {
+   "t": 31.305,
+   "source": "morty_said",
+   "text": "Going to drop right."
+  },
+  {
+   "t": 31.643,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 36.385,
+   "source": "robot_status",
+   "text": "awaiting_release"
+  },
+  {
+   "t": 36.394,
+   "source": "morty_said",
+   "text": "I'm at the drop right position, still holding the wooden maze puzzle. Should I open the gripper?"
+  },
+  {
+   "t": 45.927,
+   "source": "utterance",
+   "text": "{\"text\": \"Yes, open the grippers and go back home.\", \"speech_end\": 1790779451.341, \"voiced_ms\": 2200, \"speech_start\": 1790779448.923, \"published\": 1790779452.672}"
+  },
+  {
+   "t": 45.927,
+   "source": "transcript",
+   "text": "Yes, open the grippers and go back home."
+  },
+  {
+   "t": 47.084,
+   "source": "intent",
+   "text": "{\"action_intent\":\"release_home\",\"object_intent\":null,\"object_attributes\":null,\"stamp\":1790779453.829}"
+  },
+  {
+   "t": 47.098,
+   "source": "robot_status",
+   "text": "releasing"
+  },
+  {
+   "t": 47.106,
+   "source": "morty_said",
+   "text": "Opening the gripper."
+  },
+  {
+   "t": 47.712,
+   "source": "robot_status",
+   "text": "released"
+  },
+  {
+   "t": 49.969,
+   "source": "arm_motion",
+   "text": "starts"
+  },
+  {
+   "t": 55.174,
+   "source": "cycle_done",
+   "text": "done|5"
+  },
+  {
+   "t": 55.196,
+   "source": "morty_said",
+   "text": "Done \u2014 I'm back at the home position. What's next?"
+  },
+  {
+   "t": 56.438,
+   "source": "detections",
+   "text": "[{\"label\": \"small_bottle\", \"display\": \"small_bottle\", \"score\": 0.909922182559967, \"bbox\": [0.4369964599609375, 269.38726806640625, 78.65103912353516, 425.82958984375], \"reach_pct\": 80.9, \"reach_state\": \"green\", \"reach_angle_deg\": 23.9, \"reach_closer_cm\": 0.0, \"source\": \"ys\", \"colour\": \"blue\", \"cap_colour\": \"\"}, {\"label\": \"vitamin_tube\", \"display\": \"vitamin_tube\", \"score\": 0.8164998292922974, \"bbox"
+  },
+  {
+   "t": 58.962,
+   "source": "trial",
+   "text": "stop"
+  }
+ ]
+}

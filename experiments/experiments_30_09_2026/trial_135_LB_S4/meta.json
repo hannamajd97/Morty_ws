@@ -1,0 +1,512 @@
+{
+  "format": "morty_vla_raw_v2",
+  "episode_id": "trial_135_LB_S4",
+  "episode_index": 135,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_30_09_2026/trial_135_LB_S4",
+  "in_trial_dir": true,
+  "trial_id": "135",
+  "task": "pick up the blue vitamin c",
+  "task_from": "intent",
+  "outcome": "success",
+  "success": true,
+  "intent": "open_gripper",
+  "cycle_done": "done|7",
+  "note": "outcome: human",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_30_09_2026/trial_135_LB_S4",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "Give me the ones that have a blue cup.",
+  "trial_form_task": "pick up the Vitamin Multi and bring it home",
+  "transcripts": [
+    "Morty, give me the vitamin.",
+    "Give me the ones that have a blue cup.",
+    "Drop it on the right side.",
+    "I changed my mind, go back home.",
+    "Yes, give me the object."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "t": 18.828838109970093,
+      "stamp": 1790781324.33,
+      "action_intent": "pick",
+      "object": "vitamin_c",
+      "attributes": {
+        "colour": "blue",
+        "shape": null,
+        "position": null,
+        "ordinal": null,
+        "ordinal_from": null,
+        "speed": null,
+        "destination": null,
+        "then": null
+      },
+      "transcript": "Give me the ones that have a blue cup.",
+      "transcript_stamp": 1790781323.039172,
+      "instruction": "pick up the blue vitamin c"
+    },
+    {
+      "idx": 1,
+      "t": 33.13683819770813,
+      "stamp": 1790781338.638,
+      "action_intent": "drop_right",
+      "object": null,
+      "attributes": null,
+      "transcript": "Drop it on the right side.",
+      "transcript_stamp": 1790781338.6392896,
+      "instruction": "drop it on the right side"
+    },
+    {
+      "idx": 2,
+      "t": 45.51883816719055,
+      "stamp": 1790781351.02,
+      "action_intent": "go_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "I changed my mind, go back home.",
+      "transcript_stamp": 1790781350.000037,
+      "instruction": "go back home"
+    },
+    {
+      "idx": 3,
+      "t": 57.431838274002075,
+      "stamp": 1790781362.933,
+      "action_intent": "open_gripper",
+      "object": null,
+      "attributes": null,
+      "transcript": "Yes, give me the object.",
+      "transcript_stamp": 1790781362.9333053,
+      "instruction": "open the gripper"
+    }
+  ],
+  "events": {
+    "transcript": [
+      {
+        "t": 5.532780885696411,
+        "stamp": 1790781311.0339427,
+        "text": "Morty, give me the vitamin."
+      },
+      {
+        "t": 17.538010120391846,
+        "stamp": 1790781323.039172,
+        "text": "Give me the ones that have a blue cup."
+      },
+      {
+        "t": 33.13812780380249,
+        "stamp": 1790781338.6392896,
+        "text": "Drop it on the right side."
+      },
+      {
+        "t": 44.4988751411438,
+        "stamp": 1790781350.000037,
+        "text": "I changed my mind, go back home."
+      },
+      {
+        "t": 57.432143449783325,
+        "stamp": 1790781362.9333053,
+        "text": "Yes, give me the object."
+      }
+    ],
+    "intent": [
+      {
+        "t": 18.828838109970093,
+        "stamp": 1790781324.33,
+        "action_intent": "pick",
+        "object_intent": "vitamin_c",
+        "object_attributes": {
+          "colour": "blue",
+          "shape": null,
+          "position": null,
+          "ordinal": null,
+          "ordinal_from": null,
+          "speed": null,
+          "destination": null,
+          "then": null
+        }
+      },
+      {
+        "t": 33.13683819770813,
+        "stamp": 1790781338.638,
+        "action_intent": "drop_right",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 45.51883816719055,
+        "stamp": 1790781351.02,
+        "action_intent": "go_home",
+        "object_intent": null,
+        "object_attributes": null
+      },
+      {
+        "t": 57.431838274002075,
+        "stamp": 1790781362.933,
+        "action_intent": "open_gripper",
+        "object_intent": null,
+        "object_attributes": null
+      }
+    ],
+    "selection": [
+      {
+        "t": 19.53684973716736,
+        "stamp": 1790781325.0380116,
+        "label": "vitamin_tube",
+        "source": "voice",
+        "cycle_id": 7
+      }
+    ],
+    "gripper_cmd": [
+      {
+        "t": 20.288543462753296,
+        "stamp": 1790781325.7897053,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 22.396844148635864,
+        "stamp": 1790781327.898006,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      },
+      {
+        "t": 57.72823882102966,
+        "stamp": 1790781363.2294006,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 60.36400294303894,
+        "stamp": 1790781365.8651648,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      }
+    ],
+    "interactive_status": [
+      {
+        "t": 24.893776178359985,
+        "stamp": 1790781330.394938,
+        "status": "paused"
+      },
+      {
+        "t": 33.150452613830566,
+        "stamp": 1790781338.6516144,
+        "status": "resumed:vla_drop_right"
+      },
+      {
+        "t": 38.76954698562622,
+        "stamp": 1790781344.2707088,
+        "status": "awaiting_release"
+      },
+      {
+        "t": 45.56371593475342,
+        "stamp": 1790781351.0648777,
+        "status": "redirect:home"
+      },
+      {
+        "t": 49.782856941223145,
+        "stamp": 1790781355.2840188,
+        "status": "resumed:home"
+      },
+      {
+        "t": 49.78455448150635,
+        "stamp": 1790781355.2857163,
+        "status": "awaiting_release"
+      },
+      {
+        "t": 57.47329592704773,
+        "stamp": 1790781362.9744577,
+        "status": "releasing"
+      },
+      {
+        "t": 58.08930468559265,
+        "stamp": 1790781363.5904665,
+        "status": "released"
+      }
+    ],
+    "executor_phase": [
+      {
+        "t": 19.88683819770813,
+        "stamp": 1790781325.388,
+        "name": "candidates_received",
+        "cycle_id": 7
+      },
+      {
+        "t": 19.887838125228882,
+        "stamp": 1790781325.389,
+        "name": "precheck_hit",
+        "cycle_id": 7
+      },
+      {
+        "t": 20.031838178634644,
+        "stamp": 1790781325.533,
+        "name": "open_sent",
+        "cycle_id": 7
+      },
+      {
+        "t": 20.031838178634644,
+        "stamp": 1790781325.533,
+        "name": "motion_start",
+        "cycle_id": 7
+      },
+      {
+        "t": 22.1428382396698,
+        "stamp": 1790781327.644,
+        "name": "close_sent",
+        "cycle_id": 7
+      },
+      {
+        "t": 22.626838207244873,
+        "stamp": 1790781328.128,
+        "name": "arrival",
+        "cycle_id": 7
+      },
+      {
+        "t": 23.658838272094727,
+        "stamp": 1790781329.16,
+        "name": "grasp_verdict",
+        "cycle_id": 7
+      },
+      {
+        "t": 24.754838228225708,
+        "stamp": 1790781330.256,
+        "name": "lift_done",
+        "cycle_id": 7
+      },
+      {
+        "t": 24.89183807373047,
+        "stamp": 1790781330.393,
+        "name": "wait_destination_start",
+        "cycle_id": 7
+      },
+      {
+        "t": 33.14983820915222,
+        "stamp": 1790781338.651,
+        "name": "destination_received",
+        "cycle_id": 7
+      },
+      {
+        "t": 58.08883810043335,
+        "stamp": 1790781363.59,
+        "name": "home_done",
+        "cycle_id": 7
+      },
+      {
+        "t": 61.47083806991577,
+        "stamp": 1790781366.972,
+        "name": "cycle_done",
+        "cycle_id": 7
+      }
+    ],
+    "cycle_done": [
+      {
+        "t": 61.472944498062134,
+        "stamp": 1790781366.9741063,
+        "ok": true,
+        "cycle_id": "7",
+        "reason": ""
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 646,
+  "duration_s": 64.69931387901306,
+  "dropped_ticks": 1,
+  "drop_reasons": {
+    "joints": 1
+  },
+  "started_unix": 1790781305.5012145,
+  "started_ros": 1790781305.5011618,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.5,
+      0.5,
+      0.06
+    ],
+    "rpy": [
+      0.0,
+      -0.5,
+      -0.8
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2
+  },
+  "phase_names": [
+    "candidates_received",
+    "precheck_hit",
+    "open_sent",
+    "motion_start",
+    "close_sent",
+    "arrival",
+    "grasp_verdict",
+    "lift_done",
+    "wait_destination_start",
+    "destination_received",
+    "home_done",
+    "cycle_done"
+  ],
+  "quality": {
+    "ok": false,
+    "issues": [
+      "1 dropped tick(s): {'joints': 1}"
+    ],
+    "num_steps": 646,
+    "task_steps": 432,
+    "idle_steps": 214,
+    "reset_steps": 0,
+    "step_gaps": [],
+    "dt_max_s": 0.3673698902130127,
+    "images": {
+      "exterior": {
+        "age_max_s": 0.31352848900041863,
+        "age_p95_s": 0.12686371799986773,
+        "missing": 0
+      },
+      "wrist": {
+        "age_max_s": 0.2793267420001939,
+        "age_p95_s": 0.03966212549971715,
+        "missing": 0
+      }
+    },
+    "joint_age_max_s": 0.09721060699939699,
+    "tcp_stale_steps": 0,
+    "ur_tcp_missing_steps": 0,
+    "gripper_commands": [
+      {
+        "t": 20.288543462753296,
+        "cmd": "open",
+        "state_lag_s": 0.45624232292175293
+      },
+      {
+        "t": 22.396844148635864,
+        "cmd": "close",
+        "state_lag_s": 1.1450910568237305
+      },
+      {
+        "t": 57.72823882102966,
+        "cmd": "open",
+        "state_lag_s": 0.4144020080566406
+      },
+      {
+        "t": 60.36400294303894,
+        "cmd": "close",
+        "state_lag_s": 1.1775321960449219
+      }
+    ],
+    "gripper_state_changes": 4,
+    "n_transcripts": 5,
+    "n_intents": 4,
+    "n_instructions": 4,
+    "n_executor_phases": 12
+  }
+}

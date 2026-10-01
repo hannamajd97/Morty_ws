@@ -1,0 +1,98 @@
+TRIAL TIMELINE  start 2026-09-30 16:43:26  stop 16:44:25  (59.0 s)
+seconds after the trial start; negative = work already done in the background before the trial
+
+t= -645.50  background: GraspGen for 'wooden_maze_puzzle' done (job 0.98 s, 18 grasps)
+t= -643.00  background: 'wooden_maze_puzzle' verified for execution via the curve (executor probe 2.37 s, 3 tried)
+t= -237.69  background: GraspGen for 'wooden_maze_puzzle' done (job 1.76 s, 17 grasps)
+t= -237.01  background: 'wooden_maze_puzzle' verified for execution via the curve (executor probe 0.58 s, 1 tried)
+t= -190.02  background: GraspGen for 'wooden_maze_puzzle' done (job 1.91 s, 20 grasps)
+t= -189.30  background: 'wooden_maze_puzzle' verified for execution via the curve (executor probe 0.56 s, 1 tried)
+t= -143.11  background: GraspGen for 'wooden_maze_puzzle' done (job 1.02 s, 5 grasps)
+t= -139.18  background: GraspGen for 'wooden_maze_puzzle' done (job 1.54 s, 13 grasps)
+t= -121.82  background: GraspGen for 'wooden_maze_puzzle' done (job 2.27 s, 11 grasps)
+t= -110.57  background: 'wooden_maze_puzzle' no feasible grasp (executor probe 11.02 s, 10 tried)
+t= -108.07  background: GraspGen for 'wooden_maze_puzzle' done (job 1.34 s, 12 grasps)
+t= -103.84  background: GraspGen for 'wooden_maze_puzzle' done (job 1.35 s, 15 grasps)
+t=  -84.89  background: 'wooden_maze_puzzle' no feasible grasp (executor probe 5.32 s, 5 tried)
+t=  -79.60  background: GraspGen for 'wooden_maze_puzzle' done (job 4.22 s, 15 grasps)
+t=  -71.48  background: 'wooden_maze_puzzle' verified for execution via the curve (executor probe 7.81 s, 7 tried)
+t=  -41.59  background: GraspGen for 'wooden_maze_puzzle' done (job 1.91 s, 23 grasps)
+t=  -28.28  background: GraspGen for 'wooden_maze_puzzle' done (job 2.54 s, 7 grasps)
+t=  -20.89  background: 'wooden_maze_puzzle' no feasible grasp (executor probe 7.28 s, 7 tried)
+t=  -12.53  background: GraspGen for 'wooden_maze_puzzle' done (job 2.74 s, 6 grasps)
+t=  -10.82  background: 'wooden_maze_puzzle' verified for execution via the curve (executor probe 0.56 s, 1 tried)
+t=   +0.00  trial start
+t=   +3.00  you stopped speaking ("Grasp for me the wooden maze puzzle.")
+t=   +4.18  you said: "Grasp for me the wooden maze puzzle."
+t=   +4.19  intent: pick wooden_maze_puzzle
+t=   +4.78  trial bag ready
+t=   +5.58  selection cycle 5 started
+t=   +5.61  pipeline: 'wooden_maze_puzzle' precomputed — GraspGen ran 18.0 s before the click (job 2.74 s), executor verified it via the curve (probe 0.56 s)
+t=   +5.87  pipeline: 6 candidates published (0.37 s after the click, precomputed)
+t=   +6.20  Morty said: "Starting grasp on the wooden maze puzzle."
+t=   +6.63  executor: candidates received
+t=   +6.63  executor: precheck hit (+0.01 s)
+t=   +6.78  probe: grasp 1/6: FEASIBLE (verified in the background via the curve) — executing this one
+t=   +6.81  executor: open sent (+0.17 s)
+t=   +6.81  executor: motion start (+0.00 s)
+t=   +6.87  arm starts moving (joint data)
+t=   +8.91  executor: close sent (+2.11 s)
+t=   +9.37  executor: arrival (+0.45 s)
+t=  +10.42  executor: grasp verdict (+1.06 s)
+t=  +10.62  arm starts moving (joint data)
+t=  +11.53  executor: lift done (+1.11 s)
+t=  +11.62  executor: wait destination start (+0.10 s)
+t=  +11.63  robot: paused
+t=  +11.64  Morty said: "Got the wooden maze puzzle. Where should I drop it? Left, right, or home?"
+t=  +21.34  you stopped speaking ("Give it to me on the drop right position.")
+t=  +23.62  you said: "Give it to me on the drop right position."
+t=  +24.66  Morty said: "Left or right?"
+t=  +29.98  you stopped speaking ("on the drop right position")
+t=  +31.25  you said: "on the drop right position"
+t=  +31.25  intent: drop_right
+t=  +31.29  executor: destination received (+19.67 s)
+t=  +31.29  robot: resumed:vla drop right
+t=  +31.31  Morty said: "Going to drop right."
+t=  +31.64  arm starts moving (joint data)
+t=  +36.38  robot: awaiting release
+t=  +36.39  Morty said: "I'm at the drop right position, still holding the wooden maze puzzle. Should I o"
+t=  +44.60  you stopped speaking ("Yes, open the grippers and go back home.")
+t=  +45.93  you said: "Yes, open the grippers and go back home."
+t=  +47.08  intent: release_home
+t=  +47.10  robot: releasing
+t=  +47.11  Morty said: "Opening the gripper."
+t=  +47.71  executor: released (+16.42 s)
+t=  +47.71  robot: released
+t=  +49.97  arm starts moving (joint data)
+t=  +53.81  executor: home done (+6.10 s)
+t=  +55.17  executor: cycle done (+1.36 s)
+t=  +55.17  executor reported: done|5
+t=  +55.20  Morty said: "Done — I'm back at the home position. What's next?"
+t=  +58.96  trial stop
+
+SUMMARY  (the choice = the moment the pipeline committed the object)
+  INTERACTION: command given -> arm moves       3.81 s
+  end of your voice -> transcript               1.17 s
+  you stopped speaking -> command               1.19 s
+  transcript -> command (understanding)         0.01 s
+  command -> object chosen (incl. clarification)    1.39 s
+  object chosen -> grasp candidates             0.29 s
+  GraspGen compute (the run that was used)      2.74 s
+    of it waited for after the choice           0.00 s
+    ready this long before the choice          18.10 s
+  reachability check (background probe)         0.56 s
+  executor: candidates -> motion start          0.18 s
+  command -> arm moves                          2.63 s
+  approach                                      2.56 s
+  arrival -> grasp verdict                      1.06 s
+  waiting for the drop side                    19.67 s
+  motion start -> home                         48.37 s
+  command given -> object handed over          44.71 s
+  Morty waited for your answers                30.33 s
+  robot's own time (total - waiting)           20.67 s
+  total                                        51.00 s
+  understood by                              instant rule
+  GraspGen in the background                 yes
+  execution plan checked in the background   yes
+  grasp executed                             1 of 6
+  execution plan compute                        0.56 s

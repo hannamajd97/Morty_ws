@@ -1,0 +1,109 @@
+{
+  "vla": {
+    "trial": "/home/deep/morty_ws/experiments/experiments_30_09_2026/trial_135_LB_S4",
+    "ready": {
+      "bag": true,
+      "episode": "written",
+      "timeout": false
+    },
+    "bags": [
+      {
+        "bag": "/home/deep/morty_ws/experiments/experiments_30_09_2026/trial_135_LB_S4/bag",
+        "ok": true,
+        "issues": [],
+        "files": [
+          {
+            "file": "bag_0.db3",
+            "exists": true,
+            "bytes": 168439808
+          }
+        ],
+        "topics": {
+          "/astra/color/camera_info": 1890,
+          "/astra/color/compressed_slow": 543,
+          "/grasp_pipeline/point_proposal": 0,
+          "/tf_static": 14,
+          "/grasp_executor_lin_llm/cycle_done": 1,
+          "/grasp_executor_lin_llm/interactive_status": 8,
+          "/graspgen/timing": 1,
+          "/grasp_executor_lin_llm/selected_pose": 2,
+          "/graspgen/selection_cycle_id": 2,
+          "/speech/ai_said": 9,
+          "/tf": 32185,
+          "/yolo/all_detections": 17,
+          "/joint_states": 30931,
+          "/grasp_executor_lin_llm/timing": 1,
+          "/camera/camera/color/image_raw/compressed": 1899,
+          "/camera/camera/color/camera_info": 1898,
+          "/gripper_controller/joint_states": 608,
+          "/speech/accepted_transcript": 5,
+          "/robot/intent": 4,
+          "/io_and_status_controller/robot_program_running": 1,
+          "/scaled_joint_trajectory_controller/controller_state": 5391,
+          "/io_and_status_controller/io_states": 30117,
+          "/tcp_pose_broadcaster/pose": 29924,
+          "/speed_scaling_state_broadcaster/speed_scaling": 30112,
+          "/speech/utterance_meta": 5
+        },
+        "message_count": 165568,
+        "start": 1790781306.6935341,
+        "end": 1790781370.3218102
+      }
+    ],
+    "joints_full": {
+      "trial": "trial_135_LB_S4",
+      "samples": 30323,
+      "rate_hz": 500.0,
+      "ctrl_samples": 5391,
+      "ctrl_acc_filled": 340,
+      "acc_p99": [
+        2.8,
+        2.78,
+        4.56,
+        2.24,
+        4.3,
+        2.69
+      ],
+      "step_vel_vs_bag_max": 0.0,
+      "steps_filled": 616,
+      "steps": 646
+    },
+    "errors": [],
+    "ok": true
+  },
+  "ok": true,
+  "updated_unix": 1790781388.746007,
+  "trial_times": {
+    "ok": true,
+    "result": {
+      "trial": "trial_135_LB_S4",
+      "event_times": {
+        "moved": 28,
+        "from": {
+          "bag": 26,
+          "vla": 2
+        },
+        "gui_late_by_s": {
+          "median": 0.135,
+          "max": 0.276
+        },
+        "note": "GUI event times moved to the bag's receive stamps (else the VLA recorder's); stage times rebuilt from them"
+      },
+      "csv_values_updated": 1,
+      "stage": {
+        "interaction_s": 15.695,
+        "speech_end_to_intent_s": 2.494,
+        "intent_s": 1.324,
+        "choice_s": 0.807,
+        "yolo_s": 0.244,
+        "graspgen_compute_s": 1.825,
+        "graspgen_wait_s": 0.0,
+        "graspgen_lead_s": 387.267,
+        "verify_compute_s": 1.784,
+        "command_to_motion_s": 14.503,
+        "total_s": 55.942,
+        "started_by": "voice"
+      }
+    }
+  }
+}

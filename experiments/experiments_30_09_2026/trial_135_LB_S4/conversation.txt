@@ -1,0 +1,15 @@
+# trial 135 started 2026-09-30T17:15:05.338153
+[   6.04s] You: Morty, give me the vitamin.
+[   6.97s] Morty: Which vitamin do you mean—the Vitamin B12 with the purple cap, or the Multivitamin with the blue cap?
+[  17.90s] You: Give me the ones that have a blue cup.
+[  19.37s] Morty (status): Picking the blue Multivitamin.
+[  22.12s] Morty (status): Starting grasp on the vitamin tube.
+[  25.28s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  33.57s] You: Drop it on the right side.
+[  33.67s] Morty (status): Going to drop right.
+[  39.16s] Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+[  44.87s] You: I changed my mind, go back home.
+[  50.27s] Morty (status): I'm at the home position, still holding the vitamin tube. Should I open the gripper?
+[  57.87s] You: Yes, give me the object.
+[  58.07s] Morty (status): Opening the gripper.
+[  61.97s] Morty (status): I'm at the home position. What's next?

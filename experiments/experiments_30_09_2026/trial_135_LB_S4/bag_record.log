@@ -1,0 +1,37 @@
+
+===== session started 2026-09-30 17:15:05 =====
+[INFO] [1790781306.425641547] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1790781306.435861542] [rosbag2_storage]: Opened database '/home/deep/morty_ws/experiments/experiments_30_09_2026/trial_135_LB_S4/bag/bag_0.db3' for READ_WRITE.
+[INFO] [1790781306.466283751] [rosbag2_recorder]: Listening for topics...
+[INFO] [1790781306.466732856] [rosbag2_recorder]: Recording...
+[INFO] [1790781306.466325475] [rosbag2_recorder]: Event publisher thread: Starting
+[INFO] [1790781306.614469484] [rosbag2_recorder]: Subscribed to topic '/astra/color/camera_info'
+[INFO] [1790781306.642710563] [rosbag2_recorder]: Subscribed to topic '/astra/color/compressed_slow'
+[INFO] [1790781306.664616214] [rosbag2_recorder]: Subscribed to topic '/grasp_pipeline/point_proposal'
+[INFO] [1790781306.677717353] [rosbag2_recorder]: Subscribed to topic '/tf_static'
+[INFO] [1790781306.703889199] [rosbag2_recorder]: Subscribed to topic '/grasp_executor_lin_llm/cycle_done'
+[INFO] [1790781306.717952105] [rosbag2_recorder]: Subscribed to topic '/grasp_executor_lin_llm/interactive_status'
+[INFO] [1790781306.739514506] [rosbag2_recorder]: Subscribed to topic '/graspgen/timing'
+[INFO] [1790781306.762968786] [rosbag2_recorder]: Subscribed to topic '/grasp_executor_lin_llm/selected_pose'
+[INFO] [1790781306.787932492] [rosbag2_recorder]: Subscribed to topic '/graspgen/selection_cycle_id'
+[INFO] [1790781306.806139244] [rosbag2_recorder]: Subscribed to topic '/speech/ai_said'
+[INFO] [1790781306.822017304] [rosbag2_recorder]: Subscribed to topic '/tf'
+[INFO] [1790781306.868317895] [rosbag2_recorder]: Subscribed to topic '/yolo/all_detections'
+[WARN] [1790781306.988963747] [ROSBAG2_TRANSPORT]: Some, but not all, publishers on topic "/joint_states" are offering RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL. Falling back to RMW_QOS_POLICY_DURABILITY_VOLATILE as it will connect to all publishers. Previously-published latched messages will not be retrieved.
+[INFO] [1790781306.997531079] [rosbag2_recorder]: Subscribed to topic '/joint_states'
+[INFO] [1790781307.010778967] [rosbag2_recorder]: Subscribed to topic '/grasp_executor_lin_llm/timing'
+[INFO] [1790781307.018871933] [rosbag2_recorder]: Subscribed to topic '/camera/camera/color/image_raw/compressed'
+[INFO] [1790781307.030184209] [rosbag2_recorder]: Subscribed to topic '/camera/camera/color/camera_info'
+[INFO] [1790781307.037941811] [rosbag2_recorder]: Subscribed to topic '/gripper_controller/joint_states'
+[INFO] [1790781307.068522532] [rosbag2_recorder]: Subscribed to topic '/speech/accepted_transcript'
+[INFO] [1790781307.099508509] [rosbag2_recorder]: Subscribed to topic '/robot/intent'
+[INFO] [1790781307.304644174] [rosbag2_recorder]: Subscribed to topic '/io_and_status_controller/robot_program_running'
+[INFO] [1790781307.354126880] [rosbag2_recorder]: Subscribed to topic '/scaled_joint_trajectory_controller/controller_state'
+[INFO] [1790781307.370393078] [rosbag2_recorder]: Subscribed to topic '/io_and_status_controller/io_states'
+[INFO] [1790781307.396190923] [rosbag2_recorder]: Subscribed to topic '/tcp_pose_broadcaster/pose'
+[INFO] [1790781307.425648379] [rosbag2_recorder]: Subscribed to topic '/speed_scaling_state_broadcaster/speed_scaling'
+[INFO] [1790781308.330436894] [rosbag2_recorder]: Subscribed to topic '/speech/utterance_meta'
+[INFO] [1790781308.330594503] [rosbag2_recorder]: All requested topics are subscribed. Stopping discovery...
+[INFO] [1790781370.322863645] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1790781370.329341986] [rosbag2_recorder]: Event publisher thread: Exiting
+[INFO] [1790781370.330320687] [rosbag2_recorder]: Recording stopped

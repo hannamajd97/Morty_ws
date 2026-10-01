@@ -1,0 +1,111 @@
+[speech_input_node-4] [INFO] [1790781310.687619253] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.052)
+[speech_input_node-4] [INFO] [1790781311.028056973] [speech_input_node]: [timing] omni 0.33s for 2.4s audio (today 42, month 1164)
+[speech_input_node-4] [INFO] [1790781311.029440029] [speech_input_node]: Heard: 'Morty, give me the vitamin.'
+[chat_node-7] User (voice): Morty, give me the vitamin.
+[chat_node-7] [0m[INFO] [1790781311.037604261] [communication_llm_chat_node]: [timing] pruned 9 stale message(s) from the LLM context (35 -> 26)[0m
+[chat_node-7] [0m[INFO] [1790781312.115502047] [communication_llm_chat_node]: [timing] LLM main call 1.07s (prompt cache: 6946 tokens read)[0m
+[chat_node-7] Assistant: Which vitamin do you mean—the Vitamin B12 with the purple cap, or the Multivitamin with the blue cap?
+[speak_action_server-3] [INFO] [1790781312.132654897] [speak_action_server]: Speak: 'Which vitamin do you mean—the Vitamin B12 with the purple cap, or the Multivitamin with the blue cap?'
+[speak_action_server-3] [INFO] [1790781319.166046474] [speak_action_server]: [timing] TTS first audio after 0.60s, 6.5s of speech, done 7.01s after the request
+[speech_input_node-4] [INFO] [1790781322.663126640] [speech_input_node]: [speaker] human voice (cos 0.00, rms 0.059)
+[speech_input_node-4] [INFO] [1790781323.001621826] [speech_input_node]: [timing] omni 0.33s for 3.2s audio (today 43, month 1165)
+[speech_input_node-4] [INFO] [1790781323.005418020] [speech_input_node]: Heard: 'Give me the ones that have a blue cup.'
+[chat_node-7] User (voice): Give me the ones that have a blue cup.
+[chat_node-7] [0m[INFO] [1790781323.011871263] [communication_llm_chat_node]: [timing] pruned 10 stale message(s) from the LLM context (35 -> 25)[0m
+[chat_node-7] [0m[INFO] [1790781324.331249850] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"pick","object_intent":"vitamin_c","object_attributes":{"colour":"blue","shape":null,"position":null,"ordinal":null,"ordinal_from":null,"speed":null,"destination":null,"then":null}}[0m
+[chat_node-7] [0m[INFO] [1790781324.332736524] [communication_llm_chat_node]: [timing] intent dispatched 1.32s into the LLM call (before the reply finished)[0m
+[chat_node-7] [0m[INFO] [1790781324.335348823] [communication_llm_chat_node]: [timing] LLM main call 1.32s (prompt cache: 6946 tokens read)[0m
+[intent_router_node-6] [INFO] [1790781324.339585290] [intent_router_node]: Queued intent 'pick'; queue size now 1, busy=False
+[intent_router_node-6] [INFO] [1790781324.347273108] [intent_router_node]: dispatching: action='pick', object='vitamin_c', colour='blue', shape='', position='', speed='slow'
+[intent_router_node-6] [INFO] [1790781324.357739749] [intent_router_node]: controller auto-heal: best-effort activate of scaled_joint_trajectory_controller dispatched.
+[intent_router_node-6] [INFO] [1790781324.367485470] [intent_router_node]: Vitamin-tube pick check: position='', visible_count=2, scene_age_s=0.10
+[chat_node-7] [0m[INFO] [1790781324.383661603] [communication_llm_chat_node]: Current pose update: 'home' -> ''[0m
+[intent_router_node-6] [INFO] [1790781324.385467010] [intent_router_node]: Voice pick: execution gate OPENED (auto-execute checkbox applies to GUI clicks only).
+[intent_router_node-6] [INFO] [1790781324.386939407] [intent_router_node]: Published spatial pick det (index=3, label='vitamin_tube') to /yolo/select_detection for live re-resolution.
+[speak_action_server-3] [INFO] [1790781324.387561675] [speak_action_server]: Speak: 'Picking the blue Multivitamin.'
+[intent_router_node-6] [INFO] [1790781324.399680063] [intent_router_node]: Set wait_for_destination=True on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790781324.415489091] [intent_router_node]: Set vitamin_mode_active=False on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790781324.435619880] [intent_router_node]: Set task_object_label='vitamin_tube' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790781325.069942360] [intent_router_node]: Selected detection: label='vitamin_tube' (updating _last_target_label for narration).
+[intent_router_node-6] [INFO] [1790781325.094690054] [intent_router_node]: Set task_object_label='vitamin_tube' on grasp_executor_lin_llm.
+[chat_node-7] [0m[INFO] [1790781325.121415123] [communication_llm_chat_node]: [timing] LLM follow-up call 0.78s[0m
+[intent_router_node-6] [INFO] [1790781325.391301712] [intent_router_node]: task_state: cycle 7 phase='probing' question='' holding=False object='vitamin_tube'
+[chat_node-7] [0m[INFO] [1790781325.391106842] [communication_llm_chat_node]: Cycle state: BUSY — pick running[0m
+[intent_router_node-6] [INFO] [1790781325.396602089] [intent_router_node]: task_state: cycle 7 phase='approaching' question='' holding=False object='vitamin_tube'
+[intent_router_node-6] [INFO] [1790781325.741478281] [intent_router_node]: cycle_id=7 (target='vitamin tube') — narrating start
+[speak_action_server-3] [INFO] [1790781325.750302439] [speak_action_server]: Queueing Speak behind in-flight goal (interrupt_current=false).
+[speak_action_server-3] [INFO] [1790781327.063448948] [speak_action_server]: [timing] TTS first audio after 0.28s, 2.5s of speech, done 2.67s after the request
+[speak_action_server-3] [INFO] [1790781327.086920823] [speak_action_server]: Speak: 'Starting grasp on the vitamin tube.'
+[chat_node-7] [0m[INFO] [1790781329.162466168] [communication_llm_chat_node]: Held-object update (task state): '' -> 'vitamin_tube'[0m
+[intent_router_node-6] [INFO] [1790781329.166641871] [intent_router_node]: Held-object memory: 'vitamin_tube'
+[speak_action_server-3] [INFO] [1790781330.260923849] [speak_action_server]: [timing] TTS first audio after 0.38s, 2.9s of speech, done 3.17s after the request
+[chat_node-7] [0m[INFO] [1790781330.396228250] [communication_llm_chat_node]: Cycle state: HOLDING the object at the grasp pose — waiting for a drop destination[0m
+[intent_router_node-6] [INFO] [1790781330.397039540] [intent_router_node]: task_state: cycle 7 phase='awaiting_destination' question='destination' holding=True object='vitamin_tube'
+[speak_action_server-3] [INFO] [1790781330.402578197] [speak_action_server]: Speak: 'Got the vitamin tube. Where should I drop it? Left, right, or home?'
+[speak_action_server-3] [INFO] [1790781335.122501752] [speak_action_server]: [timing] TTS first audio after 0.32s, 4.5s of speech, done 4.72s after the request
+[speech_input_node-4] [INFO] [1790781338.173945163] [speech_input_node]: [speaker] human voice (cos 0.02, rms 0.048)
+[speech_input_node-4] [INFO] [1790781338.632495334] [speech_input_node]: [timing] omni 0.46s for 2.2s audio (today 44, month 1166)
+[speech_input_node-4] [INFO] [1790781338.633789111] [speech_input_node]: Heard: 'Drop it on the right side.'
+[chat_node-7] User (voice): Drop it on the right side.
+[chat_node-7] [0m[INFO] [1790781338.641523169] [communication_llm_chat_node]: FAST: matched 'Drop it on the right side.' -> drop_right (speed=default); published {"action_intent":"drop_right","object_intent":null,"object_attributes":null}[0m
+[intent_router_node-6] [INFO] [1790781338.641575346] [intent_router_node]: Resume 'drop_right' published (bypass queue (pick paused): plain 'drop_right').
+[chat_node-7] [0m[INFO] [1790781338.644222577] [communication_llm_chat_node]: Withholding pre-emptive narration 'Going to drop right.' for 'drop_right' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790781338.645905363] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer drop_right, question='destination', fresh=True)[0m
+[chat_node-7] [0m[INFO] [1790781338.652889476] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting destination)[0m
+[intent_router_node-6] [INFO] [1790781338.652793404] [intent_router_node]: task_state: cycle 7 phase='awaiting_destination' question='' holding=True object='vitamin_tube'
+[chat_node-7] [0m[INFO] [1790781338.656445695] [communication_llm_chat_node]: Cycle state: BUSY — pick running (carrying)[0m
+[intent_router_node-6] [INFO] [1790781338.657976841] [intent_router_node]: task_state: cycle 7 phase='carrying' question='' holding=True object='vitamin_tube'
+[speak_action_server-3] [INFO] [1790781338.663027316] [speak_action_server]: Speak: 'Going to drop right.'
+[speak_action_server-3] [INFO] [1790781340.918940764] [speak_action_server]: [timing] TTS first audio after 0.26s, 2.1s of speech, done 2.25s after the request
+[chat_node-7] [0m[INFO] [1790781344.270227101] [communication_llm_chat_node]: Current pose update: '' -> 'vla_drop_right'[0m
+[chat_node-7] [0m[INFO] [1790781344.273212962] [communication_llm_chat_node]: Cycle state: HOLDING at the drop pose — waiting for release confirmation[0m
+[intent_router_node-6] [INFO] [1790781344.273252431] [intent_router_node]: task_state: cycle 7 phase='awaiting_release' question='release' holding=True object='vitamin_tube'
+[speak_action_server-3] [INFO] [1790781344.276423761] [speak_action_server]: Speak: "I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?"
+[speech_input_node-4] [INFO] [1790781347.264517095] [speech_input_node]: [speaker] barge-in: a human is talking over Morty (cos 0.01, rms 0.166 vs echo 0.177) — stopping playback
+[speak_action_server-3] [INFO] [1790781347.266502935] [speak_action_server]: Barge-in: the operator is talking — stopping playback; new speech waits until they finish.
+[speak_action_server-3] [INFO] [1790781347.361968710] [speak_action_server]: [timing] TTS first audio after 0.30s, 5.5s of speech, done 3.08s after the request
+[speech_input_node-4] [INFO] [1790781349.635129361] [speech_input_node]: [speaker] human voice (cos 0.04, rms 0.064)
+[speech_input_node-4] [INFO] [1790781349.988256434] [speech_input_node]: [timing] omni 0.35s for 3.6s audio (today 45, month 1167)
+[speech_input_node-4] [INFO] [1790781349.989437096] [speech_input_node]: Heard: 'I changed my mind, go back home.'
+[chat_node-7] User (voice): I changed my mind, go back home.
+[chat_node-7] [0m[INFO] [1790781350.003307598] [communication_llm_chat_node]: [timing] pruned 11 stale message(s) from the LLM context (38 -> 27)[0m
+[chat_node-7] [0m[INFO] [1790781351.021106545] [communication_llm_chat_node]: Published intent on /robot/intent: {"action_intent":"go_home","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790781351.022034583] [communication_llm_chat_node]: [timing] intent dispatched 1.02s into the LLM call (before the reply finished)[0m
+[intent_router_node-6] [INFO] [1790781351.022940858] [intent_router_node]: Resume 'home' published (bypass queue (pick paused): plain 'go_home').
+[chat_node-7] [0m[INFO] [1790781351.023823239] [communication_llm_chat_node]: [timing] LLM main call 1.02s (prompt cache: 6946 tokens read)[0m
+[chat_node-7] [0m[INFO] [1790781351.066232049] [communication_llm_chat_node]: Cycle state: BUSY — pick running (carrying)[0m
+[intent_router_node-6] [INFO] [1790781351.067180049] [intent_router_node]: Executor redirect in progress: 'redirect:home'
+[intent_router_node-6] [INFO] [1790781351.068787665] [intent_router_node]: task_state: cycle 7 phase='carrying' question='' holding=True object='vitamin_tube'
+[chat_node-7] [0m[INFO] [1790781351.770082491] [communication_llm_chat_node]: [timing] LLM follow-up call 0.74s[0m
+[chat_node-7] [0m[INFO] [1790781351.774577543] [communication_llm_chat_node]: Withholding end-of-turn TTS: narration for ['go_home'] is driven by intent_router confirmation, not by intent.[0m
+[chat_node-7] [0m[INFO] [1790781355.273531897] [communication_llm_chat_node]: Current pose update: 'vla_drop_right' -> 'home'[0m
+[chat_node-7] [0m[INFO] [1790781355.276952977] [communication_llm_chat_node]: Cycle state: HOLDING at the drop pose — waiting for release confirmation[0m
+[intent_router_node-6] [INFO] [1790781355.279974190] [intent_router_node]: task_state: cycle 7 phase='awaiting_release' question='release' holding=True object='vitamin_tube'
+[speak_action_server-3] [INFO] [1790781355.290981996] [speak_action_server]: Speak: "I'm at the home position, still holding the vitamin tube. Should I open the gripper?"
+[speak_action_server-3] [INFO] [1790781360.881102519] [speak_action_server]: [timing] TTS first audio after 0.39s, 5.2s of speech, done 5.59s after the request
+[speech_input_node-4] [INFO] [1790781362.645476133] [speech_input_node]: [speaker] human voice (cos -0.02, rms 0.128)
+[speech_input_node-4] [INFO] [1790781362.928505137] [speech_input_node]: [timing] omni 0.28s for 2.1s audio (today 46, month 1168)
+[speech_input_node-4] [INFO] [1790781362.929710543] [speech_input_node]: Heard: 'Yes, give me the object.'
+[chat_node-7] User (voice): Yes, give me the object.
+[chat_node-7] [0m[INFO] [1790781362.936789972] [communication_llm_chat_node]: FAST: matched 'Yes, give me the object.' -> open_gripper (speed=default); published {"action_intent":"open_gripper","object_intent":null,"object_attributes":null}[0m
+[chat_node-7] [0m[INFO] [1790781362.939717423] [communication_llm_chat_node]: Withholding pre-emptive narration 'Opening the gripper.' for 'open_gripper' — intent_router speaks it only after the action is confirmed (2026-08-28 'said Opening the gripper but did not open the gripper').[0m
+[chat_node-7] [0m[INFO] [1790781362.941087397] [communication_llm_chat_node]: [timing] handled in 0.01s (route=GRAMMAR answer open_gripper, question='release', fresh=True)[0m
+[intent_router_node-6] [INFO] [1790781362.945268734] [intent_router_node]: Resume 'release' published (bypass queue (release paused): open_gripper).
+[intent_router_node-6] [INFO] [1790781362.975258336] [intent_router_node]: task_state: cycle 7 phase='awaiting_release' question='' holding=True object='vitamin_tube'
+[chat_node-7] [0m[INFO] [1790781362.975549300] [communication_llm_chat_node]: Cycle state: BUSY — pick running (awaiting release)[0m
+[chat_node-7] [0m[INFO] [1790781362.978382815] [communication_llm_chat_node]: Cycle state: BUSY — pick running (releasing)[0m
+[intent_router_node-6] [INFO] [1790781362.979217860] [intent_router_node]: task_state: cycle 7 phase='releasing' question='' holding=True object='vitamin_tube'
+[speak_action_server-3] [INFO] [1790781362.981818654] [speak_action_server]: Speak: 'Opening the gripper.'
+[chat_node-7] [0m[INFO] [1790781363.231983881] [communication_llm_chat_node]: Held-object update (task state): 'vitamin_tube' -> ''[0m
+[intent_router_node-6] [INFO] [1790781363.234181758] [intent_router_node]: Held-object memory: ''
+[speak_action_server-3] [INFO] [1790781365.178614720] [speak_action_server]: [timing] TTS first audio after 0.21s, 2.0s of speech, done 2.20s after the request
+[chat_node-7] [0m[INFO] [1790781366.973406758] [communication_llm_chat_node]: Cycle state: IDLE — last pick finished[0m
+[intent_router_node-6] [INFO] [1790781366.973452504] [intent_router_node]: task_state: cycle 7 phase='idle' question='' holding=False object=''
+[intent_router_node-6] [INFO] [1790781366.980010543] [intent_router_node]: cycle_done received: 'done|7' (outcome=done)
+[intent_router_node-6] [INFO] [1790781366.982069994] [intent_router_node]: Grasp cycle completed successfully.
+[speak_action_server-3] [INFO] [1790781366.987599800] [speak_action_server]: Speak: "I'm at the home position. What's next?"
+[intent_router_node-6] [INFO] [1790781366.992257122] [intent_router_node]: Selected detection: label='vitamin_tube' (updating _last_target_label for narration).
+[intent_router_node-6] [INFO] [1790781366.996773172] [intent_router_node]: Set task_object_label='' on grasp_executor_lin_llm.
+[intent_router_node-6] [INFO] [1790781367.003967558] [intent_router_node]: Cleared auto_select_label on /yolo_live_select_grasp.
+[intent_router_node-6] [INFO] [1790781367.018416127] [intent_router_node]: Set task_object_label='vitamin_tube' on grasp_executor_lin_llm.
+[speak_action_server-3] [INFO] [1790781370.012283283] [speak_action_server]: [timing] TTS first audio after 0.23s, 2.9s of speech, done 3.02s after the request
