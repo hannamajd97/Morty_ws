@@ -176,7 +176,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.vf_min_rms.setValue(0.012)
         self.vf_min_rms.setToolTip(
             "Speech energy gate: buffers quieter than this RMS are ignored as "
-            "background noise (−32 dB default). Lower it for quiet mics."
+            "background noise (0.012 ≈ −38 dB here; the node's own default 0.025 ≈ −32 dB). Lower it for quiet mics."
         )
         vf.addRow("Min speech RMS:", self.vf_min_rms)
         self.vf_silence = QtWidgets.QSpinBox()
@@ -321,7 +321,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         df.addWidget(self.rs_cloud_status)
         self._rs_cam_alive = False
         det_note = QtWidgets.QLabel(
-            "Apply sends both switches to the running pipeline and reads them back; they are "
+            "Apply sends the three switches to the running pipeline and reads them back; they are "
             "also used when the pipeline next starts. Turning unknown-object detection off "
             "also stops the naming service and frees its memory on the graphics card.")
         det_note.setWordWrap(True)
@@ -331,7 +331,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.det_apply_status.setWordWrap(True)
         self.det_apply_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
         self.det_apply_btn = MotionWindow._small_apply_button(
-            "Send the two switches to the running pipeline, then read them back to verify."
+            "Send the three switches to the running pipeline, then read them back to verify."
         )
         self.det_apply_btn.clicked.connect(self._apply_detection)
         df.addLayout(MotionWindow._apply_row(self.det_apply_btn, self.det_apply_status))

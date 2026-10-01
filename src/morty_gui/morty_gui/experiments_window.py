@@ -115,7 +115,7 @@ class ExperimentsWindow(QtWidgets.QMainWindow):
         params_lay.addWidget(self.params_table, stretch=1)
         note = QtWidgets.QLabel(
             "Values apply to the RUNNING pipeline only (next cycle uses them); "
-            "they reset on pipeline restart. Booleans: type true/false."
+            "they reset on pipeline restart. Booleans: choose True / False. 'conf' only takes effect at the next pipeline start."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color:#888; font-size:10px;")
@@ -231,7 +231,7 @@ class ExperimentsWindow(QtWidgets.QMainWindow):
                 self._rec_file.close()
             self._rec_file = None
             self._rec_writer = None
-            self.rec_btn.setText("● Record experiments")
+            self.rec_btn.setText("● Record pipeline stats")
             self.rec_label.setText(f"stopped ({self._rec_rows} rows saved)")
             self.rec_label.setStyleSheet("color:#888;")
 

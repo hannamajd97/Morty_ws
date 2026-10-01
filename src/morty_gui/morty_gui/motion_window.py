@@ -63,8 +63,9 @@ class MotionWindow(QtWidgets.QMainWindow):
         )
         self.fast_cb.setToolTip(
             "Replays a recorded trajectory directly; no planning happens.\n"
-            "Planner settings above only matter for joint goals and for the\n"
-            "automatic fallback when a pose is not in the cache."
+            "Planner settings above only matter for joint goals and when no\n"
+            "replay node runs. A failed fast move is NOT re-planned automatically:\n"
+            "untick ⚡ and press GO to use the planner."
         )
         self.fast_cb.setChecked(True)
         self.fast_cb.toggled.connect(self._on_fast_toggle)
@@ -270,7 +271,7 @@ class MotionWindow(QtWidgets.QMainWindow):
         self.speed_status.setWordWrap(True)
         self.speed_status.setStyleSheet(f"color:{GREY}; font-size:10px;")
         self.speed_apply_btn = self._small_apply_button(
-            "Send these six values to the running grasp executor and read them back.\n"
+            "Send these values to the running grasp executor and read them back.\n"
             "Green = the executor confirmed them. They are remembered and used again\n"
             "when the executor next starts, so a restart keeps them."
         )
