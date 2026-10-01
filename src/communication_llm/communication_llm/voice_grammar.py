@@ -277,6 +277,42 @@ PICK_OBJECTS: list[tuple[str, str, str | None]] = [
     (r"(?:wooden\s+)?maze(?:\s+puzzle)?\b", "wooden_maze_puzzle", None),
     (r"(?:toy\s+)?faucet\b", "toy_faucet", None),
 ]
+# 2026-10-01 (Majd, trial 197: "Yes, this one. I don't know the name of it."
+# at "You pointed at the vitamin tube. Should I grasp it?" went to the model,
+# which answered "I'm still waiting for you to point"): at the pointing
+# question a FIRST clause that is a whole consent ("Yes, this one.") is the
+# yes when the rest is only a remark. The rest must not speak about the
+# robot's action or the choice: no negation (only "don't know / remember" is
+# a remark), no reversal, position, colour, object name or action verb —
+# "Yes. No, the other one.", "Yes, the left one.", "Yes. Give me the small
+# bottle." stay the model's.
+_POINT_REMARK_BLOCK = re.compile(
+    r"(?<![\w'-])(?:" + NEG + r"|not|never|(?:don't|dont|didn't|didnt)(?! (?:know|remember|recall))"
+    r"|wait|other|another|instead|wrong|actually|but|rather|except|before|after|later"
+    r"|left|right|middle|center|centre|leftmost|rightmost|first|second|third|last"
+    r"|red|pink|purple|blue|yellow|orange|green|white|black"
+    r"|grasp|grab|take|pick|get|give|bring|hand|pass|put|drop|place|move|go|carry"
+    r"|open|close|release|hold|keep|stay|home)(?![\w'-])")
+_POINT_REMARK_MAX_WORDS = 12
+
+
+def _point_consent_lead(text: str) -> bool:
+    """2026-10-01: ``text`` (raw — its punctuation splits the clauses) is a
+    consent to the pointing question followed by a remark (see
+    _POINT_REMARK_BLOCK). One clause alone is judged by classify's whole
+    patterns, not here."""
+    parts = [normalise(c) for c in re.split(r"[.!?;,…]+", text or "")]
+    parts = [c for c in parts if c]
+    if len(parts) < 2:
+        return False
+    first, rest = parts[0], " ".join(parts[1:])
+    if not (YES.match(first) or _grasp_consent(first) or DEICTIC_PICK.match(first)):
+        return False
+    if len(rest.split()) > _POINT_REMARK_MAX_WORDS or _POINT_REMARK_BLOCK.search(rest):
+        return False
+    return not any(re.search(r"(?<![\w'-])(?:" + pat + r")", rest) for pat, _l, _c in PICK_OBJECTS)
+
+
 # "give me / bring me / hand me / pass me X" is the same plain pick (B1).
 _PICK_GIVE = r"(?:give|bring|hand|pass)"
 _PICK_HEAD = re.compile(
@@ -492,7 +528,8 @@ def classify(text: str, question: str = "", fresh: bool = False,
             # I grasp it?" — yes / a short consent to grasp = confirm_point, a
             # whole no = reject_point; anything else (another object, a
             # position) is the LLM's.
-            if YES.match(t) or _grasp_consent(t) or DEICTIC_PICK.match(t):
+            if (YES.match(t) or _grasp_consent(t) or DEICTIC_PICK.match(t)
+                    or _point_consent_lead(text)):        # 2026-10-01: "Yes, this one. <remark>"
                 return ("answer", "confirm_point")
             if NO_POINT.match(t):
                 return ("answer", "reject_point")

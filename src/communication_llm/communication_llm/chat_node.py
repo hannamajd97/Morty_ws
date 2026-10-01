@@ -178,6 +178,10 @@ _WHICH_OBJECT_LINE = "Which object do you mean? Say its name or point at it."
 # pointing while saying it: the pipeline's vote proposes the object and the
 # router asks; the line is said only if no pointing question opens by then
 _WHICH_OBJECT_WAIT_S = 4.0
+# 2026-10-01 (trial 197: "Yes." + "Grasp it." arrived as two transcripts; the
+# second asked "Which object do you mean?" while the pointed pick ran): a pick
+# naming no object this soon after a pointing yes is the rest of that yes.
+_POINT_YES_REST_S = 6.0
 # The FAST-NEGATIVE lines (2026-08-28), shared since 2026-09-25 with the LLM
 # path (review Y2): a NO the LLM turned into close_gripper / stay says them too.
 _KEEP_HOLDING_LINE = "Okay, I'll keep holding it. Where should I take it?"
@@ -1396,6 +1400,7 @@ class ChatIntentNode(Node):
         # _route_minimal answers it like an executor question when none of
         # those is open.
         self._router_q: dict = {}
+        self._point_yes_at = -1e9       # monotonic time of the last pointing yes (2026-10-01)
         self.create_subscription(
             String, "/robot/open_question", self._on_router_question,
             QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
@@ -3262,6 +3267,13 @@ class ChatIntentNode(Node):
                     f"{rq['object']} {ans})")
                 return
         if (not question and not task.get("holding") and not self._held_object_label
+                and voice_grammar.match_deictic_pick(text)
+                and time.monotonic() - self._point_yes_at < _POINT_YES_REST_S):
+            self.get_logger().info(
+                f"{text!r} {time.monotonic() - self._point_yes_at:.1f} s after the pointing yes "
+                "— the rest of that yes (the pointed pick), nothing to do")
+            return
+        if (not question and not task.get("holding") and not self._held_object_label
                 and voice_grammar.match_deictic_pick(text)):
             self._ask_which_object(text)
             self.get_logger().info(
@@ -3738,7 +3750,8 @@ class ChatIntentNode(Node):
                      f"emit the pick of the {obj_w} with that qualifier")
         if not q and rq.get("question") == "point":
             # 2026-09-28: the router's pointing question (no cycle runs yet)
-            obj_p = str(rq.get("object") or "object").replace("_", " ")
+            # 2026-10-01: the router's name of the pointed object ("Vitamin C tube")
+            obj_p = str(rq.get("name") or rq.get("object") or "object").replace("_", " ")
             qtext = (f'OPEN QUESTION: "{rq.get("line") or f"You pointed at the {obj_p}. Should I grasp it?"}" '
                      f"(the operator POINTED at the {obj_p}; nothing moves until answered) — "
                      "yes / grab it = confirm_point, no / not that one = reject_point; naming "
@@ -4886,6 +4899,9 @@ class ChatIntentNode(Node):
             rq = self._router_q
             if rq.get("question") == "point" or rq.get("id") != seen:
                 return          # the pointing question came (or already ended)
+            t = self._live_task() or {}
+            if str(t.get("phase") or "idle") != "idle" or t.get("holding"):
+                return          # 2026-10-01: a pick started meanwhile — it is that object
             self.get_logger().info(
                 f"no pointing question {_WHICH_OBJECT_WAIT_S:.0f} s after {text!r} "
                 f"(was pointing at {pointed!r}) — asking which object")
@@ -4906,7 +4922,9 @@ class ChatIntentNode(Node):
             if d.get("question") != self._router_q.get("question"):
                 self.get_logger().info(
                     f"Router question: {d.get('question') or 'closed'!r}"
-                    + (f" ({d.get('object')!r})" if d.get("object") else ""))
+                    + (f" ({d.get('name') or d.get('object')!r})" if d.get("object") else ""))
+            if d.get("closed") == "yes" and self._router_q.get("question") == "point":
+                self._point_yes_at = time.monotonic()
             self._router_q = d
 
     def _on_task_state(self, msg: String) -> None:

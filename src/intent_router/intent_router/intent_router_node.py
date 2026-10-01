@@ -630,6 +630,13 @@ class IntentRouterNode(Node):
         # is published latched on /robot/open_question, so chat_node answers
         # a yes / no instantly, as it does the executor's own questions.
         self._point_q: Optional[dict] = None
+        # 2026-10-01 (Majd, trial 197: "he didn't say which object exactly I
+        # pointed on"): the confirmed pointed object's spoken name ("Vitamin
+        # C tube"), handed to the next pick cycle, and that cycle's name —
+        # (cycle_id, label, name) — for every line naming its object
+        # (_object_words).
+        self._pointed_yes_name: Optional[dict] = None
+        self._cycle_object_name: Optional[tuple] = None
         # (display label, monotonic) of this node's last which-one question
         # (_two_of_line) — a pointed answer to it is worded against it.
         self._clarify: Optional[tuple] = None
@@ -2476,7 +2483,7 @@ class IntentRouterNode(Node):
             return
         self._still_holding_mono = now
         task = self._live_task() or {}
-        what = (str(task.get("object") or "") or fallback or "object").replace("_", " ")
+        what = self._object_words(str(task.get("object") or "") or fallback or "object")
         self._narrate(f"I'm still holding the {what} — where should I put it first?")
 
     def _two_of_line(self, label: str, n: int = 2) -> str:
@@ -2597,11 +2604,13 @@ class IntentRouterNode(Node):
             self._point_answer_pub.publish(String(data=f"no|{pid}"))
             self._say_still_holding(rate_limited=True)
             return
-        line = self._point_question_line(label, d.get("bbox"))
-        self._point_q = {"id": pid, "label": label, "since": time.time(), "bbox": d.get("bbox")}
+        name = self._pointed_object_name(label, d.get("cap_colour"), d.get("bbox"))
+        line = self._point_question_line(label, d.get("bbox"), name)
+        self._point_q = {"id": pid, "label": label, "name": name, "since": time.time(),
+                         "bbox": d.get("bbox")}
         self._open_q_pub.publish(String(data=json.dumps({
             "question": "point", "id": pid, "since": round(self._point_q["since"], 3),
-            "object": label, "line": line})))
+            "object": label, "name": name, "line": line})))
         self.get_logger().info(f"Point proposal {pid} ({label}): asking {line!r}")
         self._narrate(line)
 
@@ -2647,9 +2656,54 @@ class IntentRouterNode(Node):
             return parts[0] if parts else ""
         return ", ".join(parts[:-1]) + " and " + parts[-1]
 
-    def _point_question_line(self, label: str, bbox) -> str:
-        """The question for a pointed ``label`` (see _on_point_proposal)."""
-        name = label.replace("_", " ").strip() or "object"
+    # Cap colour -> product, as _spoken_name_for_index and the scene summary
+    # name the vitamin tubes (C yellow, B12 purple, Multivitamin blue; the
+    # neighbour colours are the lighting aliases of _resolve_index_by_position).
+    _CAP_PRODUCT = {"yellow": "Vitamin C", "orange": "Vitamin C", "red": "Vitamin B12",
+                    "purple": "Vitamin B12", "blue": "Multivitamin"}
+
+    def _pointed_object_name(self, label: str, cap, bbox) -> str:
+        """2026-10-01 (Majd, trial 197: three tubes, "You pointed at the
+        vitamin tube"): the pointed object in words — "Vitamin C tube" for a
+        vitamin tube whose cap colour is known (the proposal's; from an older
+        pipeline without it, the live detection of that kind nearest to the
+        proposal's box), else the label ("small bottle")."""
+        plain = label.replace("_", " ").strip() or "object"
+        if self._to_display_label(label).lower() != "vitamin_tube":
+            return plain
+        cap = str(cap or "").lower()
+        if not cap:
+            try:
+                cx, cy = 0.5 * (float(bbox[0]) + float(bbox[2])), 0.5 * (float(bbox[1]) + float(bbox[3]))
+                best = None
+                for det in self._detections:
+                    if str(det.get("label") or det.get("display") or "").lower() != "vitamin_tube":
+                        continue
+                    b = det.get("bbox")
+                    d2 = (0.5 * (float(b[0]) + float(b[2])) - cx) ** 2 + (0.5 * (float(b[1]) + float(b[3])) - cy) ** 2
+                    if d2 < 80.0 ** 2 and (best is None or d2 < best[0]):
+                        best = (d2, str(det.get("cap_colour") or "").lower())
+                cap = best[1] if best else ""
+            except (TypeError, ValueError, IndexError):
+                cap = ""
+        product = self._CAP_PRODUCT.get(cap)
+        return f"{product} tube" if product else plain
+
+    def _object_words(self, label: str) -> str:
+        """The object of a narration in words: the confirmed pointed name
+        ("Vitamin C tube") while the current cycle is that pointed pick and
+        ``label`` is its kind, else the label with spaces ("vitamin tube")."""
+        lab = str(label or "")
+        cn = self._cycle_object_name
+        if (lab and cn is not None and cn[0] == self._last_cycle_id
+                and self._to_display_label(lab).lower() == self._to_display_label(cn[1]).lower()):
+            return cn[2]
+        return lab.replace("_", " ")
+
+    def _point_question_line(self, label: str, bbox, name: str = "") -> str:
+        """The question for a pointed ``label`` (see _on_point_proposal);
+        ``name`` is its spoken name (_pointed_object_name)."""
+        name = name or label.replace("_", " ").strip() or "object"
         ctx = self._clarify
         if ctx is None or time.monotonic() - ctx[1] > 120.0:
             return f"You pointed at the {name}. Should I grasp it?"
@@ -2825,6 +2879,8 @@ class IntentRouterNode(Node):
         if yes:
             self._clarify = None
             self._open_execution_gate()
+            self._pointed_yes_name = {"label": q["label"], "name": q.get("name") or "",
+                                      "t": time.monotonic()}
         else:
             self._narrate("Okay. Point at the one you want, or tell me which one.")
         return True
@@ -3072,7 +3128,7 @@ class IntentRouterNode(Node):
             "let_go", "let go",
         )
         if wants_open:
-            held = (self._held_object_label or "").replace("_", " ")
+            held = self._object_words(self._held_object_label or "")
             if held:
                 self._narrate(
                     "I did not open the gripper. That came in right after "
@@ -3583,7 +3639,7 @@ class IntentRouterNode(Node):
             # known is whether the robot was already holding something —
             # the held-object memory, derived from the executor's task state
             # when it reports one.
-            _held = (self._held_object_label or "").replace("_", " ")
+            _held = self._object_words(self._held_object_label or "")
             if _held:
                 self._narrate(f"The gripper is closed. I'm still holding the {_held}.")
             else:
@@ -3767,6 +3823,12 @@ class IntentRouterNode(Node):
             self._last_done_cycle_id = -1
             self._start_suppressed_upto = -1
         self._last_cycle_id = cycle
+        # 2026-10-01: the cycle a pointed yes starts is named by the pointed
+        # name ('Vitamin C tube') in its lines (_object_words).
+        pn, self._pointed_yes_name = self._pointed_yes_name, None
+        self._cycle_object_name = (
+            (cycle, pn["label"], pn["name"])
+            if pn and pn["name"] and time.monotonic() - pn["t"] < 30.0 else None)
         if not self._narrate_lifecycle:
             return
         # Don't narrate immediately: the pipeline publishes the chosen
@@ -3799,10 +3861,7 @@ class IntentRouterNode(Node):
                     f"cycle_id={cycle}: start narration suppressed (still holding "
                     f"{_t.get('object')!r}; the executor refuses this pick).")
                 return
-            target = (
-                self._last_target_label.replace("_", " ")
-                if self._last_target_label else ""
-            )
+            target = self._object_words(self._last_target_label)
             self.get_logger().info(
                 f"cycle_id={cycle} (target={target!r}) — narrating start"
             )
@@ -3915,13 +3974,13 @@ class IntentRouterNode(Node):
                     self._claim_executor_resume(latch["token"], "early destination",
                                                 cmd=latch.get("cmd"))
                     self._narrate(
-                        f"Got the {label.replace('_', ' ')}." if label else "Got it.")
+                        f"Got the {self._object_words(label)}." if label else "Got it.")
                     return
                 self.get_logger().info(
                     f"Early destination {latch['token']!r} dropped at the pause: "
                     f"latched for cycle {latch['cycle']}, pause of cycle {_cid}.")
             if label:
-                human = label.replace("_", " ")
+                human = self._object_words(label)
                 prompt = (
                     f"Got the {human}. Where should I drop it? "
                     f"Left, right, or home?"
@@ -3971,8 +4030,8 @@ class IntentRouterNode(Node):
             # nature"). Also re-spoken after every REDIRECT, naming the
             # NEW pose, because the executor re-publishes this status on
             # arrival.
-            _holding = (self._last_target_label
-                        or self._held_object_label or "").replace("_", " ")
+            _holding = self._object_words(self._last_target_label
+                                          or self._held_object_label or "")
             if _holding:
                 self._narrate(
                     f"I'm at the {_spoken} position, still holding the "
@@ -4475,8 +4534,8 @@ class IntentRouterNode(Node):
                 return
             tail = ""
             if task.get("holding"):
-                what = (str(task.get("object") or "") or self._held_object_label
-                        or "object").replace("_", " ")
+                what = self._object_words(str(task.get("object") or "") or self._held_object_label
+                                          or "object")
                 tail = f", still holding the {what}"
             if last.get("at_home"):
                 self._narrate(f"Reset — I'm back home{tail}.")

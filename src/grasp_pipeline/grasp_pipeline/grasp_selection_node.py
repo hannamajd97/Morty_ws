@@ -2135,7 +2135,7 @@ class YoloLiveSelectGrasp(Node):
         POINTED choice until the operator confirms it.
 
         The proposal goes out on /grasp_pipeline/point_proposal (JSON: id,
-        state "open", label, display, index, bbox, stamp) and the object is
+        state "open", label, display, index, bbox, cap_colour, stamp) and the object is
         highlighted in the debug image; intent_router asks the question —
         worded for its which-one clarification and for an object other than
         the one asked for — and answers on /grasp_pipeline/point_answer. The
@@ -2164,10 +2164,14 @@ class YoloLiveSelectGrasp(Node):
         self._point_prop_id += 1
         pid = self._point_prop_id
         self._point_answer = None
+        # 2026-10-01 (Majd, trial 197: "You pointed at the vitamin tube" with
+        # three tubes in view): the cap colour goes along, so the question
+        # names the tube — Vitamin C / B12 / Multivitamin.
         self._point_prop_pub.publish(String(data=json.dumps({
             "id": pid, "state": "open", "label": label,
             "display": str(det.get("display", det["label"])), "index": int(idx),
-            "bbox": bbox, "stamp": round(time.time(), 3)})))
+            "bbox": bbox, "cap_colour": str(det.get("cap_colour") or ""),
+            "stamp": round(time.time(), 3)})))
         self.get_logger().info(f"[point] proposal {pid}: {label} — waiting for the operator's yes/no.")
         try:
             if bool(self.get_parameter("publish_debug_image").value) and self.fb.rgb_frame is not None:
