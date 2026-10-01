@@ -1,0 +1,13 @@
+# trial 196 started 2026-10-01T17:02:06.172344
+[   8.08s] You: Crust for me is vitamin tube is a middle one.
+[  14.37s] Morty (status): Picking the middle Multivitamin.
+[  17.08s] Morty (status): Starting grasp on the vitamin tube.
+[  20.08s] Morty (status): Got the vitamin tube. Where should I drop it? Left, right, or home?
+[  31.08s] You: Drop it on the right side.
+[  31.17s] Morty (status): Going to drop right.
+[  36.98s] Morty (status): I'm at the drop right position, still holding the vitamin tube. Should I open the gripper?
+[  45.17s] You: No, go back home.
+[  49.52s] Morty (status): I'm at the home position, still holding the vitamin tube. Should I open the gripper?
+[  55.47s] You: Yes.
+[  55.47s] Morty (status): Opening the gripper.
+[  59.38s] Morty (status): I'm at the home position. What's next?

@@ -1,0 +1,20 @@
+{
+  "schema": "morty.recording_manifest.v1",
+  "run_id": "e91f2d2c51474774a0c5b166669a90c6",
+  "state": "complete",
+  "episode_id": "trial_195_LC_S3",
+  "started_unix": 1790866808.5373569,
+  "saved_unix": 1790866869.921573,
+  "num_steps": 612,
+  "files": {
+    "steps.npz": 147979,
+    "meta.json": 36181
+  },
+  "images": {
+    "exterior": 612,
+    "wrist": 612
+  },
+  "integrity_issues": [],
+  "outcome": "success",
+  "training_eligible": true
+}

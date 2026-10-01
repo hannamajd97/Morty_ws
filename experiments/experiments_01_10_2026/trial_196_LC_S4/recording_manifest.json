@@ -1,0 +1,20 @@
+{
+  "schema": "morty.recording_manifest.v1",
+  "run_id": "52073d9f861b446b87c8f216001bd129",
+  "state": "complete",
+  "episode_id": "trial_196_LC_S4",
+  "started_unix": 1790866926.1960561,
+  "saved_unix": 1790866990.1904843,
+  "num_steps": 639,
+  "files": {
+    "steps.npz": 156845,
+    "meta.json": 47792
+  },
+  "images": {
+    "exterior": 639,
+    "wrist": 639
+  },
+  "integrity_issues": [],
+  "outcome": "success",
+  "training_eligible": true
+}

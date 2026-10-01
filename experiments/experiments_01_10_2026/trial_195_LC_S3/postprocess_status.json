@@ -1,0 +1,159 @@
+{
+  "vla": {
+    "trial": "/home/deep/morty_ws/experiments/experiments_01_10_2026/trial_195_LC_S3",
+    "ready": {
+      "bag": true,
+      "episode": "complete",
+      "timeout": false
+    },
+    "bags": [
+      {
+        "bag": "/home/deep/morty_ws/experiments/experiments_01_10_2026/trial_195_LC_S3/bag",
+        "ok": true,
+        "issues": [],
+        "warnings": [
+          "rosbag2 did not exit cleanly (exit code -9, stop stage 3) \u2014 after 'Recording stopped'; the data is complete"
+        ],
+        "files": [
+          {
+            "file": "bag_0.db3",
+            "exists": true,
+            "bytes": 148733952
+          }
+        ],
+        "topics": {
+          "/speech/ai_said": 5,
+          "/tf_static": 14,
+          "/grasp_pipeline/point_proposal": 0,
+          "/gripper_controller/command_event": 4,
+          "/graspgen/selection_cycle_id": 2,
+          "/graspgen/timing": 7,
+          "/joint_states": 29395,
+          "/gripper_controller/joint_states": 576,
+          "/robot/intent": 2,
+          "/speech/accepted_transcript": 2,
+          "/tf": 30339,
+          "/yolo/all_detections": 24,
+          "/grasp_executor_lin_llm/selected_pose": 2,
+          "/grasp_pipeline/point_answer": 0,
+          "/grasp_executor_lin_llm/interactive_status": 4,
+          "/grasp_executor_lin_llm/task_state": 15,
+          "/camera/camera/color/camera_info": 1780,
+          "/camera/camera/color/image_raw/compressed": 1779,
+          "/astra/color/camera_info": 1779,
+          "/grasp_executor_lin_llm/cycle_done": 1,
+          "/grasp_executor_lin_llm/timing": 1,
+          "/speech/utterance_meta": 2,
+          "/robot/command_event": 7,
+          "/robot/open_question": 1,
+          "/scaled_joint_trajectory_controller/controller_state": 5053,
+          "/astra/color/compressed_slow": 501,
+          "/io_and_status_controller/robot_program_running": 1,
+          "/speed_scaling_state_broadcaster/speed_scaling": 28189,
+          "/tcp_pose_broadcaster/pose": 28145,
+          "/io_and_status_controller/io_states": 28131
+        },
+        "message_count": 155761,
+        "start": 1790866809.7567573,
+        "end": 1790866869.741302,
+        "recorder": {
+          "state": "exited",
+          "bag": "/home/deep/morty_ws/experiments/experiments_01_10_2026/trial_195_LC_S3/bag",
+          "started_unix": 1790866808.5575092,
+          "topics": [
+            "/camera/camera/color/image_raw/compressed",
+            "/camera/camera/color/camera_info",
+            "/astra/color/compressed_slow",
+            "/astra/color/camera_info",
+            "/joint_states",
+            "/tcp_pose_broadcaster/pose",
+            "/scaled_joint_trajectory_controller/controller_state",
+            "/io_and_status_controller/io_states",
+            "/gripper_controller/joint_states",
+            "/speed_scaling_state_broadcaster/speed_scaling",
+            "/io_and_status_controller/robot_program_running",
+            "/speech/accepted_transcript",
+            "/speech/utterance_meta",
+            "/speech/ai_said",
+            "/robot/intent",
+            "/graspgen/timing",
+            "/grasp_executor_lin_llm/timing",
+            "/yolo/all_detections",
+            "/graspgen/selection_cycle_id",
+            "/grasp_executor_lin_llm/selected_pose",
+            "/grasp_executor_lin_llm/interactive_status",
+            "/grasp_executor_lin_llm/cycle_done",
+            "/grasp_pipeline/point_proposal",
+            "/robot/command_event",
+            "/grasp_executor_lin_llm/task_state",
+            "/gripper_controller/command_event",
+            "/grasp_pipeline/point_answer",
+            "/robot/open_question",
+            "/tf",
+            "/tf_static"
+          ],
+          "stop_requested_unix": 1790866869.7409604,
+          "exit_code": -9,
+          "stop_stage": 3,
+          "stopped_by_gui": true,
+          "finished_unix": 1790866880.5101857
+        }
+      }
+    ],
+    "joints_full": {
+      "trial": "trial_195_LC_S3",
+      "samples": 28823,
+      "rate_hz": 500.0,
+      "ctrl_samples": 5053,
+      "ctrl_acc_filled": 338,
+      "acc_p99": [
+        2.11,
+        1.73,
+        2.13,
+        2.71,
+        0.76,
+        2.14
+      ],
+      "step_vel_vs_bag_max": 0.0,
+      "steps_filled": 582,
+      "steps": 612
+    },
+    "errors": [],
+    "ok": true
+  },
+  "ok": true,
+  "updated_unix": 1790866916.1366305,
+  "trial_times": {
+    "ok": true,
+    "result": {
+      "trial": "trial_195_LC_S3",
+      "event_times": {
+        "moved": 15,
+        "from": {
+          "bag": 12,
+          "vla": 3
+        },
+        "gui_late_by_s": {
+          "median": 0.121,
+          "max": 0.213
+        },
+        "note": "GUI event times moved to the bag's receive stamps (else the VLA recorder's); stage times rebuilt from them"
+      },
+      "csv_values_updated": 1,
+      "stage": {
+        "interaction_s": 4.72,
+        "speech_end_to_intent_s": 4.271,
+        "intent_s": 2.711,
+        "choice_s": 0.217,
+        "yolo_s": 0.123,
+        "graspgen_compute_s": 1.907,
+        "graspgen_wait_s": 0.0,
+        "graspgen_lead_s": 144.282,
+        "verify_compute_s": 0.538,
+        "command_to_motion_s": 3.16,
+        "total_s": 32.51,
+        "started_by": "voice"
+      }
+    }
+  }
+}

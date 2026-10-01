@@ -1,0 +1,8 @@
+# trial 195 started 2026-10-01T17:00:08.524108
+[   7.33s] You: Grasp for me is a small bottle. Pick up for me is a small bottle.
+[  11.03s] Morty (status): Starting grasp on the small bottle.
+[  15.43s] Morty (status): Got the small bottle. Where should I drop it? Left, right, or home?
+[  25.53s] You: Drop it on the left side. Give me the objects and go back home.
+[  25.53s] Morty (status): Going to drop left.
+[  32.83s] Morty (status): Opening the gripper.
+[  39.93s] Morty (status): Done — I'm back at the home position. What's next?

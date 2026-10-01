@@ -1,0 +1,401 @@
+[gripper_command_adapter-3] [INFO] [1790866810.008588290] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866810.027535687] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866815.172055347] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866815.175608246] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [WARN] [1790866818.400488626] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1790866818.400805803] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1790866818.400942373] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[move_group-15] [INFO] [1790866818.845309804] [moveit_move_group_default_capabilities.execute_trajectory_action_capability]: Received goal request
+[move_group-15] [INFO] [1790866818.845446306] [moveit_move_group_default_capabilities.execute_trajectory_action_capability]: Execution request received
+[move_group-15] [INFO] [1790866818.845478594] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866818.845504847] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866818.845624131] [moveit_ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-15] [INFO] [1790866818.846929360] [moveit_ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-15] [INFO] [1790866818.846981293] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866818.847031857] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866818.847418190] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to scaled_joint_trajectory_controller
+[ur_ros2_control_node-7] [INFO] [1790866818.847820400] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866818.847924868] [scaled_joint_trajectory_controller]: Accepted new action goal
+[move_group-15] [INFO] [1790866818.848183106] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: scaled_joint_trajectory_controller started execution
+[move_group-15] [INFO] [1790866818.848200304] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[gripper_command_adapter-3] [INFO] [1790866819.097936910] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.50, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866819.099541692] [gripper_controller.gripper_command_adapter]: GRIPPER: OPEN (pulse 16s for 0.20s)
+[ur_ros2_control_node-7] [INFO] [1790866819.099961643] [io_and_status_controller]: Setting digital output '16' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866819.353842657] [io_and_status_controller]: Setting digital output '16' to state: '0'.
+[gripper_command_adapter-3] [INFO] [1790866820.166212476] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866820.168693424] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866821.207267920] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.00, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866821.208724566] [gripper_controller.gripper_command_adapter]: GRIPPER: CLOSE (pulse 17s for 1.00s)
+[ur_ros2_control_node-7] [INFO] [1790866821.209452369] [io_and_status_controller]: Setting digital output '17' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866821.349066125] [scaled_joint_trajectory_controller]: Goal reached, success!
+[move_group-15] [INFO] [1790866821.398951584] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'scaled_joint_trajectory_controller' successfully finished
+[move_group-15] [INFO] [1790866821.404794353] [moveit_ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-15] [INFO] [1790866821.404962541] [moveit_move_group_default_capabilities.execute_trajectory_action_capability]: Execution completed: SUCCEEDED
+[ur_ros2_control_node-7] [INFO] [1790866822.261782693] [io_and_status_controller]: Setting digital output '17' to state: '0'.
+[ur_ros2_control_node-7] [INFO] [1790866822.634621258] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866822.634714973] [scaled_joint_trajectory_controller]: Accepted new action goal
+[ur_ros2_control_node-7] [INFO] [1790866823.438965411] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790866825.162941964] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866825.165838829] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866830.154286732] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866830.157067805] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866835.166563644] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866835.169496873] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790866837.106564013] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866837.106725352] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790866840.162668934] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866840.165242381] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790866841.076881867] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790866841.370478449] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.50, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866841.372683341] [gripper_controller.gripper_command_adapter]: GRIPPER: OPEN (pulse 16s for 0.20s)
+[ur_ros2_control_node-7] [INFO] [1790866841.375357106] [io_and_status_controller]: Setting digital output '16' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866841.629153097] [io_and_status_controller]: Setting digital output '16' to state: '0'.
+[ur_ros2_control_node-7] [INFO] [1790866844.070510573] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866844.070659965] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790866845.159881194] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866845.162195086] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790866846.773033940] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790866847.082074071] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.00, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866847.083587604] [gripper_controller.gripper_command_adapter]: GRIPPER: CLOSE (pulse 17s for 1.00s)
+[ur_ros2_control_node-7] [INFO] [1790866847.084144205] [io_and_status_controller]: Setting digital output '17' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866848.136123032] [io_and_status_controller]: Setting digital output '17' to state: '0'.
+[gripper_command_adapter-3] [INFO] [1790866850.162973969] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866850.166034833] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790866851.436354812] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866851.436852265] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866852.100179074] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866852.123422368] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866852.123629024] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866852.166169257] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -56.6912, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866852.166205594] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866852.166255517] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866852.166359768] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866852.169215787] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866852.169439412] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866852.206427947] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -60.3251, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866852.206470679] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866852.206516022] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866852.206628021] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866852.210909023] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866852.211120533] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866852.329233644] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866852.329268170] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866852.329345159] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866852.329443562] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866852.334570712] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866852.334749562] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866852.336935903] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866852.336978681] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866852.337162490] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866852.383589487] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -20.0678, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866852.383632448] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 1.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866852.383686929] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866852.383781065] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866852.385771867] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866852.385931462] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866852.386960190] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866852.386987075] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866852.387160909] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866852.464151747] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -15.9564, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866852.464183488] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 2.2s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866852.464224152] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866852.464287054] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866852.567605967] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866852.568209658] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866853.201359660] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866853.204362512] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866853.204582491] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866853.282667804] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 6.47285, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866853.282709516] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866853.282761776] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866853.282871040] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866853.288005836] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866853.288201951] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866853.355031496] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -56.7552, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866853.355073833] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866853.355123043] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866853.355229042] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866853.359138479] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866853.359315560] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866853.551077871] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866853.551130490] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866853.551196569] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866853.551335215] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866853.555701558] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866853.555870624] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866853.557082925] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866853.557110212] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866853.557273866] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866853.565308089] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint acceleration limit of elbow_joint violated. Set the acceleration scaling factor lower! Actual joint acceleration is -9.39567, while the limit is 8. 
+[move_group-15] [ERROR] [1790866853.565344040] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.9s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866853.565387877] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866853.565464129] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866853.567211804] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866853.567372088] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866853.568980415] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866853.569012737] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866853.569207443] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866853.629837597] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 13.9672, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866853.629877853] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 1.9s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866853.629930603] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866853.630013489] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866853.733882404] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866853.734341303] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866854.233848603] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866854.241116249] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866854.241353844] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866854.357762607] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866854.357792450] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866854.357842922] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866854.357948894] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866854.362755808] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866854.363001950] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866854.364941127] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866854.364979550] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866854.365149193] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866854.368512285] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint acceleration limit of elbow_joint violated. Set the acceleration scaling factor lower! Actual joint acceleration is -10.1054, while the limit is 8. 
+[move_group-15] [ERROR] [1790866854.368555133] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.7s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866854.368599417] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866854.368717863] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866854.371708576] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866854.371929213] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866854.373162220] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866854.373188530] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866854.373361493] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866854.402863909] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 14.6289, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866854.402918113] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 1.5s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866854.402984435] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866854.403106464] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866854.506552630] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866854.507061936] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866855.074047027] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866855.077363075] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866855.077545694] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866855.100475287] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -58.7967, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866855.100513802] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866855.100568251] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866855.100688125] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866855.104745303] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866855.104983626] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[gripper_command_adapter-3] [INFO] [1790866855.167853788] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866855.170405538] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [ERROR] [1790866855.220889073] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866855.220999653] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866855.221054893] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866855.221245199] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866855.224977906] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866855.225162304] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866855.227548371] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866855.227577041] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866855.227703367] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866855.270947233] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint acceleration limit of elbow_joint violated. Set the acceleration scaling factor lower! Actual joint acceleration is -9.35449, while the limit is 8. 
+[move_group-15] [ERROR] [1790866855.271002889] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.7s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866855.271059212] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866855.271152670] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866855.272548995] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866855.272700385] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866855.274905483] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866855.275023457] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866855.275205776] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866855.316222549] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 14.9171, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866855.316254908] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 1.5s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866855.316292776] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866855.316359800] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866855.419994105] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866855.420454478] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866856.345712139] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 44 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866856.369762037] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866856.369965879] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866856.403673826] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 55.2528, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866856.403714296] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866856.403779243] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866856.403927420] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866856.407339220] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866856.407567432] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866856.481452430] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -60.7254, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866856.481490243] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866856.481551124] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866856.481665667] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866856.486280746] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866856.486492328] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866856.557242369] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint acceleration limit of elbow_joint violated. Set the acceleration scaling factor lower! Actual joint acceleration is -14.8817, while the limit is 8. 
+[move_group-15] [ERROR] [1790866856.557279178] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866856.557326887] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866856.557435117] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866856.562768470] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866856.562979392] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866856.564906942] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866856.564953423] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866856.565110921] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866856.617481158] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 45.3193, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866856.617511667] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 4s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866856.617557463] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866856.617614084] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866856.619798785] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866856.619966927] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866856.621027776] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866856.621085367] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866856.621247680] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866856.658868720] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint acceleration limit of elbow_joint violated. Set the acceleration scaling factor lower! Actual joint acceleration is -11.468, while the limit is 8. 
+[move_group-15] [ERROR] [1790866856.658908879] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 7.9s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866856.658985996] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866856.659083485] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866856.763383404] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866856.763794748] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866857.326630861] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866860.131928637] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866860.132420484] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[gripper_command_adapter-3] [INFO] [1790866860.176259214] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866860.180841154] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790866860.802287347] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866862.794216140] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866862.794608385] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866863.398660758] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866864.963816708] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866864.964450070] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 30 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[gripper_command_adapter-3] [INFO] [1790866865.176002986] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866865.182836031] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790866866.001189625] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 43 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866866.011200404] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866866.011409816] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866866.023610635] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866866.023654813] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866866.025463301] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866866.025510789] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866866.038369994] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866866.038411602] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866866.152224053] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866866.152260765] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866866.152321723] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866866.152451068] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866866.158041810] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866866.158266056] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866866.159153363] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866866.159187862] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866866.159383987] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866866.225750086] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 44.0415, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866866.225782157] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 2.4s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866866.225821633] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866866.225885236] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866866.228933440] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866866.229702169] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866866.231071114] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866866.231103381] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866866.231304147] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866866.266999939] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 43.8, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866866.267045284] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 4.7s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866866.267180623] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866866.267297095] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866866.371538522] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866866.371991789] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 30 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866867.515748075] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 43 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866867.549549569] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866867.549786874] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866867.551897148] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866867.551934942] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866867.692797288] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866867.692851014] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866867.693001809] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866867.693220140] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866867.697221826] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866867.697414398] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866867.699618004] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866867.699667320] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866867.699878424] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866867.707037372] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866867.707080678] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866867.763381808] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 42.4551, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866867.763426004] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 2.2s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866867.763487432] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866867.763592271] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866867.765481692] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866867.765661616] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866867.767445441] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866867.767478224] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866867.767639094] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866867.810841242] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 16.7004, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866867.810884958] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 4.4s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866867.810942031] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866867.811024282] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866867.915414712] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866867.915934825] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 30 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866868.892698887] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 43 points (followed 100.000000% of requested trajectory)
+[move_group-15] [INFO] [1790866868.898087551] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866868.898239719] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [ERROR] [1790866868.941295961] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -53.9746, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866868.941343873] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866868.941549175] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866868.941760869] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866868.945998103] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866868.946212471] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866868.948544372] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866868.948582791] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866869.008197541] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is 60.3728, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866869.008248417] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 0.1s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866869.008306552] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866869.008436953] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -1): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866869.012972109] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866869.013247001] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866869.025445271] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'gripper_base' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.025485183] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866869.140448980] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Unable to find IK solution.
+[move_group-15] [ERROR] [1790866869.140483419] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Failed to compute inverse kinematics solution for sampled Cartesian pose.
+[move_group-15] [ERROR] [1790866869.140543457] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [ERROR] [1790866869.140654999] [moveit.pilz_industrial_motion_planner.move_group_sequence_service]: Planner threw an exception (error code: -31): Could not solve request
+[move_group-15] 
+[move_group-15] [INFO] [1790866869.144557663] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866869.144776298] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866869.147195357] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866869.147236232] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866869.147426889] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866869.157604314] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.157641797] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.159830314] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.159857129] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.164382569] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.164415446] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.178210645] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.178245111] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.179624394] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.179644729] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.184727614] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.184764904] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866869.194314755] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint acceleration limit of elbow_joint violated. Set the acceleration scaling factor lower! Actual joint acceleration is -8.86815, while the limit is 8. 
+[move_group-15] [ERROR] [1790866869.194354761] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 2.6s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866869.194416439] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866869.194510939] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866869.196779175] [moveit_move_group_default_capabilities.move_action_capability]: Received request
+[move_group-15] [INFO] [1790866869.197039422] [moveit_move_group_default_capabilities.move_action_capability]: executing..
+[move_group-15] [INFO] [1790866869.198942489] [moveit_move_group_default_capabilities.move_action_capability]: Planning request received for MoveGroup action. Forwarding to planning pipeline.
+[move_group-15] [INFO] [1790866869.198968889] [moveit_move_group_capabilities_base.move_group_capability]: Using planning pipeline 'pilz_industrial_motion_planner'
+[move_group-15] [INFO] [1790866869.199127771] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Generating LIN trajectory...
+[move_group-15] [INFO] [1790866869.217778621] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.217815446] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.220438832] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.220467944] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.225630356] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.225660140] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [INFO] [1790866869.230308437] [moveit_collision_detection_fcl.collision_common]: Found a contact between 'forearm_link' (type 'Robot link') and 'camera_mount' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-15] [INFO] [1790866869.230344200] [moveit_collision_detection_fcl.collision_common]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-15] [ERROR] [1790866869.275809694] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Joint velocity limit of elbow_joint violated. Set the velocity scaling factor lower! Actual joint velocity is -48.4449, while the limit is 6.28319. 
+[move_group-15] [ERROR] [1790866869.275843810] [moveit.pilz_industrial_motion_planner.trajectory_functions]: Inverse kinematics solution at 5.2s violates the joint velocity/acceleration/deceleration limits.
+[move_group-15] [ERROR] [1790866869.275899116] [moveit.pilz_industrial_motion_planner.trajectory_generator]: Failed to generate valid joint trajectory from the Cartesian path
+[move_group-15] [INFO] [1790866869.276035243] [moveit_move_group_default_capabilities.move_action_capability]: No motion plan found. No execution attempted.
+[move_group-15] [INFO] [1790866869.381700556] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866869.382134966] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 30 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)

@@ -1,0 +1,1273 @@
+{
+  "format": "morty_vla_raw_v3",
+  "run_id": "e91f2d2c51474774a0c5b166669a90c6",
+  "label_source": "command_lifecycle",
+  "episode_id": "trial_195_LC_S3",
+  "episode_index": 195,
+  "episode_dir": "/home/deep/morty_ws/experiments/experiments_01_10_2026/trial_195_LC_S3",
+  "in_trial_dir": true,
+  "trial_id": "195",
+  "task": "pick up the small bottle",
+  "task_from": "intent",
+  "outcome": "success",
+  "success": true,
+  "outcome_provenance": "outcome: executor cycle_done (execution only, not verified task success)",
+  "intent": "drop_left_release_home",
+  "cycle_done": "done|1790863168009",
+  "note": "outcome: executor cycle_done (execution only, not verified task success)",
+  "mmhri_trial_hint": "/home/deep/morty_ws/experiments/experiments_01_10_2026/trial_195_LC_S3",
+  "bound_to_trial": true,
+  "confirmed_by": "intent",
+  "spoken_task": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+  "trial_form_task": "pick up the small bottle and drop it on the right",
+  "transcripts": [
+    "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+    "Drop it on the left side. Give me the objects and go back home."
+  ],
+  "instructions": [
+    {
+      "idx": 0,
+      "stamp": 1790866818.752,
+      "end_stamp": 1790866823.688,
+      "t": 10.12177300453186,
+      "command_id": "d849f51bfd48490d9526a50184a817e1",
+      "parent_command_id": "",
+      "action_intent": "pick",
+      "object": "small_bottle",
+      "attributes": {},
+      "target": {
+        "label": "small_bottle",
+        "colour": "",
+        "position": "",
+        "ordinal": 0,
+        "ordinal_from": "left",
+        "source": "voice"
+      },
+      "target_resolution": "name only",
+      "route": "pick",
+      "cycle_id": 1790863168009,
+      "question": "",
+      "question_id": null,
+      "transcript": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+      "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+      "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+      "received_stamp": 1790866818.396,
+      "accepted_stamp": 1790866818.4079,
+      "outcome": "completed",
+      "outcome_reason": "",
+      "end_evidence": "awaiting_destination",
+      "auto_cleanup_from": null,
+      "instruction": "pick up the small bottle",
+      "requested_instruction": null
+    },
+    {
+      "idx": 1,
+      "stamp": 1790866833.805,
+      "end_stamp": 1790866848.194,
+      "t": 25.17477297782898,
+      "command_id": "fc7625bc8f9f480abaf5e57d0b47a4bf",
+      "parent_command_id": "d849f51bfd48490d9526a50184a817e1",
+      "action_intent": "drop_left_release_home",
+      "object": null,
+      "attributes": {},
+      "target": null,
+      "target_resolution": "",
+      "route": "executor_answer",
+      "cycle_id": 1790863168009,
+      "question": "destination",
+      "question_id": 22,
+      "transcript": "Drop it on the left side. Give me the objects and go back home.",
+      "utterance_id": "voice-d407418a239d48c89d0c78de766945c7",
+      "plan_id": "voice-d407418a239d48c89d0c78de766945c7",
+      "received_stamp": 1790866833.7786,
+      "accepted_stamp": 1790866833.7807,
+      "outcome": "completed",
+      "outcome_reason": "",
+      "end_evidence": "idle",
+      "auto_cleanup_from": 1790866847.0822115,
+      "instruction": "drop it on the left side, hand it over and go back home",
+      "requested_instruction": null
+    }
+  ],
+  "intent_instructions": [
+    {
+      "idx": 0,
+      "t": 9.857666969299316,
+      "stamp": 1790866818.395,
+      "action_intent": "pick",
+      "object": "small_bottle",
+      "attributes": null,
+      "transcript": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+      "transcript_stamp": 1790866815.6907272,
+      "instruction": "pick up the small bottle"
+    },
+    {
+      "idx": 1,
+      "t": 25.24066710472107,
+      "stamp": 1790866833.778,
+      "action_intent": "drop_left_release_home",
+      "object": null,
+      "attributes": null,
+      "transcript": "Drop it on the left side. Give me the objects and go back home.",
+      "transcript_stamp": 1790866833.7775798,
+      "instruction": "drop it on the left side, hand it over and go back home"
+    }
+  ],
+  "commands": [
+    {
+      "command_id": "d849f51bfd48490d9526a50184a817e1",
+      "action": "pick",
+      "accepted_action": "pick",
+      "route": "pick",
+      "cycle_id": 1790863168009,
+      "parent_id": null,
+      "question": null,
+      "question_id": null,
+      "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+      "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+      "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+      "received": 1790866818.396,
+      "accepted": 1790866818.4079,
+      "terminal": "completed",
+      "terminal_stamp": 1790866848.1956,
+      "terminal_reason": "",
+      "states": [
+        "received",
+        "queued",
+        "accepted",
+        "cycle",
+        "completed"
+      ]
+    },
+    {
+      "command_id": "fc7625bc8f9f480abaf5e57d0b47a4bf",
+      "action": "drop_left_release_home",
+      "accepted_action": "drop_left_release_home",
+      "route": "executor_answer",
+      "cycle_id": 1790863168009,
+      "parent_id": "d849f51bfd48490d9526a50184a817e1",
+      "question": "destination",
+      "question_id": 22,
+      "utterance": "Drop it on the left side. Give me the objects and go back home.",
+      "utterance_id": "voice-d407418a239d48c89d0c78de766945c7",
+      "plan_id": "voice-d407418a239d48c89d0c78de766945c7",
+      "received": 1790866833.7786,
+      "accepted": 1790866833.7807,
+      "terminal": null,
+      "terminal_stamp": null,
+      "terminal_reason": null,
+      "states": [
+        "received",
+        "accepted"
+      ]
+    }
+  ],
+  "open_commands_at_stop": [],
+  "interventions": [],
+  "events": {
+    "utterance": [
+      {
+        "t": 7.146667003631592,
+        "stamp": 1790866815.684,
+        "recv": 1790866815.6842,
+        "text": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "speech_end": 1790866814.124,
+        "voiced_ms": 2800,
+        "speech_start": 1790866809.904,
+        "published": 1790866815.684,
+        "utterance_id": "244428d4b0ca4b29988e8d98ceeb8ed6"
+      },
+      {
+        "t": 25.237667083740234,
+        "stamp": 1790866833.775,
+        "recv": 1790866833.7753,
+        "text": "Drop it on the left side. Give me the objects and go back home.",
+        "speech_end": 1790866832.498,
+        "voiced_ms": 2700,
+        "speech_start": 1790866829.452,
+        "published": 1790866833.775,
+        "utterance_id": "cbef7e2a4ebe4cf59243094c445ec553"
+      }
+    ],
+    "transcript": [
+      {
+        "t": 7.1533942222595215,
+        "stamp": 1790866815.6907272,
+        "recv": 1790866815.6908,
+        "text": "Grasp for me is a small bottle. Pick up for me is a small bottle."
+      },
+      {
+        "t": 25.240246772766113,
+        "stamp": 1790866833.7775798,
+        "recv": 1790866833.7776,
+        "text": "Drop it on the left side. Give me the objects and go back home."
+      }
+    ],
+    "intent": [
+      {
+        "t": 9.857666969299316,
+        "stamp": 1790866818.395,
+        "recv": 1790866818.3961,
+        "action_intent": "pick",
+        "object_intent": "small_bottle",
+        "object_attributes": null,
+        "command_id": "d849f51bfd48490d9526a50184a817e1",
+        "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "plan_index": 0
+      },
+      {
+        "t": 25.24066710472107,
+        "stamp": 1790866833.778,
+        "recv": 1790866833.7783,
+        "action_intent": "drop_left_release_home",
+        "object_intent": null,
+        "object_attributes": null,
+        "command_id": "fc7625bc8f9f480abaf5e57d0b47a4bf",
+        "utterance_id": "voice-d407418a239d48c89d0c78de766945c7",
+        "utterance": "Drop it on the left side. Give me the objects and go back home.",
+        "question": "destination",
+        "question_id": 22,
+        "plan_id": "voice-d407418a239d48c89d0c78de766945c7",
+        "plan_index": 0
+      }
+    ],
+    "command": [
+      {
+        "t": 9.858666896820068,
+        "stamp": 1790866818.396,
+        "recv": 1790866818.4043,
+        "schema": "morty.command_event.v1",
+        "event_id": "6933f88804f841c8bbfc7b8fda639fe6",
+        "seq": 163,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "d849f51bfd48490d9526a50184a817e1",
+        "parent_id": "",
+        "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "plan_index": 0,
+        "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "question": "",
+        "question_id": null,
+        "cycle_id": null,
+        "state": "received",
+        "action": "pick",
+        "attributes": {},
+        "target": null,
+        "route": "",
+        "reason": ""
+      },
+      {
+        "t": 9.85936689376831,
+        "stamp": 1790866818.3967,
+        "recv": 1790866818.4056,
+        "schema": "morty.command_event.v1",
+        "event_id": "d43ee0606cf8421686cbb464abff899d",
+        "seq": 164,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "d849f51bfd48490d9526a50184a817e1",
+        "parent_id": "",
+        "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "plan_index": 0,
+        "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "question": "",
+        "question_id": null,
+        "cycle_id": null,
+        "state": "queued",
+        "action": "pick",
+        "attributes": {},
+        "target": null,
+        "route": "",
+        "reason": "position 1, router busy=False"
+      },
+      {
+        "t": 9.870567083358765,
+        "stamp": 1790866818.4079,
+        "recv": 1790866818.4101,
+        "schema": "morty.command_event.v1",
+        "event_id": "e6cb676a9da14a599e3b5f23f5a83382",
+        "seq": 165,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "d849f51bfd48490d9526a50184a817e1",
+        "parent_id": "",
+        "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "plan_index": 0,
+        "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "question": "",
+        "question_id": null,
+        "cycle_id": null,
+        "state": "accepted",
+        "action": "pick",
+        "attributes": {},
+        "target": {
+          "label": "small_bottle",
+          "colour": "",
+          "position": "",
+          "ordinal": 0,
+          "ordinal_from": "left",
+          "source": "voice"
+        },
+        "route": "pick",
+        "reason": ""
+      },
+      {
+        "t": 10.07746696472168,
+        "stamp": 1790866818.6148,
+        "recv": 1790866818.6163,
+        "schema": "morty.command_event.v1",
+        "event_id": "600d511f051d4c2e8c9ea873ba7b1fa7",
+        "seq": 166,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "d849f51bfd48490d9526a50184a817e1",
+        "parent_id": "",
+        "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "plan_index": 0,
+        "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "question": "",
+        "question_id": null,
+        "cycle_id": 1790863168009,
+        "state": "cycle",
+        "action": "pick",
+        "attributes": {},
+        "target": {
+          "label": "small_bottle",
+          "colour": "",
+          "position": "",
+          "ordinal": 0,
+          "ordinal_from": "left",
+          "source": "voice"
+        },
+        "route": "pick",
+        "reason": ""
+      },
+      {
+        "t": 25.24126696586609,
+        "stamp": 1790866833.7786,
+        "recv": 1790866833.7829,
+        "schema": "morty.command_event.v1",
+        "event_id": "477393cf4a99491f9b8b2628f805844a",
+        "seq": 167,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "fc7625bc8f9f480abaf5e57d0b47a4bf",
+        "parent_id": "",
+        "plan_id": "voice-d407418a239d48c89d0c78de766945c7",
+        "plan_index": 0,
+        "utterance_id": "voice-d407418a239d48c89d0c78de766945c7",
+        "utterance": "Drop it on the left side. Give me the objects and go back home.",
+        "question": "destination",
+        "question_id": 22,
+        "cycle_id": null,
+        "state": "received",
+        "action": "drop_left_release_home",
+        "attributes": {},
+        "target": null,
+        "route": "",
+        "reason": ""
+      },
+      {
+        "t": 25.243366956710815,
+        "stamp": 1790866833.7807,
+        "recv": 1790866833.7839,
+        "schema": "morty.command_event.v1",
+        "event_id": "41ec1add77bc43c7b07f3ef957d7f874",
+        "seq": 168,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "fc7625bc8f9f480abaf5e57d0b47a4bf",
+        "parent_id": "d849f51bfd48490d9526a50184a817e1",
+        "plan_id": "voice-d407418a239d48c89d0c78de766945c7",
+        "plan_index": 0,
+        "utterance_id": "voice-d407418a239d48c89d0c78de766945c7",
+        "utterance": "Drop it on the left side. Give me the objects and go back home.",
+        "question": "destination",
+        "question_id": 22,
+        "cycle_id": 1790863168009,
+        "state": "accepted",
+        "action": "drop_left_release_home",
+        "attributes": {},
+        "target": null,
+        "route": "executor_answer",
+        "reason": "compound 'drop_left_release_home'",
+        "resume_token": "drop_left+release_home"
+      },
+      {
+        "t": 39.6582670211792,
+        "stamp": 1790866848.1956,
+        "recv": 1790866848.1976,
+        "schema": "morty.command_event.v1",
+        "event_id": "18ac16eb47904d3ea4a664b7c1f901b7",
+        "seq": 169,
+        "source": "intent_router",
+        "boot": 1790862033.076,
+        "command_id": "d849f51bfd48490d9526a50184a817e1",
+        "parent_id": "",
+        "plan_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "plan_index": 0,
+        "utterance_id": "voice-67e620e76cbc4b18bd8225d98f6f164f",
+        "utterance": "Grasp for me is a small bottle. Pick up for me is a small bottle.",
+        "question": "",
+        "question_id": null,
+        "cycle_id": 1790863168009,
+        "state": "completed",
+        "action": "pick",
+        "attributes": {},
+        "target": {
+          "label": "small_bottle",
+          "colour": "",
+          "position": "",
+          "ordinal": 0,
+          "ordinal_from": "left",
+          "source": "voice"
+        },
+        "route": "pick",
+        "reason": ""
+      }
+    ],
+    "selection": [
+      {
+        "t": 10.00917935371399,
+        "stamp": 1790866818.5465124,
+        "recv": 1790866818.7363,
+        "cycle_id": 1790863168009,
+        "label": "small_bottle",
+        "source": "voice",
+        "n_candidates": 18,
+        "bbox": [
+          0,
+          268,
+          75,
+          424
+        ],
+        "index": 3,
+        "n_detections": 4,
+        "display": "small_bottle",
+        "proposal_id": null,
+        "image_stamp": 1790866818.4762626,
+        "image_frame": "camera_color_optical_frame",
+        "path": "precomputed",
+        "select": 1790866818.5465124,
+        "hit": 1790866818.6209655,
+        "precompute": {
+          "label": "small_bottle",
+          "key": "small_bottle",
+          "job_start": 1790866672.422453,
+          "job_done": 1790866674.3300943,
+          "job_s": 1.9070134089997737,
+          "verified_at": 1790866674.9307673,
+          "probe_s": 0.538276,
+          "planner": "curve"
+        },
+        "published": 1790866818.7357123
+      }
+    ],
+    "task_state": [
+      {
+        "t": 10.213666915893555,
+        "stamp": 1790866818.751,
+        "recv": 1790866818.7521,
+        "boot": 1790862044.437,
+        "seq": 145,
+        "cycle_id": 1790863168009,
+        "phase": "probing",
+        "question": "",
+        "question_id": 21,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 10.214667081832886,
+        "stamp": 1790866818.752,
+        "recv": 1790866818.7534,
+        "boot": 1790862044.437,
+        "seq": 146,
+        "cycle_id": 1790863168009,
+        "phase": "approaching",
+        "question": "",
+        "question_id": 21,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 10.560667037963867,
+        "stamp": 1790866819.098,
+        "recv": 1790866819.1016,
+        "boot": 1790862044.437,
+        "seq": 147,
+        "cycle_id": 1790863168009,
+        "phase": "approaching",
+        "question": "",
+        "question_id": 21,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 12.670666933059692,
+        "stamp": 1790866821.208,
+        "recv": 1790866821.2091,
+        "boot": 1790862044.437,
+        "seq": 148,
+        "cycle_id": 1790863168009,
+        "phase": "approaching",
+        "question": "",
+        "question_id": 21,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 13.927666902542114,
+        "stamp": 1790866822.465,
+        "recv": 1790866822.4683,
+        "boot": 1790862044.437,
+        "seq": 149,
+        "cycle_id": 1790863168009,
+        "phase": "approaching",
+        "question": "",
+        "question_id": 21,
+        "holding": true,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 15.150666952133179,
+        "stamp": 1790866823.688,
+        "recv": 1790866823.6904,
+        "boot": 1790862044.437,
+        "seq": 150,
+        "cycle_id": 1790863168009,
+        "phase": "awaiting_destination",
+        "question": "destination",
+        "question_id": 22,
+        "holding": true,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 25.266666889190674,
+        "stamp": 1790866833.804,
+        "recv": 1790866833.8056,
+        "boot": 1790862044.437,
+        "seq": 151,
+        "cycle_id": 1790863168009,
+        "phase": "awaiting_destination",
+        "question": "",
+        "question_id": 22,
+        "holding": true,
+        "object": "small_bottle",
+        "destination": "",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 25.267667055130005,
+        "stamp": 1790866833.805,
+        "recv": 1790866833.8065,
+        "boot": 1790862044.437,
+        "seq": 152,
+        "cycle_id": 1790863168009,
+        "phase": "carrying",
+        "question": "",
+        "question_id": 22,
+        "holding": true,
+        "object": "small_bottle",
+        "destination": "vla_drop_left",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 32.5786669254303,
+        "stamp": 1790866841.116,
+        "recv": 1790866841.1162,
+        "boot": 1790862044.437,
+        "seq": 153,
+        "cycle_id": 1790863168009,
+        "phase": "releasing",
+        "question": "",
+        "question_id": 22,
+        "holding": true,
+        "object": "small_bottle",
+        "destination": "vla_drop_left",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 32.833667039871216,
+        "stamp": 1790866841.371,
+        "recv": 1790866841.3724,
+        "boot": 1790862044.437,
+        "seq": 154,
+        "cycle_id": 1790863168009,
+        "phase": "releasing",
+        "question": "",
+        "question_id": 22,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "vla_drop_left",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 33.14366698265076,
+        "stamp": 1790866841.681,
+        "recv": 1790866841.6824,
+        "boot": 1790862044.437,
+        "seq": 155,
+        "cycle_id": 1790863168009,
+        "phase": "releasing",
+        "question": "",
+        "question_id": 22,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "vla_drop_left",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 35.15866708755493,
+        "stamp": 1790866843.696,
+        "recv": 1790866843.6962,
+        "boot": 1790862044.437,
+        "seq": 156,
+        "cycle_id": 1790863168009,
+        "phase": "returning_home",
+        "question": "",
+        "question_id": 22,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "vla_drop_left",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 38.54466700553894,
+        "stamp": 1790866847.082,
+        "recv": 1790866847.084,
+        "boot": 1790862044.437,
+        "seq": 157,
+        "cycle_id": 1790863168009,
+        "phase": "returning_home",
+        "question": "",
+        "question_id": 22,
+        "holding": false,
+        "object": "small_bottle",
+        "destination": "vla_drop_left",
+        "last_outcome": "reset"
+      },
+      {
+        "t": 39.65666699409485,
+        "stamp": 1790866848.194,
+        "recv": 1790866848.1962,
+        "boot": 1790862044.437,
+        "seq": 158,
+        "cycle_id": 1790863168009,
+        "phase": "idle",
+        "question": "",
+        "question_id": 22,
+        "holding": false,
+        "object": "",
+        "destination": "vla_drop_left",
+        "last_outcome": "done"
+      }
+    ],
+    "gripper_cmd": [
+      {
+        "t": 10.560758352279663,
+        "stamp": 1790866819.0980914,
+        "recv": 1790866819.1013,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 12.670061349868774,
+        "stamp": 1790866821.2073944,
+        "recv": 1790866821.2081,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      },
+      {
+        "t": 32.83333158493042,
+        "stamp": 1790866841.3706646,
+        "recv": 1790866841.3714,
+        "cmd": "open",
+        "target": 0.5,
+        "backend": "io",
+        "value": 1.0
+      },
+      {
+        "t": 38.5448784828186,
+        "stamp": 1790866847.0822115,
+        "recv": 1790866847.0829,
+        "cmd": "close",
+        "target": 0.0,
+        "backend": "io",
+        "value": 0.0
+      }
+    ],
+    "interactive_status": [
+      {
+        "t": 15.154747486114502,
+        "stamp": 1790866823.6920805,
+        "recv": 1790866823.6921,
+        "status": "paused"
+      },
+      {
+        "t": 25.26800847053528,
+        "stamp": 1790866833.8053415,
+        "recv": 1790866833.8054,
+        "status": "resumed:vla_drop_left"
+      },
+      {
+        "t": 32.579638957977295,
+        "stamp": 1790866841.116972,
+        "recv": 1790866841.117,
+        "status": "releasing"
+      },
+      {
+        "t": 33.14478802680969,
+        "stamp": 1790866841.682121,
+        "recv": 1790866841.6821,
+        "status": "released"
+      }
+    ],
+    "cycle_done": [
+      {
+        "t": 39.65983295440674,
+        "stamp": 1790866848.197166,
+        "recv": 1790866848.1972,
+        "ok": true,
+        "cycle_id": "1790863168009",
+        "reason": ""
+      }
+    ],
+    "executor_phase": [
+      {
+        "t": 10.213666915893555,
+        "stamp": 1790866818.751,
+        "name": "candidates_received",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 10.214667081832886,
+        "stamp": 1790866818.752,
+        "name": "precheck_hit",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 10.30666708946228,
+        "stamp": 1790866818.844,
+        "name": "open_sent",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 10.30666708946228,
+        "stamp": 1790866818.844,
+        "name": "motion_start",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 12.416666984558105,
+        "stamp": 1790866820.954,
+        "name": "close_sent",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 12.893666982650757,
+        "stamp": 1790866821.431,
+        "name": "arrival",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 13.927666902542114,
+        "stamp": 1790866822.465,
+        "name": "grasp_verdict",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 15.016666889190674,
+        "stamp": 1790866823.554,
+        "name": "lift_done",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 15.150666952133179,
+        "stamp": 1790866823.688,
+        "name": "wait_destination_start",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 25.267667055130005,
+        "stamp": 1790866833.805,
+        "name": "destination_received",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 33.14466691017151,
+        "stamp": 1790866841.682,
+        "name": "released",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 38.29066705703735,
+        "stamp": 1790866846.828,
+        "name": "home_done",
+        "cycle_id": 1790863168009
+      },
+      {
+        "t": 39.65666699409485,
+        "stamp": 1790866848.194,
+        "name": "cycle_done",
+        "cycle_id": 1790863168009
+      }
+    ]
+  },
+  "fps": 10.0,
+  "num_steps": 612,
+  "duration_s": 61.10187816619873,
+  "dropped_ticks": 0,
+  "drop_reasons": {},
+  "started_unix": 1790866808.5373569,
+  "started_ros": 1790866808.537333,
+  "robot_type": "ur3e_gripper_3d",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "gripper_joint": "gripper_close_open_joint",
+  "gripper_open_pos": 0.23,
+  "frames": {
+    "base": "base_link",
+    "ee": "gripper_tcp",
+    "tool": "tool0",
+    "ur_tcp_source_frame": "base",
+    "ur_tcp_expressed_in": "base_link"
+  },
+  "cameras": {
+    "exterior": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        598.3179931640625,
+        0.0,
+        304.1340026855469,
+        0.0,
+        598.3179931640625,
+        253.25799560546875,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "astra_color_optical_frame"
+    },
+    "wrist": {
+      "width": 640,
+      "height": 480,
+      "K": [
+        612.87109375,
+        0.0,
+        323.9466857910156,
+        0.0,
+        612.8577880859375,
+        237.9137725830078,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame"
+    }
+  },
+  "image_sources": {
+    "exterior": "/astra/color/compressed_slow",
+    "wrist": "/camera/camera/color/image_raw/compressed"
+  },
+  "astra_static_tf_base_to_astra_link": {
+    "xyz": [
+      -0.5,
+      0.5,
+      0.06
+    ],
+    "rpy": [
+      0.0,
+      -0.5,
+      -0.8
+    ]
+  },
+  "step_keys": [
+    "t",
+    "stamp_ros",
+    "joint_pos",
+    "joint_vel",
+    "joint_cmd",
+    "tcp_pos",
+    "tcp_quat",
+    "tool0_pos",
+    "tool0_quat",
+    "gripper",
+    "gripper_cmd",
+    "grasp_detected",
+    "img_age_exterior",
+    "img_age_wrist",
+    "joint_age",
+    "joint_stamp",
+    "img_stamp_exterior",
+    "img_stamp_wrist",
+    "tcp_stamp",
+    "ur_tcp_pos",
+    "ur_tcp_quat",
+    "ur_tcp_stamp",
+    "gripper_cmd_age",
+    "instruction_idx",
+    "phase",
+    "segment",
+    "img_src_age_exterior",
+    "img_src_age_wrist",
+    "img_repeat_exterior",
+    "img_repeat_wrist",
+    "camera_skew",
+    "gripper_age",
+    "task_phase"
+  ],
+  "segment_codes": {
+    "idle": 0,
+    "task": 1,
+    "reset": 2,
+    "hold": 3,
+    "clarify": 4,
+    "assist": 5
+  },
+  "phase_names": [
+    "candidates_received",
+    "precheck_hit",
+    "open_sent",
+    "motion_start",
+    "close_sent",
+    "arrival",
+    "grasp_verdict",
+    "lift_done",
+    "wait_destination_start",
+    "destination_received",
+    "released",
+    "home_done",
+    "cycle_done"
+  ],
+  "task_phase_names": [
+    "probing",
+    "approaching",
+    "awaiting_destination",
+    "carrying",
+    "releasing",
+    "returning_home",
+    "idle"
+  ],
+  "quality": {
+    "ok": true,
+    "issues": [],
+    "integrity": {
+      "ok": true,
+      "issues": [],
+      "images_on_disk": {
+        "exterior": 612,
+        "wrist": 612
+      },
+      "drained": true
+    },
+    "alignment": {
+      "ok": true,
+      "issues": [],
+      "notes": [],
+      "details": [],
+      "limits": {
+        "max_image_age_s": 0.5,
+        "max_camera_skew_s": 0.35,
+        "max_gripper_age_s": 2.0
+      },
+      "misaligned_steps": 0,
+      "misaligned_task_steps": 0,
+      "images": {
+        "exterior": {
+          "age_max_s": 0.1900597719995858,
+          "age_p95_s": 0.12568053565037188,
+          "capture_age_p95_s": 0.22652950286865214,
+          "capture_age_max_s": 0.33918094635009766,
+          "repeated_frames": 98,
+          "clock_offset_s": 0.04689598083496094,
+          "clock_offset_spread_s": 0.03656522189946959,
+          "clock_comparable": true,
+          "missing": 0,
+          "longest_repeat_steps": 1
+        },
+        "wrist": {
+          "age_max_s": 0.10054241199941316,
+          "age_p95_s": 0.037504485550198294,
+          "capture_age_p95_s": 0.0891371726989746,
+          "capture_age_max_s": 0.40573692321777344,
+          "repeated_frames": 0,
+          "clock_offset_s": 0.05141007900238037,
+          "clock_offset_spread_s": 0.0038424072238699776,
+          "clock_comparable": true,
+          "missing": 0,
+          "longest_repeat_steps": 0
+        }
+      },
+      "step_gaps": [],
+      "dt_max_s": 0.17366957664489746,
+      "joint_age_max_s": 0.05031692599914095,
+      "gripper_age_max_s": 1.0444650130011723,
+      "tcp_stale_steps": 0,
+      "ur_tcp_missing_steps": 0,
+      "gripper_commands": [
+        {
+          "t": 10.560758352279663,
+          "cmd": "open",
+          "state_lag_s": 0.3343017101287842
+        },
+        {
+          "t": 12.670061349868774,
+          "cmd": "close",
+          "state_lag_s": 1.1236231327056885
+        },
+        {
+          "t": 32.83333158493042,
+          "cmd": "open",
+          "state_lag_s": 0.36019086837768555
+        },
+        {
+          "t": 38.5448784828186,
+          "cmd": "close",
+          "state_lag_s": 1.1492717266082764
+        }
+      ],
+      "gripper_state_changes": 4
+    },
+    "semantic": {
+      "label_source": "command_lifecycle",
+      "verified": true,
+      "review_required": false,
+      "flags": [],
+      "notes": [
+        "'drop it on the left side, hand it over and go back home': automatic gripper close at 1790866847.08 labelled as cleanup, not as the command (the executor's release routine)"
+      ]
+    },
+    "training_eligible": true,
+    "num_steps": 612,
+    "task_steps": 182,
+    "segments": {
+      "idle": 318,
+      "task": 182,
+      "reset": 11,
+      "hold": 101,
+      "clarify": 0,
+      "assist": 0
+    },
+    "idle_steps": 318,
+    "reset_steps": 11,
+    "n_transcripts": 2,
+    "n_intents": 2,
+    "n_commands": 2,
+    "n_instructions": 2,
+    "n_executor_phases": 13,
+    "n_task_states": 14
+  },
+  "training_eligible": true,
+  "provenance": {
+    "raw_format": "morty_vla_raw_v3",
+    "command_event_schema": "morty.command_event.v1",
+    "parameters": {
+      "use_sim_time": false,
+      "dataset_root": "~/morty_ws/vla_experiments/datasets",
+      "dataset_name": "morty_ur3e",
+      "fps": 10.0,
+      "exterior_image_topic": "/astra/color/image_raw",
+      "exterior_compressed_topic": "/astra/color/compressed_slow",
+      "exterior_info_topic": "/astra/color/camera_info",
+      "wrist_image_topic": "/camera/camera/color/image_raw",
+      "wrist_compressed_topic": "/camera/camera/color/image_raw/compressed",
+      "wrist_info_topic": "/camera/camera/color/camera_info",
+      "require_exterior": true,
+      "require_wrist": true,
+      "joint_states_topic": "/joint_states",
+      "controller_state_topic": "/scaled_joint_trajectory_controller/controller_state",
+      "tcp_pose_topic": "/tcp_pose_broadcaster/pose",
+      "io_states_topic": "/io_and_status_controller/io_states",
+      "gripper_cmd_topic": "/gripper_controller/command_event",
+      "transcript_topic": "/speech/accepted_transcript",
+      "task_from_transcript": false,
+      "auto_mode": false,
+      "motion_confirm_rad": 0.1,
+      "intent_topic": "/robot/intent",
+      "motion_intents": [
+        "pick_and_place",
+        "pick",
+        "place",
+        "drop_held",
+        "drop_left",
+        "drop_right",
+        "go_home",
+        "carry_release",
+        "release_home",
+        "release",
+        "open_gripper",
+        "close_gripper",
+        "confirm_drop",
+        "look_left",
+        "look_right",
+        "look_up",
+        "go_to_ready",
+        "go_to_start",
+        "sleep",
+        "drop_right_release",
+        "drop_left_release",
+        "drop_right_release_home",
+        "drop_left_release_home",
+        "go_home_open"
+      ],
+      "cycle_done_topic": "/grasp_executor_lin_llm/cycle_done",
+      "timing_topic": "/grasp_executor_lin_llm/timing",
+      "selection_timing_topic": "/graspgen/timing",
+      "interactive_status_topic": "/grasp_executor_lin_llm/interactive_status",
+      "intent_wait_s": 25.0,
+      "max_episode_s": 240.0,
+      "mmhri_dir": "~/morty_ws/experiments",
+      "base_frame": "base_link",
+      "ee_frame": "gripper_tcp",
+      "tool_frame": "tool0",
+      "gripper_joint": "gripper_close_open_joint",
+      "gripper_open_pos": 0.23,
+      "grasp_pin": 16,
+      "max_image_age_s": 0.5,
+      "max_joint_age_s": 0.2,
+      "max_tf_age_s": 0.2,
+      "max_step_gap_s": 0.5,
+      "preflight": true,
+      "jpeg_quality": 95,
+      "command_event_topic": "/robot/command_event",
+      "task_state_topic": "/grasp_executor_lin_llm/task_state",
+      "point_proposal_topic": "/grasp_pipeline/point_proposal",
+      "open_question_topic": "/robot/open_question",
+      "utterance_meta_topic": "/speech/utterance_meta",
+      "max_camera_skew_s": 0.35,
+      "max_gripper_age_s": 2.0,
+      "max_clock_offset_s": 0.5,
+      "save_timeout_s": 20.0,
+      "astra_tf_xyz": [
+        -0.5,
+        0.5,
+        0.06
+      ],
+      "astra_tf_rpy": [
+        0.0,
+        -0.5,
+        -0.8
+      ]
+    },
+    "software": {
+      "repo": "/home/deep/morty_ws/src",
+      "commit": "67ff43e23aa6516e897b2f9d613abd2e6f5985f6",
+      "dirty_files": 0,
+      "dirty": false
+    },
+    "node_started_unix": 1790863251.2029836,
+    "saved_unix": 1790866869.9012358,
+    "cameras": {
+      "exterior": {
+        "width": 640,
+        "height": 480,
+        "K": [
+          598.3179931640625,
+          0.0,
+          304.1340026855469,
+          0.0,
+          598.3179931640625,
+          253.25799560546875,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "D": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "distortion_model": "plumb_bob",
+        "frame_id": "astra_color_optical_frame"
+      },
+      "wrist": {
+        "width": 640,
+        "height": 480,
+        "K": [
+          612.87109375,
+          0.0,
+          323.9466857910156,
+          0.0,
+          612.8577880859375,
+          237.9137725830078,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "D": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "distortion_model": "plumb_bob",
+        "frame_id": "camera_color_optical_frame"
+      },
+      "astra_static_tf": {
+        "xyz": [
+          -0.5,
+          0.5,
+          0.06
+        ],
+        "rpy": [
+          0.0,
+          -0.5,
+          -0.8
+        ]
+      },
+      "sources": {
+        "exterior": "/astra/color/compressed_slow",
+        "wrist": "/camera/camera/color/image_raw/compressed"
+      }
+    }
+  }
+}

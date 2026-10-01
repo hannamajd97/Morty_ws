@@ -1,0 +1,184 @@
+[grasp_executor_lin_llm-1] [INFO] [1790866818.630692965] [grasp_executor_lin_llm]: New selection cycle_id=1790863168009 — discarding buffered candidates/grasp from the previous cycle.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.750659108] [grasp_executor_lin_llm]: Buffered 18 candidates for active cycle_id=1790863168009; ready for evaluation.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.750926497] [grasp_executor_lin_llm]: Received 18 grasp candidates; evaluating LIN feasibility (cycle_id=1790863168009).
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751415653] [grasp_executor_lin_llm]: Kept the probe's verified LIN plan (135 points, cost 0.46 s) so Step 2 does not have to recompute it.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751509831] [grasp_executor_lin_llm]: [precheck] HIT: candidate 1 of 18 was LIN-verified 144 s ago — executing without probing (plan reused).
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751663057] [grasp_executor_lin_llm]: Published selected pose on '/grasp_executor_lin_llm/selected_pose': [0.223, -0.172, 0.633]
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751740983] [grasp_executor_lin_llm]: Received grasp pose in frame 'base_link'
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751838416] [grasp_executor_lin_llm]: Grasp pose in 'base_link': [0.223, -0.172, 0.633]
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751897581] [grasp_executor_lin_llm]: Pre-check skipped — pose already LIN-verified by the candidate probe.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.751969917] [grasp_executor_lin_llm]: refresh_runtime_params: vitamin_mode_active=false, wait_for_destination=true, wait_for_release=true, drop_target_name='drop_right_side', blend_via_home=true (velocity_scaling=0.30).
+[grasp_executor_lin_llm-1] [INFO] [1790866818.752094481] [grasp_executor_lin_llm]: Step 1 - Open gripper: goes out with the approach, not before it.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.843108898] [grasp_executor_lin_llm]: Step 2 - reusing the probe's verified plan (saved ~0.5 s) [pose match 0.037 mm / 0.0043 deg; start state within 0.0000 rad of the cached first point (tol 0.010); 5 of 135 waypoints re-validated; plan age 0.0 s].
+[grasp_executor_lin_llm-1] [INFO] [1790866818.843264291] [grasp_executor_lin_llm]: Step 2 - one motion: planned 1.33 s, stretched to 2.50 s (x1.88 slower): approach duration 2.50 s, fingers 1.00 + 0.10 s.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.843782191] [grasp_executor_lin_llm]: Gripper open sent (target=0.500) — it opens while the arm travels.
+[grasp_executor_lin_llm-1] [INFO] [1790866818.843848944] [grasp_executor_lin_llm]: Step 2 - one motion: open sent with the motion.
+[grasp_executor_lin_llm-1] [INFO] [1790866820.953415684] [grasp_executor_lin_llm]: Gripper close sent on the way in (0.40 s before the arm stops).
+[grasp_executor_lin_llm-1] [INFO] [1790866821.430829599] [grasp_executor_lin_llm]: Step 2 - blended two lines: execution OK (2.59 s, no stop at the corner).
+[grasp_executor_lin_llm-1] [INFO] [1790866821.431297411] [grasp_executor_lin_llm]: [arrival] Step 2 - blended two lines: commanded TCP [0.223, -0.172, 0.633], reached [0.223, -0.172, 0.633] (base_link) — error 0.0 mm (dx -0.0, dy -0.0, dz +0.0)
+[grasp_executor_lin_llm-1] [INFO] [1790866822.263624268] [grasp_executor_lin_llm]: Step 1 - Open gripper: already open (reached=0.230, opened during the probing).
+[grasp_executor_lin_llm-1] [INFO] [1790866822.313973330] [grasp_executor_lin_llm]: Step 3 - Close gripper: closed on the way in (reached=0.000).
+[grasp_executor_lin_llm-1] [INFO] [1790866822.464777168] [grasp_executor_lin_llm]: Grasp sensor check is OFF — the object is assumed to be held.
+[grasp_executor_lin_llm-1] [INFO] [1790866822.465125443] [grasp_executor_lin_llm]: Post-close DI check: grasp_pin(TI0)=16=HIGH(holding) (stall after 0.64 s), slip_pin(TI1)=17=low (TI1 is informational — gripper hardware self-compensates).
+[grasp_executor_lin_llm-1] [INFO] [1790866822.615745789] [grasp_executor_lin_llm]: Post-grasp lift - lifting 0.070 m along dir=[-0.707, 0.707, 0.000] in base_link: d=[-0.049, 0.049, 0.000] -> [0.173, -0.122, 0.633]
+[grasp_executor_lin_llm-1] [INFO] [1790866822.616042295] [grasp_executor_lin_llm]: fast-lift: 0.070 m along up=[-0.707, 0.707, 0.000]: TCP [0.223, -0.172, 0.633] -> [0.173, -0.122, 0.633]
+[grasp_executor_lin_llm-1] [INFO] [1790866823.527939270] [grasp_executor_lin_llm]: fast-lift: DONE — TCP now [0.176, -0.125, 0.633], moved d=[-0.047, +0.047, +0.000].
+[grasp_executor_lin_llm-1] [INFO] [1790866823.553928331] [grasp_executor_lin_llm]: Post-grasp lift - fast joint lift OK (planner-free).
+[grasp_executor_lin_llm-1] [INFO] [1790866823.554077918] [grasp_executor_lin_llm]: Post-grasp lift OK — holding clear of the table.
+[grasp_executor_lin_llm-1] [INFO] [1790866823.687762380] [grasp_executor_lin_llm]: Interactive drop: object grasped, pausing at grasp pose. Waiting for destination on '/grasp_executor_lin_llm/resume' (timeout 1800.0s).
+[grasp_executor_lin_llm-1] [INFO] [1790866833.804574033] [grasp_executor_lin_llm]: Interactive drop: destination set to 'vla_drop_left'. Continuing with lift + drop sequence.
+[grasp_executor_lin_llm-1] [INFO] [1790866833.804954185] [grasp_executor_lin_llm]: Step 3a - already lifted right after the grasp; skipping.
+[grasp_executor_lin_llm-1] [INFO] [1790866833.805613256] [grasp_executor_lin_llm]: [blend] Step 3b+4 - Blended transport: ONE goal for lift->home->vla_drop_left (velocity_scaling=0.30, 2 segments).
+[grasp_executor_lin_llm-1] [INFO] [1790866841.115565807] [grasp_executor_lin_llm]: [blend] lift->home->vla_drop_left completed in 7.31 s (2 segments, 81 waypoints).
+[grasp_executor_lin_llm-1] [INFO] [1790866841.115666548] [grasp_executor_lin_llm]: Interactive release: PRE-AUTHORIZED by the compound command — opening on arrival, then straight home.
+[grasp_executor_lin_llm-1] [INFO] [1790866841.115895829] [grasp_executor_lin_llm]: Step 5 - Open gripper at drop: target=0.500 via action '/gripper_controller/gripper_cmd'.
+[grasp_executor_lin_llm-1] [INFO] [1790866841.681228912] [grasp_executor_lin_llm]: Step 5 - Open gripper at drop: execution OK (reached=0.230).
+[grasp_executor_lin_llm-1] [INFO] [1790866841.681628350] [grasp_executor_lin_llm]: Step 5c - Released; staying 2.0 s at the drop pose before going home.
+[grasp_executor_lin_llm-1] [INFO] [1790866846.827428157] [grasp_executor_lin_llm]: Step 6 - Move to reset target: action-fast-replay completed (collision-checked) for 'home'.
+[grasp_executor_lin_llm-1] [INFO] [1790866846.827546232] [grasp_executor_lin_llm]: Step 7 - Close gripper at reset: target=0.000 via action '/gripper_controller/gripper_cmd'.
+[grasp_executor_lin_llm-1] [INFO] [1790866848.194326044] [grasp_executor_lin_llm]: Step 7 - Close gripper at reset: execution OK (reached=0.000).
+[grasp_executor_lin_llm-1] [INFO] [1790866848.194420321] [grasp_executor_lin_llm]: Pick-place sequence complete.
+[grasp_executor_lin_llm-1] [INFO] [1790866848.194958093] [grasp_executor_lin_llm]: Grasp sequence finished.
+[grasp_executor_lin_llm-1] [INFO] [1790866851.355824922] [grasp_executor_lin_llm]: [precheck] start: arm joints [130 -205 73 44 88 5] deg
+[grasp_executor_lin_llm-1] [INFO] [1790866851.356206047] [grasp_executor_lin_llm]: Wrist-twin rewrite disabled; preserving all pipeline TCP orientations.
+[grasp_executor_lin_llm-1] [INFO] [1790866851.435439954] [grasp_executor_lin_llm]: Pre-filter: 10/11 candidates have a quick IK solution; 1 demoted to the end of the probe order (none dropped; 15 untested: enough passed for the first batch). Sort by reachability: disabled.
+[grasp_executor_lin_llm-1] [INFO] [1790866851.435580840] [grasp_executor_lin_llm]: Evaluating candidate batch 1/3 (indices 1..10).
+[grasp_executor_lin_llm-1] [INFO] [1790866852.122215680] [grasp_executor_lin_llm]: one-motion approach not planned (configuration flip along the curve: elbow_joint would turn 315 deg in total (limit 250)) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866852.333253670] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866852.334255083] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866852.334780293] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866852.384270263] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866852.384684622] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866852.384716448] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.05 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866852.385471631] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866852.385934437] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866852.464832516] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866852.464863506] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866852.464904490] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.08 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866852.465042717] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866852.566563664] [grasp_executor_lin_llm]: Candidate 1/26 (orig=1) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866853.203016001] [grasp_executor_lin_llm]: one-motion approach not planned (the curve ends 483 deg from the start where the solver's solution is 177 deg away (shoulder_lift_joint): a wide swing into another branch) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866853.554279341] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866853.555263647] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866853.555867214] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866853.566016217] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866853.566081527] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866853.566108485] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.01 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866853.566860738] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866853.567783514] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866853.630554984] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866853.631419705] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866853.631466924] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.07 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866853.631603177] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866853.733109565] [grasp_executor_lin_llm]: Candidate 2/26 (orig=2) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866854.239998199] [grasp_executor_lin_llm]: one-motion approach not planned (the curve ends 397 deg from the start where the solver's solution is 148 deg away (shoulder_lift_joint): a wide swing into another branch) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866854.361723047] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866854.362412231] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866854.363096212] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866854.369469218] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866854.370563400] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866854.370603635] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.01 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866854.371431493] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866854.371913085] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866854.403714834] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866854.404128572] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866854.404164927] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.03 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866854.404293719] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866854.505725368] [grasp_executor_lin_llm]: Candidate 3/26 (orig=4) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866855.076430712] [grasp_executor_lin_llm]: one-motion approach not planned (the curve ends 503 deg from the start where the solver's solution is 175 deg away (shoulder_lift_joint): a wide swing into another branch) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866855.223879742] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866855.224636243] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866855.225417124] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866855.271636525] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866855.271795357] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866855.271842304] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.05 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866855.272355076] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866855.272685479] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866855.317201460] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866855.317385064] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866855.317419279] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.05 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866855.317515365] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866855.418955142] [grasp_executor_lin_llm]: Candidate 4/26 (orig=5) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866856.368599343] [grasp_executor_lin_llm]: one-motion approach not planned (configuration flip along the curve: shoulder_pan_joint would turn 752 deg in total (limit 250)) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866856.561892288] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: PLANNING_FAILED (-1)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866856.562505413] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866856.562924498] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866856.618069814] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866856.618165023] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866856.618200288] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.06 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866856.619472372] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866856.619952393] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866856.659588944] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866856.660599816] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866856.660634812] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.04 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866856.660744567] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866856.762557783] [grasp_executor_lin_llm]: Candidate 5/26 (orig=6) rejected for LIN: sequence planning failed: PLANNING_FAILED (-1); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866857.332545947] [grasp_executor_lin_llm]: Kept the probe's verified LIN plan (132 points, cost 0.57 s) so Step 2 does not have to recompute it.
+[grasp_executor_lin_llm-1] [INFO] [1790866857.332680681] [grasp_executor_lin_llm]: one-motion approach OK: 132 points, 1.30 s, bend into a straight 5 cm slide along the fingers' axis, scaling x1.00, planned in 0.57 s.
+[grasp_executor_lin_llm-1] [INFO] [1790866857.332868668] [grasp_executor_lin_llm]: Candidate 6/26 (orig=7, cost=6.000) is LIN-feasible; selecting it.
+[grasp_executor_lin_llm-1] [INFO] [1790866857.333172209] [grasp_executor_lin_llm]: Probe-plan cache dropped: kept in the background-check record instead.
+[grasp_executor_lin_llm-1] [INFO] [1790866857.333291093] [grasp_executor_lin_llm]: [precheck] set 42: candidate 7 of 26 is LIN-feasible (6 probed, 5.98 s) — verdict kept.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.014364205] [grasp_executor_lin_llm]: [precheck] start: arm joints [130 -205 73 44 88 5] deg
+[grasp_executor_lin_llm-1] [INFO] [1790866860.014885058] [grasp_executor_lin_llm]: Wrist-twin rewrite disabled; preserving all pipeline TCP orientations.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.130777957] [grasp_executor_lin_llm]: Pre-filter: 10/11 candidates have a quick IK solution; 1 demoted to the end of the probe order (none dropped; 12 untested: enough passed for the first batch). Sort by reachability: disabled.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.130961781] [grasp_executor_lin_llm]: Evaluating candidate batch 1/3 (indices 1..10).
+[grasp_executor_lin_llm-1] [INFO] [1790866860.806870817] [grasp_executor_lin_llm]: Kept the probe's verified LIN plan (127 points, cost 0.68 s) so Step 2 does not have to recompute it.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.807051660] [grasp_executor_lin_llm]: one-motion approach OK: 127 points, 1.25 s, bend into a straight 5 cm slide along the fingers' axis, scaling x1.00, planned in 0.68 s.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.807252971] [grasp_executor_lin_llm]: Candidate 1/23 (orig=1, cost=0.000) is LIN-feasible; selecting it.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.807455521] [grasp_executor_lin_llm]: Probe-plan cache dropped: kept in the background-check record instead.
+[grasp_executor_lin_llm-1] [INFO] [1790866860.807594108] [grasp_executor_lin_llm]: [precheck] set 43: candidate 1 of 23 is LIN-feasible (1 probed, 0.79 s) — verdict kept.
+[grasp_executor_lin_llm-1] [INFO] [1790866862.768469147] [grasp_executor_lin_llm]: [precheck] start: arm joints [130 -205 73 44 88 5] deg
+[grasp_executor_lin_llm-1] [INFO] [1790866862.768779936] [grasp_executor_lin_llm]: Wrist-twin rewrite disabled; preserving all pipeline TCP orientations.
+[grasp_executor_lin_llm-1] [INFO] [1790866862.793578482] [grasp_executor_lin_llm]: Pre-filter: 10/10 candidates have a quick IK solution; 0 demoted to the end of the probe order (none dropped; 13 untested: enough passed for the first batch). Sort by reachability: disabled.
+[grasp_executor_lin_llm-1] [INFO] [1790866862.793680898] [grasp_executor_lin_llm]: Evaluating candidate batch 1/3 (indices 1..10).
+[grasp_executor_lin_llm-1] [INFO] [1790866863.402191053] [grasp_executor_lin_llm]: Kept the probe's verified LIN plan (90 points, cost 0.61 s) so Step 2 does not have to recompute it.
+[grasp_executor_lin_llm-1] [INFO] [1790866863.402314078] [grasp_executor_lin_llm]: one-motion approach OK: 90 points, 0.88 s, bend into a straight 5 cm slide along the fingers' axis, scaling x1.00, planned in 0.61 s.
+[grasp_executor_lin_llm-1] [INFO] [1790866863.402436383] [grasp_executor_lin_llm]: Candidate 1/23 (orig=1, cost=0.000) is LIN-feasible; selecting it.
+[grasp_executor_lin_llm-1] [INFO] [1790866863.402602420] [grasp_executor_lin_llm]: Probe-plan cache dropped: kept in the background-check record instead.
+[grasp_executor_lin_llm-1] [INFO] [1790866863.402724056] [grasp_executor_lin_llm]: [precheck] set 44: candidate 1 of 23 is LIN-feasible (1 probed, 0.63 s) — verdict kept.
+[grasp_executor_lin_llm-1] [INFO] [1790866864.823831494] [grasp_executor_lin_llm]: [precheck] start: arm joints [130 -205 73 44 88 5] deg
+[grasp_executor_lin_llm-1] [INFO] [1790866864.824140445] [grasp_executor_lin_llm]: Wrist-twin rewrite disabled; preserving all pipeline TCP orientations.
+[grasp_executor_lin_llm-1] [INFO] [1790866864.962704831] [grasp_executor_lin_llm]: Pre-filter: 10/12 candidates have a quick IK solution; 2 demoted to the end of the probe order (none dropped; 3 untested: enough passed for the first batch). Sort by reachability: disabled.
+[grasp_executor_lin_llm-1] [INFO] [1790866864.962891733] [grasp_executor_lin_llm]: Evaluating candidate batch 1/2 (indices 1..10).
+[grasp_executor_lin_llm-1] [INFO] [1790866866.009866516] [grasp_executor_lin_llm]: one-motion approach not planned (the curve ends 487 deg from the start where the solver's solution is 168 deg away (shoulder_lift_joint): a wide swing into another branch) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866866.156810808] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866866.157750492] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866866.158229004] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866866.226451114] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866866.226738974] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866866.227315659] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.07 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866866.228003117] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866866.230334011] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866866.268098721] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866866.268791783] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866866.268837153] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.04 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866866.268960225] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866866.370642569] [grasp_executor_lin_llm]: Candidate 1/15 (orig=1) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866867.548231513] [grasp_executor_lin_llm]: one-motion approach not planned (the curve ends 489 deg from the start where the solver's solution is 176 deg away (wrist_2_joint): a wide swing into another branch) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866867.695890987] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866867.696855029] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866867.697413242] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866867.764136167] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866867.764550135] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866867.764595872] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.07 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866867.765255217] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866867.765628303] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866867.811710705] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866867.812610840] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866867.812651642] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.05 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866867.812813032] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866867.914340186] [grasp_executor_lin_llm]: Candidate 2/15 (orig=2) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)
+[grasp_executor_lin_llm-1] [INFO] [1790866868.896935407] [grasp_executor_lin_llm]: one-motion approach not planned (the curve ends 392 deg from the start where the solver's solution is 179 deg away (wrist_2_joint): a wide swing into another branch) — trying the blend.
+[grasp_executor_lin_llm-1] [INFO] [1790866869.143491031] [grasp_executor_lin_llm]: blend not planned (sequence planning failed: NO_IK_SOLUTION (-31)) — trying the direct line.
+[grasp_executor_lin_llm-1] [INFO] [1790866869.144221200] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866869.144755210] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866869.195249432] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866869.195999632] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866869.196032247] [grasp_executor_lin_llm]: candidate LIN probe: plan() round trip: 0.05 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866869.196541980] [move_group_interface]: MoveGroup action client/server ready
+[grasp_executor_lin_llm-1] [INFO] [1790866869.196942986] [move_group_interface]: Planning request accepted
+[grasp_executor_lin_llm-1] [INFO] [1790866869.276546473] [move_group_interface]: Planning request aborted
+[grasp_executor_lin_llm-1] [ERROR] [1790866869.277531852] [move_group_interface]: MoveGroupInterface::plan() failed or timeout reached
+[grasp_executor_lin_llm-1] [INFO] [1790866869.277568220] [grasp_executor_lin_llm]: candidate LIN probe (slower retry): plan() round trip: 0.08 s (server reported 0.000 s) [plan FAILED]
+[grasp_executor_lin_llm-1] [INFO] [1790866869.277760010] [grasp_executor_lin_llm]: direct line not planned (LIN planning failed: PLANNING_FAILED (-1)) — candidate rejected.
+[grasp_executor_lin_llm-1] [WARN] [1790866869.380692891] [grasp_executor_lin_llm]: Candidate 3/15 (orig=3) rejected for LIN: sequence planning failed: NO_IK_SOLUTION (-31); direct line: LIN planning failed: PLANNING_FAILED (-1)

@@ -1,0 +1,72 @@
+[gripper_command_adapter-3] [INFO] [1790866930.583349670] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866930.590366552] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866935.663314062] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866935.665928804] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [WARN] [1790866940.233663614] [controller_manager]: Controller with name 'scaled_joint_trajectory_controller' is not inactive so its following controllers do not have to be checked, because it cannot be activated.
+[ur_ros2_control_node-7] [WARN] [1790866940.233837192] [controller_manager]: Could not activate controller with name 'scaled_joint_trajectory_controller'. Check above warnings for more details. Check the state of the controllers and their required interfaces using `ros2 control list_controllers -v` CLI to get more information.
+[ur_ros2_control_node-7] [INFO] [1790866940.233980939] [controller_manager]: Empty activate and deactivate list, not requesting switch
+[gripper_command_adapter-3] [INFO] [1790866940.657936983] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866940.660017184] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790866940.783951993] [moveit_move_group_default_capabilities.execute_trajectory_action_capability]: Received goal request
+[move_group-15] [INFO] [1790866940.784117422] [moveit_move_group_default_capabilities.execute_trajectory_action_capability]: Execution request received
+[move_group-15] [INFO] [1790866940.784154498] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866940.784188291] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866940.784338774] [moveit_ros.trajectory_execution_manager]: Validating trajectory with allowed_start_tolerance 0.01
+[move_group-15] [INFO] [1790866940.786246335] [moveit_ros.trajectory_execution_manager]: Starting trajectory execution ...
+[move_group-15] [INFO] [1790866940.786301869] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866940.786327994] [moveit.plugins.moveit_simple_controller_manager]: Returned 2 controllers in list
+[move_group-15] [INFO] [1790866940.786790756] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: sending trajectory to scaled_joint_trajectory_controller
+[ur_ros2_control_node-7] [INFO] [1790866940.793547162] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866940.793668087] [scaled_joint_trajectory_controller]: Accepted new action goal
+[move_group-15] [INFO] [1790866940.793881800] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: scaled_joint_trajectory_controller started execution
+[move_group-15] [INFO] [1790866940.793911176] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Goal request accepted!
+[gripper_command_adapter-3] [INFO] [1790866941.037508412] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.50, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866941.039016495] [gripper_controller.gripper_command_adapter]: GRIPPER: OPEN (pulse 16s for 0.20s)
+[ur_ros2_control_node-7] [INFO] [1790866941.039627758] [io_and_status_controller]: Setting digital output '16' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866941.293287833] [io_and_status_controller]: Setting digital output '16' to state: '0'.
+[gripper_command_adapter-3] [INFO] [1790866943.138860934] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.00, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866943.141697557] [gripper_controller.gripper_command_adapter]: GRIPPER: CLOSE (pulse 17s for 1.00s)
+[ur_ros2_control_node-7] [INFO] [1790866943.142430806] [io_and_status_controller]: Setting digital output '17' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866943.294979371] [scaled_joint_trajectory_controller]: Goal reached, success!
+[move_group-15] [INFO] [1790866943.344584804] [moveit.simple_controller_manager.follow_joint_trajectory_controller_handle]: Controller 'scaled_joint_trajectory_controller' successfully finished
+[move_group-15] [INFO] [1790866943.350821977] [moveit_ros.trajectory_execution_manager]: Completed trajectory execution with status SUCCEEDED ...
+[move_group-15] [INFO] [1790866943.351065963] [moveit_move_group_default_capabilities.execute_trajectory_action_capability]: Execution completed: SUCCEEDED
+[ur_ros2_control_node-7] [INFO] [1790866944.195771935] [io_and_status_controller]: Setting digital output '17' to state: '0'.
+[ur_ros2_control_node-7] [INFO] [1790866944.567589134] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866944.567679232] [scaled_joint_trajectory_controller]: Accepted new action goal
+[ur_ros2_control_node-7] [INFO] [1790866945.370910286] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790866945.674233762] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866945.676711705] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866950.659659108] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866950.662257344] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866955.655974920] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866955.658194100] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790866957.490563537] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866957.490709268] [scaled_joint_trajectory_controller]: Accepted new action goal
+[gripper_command_adapter-3] [INFO] [1790866960.658086901] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866960.661876844] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790866962.914887914] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790866965.653417036] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866965.655492877] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866970.657788736] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866970.660491753] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[ur_ros2_control_node-7] [INFO] [1790866971.526031049] [scaled_joint_trajectory_controller]: Received new action goal
+[ur_ros2_control_node-7] [INFO] [1790866971.526148235] [scaled_joint_trajectory_controller]: Accepted new action goal
+[ur_ros2_control_node-7] [INFO] [1790866975.350870051] [scaled_joint_trajectory_controller]: Goal reached, success!
+[gripper_command_adapter-3] [INFO] [1790866975.650714512] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866975.654121598] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866980.663685587] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866980.665267293] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[gripper_command_adapter-3] [INFO] [1790866981.682395830] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.50, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866981.683969914] [gripper_controller.gripper_command_adapter]: GRIPPER: OPEN (pulse 16s for 0.20s)
+[ur_ros2_control_node-7] [INFO] [1790866981.684677583] [io_and_status_controller]: Setting digital output '16' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866981.939149124] [io_and_status_controller]: Setting digital output '16' to state: '0'.
+[gripper_command_adapter-3] [INFO] [1790866984.258003843] [gripper_controller.gripper_command_adapter]: execute_cb: backend=io, target=0.00, pulse_open=0.200s, pulse_close=1.000s
+[gripper_command_adapter-3] [INFO] [1790866984.259837148] [gripper_controller.gripper_command_adapter]: GRIPPER: CLOSE (pulse 17s for 1.00s)
+[ur_ros2_control_node-7] [INFO] [1790866984.260541111] [io_and_status_controller]: Setting digital output '17' to state: '1'.
+[ur_ros2_control_node-7] [INFO] [1790866985.313085380] [io_and_status_controller]: Setting digital output '17' to state: '0'.
+[gripper_command_adapter-3] [INFO] [1790866985.661173893] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_open']
+[gripper_command_adapter-3] [INFO] [1790866985.663327170] [gripper_controller.gripper_command_adapter]: Parameter change request: ['pulse_hold_s_close']
+[move_group-15] [INFO] [1790866988.835853889] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Received request to compute Cartesian path
+[move_group-15] [INFO] [1790866988.836202768] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Attempting to follow 31 waypoints for link 'gripper_tcp' using a step of 0.020000 m and jump threshold 0.000000 (in global reference frame)
+[move_group-15] [INFO] [1790866989.367553827] [moveit_move_group_default_capabilities.cartersian_path_service_capability]: Computed Cartesian path with 32 points (followed 100.000000% of requested trajectory)
