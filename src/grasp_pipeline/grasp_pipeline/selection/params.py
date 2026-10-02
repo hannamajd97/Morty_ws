@@ -371,7 +371,7 @@ def declare_all_parameters(node: "Node") -> None:
     # the naming service (Qwen3-VL-8B behind llama-server, started by the
     # GUI). See perception/open_set.py for the measurements behind the
     # defaults (m model at 416 px: 26 ms; 224 px crop + 6 tokens: 0.15 s).
-    node.declare_parameter("open_set_enabled", True)
+    node.declare_parameter("open_set_enabled", False)   # 2026-10-02: off by default (~4 GB of VRAM)
     node.declare_parameter("open_set_weights", "")
     node.declare_parameter("open_set_imgsz", 416)
     node.declare_parameter("open_set_conf", 0.10)

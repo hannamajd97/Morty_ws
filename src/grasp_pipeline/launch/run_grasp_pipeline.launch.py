@@ -185,10 +185,12 @@ def generate_launch_description():
         DeclareLaunchArgument("graspgen_precompute",
                               default_value=os.environ.get("MORTY_GRASP_PRECOMPUTE", "false")),
         DeclareLaunchArgument("precompute_stable_s", default_value="0.2"),
-        # Open-set detection and the identity check (2026-09-15); on by
-        # default, MORTY_OPEN_SET=false in the environment turns both off.
+        # Open-set detection and the identity check (2026-09-15).
+        # MORTY_OPEN_SET=false in the environment turns both off, =true both
+        # on. Unset: open-set OFF (2026-10-02, Majd: the naming service holds
+        # ~4 GB of the 8 GB card), the identity check on.
         DeclareLaunchArgument("open_set_enabled",
-                              default_value=os.environ.get("MORTY_OPEN_SET", "true")),
+                              default_value=os.environ.get("MORTY_OPEN_SET", "false")),
         DeclareLaunchArgument("identity_check_enabled",
                               default_value=os.environ.get("MORTY_OPEN_SET", "true")),
         # GraspGen checkpoint and its fingertip distance (2026-09-24): the GUI

@@ -253,7 +253,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
         _qs = QtCore.QSettings("morty", "morty_gui")
         self.cb_open_set = QtWidgets.QCheckBox(
             "Detect unknown objects  (YOLOE draws the boxes, Qwen3-VL-8B names them)")
-        self.cb_open_set.setChecked(_qs.value("open_set_enabled", True, type=bool))
+        # 2026-10-02 (Majd): off unless switched on — the naming service
+        # eats ~4 GB of the 8 GB card.
+        self.cb_open_set.setChecked(_qs.value("open_set_enabled", False, type=bool))
         self.cb_open_set.setToolTip(
             "On: every object on the table gets a box and a name; the trained YOLO keeps its own "
             "ten (ys in the overlay), the rest are named by the model (q8b). The naming service "
@@ -749,10 +751,9 @@ class OperatorWindow(QtWidgets.QMainWindow):
                          "Acts while the robot holds an object and waits.")
             b.clicked.connect(lambda _=False, tok=token, lab=label: self._on_drop_side(tok, lab))
             drop_row.addWidget(b)
-        rel = QtWidgets.QPushButton("Release")
-        rel.setToolTip("Voice picks only: open the gripper at the drop pose and return home.")
-        rel.clicked.connect(lambda _=False: self._on_resume("release_home", "Release"))
-        drop_row.addWidget(rel)
+        # 2026-10-02 (Majd): the "Release" button (voice picks: open at the
+        # drop pose and return home) is gone — "give it to me" / "open the
+        # gripper" by voice does the same.
         move_col.addLayout(drop_row)
         bar_lay.addLayout(move_col)
 
@@ -2059,13 +2060,6 @@ class OperatorWindow(QtWidgets.QMainWindow):
             f"Drop {label.upper()}: sent — the robot drops there once it holds an object."
             if self._exec_holding else
             f"Drop {label.upper()}: noted; the robot is not holding anything right now.")
-
-    def _on_resume(self, token: str, label: str) -> None:
-        if self._software_stop_latched:
-            self.statusBar().showMessage("Software stop is latched — re-arm before sending a destination.")
-            return
-        self.bridge.publish_resume(token)
-        self.statusBar().showMessage(f"{label}: sent to the executor (only acts while it is waiting after a grasp).")
 
     def _on_gripper(self, open_: bool) -> None:
         if self._software_stop_latched:
