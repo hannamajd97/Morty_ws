@@ -13,14 +13,6 @@
     <joint name="wrist_3_joint" value="-0.11266929308046514"/>
   </group_state>
 
-  <group_state name="init" group="ur3e_manipulator">
-    <joint name="shoulder_pan_joint" value="0.0"/>
-    <joint name="shoulder_lift_joint" value="-1.57"/>
-    <joint name="elbow_joint" value="0.0"/>
-    <joint name="wrist_1_joint" value="-1.57"/>
-    <joint name="wrist_2_joint" value="0.0"/>
-    <joint name="wrist_3_joint" value="0.0"/>
-  </group_state>
 
   <group_state name="home" group="ur3e_manipulator">
     <joint name="shoulder_pan_joint" value="2.268556594848633"/>
@@ -61,14 +53,6 @@
     <joint name="wrist_3_joint" value="2.3079347610473633"/>
   </group_state>
 
-  <group_state name="old_initgrasp" group="ur3e_manipulator">
-    <joint name="shoulder_pan_joint" value="2.2835402488708496"/>
-    <joint name="shoulder_lift_joint" value="-3.333818574944967"/>
-    <joint name="elbow_joint" value="0.7961128393756312"/>
-    <joint name="wrist_1_joint" value="1.0117356020161132"/>
-    <joint name="wrist_2_joint" value="1.5364316701889038"/>
-    <joint name="wrist_3_joint" value="0.09069927036762238"/>
-  </group_state>
 
   <group_state name="drop" group="ur3e_manipulator">
     <joint name="shoulder_pan_joint" value="3.4572880268096924"/>

@@ -220,10 +220,16 @@ def _pactl_set_default(kind: str, name: str) -> None:
         pass
 
 # SRDF group states of ur3e_manipulator (open/close are the gripper group).
+# 2026-10-02 (Majd: "no need for so many — delete drop, init and old_init if
+# I don't use them"): init and old_initgrasp were used by nothing and are
+# gone from the SRDF too; "drop" stays a pose (a side-less voice drop / "go to
+# the drop position" moves there, intent_router DROP_INTENTS) but is not
+# offered in the dropdown.
 NAMED_PLACES = [
-    "home", "init", "drop_left_side", "drop_right_side",
-    "detect_left", "detect_right", "detect_higher", "old_initgrasp", "sleep_home",
+    "home", "drop_left_side", "drop_right_side",
+    "detect_left", "detect_right", "detect_higher", "sleep_home",
 ]
+HIDDEN_PLACES = {"drop"}
 POSES_FILE = os.path.expanduser("~/morty_ws/observation_poses.yaml")
 
 
@@ -244,7 +250,7 @@ def named_places() -> List[str]:
     """Dropdown entries: the SRDF states, then poses that exist only in the
     yaml (2026-09-23, Majd: vla_drop_right "isn't included in the GUI").
     The planner path reaches a yaml-only pose as a joint target."""
-    extra = [n for n in yaml_poses() if n not in NAMED_PLACES]
+    extra = [n for n in yaml_poses() if n not in NAMED_PLACES and n not in HIDDEN_PLACES]
     return list(NAMED_PLACES) + extra
 
 # UR kinematic chain order — matches MoveIt's group joint order, which is
