@@ -554,7 +554,7 @@ VOICE_FILTER_PARAMS = [
 # what each one actually does, in operator language.
 PARAM_DOCS = {
     "open_set_enabled": "Open-set detection (2026-09-15): YOLOE draws a box around every object on the "
-                        "table, the trained YOLO keeps its own ten, the rest are named once by the naming "
+                        "table, the trained YOLO keeps its own nine, the rest are named once by the naming "
                         "service (q8b in the overlay; ys = trained YOLO). Off = detection exactly as before.",
     "identity_check_enabled": "A trained-YOLO detection must look like the reference photos of its class "
                               "(DINOv2 similarity, 10 ms) or it is treated as an unknown object and renamed. "

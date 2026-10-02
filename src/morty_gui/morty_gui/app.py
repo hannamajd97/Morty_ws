@@ -258,7 +258,7 @@ class OperatorWindow(QtWidgets.QMainWindow):
         self.cb_open_set.setChecked(_qs.value("open_set_enabled", False, type=bool))
         self.cb_open_set.setToolTip(
             "On: every object on the table gets a box and a name; the trained YOLO keeps its own "
-            "ten (ys in the overlay), the rest are named by the model (q8b). The naming service "
+            "nine (ys in the overlay), the rest are named by the model (q8b). The naming service "
             "is started with the pipeline and holds ~4 GB of the graphics card. "
             "Off: the trained YOLO alone, exactly the system as before, nothing else loaded.")
         df.addWidget(self.cb_open_set)

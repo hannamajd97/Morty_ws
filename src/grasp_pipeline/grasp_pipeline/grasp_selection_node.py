@@ -431,7 +431,7 @@ class YoloLiveSelectGrasp(Node):
         self._self_filter = GripperSelfFilter(self)
         self.fb.depth_mask_fn = self._self_filter.depth_mask
         # Open-set detection + identity check (2026-09-15): the trained YOLO
-        # keeps naming its ten objects; a detection that does not look like
+        # keeps naming its nine objects; a detection that does not look like
         # its class is rejected, and everything else on the table gets a box
         # from YOLOE and a name from the naming service, once, in the
         # background. Both off = the detection thread as before.
